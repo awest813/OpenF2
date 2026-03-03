@@ -474,7 +474,7 @@ export module Worldmap {
     export function didEncounter(): boolean {
         const squarePos = positionToSquare(worldmapPlayer)
         const square = worldmap.squares[squarePos.x][squarePos.y]
-        const encRate = worldmap.encounterRates[square.frequency]
+        let encRate = worldmap.encounterRates[square.frequency]
 
         //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
 
@@ -485,13 +485,14 @@ export module Worldmap {
             // 100% encounter rate (forced)
             return true
         else {
-            // roll for it
-            // TODO: adjust for difficulty:
-            // If easy difficulty, encRate -= encRate / 15
-            // If hard difficulty, encRate += encRate / 15
+            // Adjust for difficulty
+            if (Config.engine.encounterDifficulty === 'easy')
+                encRate -= Math.floor(encRate / 15)
+            else if (Config.engine.encounterDifficulty === 'hard')
+                encRate += Math.floor(encRate / 15)
 
             const roll = getRandomInt(0, 100)
-            console.log('encounter: rolled %d vs %d', roll, encRate)
+            console.log('encounter: rolled %d vs %d (difficulty: %s)', roll, encRate, Config.engine.encounterDifficulty)
 
             if (roll < encRate) {
                 // We rolled an encounter!

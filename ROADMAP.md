@@ -70,10 +70,10 @@ OpenF2 aims to deliver:
 **Goal:** Make Fallout 2 completable end-to-end.
 
 - [ ] World map correctness and travel balancing
-- [ ] Broader opcode/procedure coverage in scripting runtime
+- [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
 - [ ] UI migration toward full bitmap-faithful rendering
-- [ ] Audio completeness: effects, music logic, format handling
+- [x] Audio completeness: effects, music logic, format handling
 - [ ] Ending/intro/cinematic pipeline support
 
 ## Phase 3 — Fallout 1 Compatibility

@@ -34,6 +34,7 @@ export const Config = {
         doAlwaysRun: true, // always run instead of walk?
         doZOrder: true, // Z-order objects?
         doEncounters: true, // allow random encounters?
+        encounterDifficulty: 'normal' as 'easy' | 'normal' | 'hard', // random encounter difficulty (easy/normal/hard)
         doInfiniteUse: false, // allow infinite-range object usage?
         doFloorLighting: false, // use FO2-realistic floor lighting?
         useLightColorLUT: true, // Use intensityColorTable/colorLUT/colorRGB for accurate lighting colors?

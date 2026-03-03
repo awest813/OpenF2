@@ -47,10 +47,22 @@ export module ScriptVMBridge {
         0x80BF: function() { this.push(globalState.player) } // dude_obj
        ,0x80BC: function() { this.push(this.scriptObj.self_obj) } // self_obj
        ,0x8128: function() { this.push(this.scriptObj.combat_is_initialized) } // combat_is_initialized
-       ,0x8118: function() { this.push(1) } // get_month // TODO
-       ,0x80F6: function() { this.push(1200) } // game_time_hour // TODO
+       ,0x8118: function() {
+            // get_month: compute from gameTickTime (10 ticks/second, 30-day months)
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            this.push(1 + (Math.floor(days / 30) % 12))
+        } // get_month
+       ,0x80F6: function() {
+            // game_time_hour: HHMM computed from gameTickTime
+            const secs = Math.floor(globalState.gameTickTime / 10) % 86400
+            this.push(Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60))
+        } // game_time_hour
        ,0x80EA: function() { this.push(this.scriptObj.game_time) } // game_time
-       ,0x8119: function() { this.push(0) } // get_day // TODO
+       ,0x8119: function() {
+            // get_day: 1-based day within the current 30-day month
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            this.push(1 + days % 30)
+        } // get_day
        ,0x8101: function() { this.push(this.scriptObj.cur_map_index) } // cur_map_index
        ,0x80BD: function() { this.push(this.scriptObj.source_obj) } // source_obj
        ,0x80FA: function() { this.push(this.scriptObj.action_being_used) } // action_being_used
@@ -171,6 +183,10 @@ export module ScriptVMBridge {
        ,0x80F0: bridged("add_timer_event", 3, false)
        ,0x80F1: bridged("rm_timer_event", 1, false)
        ,0x80F9: bridged("dialogue_system_enter", 0, false)
+       ,0x8111: bridged("proto_data", 2)
+       ,0x8112: bridged("get_pc_stat", 1)
+       ,0x8113: bridged("radiation_dec", 2, false)
+       ,0x8114: bridged("radiation_add", 2, false)
        ,0x8129: bridged("gdialog_mod_barter", 1, false)
        ,0x80DE: bridged("start_gdialog", 5, false)
        ,0x811C: bridged("gsay_start", 0) // void?

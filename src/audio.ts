@@ -52,6 +52,9 @@ export class HTMLAudioEngine implements AudioEngine {
     playMusic(music: string): void {
         this.stopMusic()
         this.musicAudio = this.playSound('music/' + music)
+        if (this.musicAudio) {
+            this.musicAudio.loop = true
+        }
     }
 
     playSound(soundName: string): HTMLAudioElement | null {
@@ -77,7 +80,11 @@ export class HTMLAudioEngine implements AudioEngine {
         if (!curMapInfo) return ''
 
         const sfx = curMapInfo.ambientSfx
+        if (!sfx || sfx.length === 0) return ''
+
         const sumFreqs = sfx.reduce((sum: number, x: [string, number]) => sum + x[1], 0)
+        if (sumFreqs <= 0) return ''
+
         let roll = getRandomInt(0, sumFreqs)
 
         for (var i = 0; i < sfx.length; i++) {
@@ -95,7 +102,10 @@ export class HTMLAudioEngine implements AudioEngine {
     tick(): void {
         var time = window.performance.now()
 
-        if (!this.nextSfx) this.nextSfx = this.rollNextSfx()
+        if (!this.nextSfx) {
+            this.nextSfx = this.rollNextSfx()
+            if (!this.nextSfx) return
+        }
 
         if (time >= this.nextSfxTime) {
             // play next sfx in queue
