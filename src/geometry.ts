@@ -197,6 +197,51 @@ function hexGridToCube(grid: Point): Point3 {
     return { x: grid.x, y: y, z: z }
 }
 
+/** Inverse of hexGridToCube: cube → even-q offset grid coordinates. */
+function hexCubeToGrid(cube: Point3): Point {
+    const x = cube.x
+    const y = cube.z + (cube.x + (cube.x & 1)) / 2
+    return { x, y }
+}
+
+/**
+ * The 6 unit direction vectors in cube coordinate space, in the standard
+ * order used by the ring-traversal algorithm.
+ */
+const CUBE_DIRECTIONS: Point3[] = [
+    { x: 1, y: 0, z: -1 },
+    { x: 1, y: -1, z: 0 },
+    { x: 0, y: -1, z: 1 },
+    { x: -1, y: 0, z: 1 },
+    { x: -1, y: 1, z: 0 },
+    { x: 0, y: 1, z: -1 },
+]
+
+/**
+ * Returns all cube-coordinate hexes that lie exactly at `radius` steps from
+ * `center` in cube space.  Used internally by hexesInRadius.
+ */
+function hexCubeRing(center: Point3, radius: number): Point3[] {
+    if (radius === 0) return [{ x: center.x, y: center.y, z: center.z }]
+    const results: Point3[] = []
+    let cube: Point3 = {
+        x: center.x + CUBE_DIRECTIONS[4].x * radius,
+        y: center.y + CUBE_DIRECTIONS[4].y * radius,
+        z: center.z + CUBE_DIRECTIONS[4].z * radius,
+    }
+    for (let i = 0; i < 6; i++) {
+        for (let j = 0; j < radius; j++) {
+            results.push({ x: cube.x, y: cube.y, z: cube.z })
+            cube = {
+                x: cube.x + CUBE_DIRECTIONS[i].x,
+                y: cube.y + CUBE_DIRECTIONS[i].y,
+                z: cube.z + CUBE_DIRECTIONS[i].z,
+            }
+        }
+    }
+    return results
+}
+
 export function hexDistance(a: Point, b: Point): number {
     // we convert our hex coordinates into cube coordinates and then
     // we only have to see which of the 3 axes is the longest
@@ -240,29 +285,39 @@ export function hexNearestNeighbor(a: Point, b: Point) {
     return { hex: neighbors[minIdx], distance: min, direction: minIdx }
 }
 
-// Draws a line between a and b, returning the list of coordinates (including b)
+// Draws a straight line between a and b using cube-coordinate linear
+// interpolation.  Returns the list of grid coordinates from a to b
+// (inclusive), with exactly hexDistance(a,b)+1 entries.
 export function hexLine(a: Point, b: Point): Point[] {
-    var path = []
-    var position: Point = { x: a.x, y: a.y }
+    const n = hexDistance(a, b)
+    if (n === 0) return [{ x: a.x, y: a.y }]
 
-    while (true) {
-        path.push(position)
-        if (position.x === b.x && position.y === b.y) return path
-        var nearest = hexNearestNeighbor(position, b)
-        if (nearest === null) return null
-        position = nearest.hex
+    const cubeA = hexGridToCube(a)
+    const cubeB = hexGridToCube(b)
+    const path: Point[] = []
+    for (let i = 0; i <= n; i++) {
+        const t = i / n
+        const lerped: Point3 = {
+            x: cubeA.x + (cubeB.x - cubeA.x) * t,
+            y: cubeA.y + (cubeB.y - cubeA.y) * t,
+            z: cubeA.z + (cubeB.z - cubeA.z) * t,
+        }
+        path.push(hexCubeToGrid(cubeRound(lerped)))
     }
-
-    // throw "unreachable"
+    return path
 }
 
-export function hexesInRadius(center: Point, radius: number) {
-    var hexes = []
-    for (var x = 0; x < 200; x++) {
-        for (var y = 0; y < 200; y++) {
-            if (x === center.x && y === center.y) continue
-            var pos = { x: x, y: y }
-            if (hexDistance(center, pos) <= radius) hexes.push(pos)
+// Returns all grid hexes within `radius` steps of `center` (excluding center).
+// Uses the cube-coordinate ring algorithm: O(radius²) instead of O(HEX_GRID_SIZE²).
+export function hexesInRadius(center: Point, radius: number): Point[] {
+    const centerCube = hexGridToCube(center)
+    const hexes: Point[] = []
+    for (let r = 1; r <= radius; r++) {
+        for (const cube of hexCubeRing(centerCube, r)) {
+            const grid = hexCubeToGrid(cube)
+            if (grid.x >= 0 && grid.x < HEX_GRID_SIZE && grid.y >= 0 && grid.y < HEX_GRID_SIZE) {
+                hexes.push(grid)
+            }
         }
     }
     return hexes
