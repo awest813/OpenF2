@@ -62,3 +62,50 @@ export function rollSkillCheckWithDifficulty(
     const modifier = SkillCheckDifficulty[difficulty] + extraModifier
     return rollSkillCheck(skillValue, modifier)
 }
+
+// ---------------------------------------------------------------------------
+// Roll result interpretation — Fallout 2 scripting roll_vs_skill / do_check
+// ---------------------------------------------------------------------------
+
+/**
+ * Roll result codes returned by roll_vs_skill / do_check in the scripting VM.
+ *
+ * Matches the Fallout 2 ROLL_* constants used by is_success / is_critical.
+ */
+export const RollResult = {
+    CRITICAL_FAILURE: 0,
+    FAILURE: 1,
+    SUCCESS: 2,
+    CRITICAL_SUCCESS: 3,
+} as const
+
+export type RollResultValue = typeof RollResult[keyof typeof RollResult]
+
+/**
+ * Convert a SkillCheckResult into a Fallout 2 roll-result code (0–3).
+ *
+ * Critical success: roll is ≤ 10% of effective skill (min 1).
+ * Critical failure: natural roll of 96 or higher on a failed check.
+ */
+export function toRollResult(result: SkillCheckResult): RollResultValue {
+    if (result.success) {
+        const critThreshold = Math.max(1, Math.floor(result.threshold / 10))
+        return result.roll <= critThreshold ? RollResult.CRITICAL_SUCCESS : RollResult.SUCCESS
+    } else {
+        return result.roll >= 96 ? RollResult.CRITICAL_FAILURE : RollResult.FAILURE
+    }
+}
+
+/**
+ * Returns true when the roll result represents any kind of success.
+ */
+export function rollResultIsSuccess(rollResult: RollResultValue): boolean {
+    return rollResult >= RollResult.SUCCESS
+}
+
+/**
+ * Returns true when the roll result is critical (either direction).
+ */
+export function rollResultIsCritical(rollResult: RollResultValue): boolean {
+    return rollResult === RollResult.CRITICAL_SUCCESS || rollResult === RollResult.CRITICAL_FAILURE
+}

@@ -7,6 +7,10 @@ import {
     rollSkillCheck,
     rollSkillCheckWithDifficulty,
     SkillCheckDifficulty,
+    RollResult,
+    toRollResult,
+    rollResultIsSuccess,
+    rollResultIsCritical,
 } from './skillCheck.js'
 
 afterEach(() => {
@@ -119,5 +123,99 @@ describe('rollSkillCheckWithDifficulty', () => {
         expect(SkillCheckDifficulty.Normal).toBe(0)
         expect(SkillCheckDifficulty.Hard).toBe(-20)
         expect(SkillCheckDifficulty.VeryHard).toBe(-40)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// RollResult constants
+// ---------------------------------------------------------------------------
+
+describe('RollResult constants', () => {
+    it('CRITICAL_FAILURE is 0', () => { expect(RollResult.CRITICAL_FAILURE).toBe(0) })
+    it('FAILURE is 1',          () => { expect(RollResult.FAILURE).toBe(1) })
+    it('SUCCESS is 2',          () => { expect(RollResult.SUCCESS).toBe(2) })
+    it('CRITICAL_SUCCESS is 3', () => { expect(RollResult.CRITICAL_SUCCESS).toBe(3) })
+})
+
+// ---------------------------------------------------------------------------
+// toRollResult
+// ---------------------------------------------------------------------------
+
+describe('toRollResult', () => {
+    it('returns SUCCESS when roll succeeds but is not a critical', () => {
+        // threshold=50, roll=25 (> 5, so not critical); success
+        const result = toRollResult({ success: true, roll: 25, threshold: 50 })
+        expect(result).toBe(RollResult.SUCCESS)
+    })
+
+    it('returns CRITICAL_SUCCESS when roll is within 10% of threshold', () => {
+        // threshold=50 → critThreshold=5; roll=5
+        const result = toRollResult({ success: true, roll: 5, threshold: 50 })
+        expect(result).toBe(RollResult.CRITICAL_SUCCESS)
+    })
+
+    it('returns CRITICAL_SUCCESS when roll equals 1 (minimum critical threshold)', () => {
+        // Even very low threshold (5) → critThreshold=1; roll=1
+        const result = toRollResult({ success: true, roll: 1, threshold: 5 })
+        expect(result).toBe(RollResult.CRITICAL_SUCCESS)
+    })
+
+    it('returns FAILURE when roll fails and is below 96', () => {
+        const result = toRollResult({ success: false, roll: 80, threshold: 50 })
+        expect(result).toBe(RollResult.FAILURE)
+    })
+
+    it('returns CRITICAL_FAILURE when roll is 96 or higher on a failure', () => {
+        const result = toRollResult({ success: false, roll: 96, threshold: 50 })
+        expect(result).toBe(RollResult.CRITICAL_FAILURE)
+    })
+
+    it('returns CRITICAL_FAILURE on roll of 100', () => {
+        const result = toRollResult({ success: false, roll: 100, threshold: 50 })
+        expect(result).toBe(RollResult.CRITICAL_FAILURE)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// rollResultIsSuccess
+// ---------------------------------------------------------------------------
+
+describe('rollResultIsSuccess', () => {
+    it('returns true for SUCCESS', () => {
+        expect(rollResultIsSuccess(RollResult.SUCCESS)).toBe(true)
+    })
+
+    it('returns true for CRITICAL_SUCCESS', () => {
+        expect(rollResultIsSuccess(RollResult.CRITICAL_SUCCESS)).toBe(true)
+    })
+
+    it('returns false for FAILURE', () => {
+        expect(rollResultIsSuccess(RollResult.FAILURE)).toBe(false)
+    })
+
+    it('returns false for CRITICAL_FAILURE', () => {
+        expect(rollResultIsSuccess(RollResult.CRITICAL_FAILURE)).toBe(false)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// rollResultIsCritical
+// ---------------------------------------------------------------------------
+
+describe('rollResultIsCritical', () => {
+    it('returns true for CRITICAL_SUCCESS', () => {
+        expect(rollResultIsCritical(RollResult.CRITICAL_SUCCESS)).toBe(true)
+    })
+
+    it('returns true for CRITICAL_FAILURE', () => {
+        expect(rollResultIsCritical(RollResult.CRITICAL_FAILURE)).toBe(true)
+    })
+
+    it('returns false for SUCCESS', () => {
+        expect(rollResultIsCritical(RollResult.SUCCESS)).toBe(false)
+    })
+
+    it('returns false for FAILURE', () => {
+        expect(rollResultIsCritical(RollResult.FAILURE)).toBe(false)
     })
 })
