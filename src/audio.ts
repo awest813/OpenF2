@@ -90,13 +90,13 @@ export class HTMLAudioEngine implements AudioEngine {
         for (var i = 0; i < sfx.length; i++) {
             var freq = sfx[i][1]
 
-            if (roll >= freq) return sfx[i][0]
+            if (roll < freq) return sfx[i][0]
 
             roll -= freq
         }
 
-        // XXX: What happens here when none roll?
-        throw Error("shouldn't be here")
+        // Fallback: return the last entry (handles floating-point edge cases)
+        return sfx[sfx.length - 1][0]
     }
 
     tick(): void {

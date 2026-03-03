@@ -46,6 +46,11 @@ export module Worldmap {
     const WORLDMAP_SPEED = 2 // speed scalar
     const WORLDMAP_ENCOUNTER_CHECK_RATE = 800 // ms (TODO: find right value)
 
+    /** Minimum adjusted encounter rate (prevents difficulty modifier from making encounters impossible). */
+    const MIN_ENCOUNTER_RATE = 1
+    /** Maximum adjusted encounter rate (prevents difficulty modifier from forcing encounters). */
+    const MAX_ENCOUNTER_RATE = 99
+
     interface Square {
         terrainType: string //"mountain" | "ocean" | "desert" | "city" | "ocean"
         fillType: string //"no_fill" | "fill_w"
@@ -473,6 +478,7 @@ export module Worldmap {
 
     export function didEncounter(): boolean {
         const squarePos = positionToSquare(worldmapPlayer)
+        if (!squarePos) return false
         const square = worldmap.squares[squarePos.x][squarePos.y]
         let encRate = worldmap.encounterRates[square.frequency]
 
@@ -485,11 +491,14 @@ export module Worldmap {
             // 100% encounter rate (forced)
             return true
         else {
-            // Adjust for difficulty
+            // Adjust for difficulty, then clamp to [1, 99] so the modifier can
+            // never force an encounter (100+) or make one impossible (<=0).
             if (Config.engine.encounterDifficulty === 'easy')
                 encRate -= Math.floor(encRate / 15)
             else if (Config.engine.encounterDifficulty === 'hard')
                 encRate += Math.floor(encRate / 15)
+
+            encRate = Math.max(MIN_ENCOUNTER_RATE, Math.min(MAX_ENCOUNTER_RATE, encRate))
 
             const roll = getRandomInt(0, 100)
             console.log('encounter: rolled %d vs %d (difficulty: %s)', roll, encRate, Config.engine.encounterDifficulty)
@@ -546,8 +555,16 @@ export module Worldmap {
             const x = e.pageX - offsetLeft
             const y = e.pageY - offsetTop
 
-            const ax = x + this.scrollLeft
-            const ay = y + this.scrollTop
+            let ax = x + this.scrollLeft
+            let ay = y + this.scrollTop
+
+            // Snap to area's exact world position when clicking near a hotspot
+            // so the player always lands precisely on the entrance marker.
+            const clickedArea = withinArea({ x: ax, y: ay })
+            if (clickedArea !== null) {
+                ax = clickedArea.worldPosition.x
+                ay = clickedArea.worldPosition.y
+            }
 
             worldmapPlayer.target = { x: ax, y: ay }
             showv($worldmapPlayer)
@@ -672,6 +689,11 @@ export module Worldmap {
             const len = Math.sqrt(dx * dx + dy * dy)
 
             const squarePos = positionToSquare(worldmapPlayer)
+            // Guard: if the player is somehow out of the map bounds, skip movement
+            if (!squarePos) {
+                worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
+                return
+            }
             const currentSquare = worldmap.squares[squarePos.x][squarePos.y]
             const speed = WORLDMAP_SPEED / worldmap.terrainSpeed[currentSquare.terrainType]
 

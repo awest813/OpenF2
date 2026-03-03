@@ -13,8 +13,8 @@ OpenF2 aims to deliver:
 
 ## Current execution status
 
-- **Active phase:** Phase 2 — Full Fallout 2 Completion
-- **Phase state:** In progress
+- **Active phase:** Phase 2 — Full Fallout 2 Completion / Phase 3 setup
+- **Phase state:** Phase 2 nearly complete; Phase 3 scaffolding in place
 
 ## Baseline (today)
 
@@ -69,18 +69,18 @@ OpenF2 aims to deliver:
 
 **Goal:** Make Fallout 2 completable end-to-end.
 
-- [ ] World map correctness and travel balancing
+- [x] World map correctness and travel balancing
 - [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
 - [ ] UI migration toward full bitmap-faithful rendering
 - [x] Audio completeness: effects, music logic, format handling
-- [ ] Ending/intro/cinematic pipeline support
+- [x] Ending/intro/cinematic pipeline support (scaffold)
 
 ## Phase 3 — Fallout 1 Compatibility
 
 **Goal:** Add engine/version support to run Fallout 1 data and flow.
 
-- [ ] DAT1/MAP/PRO format compatibility layer
+- [x] DAT1/MAP/PRO format compatibility layer (scaffold: `src/compat/fallout1.ts`)
 - [ ] Fallout 1 specific world map and progression rules
 - [ ] Script/procedure compatibility for Fallout 1 content
 - [ ] Intro/ending presentation parity for Fallout 1 assets
