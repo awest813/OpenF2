@@ -6,19 +6,34 @@
  *  - Current AP bar (filled squares)
  *  - Equipped weapon name and ammo count
  *  - Player name
- *  - Action buttons (Inv, PipBoy, Map, Char, Options, Save)
+ *  - Action buttons (Inv, PipBoy, Char, Map, Options, Save)
  */
 
-import { UIPanel, Rect, FALLOUT_GREEN, FALLOUT_RED, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_RED, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
-import { StatsComponent, InventoryComponent } from '../ecs/components.js'
+import { StatsComponent } from '../ecs/components.js'
 
 const PANEL_HEIGHT = 99
 
+/** Button layout: label, EventBus panelName (or null for non-panel actions). */
+const HUD_BUTTONS: Array<{ label: string; panel: string | null }> = [
+    { label: 'INV',  panel: 'inventory' },
+    { label: 'PIPBOY', panel: 'pipboy' },
+    { label: 'CHAR', panel: 'characterScreen' },
+    { label: 'MAP',  panel: 'worldMap' },
+    { label: 'OPT',  panel: 'options' },
+    { label: 'SAVE', panel: 'saveLoad' },
+]
+
+const BTN_W = 44
+const BTN_H = 28
+const BTN_GAP = 4
+
 export class GamePanel extends UIPanel {
     private playerEntityId: number
+    private playerName: string
 
-    constructor(screenWidth: number, screenHeight: number, playerEntityId: number) {
+    constructor(screenWidth: number, screenHeight: number, playerEntityId: number, playerName = 'VAULT DWELLER') {
         super('gamePanel', {
             x: 0,
             y: screenHeight - PANEL_HEIGHT,
@@ -26,6 +41,7 @@ export class GamePanel extends UIPanel {
             height: PANEL_HEIGHT,
         })
         this.playerEntityId = playerEntityId
+        this.playerName = playerName
         this.zOrder = 0
         this.visible = true  // always visible
     }
@@ -41,28 +57,33 @@ export class GamePanel extends UIPanel {
         const inv = EntityManager.get<'inventory'>(this.playerEntityId, 'inventory')
         if (!stats) return
 
+        // --- Player name ---
+        drawLabel(ctx, 'NAME', 20, 14, FALLOUT_DARK_GRAY)
+        drawValue(ctx, this.playerName, 20, 30, FALLOUT_GREEN)
+
         // --- HP display ---
         const hpColor = hpColorFor(stats)
-        drawLabel(ctx, 'HP', 20, 14, FALLOUT_DARK_GRAY)
-        drawValue(ctx, `${stats.currentHp}/${stats.maxHp}`, 20, 30, hpColor)
+        drawLabel(ctx, 'HP', 20, 50, FALLOUT_DARK_GRAY)
+        drawValue(ctx, `${stats.currentHp}/${stats.maxHp}`, 20, 66, hpColor)
 
         // --- AP bar ---
         const maxAP = stats.maxAP
         const currentAP = EntityManager.get<'combat'>(this.playerEntityId, 'combat')?.combatAP ?? maxAP
-        drawLabel(ctx, 'AP', 120, 14, FALLOUT_DARK_GRAY)
-        drawAPBar(ctx, 120, 22, currentAP, maxAP)
+        drawLabel(ctx, 'AP', 140, 14, FALLOUT_DARK_GRAY)
+        drawAPBar(ctx, 140, 22, currentAP, maxAP)
 
         // --- Equipped weapon ---
         const weaponPid = inv?.equippedWeaponPrimary
         const weaponLabel = weaponPid != null ? `PID:${weaponPid}` : 'None'
-        drawLabel(ctx, 'WEAPON', 240, 14, FALLOUT_DARK_GRAY)
-        drawValue(ctx, weaponLabel, 240, 30, FALLOUT_AMBER)
+        drawLabel(ctx, 'WEAPON', 260, 14, FALLOUT_DARK_GRAY)
+        drawValue(ctx, weaponLabel, 260, 30, FALLOUT_AMBER)
 
         // --- Action buttons ---
-        const buttons = ['INV', 'PIPBOY', 'CHAR', 'MAP', 'SAVE']
-        for (let i = 0; i < buttons.length; i++) {
-            const bx = width - 240 + i * 48
-            drawButton(ctx, buttons[i], bx, 60, 44, 28)
+        const totalBtnW = HUD_BUTTONS.length * (BTN_W + BTN_GAP) - BTN_GAP
+        const btnStartX = width - totalBtnW - 8
+        for (let i = 0; i < HUD_BUTTONS.length; i++) {
+            const bx = btnStartX + i * (BTN_W + BTN_GAP)
+            drawButton(ctx, HUD_BUTTONS[i].label, bx, 60, BTN_W, BTN_H)
         }
     }
 
@@ -71,28 +92,24 @@ export class GamePanel extends UIPanel {
 
         // Action buttons region
         const { width } = this.bounds
-        const buttons = ['INV', 'PIPBOY', 'CHAR', 'MAP', 'SAVE']
-        for (let i = 0; i < buttons.length; i++) {
-            const bx = width - 240 + i * 48
-            if (x >= bx && x < bx + 44 && y >= 60 && y < 88) {
-                this.onButtonClick(buttons[i])
+        const totalBtnW = HUD_BUTTONS.length * (BTN_W + BTN_GAP) - BTN_GAP
+        const btnStartX = width - totalBtnW - 8
+        for (let i = 0; i < HUD_BUTTONS.length; i++) {
+            const bx = btnStartX + i * (BTN_W + BTN_GAP)
+            if (x >= bx && x < bx + BTN_W && y >= 60 && y < 60 + BTN_H) {
+                this._onButtonClick(HUD_BUTTONS[i])
                 return true
             }
         }
         return false
     }
 
-    private onButtonClick(btn: string): void {
-        // Delegate to UIManager via EventBus
+    private _onButtonClick(btn: { label: string; panel: string | null }): void {
+        if (!btn.panel) return
+        const panelName = btn.panel
         import('../eventBus.js').then(({ EventBus }) => {
             EventBus.emit('audio:playSound', { soundId: 'ui_click' })
-            switch (btn) {
-                case 'INV':    EventBus.emit('ui:openPanel', { panelName: 'inventory' }); break
-                case 'PIPBOY': EventBus.emit('ui:openPanel', { panelName: 'pipboy' }); break
-                case 'CHAR':   EventBus.emit('ui:openPanel', { panelName: 'characterScreen' }); break
-                case 'MAP':    EventBus.emit('ui:openPanel', { panelName: 'worldMap' }); break
-                case 'SAVE':   EventBus.emit('ui:openPanel', { panelName: 'saveLoad' }); break
-            }
+            EventBus.emit('ui:openPanel', { panelName })
         })
     }
 }

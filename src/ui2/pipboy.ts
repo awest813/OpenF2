@@ -49,12 +49,18 @@ export interface PipBoyMapData {
 
 const PANEL_WIDTH  = 400
 const PANEL_HEIGHT = 500
+/** Right-side x offset for the scroll-position hint text. */
+const SCROLL_HINT_X_OFFSET = 110
 
 export class PipBoyPanel extends UIPanel {
     private playerEntityId: number
     private questLog: QuestLog
     private activeTab: PipBoyTab = 'status'
     private mapData: PipBoyMapData | null = null
+    /** Scroll offset (in rows) for the ITEMS tab. */
+    private _itemScrollOffset = 0
+    /** Scroll offset (in rows) for the QUESTS tab. */
+    private _questScrollOffset = 0
 
     constructor(
         screenWidth: number,
@@ -178,10 +184,15 @@ export class PipBoyPanel extends UIPanel {
             return
         }
 
+        const visibleRows = Math.floor((this.bounds.height - 76) / 16)
+        const maxScroll = Math.max(0, inv.items.length - visibleRows)
+        this._itemScrollOffset = Math.min(this._itemScrollOffset, maxScroll)
+
         drawLabel(ctx, 'ITEMS', 10, 16)
 
         let y = 36
-        for (const item of inv.items) {
+        for (let i = this._itemScrollOffset; i < inv.items.length; i++) {
+            const item = inv.items[i]
             const isEquipped =
                 item.pid === inv.equippedWeaponPrimary ||
                 item.pid === inv.equippedWeaponSecondary ||
@@ -193,9 +204,16 @@ export class PipBoyPanel extends UIPanel {
             drawText(ctx, prefix + label, 14, y, color)
             y += 16
             if (y > this.bounds.height - 70) {
-                drawText(ctx, '... (more)', 14, y, FALLOUT_DARK_GRAY)
+                if (i < inv.items.length - 1) {
+                    drawText(ctx, '... (more)', 14, y, FALLOUT_DARK_GRAY)
+                }
                 break
             }
+        }
+
+        // Scroll hint
+        if (maxScroll > 0) {
+            this._renderScrollHint(ctx, this._itemScrollOffset, maxScroll)
         }
     }
 
@@ -258,29 +276,50 @@ export class PipBoyPanel extends UIPanel {
             return
         }
 
-        let y = 16
+        // Flatten all quest rows for scroll calculation
         const groups: Array<[string, QuestState, UIColor]> = [
             ['ACTIVE',    'active',    FALLOUT_GREEN],
             ['COMPLETED', 'completed', FALLOUT_AMBER],
             ['FAILED',    'failed',    FALLOUT_RED],
         ]
 
+        // Build flat list of renderable rows (header + entries per group)
+        type QuestRow = { kind: 'header'; label: string } | { kind: 'entry'; text: string; color: UIColor }
+        const rows: QuestRow[] = []
         for (const [header, state, color] of groups) {
             const entries = all.filter((e) => e.state === state)
             if (entries.length === 0) continue
-
-            drawLabel(ctx, header, 10, y)
-            y += 18
-
+            rows.push({ kind: 'header', label: header })
             for (const entry of entries) {
-                drawText(ctx, '  • ' + entry.id, 14, y, color)
-                y += 16
-                if (y > this.bounds.height - 70) {
-                    drawText(ctx, '  ... (more)', 14, y, FALLOUT_DARK_GRAY)
-                    return
-                }
+                rows.push({ kind: 'entry', text: '  • ' + entry.id, color })
             }
-            y += 6
+        }
+
+        const rowH = 16
+        const visibleRows = Math.floor((this.bounds.height - 76) / rowH)
+        const maxScroll = Math.max(0, rows.length - visibleRows)
+        this._questScrollOffset = Math.min(this._questScrollOffset, maxScroll)
+
+        let y = 16
+        for (let i = this._questScrollOffset; i < rows.length; i++) {
+            const row = rows[i]
+            if (row.kind === 'header') {
+                drawLabel(ctx, row.label, 10, y)
+            } else {
+                drawText(ctx, row.text, 14, y, row.color)
+            }
+            y += rowH
+            if (y > this.bounds.height - 70) {
+                if (i < rows.length - 1) {
+                    drawText(ctx, '  ... (more)', 14, y, FALLOUT_DARK_GRAY)
+                }
+                break
+            }
+        }
+
+        // Scroll hint
+        if (maxScroll > 0) {
+            this._renderScrollHint(ctx, this._questScrollOffset, maxScroll)
         }
     }
 
@@ -294,7 +333,7 @@ export class PipBoyPanel extends UIPanel {
         if (y >= 30 && y < 52) {
             const idx = Math.floor(x / tabW)
             if (idx >= 0 && idx < tabs.length) {
-                this.activeTab = tabs[idx]
+                this._switchTab(tabs[idx])
                 return true
             }
         }
@@ -310,14 +349,47 @@ export class PipBoyPanel extends UIPanel {
         const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
         const idx = tabs.indexOf(this.activeTab)
         if (key === 'ArrowRight' || key === 'Tab') {
-            this.activeTab = tabs[(idx + 1) % tabs.length]
+            this._switchTab(tabs[(idx + 1) % tabs.length])
             return true
         }
         if (key === 'ArrowLeft') {
-            this.activeTab = tabs[(idx + tabs.length - 1) % tabs.length]
+            this._switchTab(tabs[(idx + tabs.length - 1) % tabs.length])
+            return true
+        }
+        // Scroll within current tab
+        if (key === 'ArrowDown') {
+            if (this.activeTab === 'items') this._itemScrollOffset++
+            else if (this.activeTab === 'quests') this._questScrollOffset++
+            return true
+        }
+        if (key === 'ArrowUp') {
+            if (this.activeTab === 'items') this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)
+            else if (this.activeTab === 'quests') this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)
             return true
         }
         return false
+    }
+
+    private _switchTab(tab: PipBoyTab): void {
+        this.activeTab = tab
+        // Reset scroll when switching tabs for a clean view
+        this._itemScrollOffset = 0
+        this._questScrollOffset = 0
+    }
+
+    private _renderScrollHint(
+        ctx: OffscreenCanvasRenderingContext2D,
+        offset: number,
+        maxScroll: number,
+    ): void {
+        drawText(
+            ctx,
+            `↑↓ scroll (${offset + 1}/${maxScroll + 1})`,
+            this.bounds.width - SCROLL_HINT_X_OFFSET,
+            16,
+            FALLOUT_DARK_GRAY,
+            '9px monospace',
+        )
     }
 }
 
