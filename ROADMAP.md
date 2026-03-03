@@ -11,6 +11,11 @@ OpenF2 aims to deliver:
 - Strong modding and tooling support
 - Maintainable architecture for long-term evolution
 
+## Current execution status
+
+- **Active phase:** Phase 0 — Stabilize Core Architecture
+- **Phase state:** Started
+
 ## Baseline (today)
 
 ### Working now
