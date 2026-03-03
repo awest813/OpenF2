@@ -51,7 +51,7 @@ function simpleTrait(
 export const TRAITS: Trait[] = [
     simpleTrait(0, 'Fast Metabolism',
         '+2 Healing Rate, +2 Radiation Resistance, -10 Poison Resistance. Cannot benefit as much from RadAway and Stimpaks.',
-        { healingRate: 2, radiationResistance: 2, poisonResistance: -10 }, {}),
+        { healingRateMod: 2, radiationResistanceMod: 2, poisonResistanceMod: -10 }, {}),
 
     simpleTrait(1, 'Bruiser',
         '+2 Strength, -2 AP. Harder hitting, but slower in combat.',
@@ -59,7 +59,7 @@ export const TRAITS: Trait[] = [
 
     simpleTrait(2, 'Small Frame',
         '+1 Agility, -25 Carry Weight. Nimble but limited in cargo.',
-        { agilityMod: 1, carryWeight: -25 }, {}),
+        { agilityMod: 1, carryWeightMod: -25 }, {}),
 
     simpleTrait(3, 'One Hander',
         '+20% one-handed weapons skill, -40% two-handed weapons skill.',
@@ -67,17 +67,17 @@ export const TRAITS: Trait[] = [
 
     simpleTrait(4, 'Finesse',
         '+10% Critical Chance, but all attacks do -30% damage.',
-        { criticalChance: 10 }, {}),
+        { criticalChanceMod: 10 }, {}),
     // NOTE: Finesse damage penalty is handled specially in the damage formula.
 
     simpleTrait(5, 'Kamikaze',
         '+10 Sequence, but -AC equal to worn armor AC bonus.',
-        { sequence: 10 }, {}),
+        { sequenceMod: 10 }, {}),
     // NOTE: AC penalty is handled in the armor equip path.
 
     simpleTrait(6, 'Heavy Handed',
         'Melee attacks do +4 damage but have worse critical hit results.',
-        { meleeDamage: 4 }, {}),
+        { meleeDamageMod: 4 }, {}),
     // NOTE: critical table penalty handled in critical hit resolution.
 
     simpleTrait(7, 'Fast Shot',

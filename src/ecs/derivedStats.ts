@@ -30,7 +30,7 @@ export function recomputeDerivedStats(s: StatsComponent): void {
 
     // Max HP: 15 + (STR + 2×END) at level 1; +4 HP per level (+ END bonus)
     const hpFromLevels = (s.level - 1) * (2 + Math.floor(end / 2))
-    s.maxHp = 15 + str + 2 * end + hpFromLevels
+    s.maxHp = 15 + str + 2 * end + hpFromLevels + (s.maxHpMod ?? 0)
     s.currentHp = Math.min(s.currentHp, s.maxHp)
 
     // AP: 5 + ceil(AGI/2) + any flat modifier from perks/traits
@@ -40,28 +40,28 @@ export function recomputeDerivedStats(s: StatsComponent): void {
     s.armorClass = agi
 
     // Carry Weight: 25 + 25×STR lbs
-    s.carryWeight = 25 + 25 * str
+    s.carryWeight = 25 + 25 * str + (s.carryWeightMod ?? 0)
 
-    // Melee Damage: max(1, STR - 5)
-    s.meleeDamage = Math.max(1, str - 5)
+    // Melee Damage: max(1, STR - 5) + bonus
+    s.meleeDamage = Math.max(1, str - 5) + (s.meleeDamageMod ?? 0)
 
     // Damage Resistance (Normal): 0% base (armor adds to this)
     // (left as-is; armor system adds to dr.normal separately)
 
     // Poison Resistance: 5×END %
-    s.poisonResistance = 5 * end
+    s.poisonResistance = 5 * end + (s.poisonResistanceMod ?? 0)
 
     // Radiation Resistance: 2×END %
-    s.radiationResistance = 2 * end
+    s.radiationResistance = 2 * end + (s.radiationResistanceMod ?? 0)
 
     // Sequence: 2×PER
-    s.sequence = 2 * per
+    s.sequence = 2 * per + (s.sequenceMod ?? 0)
 
-    // Healing Rate: max(1, floor(END/3))
-    s.healingRate = Math.max(1, Math.floor(end / 3))
+    // Healing Rate: max(1, floor(END/3)) + bonus
+    s.healingRate = Math.max(1, Math.floor(end / 3)) + (s.healingRateMod ?? 0)
 
     // Critical Chance: LCK %
-    s.criticalChance = lck
+    s.criticalChance = lck + (s.criticalChanceMod ?? 0)
 
     // XP to next level: cumulative triangular threshold (Fallout 2 formula)
     s.xpToNextLevel = xpForLevel(s.level + 1)

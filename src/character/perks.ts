@@ -107,7 +107,7 @@ export const PERKS: Perk[] = [
         id: 4, name: 'Strong Back', ranks: 3,
         description: '+50 lbs carry weight per rank.',
         prerequisites: { minLevel: 3, minStrength: 6, minEndurance: 6 },
-        apply(s) { s.carryWeight += 50 },
+        apply(s) { s.carryWeightMod += 50; recomputeDerivedStats(s) },
     },
     {
         id: 5, name: 'Sharpshooter', ranks: 1,
@@ -125,14 +125,15 @@ export const PERKS: Perk[] = [
         id: 7, name: 'Better Criticals', ranks: 1,
         description: '+20% to the critical hit table. You cause better critical hits.',
         prerequisites: { minLevel: 9, minPerception: 6, minAgility: 4, minLuck: 6 },
-        apply(s) { s.criticalChance += 20 },
+        apply(s) { s.criticalChanceMod += 20; recomputeDerivedStats(s) },
     },
     {
         id: 8, name: 'Lifegiver', ranks: 2,
         description: '+4 Max HP per rank.',
         prerequisites: { minLevel: 9, minEndurance: 4 },
         apply(s) {
-            s.maxHp += 4
+            s.maxHpMod += 4
+            recomputeDerivedStats(s)
             s.currentHp = Math.min(s.currentHp + 4, s.maxHp)
         },
     },

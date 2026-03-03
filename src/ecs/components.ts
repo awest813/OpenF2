@@ -105,6 +105,16 @@ export interface StatsComponent extends BaseComponent {
     healingRate: number
     criticalChance: number  // %
 
+    // Flat bonuses from perks/traits that survive recomputeDerivedStats
+    maxHpMod: number
+    carryWeightMod: number
+    meleeDamageMod: number
+    poisonResistanceMod: number
+    radiationResistanceMod: number
+    sequenceMod: number
+    healingRateMod: number
+    criticalChanceMod: number
+
     // Leveling
     level: number
     xp: number
