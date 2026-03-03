@@ -1,6 +1,6 @@
 # OpenF2 Roadmap
 
-A staged plan for bringing OpenF2 from an experimental Fallout 2 engine reimplementation to full Fallout 1 + Fallout 2 compatibility.
+A staged plan for moving OpenF2 from a playable reimplementation to high-fidelity, moddable Fallout runtime support.
 
 ## Vision
 
@@ -15,7 +15,7 @@ OpenF2 aims to deliver:
 
 - **Active phase:** Phase 4 — Fidelity, Modding, and Tooling
 - **Phase state:** Phases 0–3 complete; Phase 4 in progress
-- **Recent:** Phase 1/2 debugging pass complete (AP formula fix, worldmap bounds fixes, encounter rate guards)
+- **Recent:** DAT override stacking and geometry correctness improvements landed
 
 ## Baseline (today)
 
@@ -39,9 +39,8 @@ OpenF2 aims to deliver:
 
 - UI parity not reached (DOM/WebGL split)
 - World map placement/travel issues
-- Incomplete audio feature set
-- Ending/intro/cinematic pipeline not implemented
-- Missing Fallout 1 compatibility layer
+- Animation timing and edge-case rendering parity still incomplete
+- In-browser debugging and authoring tools still minimal
 
 ---
 
@@ -74,8 +73,8 @@ OpenF2 aims to deliver:
 - [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
 - [ ] UI migration toward full bitmap-faithful rendering (in progress; ui2/ module scaffolded)
-- [x] Audio completeness: effects, music logic, format handling
-- [x] Ending/intro/cinematic pipeline support (scaffold)
+- [x] Audio completeness baseline: effects, music logic, format handling
+- [x] Ending/intro/cinematic pipeline baseline (scaffold)
 
 ## Phase 3 — Fallout 1 Compatibility
 
@@ -103,9 +102,9 @@ OpenF2 aims to deliver:
 
 1. UI migration away from mixed DOM rendering
 2. World map travel and entrance alignment fixes
-3. Script runtime opcode/procedure coverage expansion
-4. Audio completeness (effects, music logic, format handling)
-5. Ending/intro/cinematic pipeline support
+3. Rendering edge-case parity and animation timing polish
+4. In-browser debugging and content tooling foundation
+5. Performance work: batching, streaming, and caching
 
 ## Success criteria
 
@@ -114,4 +113,4 @@ OpenF2 will be considered "1.0 ready" when:
 - Fallout 2 is completable without major blockers
 - Save/load survives long campaigns reliably
 - Core combat, skills, and progression match expected behavior
-- UI and scripting are stable enough for community mod work
+- UI and tooling are stable enough for community mod work
