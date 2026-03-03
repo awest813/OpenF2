@@ -16,6 +16,8 @@ limitations under the License.
 
 import globalState from './globalState.js'
 import { deserializeObj } from './object.js'
+import { QuestLog } from './quest/questLog.js'
+import { Reputation } from './quest/reputation.js'
 import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
@@ -45,6 +47,8 @@ function gatherSaveData(name: string): SaveGame {
         },
         party: globalState.gParty.serialize(),
         savedMaps: { [curMap.name]: curMap, ...globalState.dirtyMapCache },
+        questLog: globalState.questLog.serialize(),
+        reputation: globalState.reputation.serialize(),
     }
 }
 
@@ -146,6 +150,11 @@ export function load(id: number): void {
             globalState.player.karma = save.player.karma ?? 0
 
             globalState.gParty.deserialize(save.party)
+
+            // Restore quest log and reputation (guaranteed present by migrateSave v2→v3;
+            // fallbacks guard against stale in-memory objects that bypassed migration).
+            globalState.questLog = QuestLog.deserialize(save.questLog ?? { entries: [] })
+            globalState.reputation = Reputation.deserialize(save.reputation ?? { karma: 0, reputations: {} })
 
             globalState.gMap.changeElevation(save.currentElevation, false)
 

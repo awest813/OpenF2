@@ -734,7 +734,7 @@ export module Scripting {
                 case 3: // PCSTAT_reputation
                     return globalVars[0] !== undefined ? globalVars[0] : 0
                 case 4: // PCSTAT_karma
-                    return player ? player.karma : 0
+                    return globalState.reputation.getKarma()
                 case 5: // PCSTAT_max_pc_stat
                     stub('get_pc_stat', arguments)
                     return 0

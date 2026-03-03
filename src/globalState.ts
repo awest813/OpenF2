@@ -20,6 +20,8 @@ import { GameMap, SerializedMap } from './map.js'
 import { Obj } from './object.js'
 import { Party } from './party.js'
 import { Player } from './player.js'
+import { QuestLog } from './quest/questLog.js'
+import { Reputation } from './quest/reputation.js'
 import { Renderer } from './renderer.js'
 import { Skills } from './skills.js'
 import { UIMode } from './ui.js'
@@ -74,6 +76,9 @@ export default {
     dirtyMapCache: {},
     gParty: new Party(),
 
+    questLog: new QuestLog(),
+    reputation: new Reputation(),
+
     uiMode: UIMode.none,
 
     mapAreas: null,
@@ -124,6 +129,11 @@ export default {
     dirtyMapCache: { [mapName: string]: SerializedMap }
 
     gParty: Party
+
+    /** Quest log: tracks state of all quests the player has interacted with. */
+    questLog: QuestLog
+    /** Reputation and global karma tracker. */
+    reputation: Reputation
 
     uiMode: UIMode
 

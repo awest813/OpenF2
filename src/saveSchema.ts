@@ -8,9 +8,11 @@
 import type { Point } from './geometry.js'
 import type { SerializedMap } from './map.js'
 import type { SerializedObj } from './object.js'
+import type { SerializedQuestLog } from './quest/questLog.js'
+import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export interface SaveGame {
     id?: number
@@ -30,6 +32,11 @@ export interface SaveGame {
     }
     party: SerializedObj[]
     savedMaps: { [mapName: string]: SerializedMap }
+
+    /** Serialized quest log (added in v3). */
+    questLog?: SerializedQuestLog
+    /** Serialized reputation/karma (added in v3). */
+    reputation?: SerializedReputation
 }
 
 /**
@@ -59,6 +66,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
                 if (save.player.karma === undefined) save.player.karma = 0
             }
             save.version = 2
+            // falls through
+        case 2:
+            // v2 → v3: add questLog and reputation snapshots
+            if (save.questLog === undefined) save.questLog = { entries: [] }
+            if (save.reputation === undefined) save.reputation = { karma: 0, reputations: {} }
+            save.version = 3
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
