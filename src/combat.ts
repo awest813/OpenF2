@@ -45,8 +45,9 @@ export class ActionPoints {
     }
 
     getMaxAP(): { combat: number; move: number } {
-        var bonusCombatAP = 0 // TODO: replace with get function
-        var bonusMoveAP = 0 // TODO: replace with get function
+        // Get bonus AP from critter's stats (perks/traits)
+        const bonusCombatAP = this.attachedCritter.stats.apBonus || 0
+        const bonusMoveAP = 0 // Move AP is typically 0 in Fallout
 
         return { combat: 5 + Math.floor(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
     }
