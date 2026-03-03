@@ -342,8 +342,9 @@ export class Combat {
 
                 this.log(who + ' failed at fail level ' + critFailLevel)
 
-                // TODO: map weapon type to crit fail table types
-                var critFailEffect = CriticalEffects.criticalFailTable.unarmed[critFailLevel]
+                // Map weapon type to appropriate crit fail table
+                var weaponType = CriticalEffects.getWeaponCritFailType(obj)
+                var critFailEffect = CriticalEffects.criticalFailTable[weaponType][critFailLevel]
                 CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
             }
         }

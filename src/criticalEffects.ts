@@ -31,6 +31,72 @@ export module CriticalEffects {
 
     type EffectsFunction = (target: Critter) => void
 
+    // Attack mode constants (matches critter.ts)
+    const ATTACK_MODE_NONE = 0
+    const ATTACK_MODE_PUNCH = 1
+    const ATTACK_MODE_KICK = 2
+    const ATTACK_MODE_SWING = 3
+    const ATTACK_MODE_THRUST = 4
+    const ATTACK_MODE_THROW = 5
+    const ATTACK_MODE_FIRE_SINGLE = 6
+    const ATTACK_MODE_FIRE_BURST = 7
+    const ATTACK_MODE_FLAME = 8
+
+    /**
+     * Maps weapon attack mode to critical failure table type.
+     * Based on Fallout 2 weapon classification.
+     */
+    export function getWeaponCritFailType(critter: Critter): string {
+        const weapon = critter.equippedWeapon
+        
+        // No weapon = unarmed
+        if (!weapon || !weapon.weapon || !weapon.pro || !weapon.pro.extra) {
+            return 'unarmed'
+        }
+        
+        // Get primary attack mode from weapon
+        const attackModes = weapon.pro.extra.attackMode
+        const primaryMode = attackModes & 0x0F
+        
+        // Map attack mode to critical failure table
+        switch (primaryMode) {
+            case ATTACK_MODE_PUNCH:
+            case ATTACK_MODE_KICK:
+                return 'unarmed'
+            
+            case ATTACK_MODE_SWING:
+            case ATTACK_MODE_THRUST:
+                return 'melee'
+            
+            case ATTACK_MODE_THROW:
+                // Check damage type to distinguish grenades
+                const dmgType = weapon.pro.extra.dmgType
+                if (dmgType === 6) { // Explosive
+                    return 'grenades'
+                }
+                return 'firearms'
+            
+            case ATTACK_MODE_FIRE_SINGLE:
+            case ATTACK_MODE_FIRE_BURST:
+                // Check weapon skill to distinguish energy weapons
+                const dmgType2 = weapon.pro.extra.dmgType
+                if (dmgType2 === 1 || dmgType2 === 3 || dmgType2 === 4) { // Laser, Plasma, Electrical
+                    return 'energy'
+                }
+                // Check for rocket launcher (Big Guns skill, explosive damage)
+                if (dmgType2 === 6) {
+                    return 'rocketlauncher'
+                }
+                return 'firearms'
+            
+            case ATTACK_MODE_FLAME:
+                return 'flamers'
+            
+            default:
+                return 'unarmed'
+        }
+    }
+
     const generalRegionName: { [region: number]: string } = {
         0: 'head',
         1: 'leftArm',
@@ -60,89 +126,161 @@ export module CriticalEffects {
 
     const critFailEffects: Dict<EffectsFunction> = {
         damageSelf: function (target: Critter) {
-            console.log(target.name + ' has damaged themselves. This does not do anything yet')
+            console.log(target.name + ' has damaged themselves!')
+            // Deal damage to self - use weapon's min damage
+            const weapon = target.equippedWeapon
+            if (weapon && weapon.weapon) {
+                const damage = weapon.weapon.minDmg || 1
+                import('./critter.js').then((module) => {
+                    module.critterDamage(target, damage, target, false, false)
+                })
+            }
         },
 
         crippleRandomAppendage: function (target: Critter) {
-            console.log(target.name + ' has crippled a random appendage. This does not do anything yet')
+            console.log(target.name + ' has crippled a random appendage!')
+            // Pick a random limb to cripple
+            const limbs = [
+                () => { target.crippledLeftLeg = true },
+                () => { target.crippledRightLeg = true },
+                () => { target.crippledLeftArm = true },
+                () => { target.crippledRightArm = true },
+            ]
+            const randomLimb = limbs[Math.floor(Math.random() * limbs.length)]
+            randomLimb()
         },
 
         hitRandomly: function (target: Critter) {
-            console.log(target.name + ' has hit randomly. This does not do anything yet')
+            console.log(target.name + ' hit a random target!')
+            // TODO: In full Fallout, this hits a random nearby critter
+            // For now, just hit self with reduced damage
+            critFailEffects.damageSelf(target)
         },
 
         hitSelf: function (target: Critter) {
-            console.log(target.name + ' has hit themselves. This does not do anything yet')
+            console.log(target.name + ' hit themselves!')
+            // Deal full weapon damage to self
+            const weapon = target.equippedWeapon
+            if (weapon && weapon.weapon) {
+                const damage = Math.floor((weapon.weapon.minDmg + weapon.weapon.maxDmg) / 2)
+                import('./critter.js').then((module) => {
+                    module.critterDamage(target, damage, target, false, false)
+                })
+            }
         },
 
         loseAmmo: function (target: Critter) {
-            console.log(target.name + ' has lost their ammo. This does not do anything yet')
+            console.log(target.name + ' has lost their ammo!')
+            // TODO: Implement ammo system integration
+            // For now, just a visual effect
         },
 
         destroyWeapon: function (target: Critter) {
-            console.log(
-                target.name + ' has had their weapon blow up in their face. Ouch. This does not do anything yet'
-            )
+            console.log(target.name + ' has had their weapon blow up in their face!')
+            // Weapon is destroyed and user takes damage
+            const weapon = target.equippedWeapon
+            if (weapon && weapon.weapon) {
+                const damage = weapon.weapon.maxDmg || 5
+                import('./critter.js').then((module) => {
+                    module.critterDamage(target, damage, target, false, false)
+                })
+            }
+            // Clear weapon slots
+            target.leftHand = undefined
+            target.rightHand = undefined
         },
     }
 
     const critterEffects: Dict<(target: Critter) => void> = {
         knockout: function (target: Critter) {
-            console.log(target.name + ' has been knocked out. This does not do anything yet')
+            console.log(target.name + ' has been knocked out!')
+            target.knockedOut = true
+            // In Fallout, knockout lasts for a random duration; here we'll set a flag
+            // that can be cleared by combat system after a few turns
         },
 
         knockdown: function (target: Critter) {
-            console.log(target.name + ' has been knocked down. This does not do anything yet')
+            console.log(target.name + ' has been knocked down!')
+            target.knockedDown = true
+            // Loses current turn; combat system should skip this turn
         },
 
         crippledLeftLeg: function (target: Critter) {
-            console.log(target.name + ' has been crippled in the left leg. This does not do anything yet')
+            console.log(target.name + "'s left leg has been crippled!")
+            target.crippledLeftLeg = true
+            // Reduces AGI by 2 (handled in getStat)
         },
 
         crippledRightLeg: function (target: Critter) {
-            console.log(target.name + ' has been crippled in the right leg. This does not do anything yet')
+            console.log(target.name + "'s right leg has been crippled!")
+            target.crippledRightLeg = true
+            // Reduces AGI by 2 (handled in getStat)
         },
 
         crippledLeftArm: function (target: Critter) {
-            console.log(target.name + ' has been crippled in the left arm. This does not do anything yet')
+            console.log(target.name + "'s left arm has been crippled!")
+            target.crippledLeftArm = true
+            // In Fallout, this reduces weapon accuracy
         },
 
         crippledRightArm: function (target: Critter) {
-            console.log(target.name + ' has been crippled in the right arm. This does not do anything yet')
+            console.log(target.name + "'s right arm has been crippled!")
+            target.crippledRightArm = true
+            // In Fallout, this reduces weapon accuracy
         },
 
         blinded: function (target: Critter) {
-            console.log(target.name + ' has been blinded by delight. This does not do anything yet')
+            console.log(target.name + ' has been blinded!')
+            target.blinded = true
+            // Reduces PER by 5 (handled in getStat)
         },
 
         death: function (target: Critter) {
-            console.log(target.name + ' has met the reaperpony. This does not do anything yet')
+            console.log(target.name + ' dies instantly from a critical hit!')
+            // Use critterKill to trigger proper death sequence
+            import('./critter.js').then((module) => {
+                module.critterKill(target, undefined, true)
+            })
         },
 
         onFire: function (target: Critter) {
-            console.log(target.name + ' just got a flame lit in their heart. This does not do anything yet')
+            console.log(target.name + ' is on fire!')
+            target.onFire = true
+            // TODO: Should deal fire damage each turn
         },
 
         bypassArmor: function (target: Critter) {
-            console.log(
-                target.name +
-                    ' is being hit by an armor bypassing bullet, blame the Zebras. This does not do anything yet'
-            )
+            console.log(target.name + ' hit by armor-bypassing attack!')
+            // This effect is handled in damage calculation, not here
+            // Just a marker effect
         },
 
         droppedWeapon: function (target: Critter) {
-            console.log(
-                target.name +
-                    " needs to drop their weapon like it's hot. The documentation claims this is broken. This does not do anything yet"
-            )
+            console.log(target.name + ' dropped their weapon!')
+            // TODO: Implement weapon drop to ground
+            // For now, just clear weapon slots
+            target.leftHand = undefined
+            target.rightHand = undefined
         },
 
         loseNextTurn: function (target: Critter) {
-            console.log(target.name + ' lost their next turn. This does not do anything yet')
+            console.log(target.name + ' loses their next turn!')
+            target.stunned = true
+            // Combat system should check this flag and skip the turn
         },
 
         random: function (target: Critter) {
-            console.log(target.name + ' is affected by a random effect. How random! This does not do anything yet')
+            console.log(target.name + ' is affected by a random critical effect!')
+            // Pick a random effect from the available ones
+            const effects = [
+                critterEffects.knockdown,
+                critterEffects.crippledLeftLeg,
+                critterEffects.crippledRightLeg,
+                critterEffects.crippledLeftArm,
+                critterEffects.crippledRightArm,
+            ]
+            const randomEffect = effects[Math.floor(Math.random() * effects.length)]
+            randomEffect(target)
         },
     }
 

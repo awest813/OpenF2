@@ -1005,6 +1005,17 @@ export class Critter extends Obj {
     isPlayer = false // Is this critter the player character?
     dead = false // Is this critter dead?
 
+    // Critical effect status flags
+    knockedOut = false // Unconscious (can't act)
+    knockedDown = false // Knocked down (loses turn)
+    stunned = false // Loses next turn
+    crippledLeftLeg = false // AGI penalty
+    crippledRightLeg = false // AGI penalty
+    crippledLeftArm = false // Accuracy penalty
+    crippledRightArm = false // Accuracy penalty
+    blinded = false // Perception penalty
+    onFire = false // Takes damage each turn
+
     static fromPID(pid: number, sid?: number): Critter {
         return Obj.fromPID_(new Critter(), pid, sid)
     }
@@ -1242,6 +1253,17 @@ export class Critter extends Obj {
             if (stat === 'AC' && this.equippedArmor.pro.extra.AC !== undefined) {
                 statValue += this.equippedArmor.pro.extra.AC
             }
+        }
+        
+        // Apply critical effect penalties
+        if (stat === 'AGI') {
+            // Each crippled leg reduces AGI by 2
+            if (this.crippledLeftLeg) statValue = Math.max(1, statValue - 2)
+            if (this.crippledRightLeg) statValue = Math.max(1, statValue - 2)
+        }
+        if (stat === 'PER') {
+            // Blindness reduces perception by 5
+            if (this.blinded) statValue = Math.max(1, statValue - 5)
         }
         
         return statValue
