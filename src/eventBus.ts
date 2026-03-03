@@ -61,6 +61,15 @@ export interface EngineEvents {
     'audio:playMusic': { trackId: string; loop: boolean }
     'audio:stopMusic': void
 
+    // Quest
+    'quest:start': { questId: string }
+    'quest:complete': { questId: string }
+    'quest:fail': { questId: string }
+
+    // Reputation / karma
+    'player:karmaChange': { oldValue: number; newValue: number }
+    'player:reputationChange': { name: string; oldValue: number; newValue: number }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

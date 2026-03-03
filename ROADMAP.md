@@ -13,7 +13,7 @@ OpenF2 aims to deliver:
 
 ## Current execution status
 
-- **Active phase:** Phase 1 — Playable Core RPG Loop
+- **Active phase:** Phase 2 — Full Fallout 2 Completion
 - **Phase state:** In progress
 
 ## Baseline (today)
