@@ -158,6 +158,7 @@ export class UIManagerImpl {
             if (!panel.visible) continue
             if (panel.containsPoint(x, y)) {
                 panel.onMouseMove(x - panel.bounds.x, y - panel.bounds.y)
+                return
             }
         }
     }
