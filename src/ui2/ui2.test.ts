@@ -250,6 +250,40 @@ describe('UIManagerImpl.handleMouseDown', () => {
 })
 
 // ---------------------------------------------------------------------------
+// UIManagerImpl — mouse move routing
+// ---------------------------------------------------------------------------
+
+describe('UIManagerImpl.handleMouseMove', () => {
+    it('routes mouse move to the topmost visible panel under the cursor', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const calls: string[] = []
+        const low = new TestPanel('low', { x: 0, y: 0, width: 200, height: 200 }, 0)
+        const high = new TestPanel('high', { x: 0, y: 0, width: 200, height: 200 }, 10)
+        ;(low as any).onMouseMove = () => calls.push('low')
+        ;(high as any).onMouseMove = () => calls.push('high')
+        low.show()
+        high.show()
+        mgr.register(low)
+        mgr.register(high)
+
+        mgr.handleMouseMove(50, 50)
+        expect(calls).toEqual(['high'])
+    })
+
+    it('does not route mouse move when no visible panel contains the cursor', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        let called = false
+        const panel = new TestPanel('p', { x: 0, y: 0, width: 100, height: 100 })
+        ;(panel as any).onMouseMove = () => { called = true }
+        panel.show()
+        mgr.register(panel)
+
+        mgr.handleMouseMove(300, 300)
+        expect(called).toBe(false)
+    })
+})
+
+// ---------------------------------------------------------------------------
 // UIManagerImpl — keyboard routing
 // ---------------------------------------------------------------------------
 
