@@ -898,7 +898,18 @@ export module Scripting {
             ;(obj as Critter).stats.modifyBase('Poison Level', amount)
         }
         radiation_dec(obj: Obj, amount: number) {
-            stub('radiation_dec', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('radiation_dec: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).stats.modifyBase('Radiation Level', -amount)
+        }
+        radiation_add(obj: Obj, amount: number) {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('radiation_add: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).stats.modifyBase('Radiation Level', amount)
         }
 
         // combat
