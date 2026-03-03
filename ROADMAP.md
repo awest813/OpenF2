@@ -72,7 +72,7 @@ OpenF2 aims to deliver:
 - [x] World map correctness and travel balancing
 - [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
-- [ ] UI migration toward full bitmap-faithful rendering
+- [ ] UI migration toward full bitmap-faithful rendering (in progress; ui2/ module scaffolded)
 - [x] Audio completeness: effects, music logic, format handling
 - [x] Ending/intro/cinematic pipeline support (scaffold)
 
