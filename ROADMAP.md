@@ -14,7 +14,7 @@ OpenF2 aims to deliver:
 ## Current execution status
 
 - **Active phase:** Phase 1 — Playable Core RPG Loop
-- **Phase state:** Not started
+- **Phase state:** In progress
 
 ## Baseline (today)
 
@@ -52,12 +52,12 @@ OpenF2 aims to deliver:
 
 **Goal:** Deliver a stable "start-to-first-hub" experience in Fallout 2 content.
 
-- [ ] Complete SPECIAL + derived stats pipeline
-- [ ] Implement all skills with checks and progression hooks
-- [ ] Implement traits/perks with prerequisite enforcement
-- [ ] Expand combat correctness: armor, ammo, ranges, AP rules
-- [ ] Improve inventory/equipment behavior and constraints
-- [ ] Reliable leveling flow and character screen interactions
+- [x] Complete SPECIAL + derived stats pipeline
+- [x] Implement all skills with checks and progression hooks
+- [x] Implement traits/perks with prerequisite enforcement
+- [x] Expand combat correctness: armor, ammo, ranges, AP rules
+- [x] Improve inventory/equipment behavior and constraints
+- [x] Reliable leveling flow and character screen interactions
 
 ## Phase 2 — Full Fallout 2 Completion
 
