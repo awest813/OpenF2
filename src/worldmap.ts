@@ -66,7 +66,7 @@ export module Worldmap {
     interface WorldmapPlayer {
         x: number
         y: number
-        target: Point
+        target: Point | null
     }
 
     interface Worldmap {

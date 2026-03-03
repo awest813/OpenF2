@@ -4,3 +4,4 @@
 export * from './uiPanel.js'
 export * from './gamePanel.js'
 export * from './characterScreen.js'
+export * from './pipboy.js'
