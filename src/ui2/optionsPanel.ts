@@ -6,7 +6,7 @@
  * CLOSE button or Escape.
  */
 
-import { UIPanel, Rect, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
 import { Config } from '../config.js'
 
 // ---------------------------------------------------------------------------

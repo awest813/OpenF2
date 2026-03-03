@@ -151,7 +151,9 @@ export class SaveLoadPanel extends UIPanel {
             return true
         }
         if (key === 'ArrowUp') {
-            this.selectedSlot = Math.max(this.selectedSlot - 1, 0)
+            if (this.selectedSlot > 0) {
+                this.selectedSlot--
+            }
             return true
         }
         if (key === 'Enter' && this.selectedSlot >= 0) {
@@ -163,16 +165,13 @@ export class SaveLoadPanel extends UIPanel {
 
     private _confirmAction(): void {
         const slot = this.selectedSlot
-        if (this.isSave) {
-            EventBus.emit('audio:playSound', { soundId: 'ui_click' })
-        }
+        EventBus.emit('audio:playSound', { soundId: 'ui_click' })
         this.hide()
-        // Emit a UI event that engine code can subscribe to for actual I/O.
-        // This keeps the panel free of save/load dependencies.
+        // Emit dedicated save/load events for engine code to subscribe to.
         if (this.isSave) {
-            EventBus.emit('ui:closePanel', { panelName: `saveConfirm:${slot}` })
+            EventBus.emit('game:saveToSlot', { slot })
         } else {
-            EventBus.emit('ui:closePanel', { panelName: `loadConfirm:${slot}` })
+            EventBus.emit('game:loadFromSlot', { slot })
         }
     }
 }

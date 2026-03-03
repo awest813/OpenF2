@@ -748,6 +748,14 @@ describe('SaveLoadPanel', () => {
         expect(panel.selectedSlot).toBe(0)
     })
 
+    it('ArrowUp from -1 (no selection) stays at -1', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        expect(panel.selectedSlot).toBe(-1)
+        panel.onKeyDown('ArrowUp')
+        expect(panel.selectedSlot).toBe(-1)
+    })
+
     it('ArrowDown does not go past max slot', () => {
         const panel = new SaveLoadPanel(800, 600)
         panel.openAs('save')

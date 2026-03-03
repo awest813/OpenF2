@@ -74,6 +74,10 @@ export interface EngineEvents {
     'ui:openPanel': { panelName: string }
     'ui:closePanel': { panelName: string }
 
+    // Save / Load
+    'game:saveToSlot': { slot: number }
+    'game:loadFromSlot': { slot: number }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }
