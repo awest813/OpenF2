@@ -91,8 +91,8 @@ OpenF2 aims to deliver:
 **Goal:** Improve correctness, performance, and contributor ecosystem.
 
 - [x] DAT override stacking + structured mod manifests (`src/mods.ts`, `ModRegistry`)
+- [x] Pathfinding and line-of-sight correctness improvements (`hexLine` cube-lerp, `hexesInRadius` ring algorithm)
 - [ ] Rendering edge-case parity and animation timing polish
-- [ ] Pathfinding and line-of-sight correctness improvements
 - [ ] In-browser editing/debugging tools (long-term)
 - [ ] Performance work: batching, streaming, caching
 
