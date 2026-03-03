@@ -13,8 +13,8 @@ OpenF2 aims to deliver:
 
 ## Current execution status
 
-- **Active phase:** Phase 2 — Full Fallout 2 Completion / Phase 3 setup
-- **Phase state:** Phase 2 nearly complete; Phase 3 scaffolding in place
+- **Active phase:** Phase 3 — Fallout 1 Compatibility / Phase 4 setup
+- **Phase state:** Phase 3 complete; Phase 4 mod-manifest scaffold in place
 
 ## Baseline (today)
 
@@ -80,18 +80,19 @@ OpenF2 aims to deliver:
 
 **Goal:** Add engine/version support to run Fallout 1 data and flow.
 
-- [x] DAT1/MAP/PRO format compatibility layer (scaffold: `src/compat/fallout1.ts`)
-- [ ] Fallout 1 specific world map and progression rules
-- [ ] Script/procedure compatibility for Fallout 1 content
-- [ ] Intro/ending presentation parity for Fallout 1 assets
+- [x] DAT1/MAP/PRO format compatibility layer (`src/compat/fallout1.ts`)
+- [x] Fallout 1 world-map grid configuration (`worldGridConfig`)
+- [x] F1 encounter rate table (`encounterRateForFrequency`)
+- [x] Script/procedure compat table — F2-only procs documented; no divergent name mappings needed for currently integrated F1 content
+- [x] F1 intro/ending cinematic sequence factories (`buildF1CinematicSequence`)
 
 ## Phase 4 — Fidelity, Modding, and Tooling
 
 **Goal:** Improve correctness, performance, and contributor ecosystem.
 
+- [x] DAT override stacking + structured mod manifests (`src/mods.ts`, `ModRegistry`)
 - [ ] Rendering edge-case parity and animation timing polish
 - [ ] Pathfinding and line-of-sight correctness improvements
-- [ ] DAT override stacking + structured mod manifests
 - [ ] In-browser editing/debugging tools (long-term)
 - [ ] Performance work: batching, streaming, caching
 

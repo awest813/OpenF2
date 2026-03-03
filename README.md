@@ -8,7 +8,7 @@ The codebase is based on [darkfo](https://github.com/darkf/darkfo) and has been 
 
 ## Current status
 
-Phase 1 (Playable Core RPG Loop) is complete. OpenF2 is now actively working through Phase 2 (Full Fallout 2 Completion). The engine is playable but still experimental.
+Phase 1 (Playable Core RPG Loop) is complete. Phase 2 (Full Fallout 2 Completion) is complete. Phase 3 (Fallout 1 Compatibility) is complete. OpenF2 is now working through Phase 4 (Fidelity, Modding, and Tooling).
 
 ### Implemented (partial or stable)
 
