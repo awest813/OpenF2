@@ -17,6 +17,7 @@ limitations under the License.
 import { Critter } from './object.js'
 import { StatType } from './skills.js'
 import { getFileJSON, rollSkillCheck } from './util.js'
+import { critterDamage, critterKill } from './critter.js'
 
 // Critical Effects system
 
@@ -70,21 +71,21 @@ export module CriticalEffects {
             
             case ATTACK_MODE_THROW:
                 // Check damage type to distinguish grenades
-                const dmgType = weapon.pro.extra.dmgType
-                if (dmgType === 6) { // Explosive
+                const throwDmgType = weapon.pro.extra.dmgType
+                if (throwDmgType === 6) { // Explosive
                     return 'grenades'
                 }
                 return 'firearms'
             
             case ATTACK_MODE_FIRE_SINGLE:
             case ATTACK_MODE_FIRE_BURST:
-                // Check weapon skill to distinguish energy weapons
-                const dmgType2 = weapon.pro.extra.dmgType
-                if (dmgType2 === 1 || dmgType2 === 3 || dmgType2 === 4) { // Laser, Plasma, Electrical
+                // Check weapon damage type to distinguish energy weapons
+                const fireDmgType = weapon.pro.extra.dmgType
+                if (fireDmgType === 1 || fireDmgType === 3 || fireDmgType === 4) { // Laser, Plasma, Electrical
                     return 'energy'
                 }
                 // Check for rocket launcher (Big Guns skill, explosive damage)
-                if (dmgType2 === 6) {
+                if (fireDmgType === 6) {
                     return 'rocketlauncher'
                 }
                 return 'firearms'
@@ -131,9 +132,7 @@ export module CriticalEffects {
             const weapon = target.equippedWeapon
             if (weapon && weapon.weapon) {
                 const damage = weapon.weapon.minDmg || 1
-                import('./critter.js').then((module) => {
-                    module.critterDamage(target, damage, target, false, false)
-                })
+                critterDamage(target, damage, target, false, false)
             }
         },
 
@@ -163,9 +162,7 @@ export module CriticalEffects {
             const weapon = target.equippedWeapon
             if (weapon && weapon.weapon) {
                 const damage = Math.floor((weapon.weapon.minDmg + weapon.weapon.maxDmg) / 2)
-                import('./critter.js').then((module) => {
-                    module.critterDamage(target, damage, target, false, false)
-                })
+                critterDamage(target, damage, target, false, false)
             }
         },
 
@@ -181,9 +178,7 @@ export module CriticalEffects {
             const weapon = target.equippedWeapon
             if (weapon && weapon.weapon) {
                 const damage = weapon.weapon.maxDmg || 5
-                import('./critter.js').then((module) => {
-                    module.critterDamage(target, damage, target, false, false)
-                })
+                critterDamage(target, damage, target, false, false)
             }
             // Clear weapon slots
             target.leftHand = undefined
@@ -238,9 +233,7 @@ export module CriticalEffects {
         death: function (target: Critter) {
             console.log(target.name + ' dies instantly from a critical hit!')
             // Use critterKill to trigger proper death sequence
-            import('./critter.js').then((module) => {
-                module.critterKill(target, undefined, true)
-            })
+            critterKill(target, undefined, true)
         },
 
         onFire: function (target: Critter) {

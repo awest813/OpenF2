@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { Weapon } from './critter.js'
+import { critterDamage } from './critter.js'
 import { getLstId, lookupScriptName } from './data.js'
 import { Events } from './events.js'
 import { directionOfDelta, hexDistance, hexesInRadius, hexToScreen, Point } from './geometry.js'
@@ -778,10 +779,8 @@ export class Obj {
                             const critter = <Critter>objs[j]
                             console.log(`Explosion damages ${critter.name} for ${adjustedDamage} (distance: ${distance}, falloff: ${damageFalloff.toFixed(2)})`)
                             
-                            // Import critterDamage to apply damage with explosive type
-                            import('./critter.js').then((module) => {
-                                module.critterDamage(critter, adjustedDamage, source as Critter, false, true, 'Explosive')
-                            })
+                            // Apply damage with explosive type (imported at module level)
+                            critterDamage(critter, adjustedDamage, source as Critter, false, true, 'Explosive')
                         }
 
                         // Also notify scripts
@@ -1007,7 +1006,7 @@ export class Critter extends Obj {
 
     leftHand?: WeaponObj // Left-hand object slot
     rightHand?: WeaponObj // Right-hand object slot
-    equippedArmor?: Obj | null = null // Equipped armor item
+    equippedArmor: Obj | null = null // Equipped armor item
 
     type = 'critter'
     anim = 'idle'
