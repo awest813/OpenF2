@@ -58,7 +58,7 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
 
     if (!obj && skillRequiresTarget(skill)) {
-        throw 'trying to use non-passive skill without a target'
+        throw 'trying to use skill that requires a target without providing one'
     }
 
     if (skillRequiresTarget(skill)) {
