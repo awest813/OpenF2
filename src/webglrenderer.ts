@@ -42,6 +42,7 @@ export class WebGLRenderer extends Renderer {
     private floorLightShader: WebGLProgram
 
     private textures: { [key: string]: WebGLTexture } = {} // WebGL texture cache
+    private uiOverlayTexture: WebGLTexture | null = null // cached WebGL texture for the ui2 overlay
 
     constructor(private shaderSources: ShaderSources, fonts: Font[]) {
         super()
@@ -570,5 +571,44 @@ export class WebGLRenderer extends Renderer {
         gl.uniform2f(this.uScaleLocation, width, font.height)
 
         gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
+
+    renderUIOverlay(): void {
+        const uiManager = globalState.uiManager
+        if (!uiManager) return
+
+        const canvas = uiManager.render()
+        // transferToImageBitmap() transfers the rendered content to a new ImageBitmap and
+        // resets the canvas to blank.  This is safe because UIManagerImpl.render() always
+        // clears and fully redraws the canvas on every call, so the next frame starts fresh.
+        const bitmap = canvas.transferToImageBitmap()
+
+        const gl = this.gl
+        gl.useProgram(this.tileShader)
+        gl.activeTexture(gl.TEXTURE0)
+
+        if (!this.uiOverlayTexture) {
+            this.uiOverlayTexture = gl.createTexture()
+            gl.bindTexture(gl.TEXTURE_2D, this.uiOverlayTexture)
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+        } else {
+            gl.bindTexture(gl.TEXTURE_2D, this.uiOverlayTexture)
+        }
+
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap)
+        bitmap.close()
+
+        // Render as a full-screen quad on top of the scene.
+        // Temporarily disable depth test so the UI always renders on top.
+        gl.disable(gl.DEPTH_TEST)
+        gl.uniform1f(this.uNumFramesLocation, 1)
+        gl.uniform1f(this.uFrameLocation, 0)
+        gl.uniform2f(this.offsetLocation, 0, 0)
+        gl.uniform2f(this.uScaleLocation, SCREEN_WIDTH, SCREEN_HEIGHT)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+        gl.enable(gl.DEPTH_TEST)
     }
 }

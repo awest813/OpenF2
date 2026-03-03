@@ -537,3 +537,81 @@ describe('PipBoyPanel scroll and tab switching', () => {
         expect(panel._questScrollOffset).toBe(0)
     })
 })
+
+// ---------------------------------------------------------------------------
+// UIManager integration: panels registered, EventBus wired, input routing
+// ---------------------------------------------------------------------------
+
+import { GamePanel } from './gamePanel.js'
+import { CharacterScreen } from './characterScreen.js'
+import { createPlayerEntity } from '../ecs/entityFactory.js'
+
+describe('UIManager integration: all standard panels', () => {
+    let mgr: UIManagerImpl
+    let playerEntityId: number
+
+    beforeEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+        playerEntityId = createPlayerEntity({ name: 'TEST DWELLER' })
+        const questLog = new QuestLog()
+        mgr = new UIManagerImpl(800, 600)
+        mgr.register(new GamePanel(800, 600, playerEntityId))
+        mgr.register(new PipBoyPanel(800, 600, playerEntityId, questLog))
+        mgr.register(new CharacterScreen(800, 600, playerEntityId))
+        mgr.connectEventBus()
+    })
+
+    afterEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('registers gamePanel, pipboy, and characterScreen', () => {
+        expect(mgr.get('gamePanel')).toBeDefined()
+        expect(mgr.get('pipboy')).toBeDefined()
+        expect(mgr.get('characterScreen')).toBeDefined()
+    })
+
+    it('gamePanel is visible by default (HUD layer)', () => {
+        expect(mgr.get('gamePanel').visible).toBe(true)
+    })
+
+    it('pipboy and characterScreen are hidden by default', () => {
+        expect(mgr.get('pipboy').visible).toBe(false)
+        expect(mgr.get('characterScreen').visible).toBe(false)
+    })
+
+    it('ui:openPanel event shows the pipboy panel', () => {
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        expect(mgr.get('pipboy').visible).toBe(true)
+        expect(mgr.isAnyPanelOpen()).toBe(true)
+    })
+
+    it('ui:closePanel event hides the pipboy panel', () => {
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
+        expect(mgr.get('pipboy').visible).toBe(false)
+    })
+
+    it('Escape key closes an open pipboy panel', () => {
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        expect(mgr.get('pipboy').visible).toBe(true)
+        const consumed = mgr.handleKeyDown('Escape')
+        expect(consumed).toBe(true)
+        expect(mgr.get('pipboy').visible).toBe(false)
+    })
+
+    it('keydown is not consumed when no overlay panel is open', () => {
+        // Only the HUD (gamePanel, zOrder=0) is visible; a key that no
+        // panel handles should not be consumed.
+        const consumed = mgr.handleKeyDown('w')
+        expect(consumed).toBe(false)
+    })
+
+    it('render() returns an OffscreenCanvas with the correct dimensions', () => {
+        const canvas = mgr.render()
+        expect(canvas.width).toBe(800)
+        expect(canvas.height).toBe(600)
+    })
+})
