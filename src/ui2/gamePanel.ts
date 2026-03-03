@@ -59,9 +59,9 @@ export class GamePanel extends UIPanel {
         drawValue(ctx, weaponLabel, 240, 30, FALLOUT_AMBER)
 
         // --- Action buttons ---
-        const buttons = ['INV', 'CHAR', 'MAP', 'SAVE']
+        const buttons = ['INV', 'PIPBOY', 'CHAR', 'MAP', 'SAVE']
         for (let i = 0; i < buttons.length; i++) {
-            const bx = width - 200 + i * 48
+            const bx = width - 240 + i * 48
             drawButton(ctx, buttons[i], bx, 60, 44, 28)
         }
     }
@@ -71,9 +71,9 @@ export class GamePanel extends UIPanel {
 
         // Action buttons region
         const { width } = this.bounds
-        const buttons = ['INV', 'CHAR', 'MAP', 'SAVE']
+        const buttons = ['INV', 'PIPBOY', 'CHAR', 'MAP', 'SAVE']
         for (let i = 0; i < buttons.length; i++) {
-            const bx = width - 200 + i * 48
+            const bx = width - 240 + i * 48
             if (x >= bx && x < bx + 44 && y >= 60 && y < 88) {
                 this.onButtonClick(buttons[i])
                 return true
@@ -85,11 +85,13 @@ export class GamePanel extends UIPanel {
     private onButtonClick(btn: string): void {
         // Delegate to UIManager via EventBus
         import('../eventBus.js').then(({ EventBus }) => {
+            EventBus.emit('audio:playSound', { soundId: 'ui_click' })
             switch (btn) {
-                case 'INV':  EventBus.emit('audio:playSound', { soundId: 'ui_click' }); break
-                case 'CHAR': EventBus.emit('audio:playSound', { soundId: 'ui_click' }); break
-                case 'MAP':  EventBus.emit('audio:playSound', { soundId: 'ui_click' }); break
-                case 'SAVE': EventBus.emit('audio:playSound', { soundId: 'ui_click' }); break
+                case 'INV':    EventBus.emit('ui:openPanel', { panelName: 'inventory' }); break
+                case 'PIPBOY': EventBus.emit('ui:openPanel', { panelName: 'pipboy' }); break
+                case 'CHAR':   EventBus.emit('ui:openPanel', { panelName: 'characterScreen' }); break
+                case 'MAP':    EventBus.emit('ui:openPanel', { panelName: 'worldMap' }); break
+                case 'SAVE':   EventBus.emit('ui:openPanel', { panelName: 'saveLoad' }); break
             }
         })
     }

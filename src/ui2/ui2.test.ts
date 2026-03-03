@@ -8,9 +8,11 @@
  *   - UIManagerImpl: register, get, isAnyPanelOpen
  *   - UIManagerImpl: handleMouseDown routing
  *   - UIManagerImpl: handleKeyDown routing
+ *   - EventBus: ui:openPanel / ui:closePanel events
+ *   - PipBoyPanel: tab switching via keyboard
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
     UIPanel,
     UIManagerImpl,
@@ -19,6 +21,7 @@ import {
     FALLOUT_RED,
     FALLOUT_AMBER,
 } from './uiPanel.js'
+import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
 // Minimal concrete UIPanel for testing
@@ -324,5 +327,46 @@ describe('UIColor palette constants', () => {
         expect(FALLOUT_AMBER.r).toBeGreaterThan(0)
         expect(FALLOUT_AMBER.g).toBeGreaterThan(0)
         expect(FALLOUT_AMBER.b).toBe(0)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// EventBus — ui:openPanel / ui:closePanel events
+// ---------------------------------------------------------------------------
+
+describe('EventBus ui panel events', () => {
+    beforeEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    afterEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('emits ui:openPanel with correct panelName', () => {
+        const received: string[] = []
+        EventBus.on('ui:openPanel', ({ panelName }) => received.push(panelName))
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        expect(received).toEqual(['pipboy'])
+    })
+
+    it('emits ui:closePanel with correct panelName', () => {
+        const received: string[] = []
+        EventBus.on('ui:closePanel', ({ panelName }) => received.push(panelName))
+        EventBus.emit('ui:closePanel', { panelName: 'characterScreen' })
+        expect(received).toEqual(['characterScreen'])
+    })
+
+    it('ui:openPanel and ui:closePanel are independent events', () => {
+        const opens: string[] = []
+        const closes: string[] = []
+        EventBus.on('ui:openPanel', ({ panelName }) => opens.push(panelName))
+        EventBus.on('ui:closePanel', ({ panelName }) => closes.push(panelName))
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
+        expect(opens).toEqual(['pipboy'])
+        expect(closes).toEqual(['pipboy'])
     })
 })

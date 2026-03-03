@@ -180,8 +180,10 @@ export class CharacterScreen extends UIPanel {
 
             const isHovered = this.hoveredSkill === key
 
-            ctx.fillStyle = isHovered ? '#1a3a1a' : 'transparent'
-            ctx.fillRect(10, y - 13, 270, 16)
+            if (isHovered) {
+                ctx.fillStyle = '#1a3a1a'
+                ctx.fillRect(10, y - 13, 270, 16)
+            }
 
             ctx.fillStyle = isTagged ? cssColor(FALLOUT_AMBER) : cssColor(FALLOUT_GREEN)
             ctx.fillText((isTagged ? '* ' : '  ') + label.padEnd(16), 14, y)
