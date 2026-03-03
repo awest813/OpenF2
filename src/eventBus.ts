@@ -73,6 +73,11 @@ export interface EngineEvents {
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }
+
+    // Cinematic / cutscene pipeline
+    'cinematic:start': { sequenceId: string }
+    'cinematic:end': { sequenceId: string }
+    'cinematic:slideChange': { sequenceId: string; slideIndex: number; total: number }
 }
 
 export type DamageType = 'normal' | 'fire' | 'plasma' | 'laser' | 'explosive' | 'electrical' | 'emp'
@@ -135,6 +140,11 @@ class EventBusImpl {
         } else {
             this.handlers = {}
         }
+    }
+
+    /** Remove all handlers for a specific event. Alias for clear(event). */
+    offAll(event: keyof EngineEvents): void {
+        delete this.handlers[event]
     }
 }
 
