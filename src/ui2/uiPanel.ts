@@ -113,9 +113,11 @@ export class BitmapFontRenderer {
             ctx.save()
             ctx.globalCompositeOperation = 'source-over'
 
-            // Draw the glyph bitmap (white mask)
+            // Draw the glyph bitmap (white mask).
+            // Cast needed because our custom OffscreenCanvas declaration
+            // does not extend the DOM's CanvasImageSource union type.
             ctx.drawImage(
-                this.glyphCanvas,
+                this.glyphCanvas as unknown as CanvasImageSource,
                 srcX, 0, sym.width, font.height,
                 cx, y, sym.width, font.height,
             )

@@ -70,6 +70,10 @@ export interface EngineEvents {
     'player:karmaChange': { oldValue: number; newValue: number }
     'player:reputationChange': { name: string; oldValue: number; newValue: number }
 
+    // UI panels
+    'ui:openPanel': { panelName: string }
+    'ui:closePanel': { panelName: string }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }
