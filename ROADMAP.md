@@ -42,10 +42,10 @@ OpenF2 aims to deliver:
 
 **Goal:** Make core systems reliable enough for rapid feature development.
 
-- [ ] Centralized engine lifecycle/state boundaries
-- [ ] Hardened event/message plumbing between subsystems
-- [ ] Typed ECS coverage for actors/items/scripts
-- [ ] Versioned save schema + migration strategy
+- [x] Centralized engine lifecycle/state boundaries
+- [x] Hardened event/message plumbing between subsystems
+- [x] Typed ECS coverage for actors/items/scripts
+- [x] Versioned save schema + migration strategy
 - [ ] Expanded regression tests for scripting and combat primitives
 
 ## Phase 1 — Playable Core RPG Loop
