@@ -129,15 +129,17 @@ export class SkillSet {
 export class StatSet {
     baseStats: { [name: string]: number } = {};
     useBonuses: boolean;
+    apBonus: number = 0; // Bonus AP from perks/traits
 
-    constructor(baseStats?: { [name: string]: number }, useBonuses: boolean=true) {
+    constructor(baseStats?: { [name: string]: number }, useBonuses: boolean=true, apBonus: number=0) {
         // Copy construct a StatSet
         if(baseStats) this.baseStats = baseStats;
         this.useBonuses = useBonuses;
+        this.apBonus = apBonus;
     }
 
     clone(): StatSet {
-        return new StatSet(this.baseStats, this.useBonuses);
+        return new StatSet(this.baseStats, this.useBonuses, this.apBonus);
     }
 
     static fromPro(pro: any): StatSet {
@@ -152,7 +154,7 @@ export class StatSet {
                 stats[stat] += bonusStats[stat];
         }
 
-        // TODO: armor, appears to be hardwired into the proto?
+        // Note: Armor DT/DR bonuses are added dynamically in Critter.getStat() when armor is equipped
 
         // Define Max HP = HP if it does not exist
         if(stats["Max HP"] === undefined && stats["HP"] !== undefined)
@@ -188,6 +190,11 @@ export class StatSet {
                 if(dep.statType)
                     statValue += Math.floor(this.get(dep.statType) * dep.multiplier);
             }
+        }
+
+        // Add AP bonus from perks/traits
+        if(stat === 'AP') {
+            statValue += this.apBonus;
         }
 
         return clamp(statDep.min, statDep.max, statValue);

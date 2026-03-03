@@ -45,8 +45,9 @@ export class ActionPoints {
     }
 
     getMaxAP(): { combat: number; move: number } {
-        var bonusCombatAP = 0 // TODO: replace with get function
-        var bonusMoveAP = 0 // TODO: replace with get function
+        // Get bonus AP from critter's stats (perks/traits)
+        const bonusCombatAP = this.attachedCritter.stats.apBonus || 0
+        const bonusMoveAP = 0 // Move AP is typically 0 in Fallout
 
         return { combat: 5 + Math.floor(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
     }
@@ -284,8 +285,8 @@ export class Combat {
         var RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
         var RB = 0 // ranged bonus (via perk)
         var CM = critModifer // critical hit damage multiplier
-        var ADR = target.getStat('DR ' + damageType) // damage resistance (TODO: armor)
-        var ADT = target.getStat('DT ' + damageType) // damage threshold (TODO: armor)
+        var ADR = target.getStat('DR ' + damageType) // damage resistance (includes equipped armor)
+        var ADT = target.getStat('DT ' + damageType) // damage threshold (includes equipped armor)
         var X = 2 // ammo dividend
         var Y = 1 // ammo divisor
         var RM = 0 // ammo resistance modifier
@@ -342,8 +343,9 @@ export class Combat {
 
                 this.log(who + ' failed at fail level ' + critFailLevel)
 
-                // TODO: map weapon type to crit fail table types
-                var critFailEffect = CriticalEffects.criticalFailTable.unarmed[critFailLevel]
+                // Map weapon type to appropriate crit fail table
+                var weaponType = CriticalEffects.getWeaponCritFailType(obj)
+                var critFailEffect = CriticalEffects.criticalFailTable[weaponType][critFailLevel]
                 CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
             }
         }
