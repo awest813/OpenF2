@@ -40,10 +40,12 @@ import { getFileJSON, getProtoMsg } from './util.js'
 import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
-import { UIManagerImpl } from './ui2/uiPanel.js'
+import { UIManagerImpl, BitmapFontRenderer } from './ui2/uiPanel.js'
 import { GamePanel } from './ui2/gamePanel.js'
 import { PipBoyPanel } from './ui2/pipboy.js'
 import { CharacterScreen } from './ui2/characterScreen.js'
+import { OptionsPanel } from './ui2/optionsPanel.js'
+import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 
 // Return the skill ID used by the Fallout 2 engine
@@ -241,9 +243,18 @@ function initUIManager(): void {
 
     const mgr = new UIManagerImpl(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+    // Wire the first loaded font (font0.fon — the main UI font) into the
+    // BitmapFontRenderer so ui2 panels can draw pixel-accurate Fallout glyphs.
+    const fonts = globalState.renderer?.fonts
+    if (fonts && fonts.length > 0) {
+        mgr.fontRenderer = new BitmapFontRenderer(fonts[0])
+    }
+
     mgr.register(new GamePanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
     mgr.register(new PipBoyPanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog))
     mgr.register(new CharacterScreen(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
+    mgr.register(new OptionsPanel(SCREEN_WIDTH, SCREEN_HEIGHT))
+    mgr.register(new SaveLoadPanel(SCREEN_WIDTH, SCREEN_HEIGHT))
 
     mgr.connectEventBus()
 
@@ -507,11 +518,21 @@ heart.keydown = (k: string) => {
     }
 
     if (k === Config.controls.saveKey) {
-        uiSaveLoad(true)
+        const slPanel = globalState.uiManager?.get<SaveLoadPanel>('saveLoad')
+        if (slPanel) {
+            slPanel.openAs('save')
+        } else {
+            uiSaveLoad(true)
+        }
     }
 
     if (k === Config.controls.loadKey) {
-        uiSaveLoad(false)
+        const slPanel = globalState.uiManager?.get<SaveLoadPanel>('saveLoad')
+        if (slPanel) {
+            slPanel.openAs('load')
+        } else {
+            uiSaveLoad(false)
+        }
     }
 
     //if(k == calledShotKey)
