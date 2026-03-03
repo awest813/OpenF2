@@ -1,0 +1,328 @@
+/**
+ * Regression tests for the scripting VM opcode handlers.
+ *
+ * We test the exported opMap functions directly, calling them with a minimal
+ * mock of the VM rather than loading real INT files. This exercises the
+ * arithmetic, comparison, logic, and stack-manipulation primitives in
+ * isolation and is stable against changes to game-data loading paths.
+ */
+
+import { describe, it, expect } from 'vitest'
+import { opMap, VMContext } from './vm_opcodes.js'
+
+// ---------------------------------------------------------------------------
+// Minimal VM stub — only the fields / methods actually used by opMap handlers.
+// ---------------------------------------------------------------------------
+
+type MinimalVM = VMContext
+
+function makeVM(initialStack: any[] = []): MinimalVM {
+    const vm: MinimalVM = {
+        dataStack: [...initialStack],
+        retStack: [],
+        pc: 0,
+        halted: false,
+        svarBase: 0,
+        dvarBase: 0,
+        script: { read32: () => 0, peek16: () => 0 },
+        intfile: { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} },
+        push(v: any) { this.dataStack.push(v) },
+        pop() {
+            if (this.dataStack.length === 0) throw 'data stack underflow'
+            return this.dataStack.pop()
+        },
+        popAddr() {
+            if (this.retStack.length === 0) throw 'return stack underflow'
+            return this.retStack.pop()
+        },
+    }
+    return vm
+}
+
+function exec(opcode: number, vm: MinimalVM): void {
+    opMap[opcode].call(vm)
+}
+
+// ---------------------------------------------------------------------------
+// Arithmetic opcodes
+// ---------------------------------------------------------------------------
+
+describe('op_add (0x8039)', () => {
+    it('pushes the sum of two values', () => {
+        const vm = makeVM([3, 4])
+        exec(0x8039, vm)
+        expect(vm.dataStack).toEqual([7])
+    })
+
+    it('adds negative numbers correctly', () => {
+        const vm = makeVM([-5, 3])
+        exec(0x8039, vm)
+        expect(vm.pop()).toBe(-2)
+    })
+})
+
+describe('op_sub (0x803a)', () => {
+    it('pushes lhs - rhs', () => {
+        const vm = makeVM([10, 3])
+        exec(0x803a, vm)
+        expect(vm.pop()).toBe(7)
+    })
+})
+
+describe('op_mul (0x803b)', () => {
+    it('pushes the product', () => {
+        const vm = makeVM([6, 7])
+        exec(0x803b, vm)
+        expect(vm.pop()).toBe(42)
+    })
+})
+
+describe('op_div (0x803c)', () => {
+    it('performs integer (truncating) division', () => {
+        const vm = makeVM([10, 3])
+        exec(0x803c, vm)
+        expect(vm.pop()).toBe(3)  // 10/3 truncated
+    })
+
+    it('truncates toward zero for negative results', () => {
+        const vm = makeVM([-7, 2])
+        exec(0x803c, vm)
+        expect(vm.pop()).toBe(-3)
+    })
+})
+
+describe('op_mod (0x803d)', () => {
+    it('pushes the remainder', () => {
+        const vm = makeVM([10, 3])
+        exec(0x803d, vm)
+        expect(vm.pop()).toBe(1)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Negation / floor opcodes
+// ---------------------------------------------------------------------------
+
+describe('op_negate (0x8046)', () => {
+    it('negates a positive value', () => {
+        const vm = makeVM([5])
+        exec(0x8046, vm)
+        expect(vm.pop()).toBe(-5)
+    })
+
+    it('negates a negative value', () => {
+        const vm = makeVM([-3])
+        exec(0x8046, vm)
+        expect(vm.pop()).toBe(3)
+    })
+})
+
+describe('op_floor (0x8044)', () => {
+    it('floors a float value', () => {
+        const vm = makeVM([3.7])
+        exec(0x8044, vm)
+        expect(vm.pop()).toBe(3)
+    })
+
+    it('floors a negative float toward negative infinity', () => {
+        const vm = makeVM([-1.2])
+        exec(0x8044, vm)
+        expect(vm.pop()).toBe(-2)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Comparison opcodes
+// ---------------------------------------------------------------------------
+
+describe('op_eq (0x8033)', () => {
+    it('returns truthy for equal values', () => {
+        const vm = makeVM([5, 5])
+        exec(0x8033, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+
+    it('returns falsy for unequal values', () => {
+        const vm = makeVM([5, 6])
+        exec(0x8033, vm)
+        expect(vm.pop()).toBeFalsy()
+    })
+})
+
+describe('op_neq (0x8034)', () => {
+    it('returns truthy for different values', () => {
+        const vm = makeVM([5, 6])
+        exec(0x8034, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+})
+
+describe('op_lt (0x8037)', () => {
+    it('returns true when lhs < rhs', () => {
+        const vm = makeVM([3, 5])
+        exec(0x8037, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+
+    it('returns false when lhs >= rhs', () => {
+        const vm = makeVM([5, 3])
+        exec(0x8037, vm)
+        expect(vm.pop()).toBeFalsy()
+    })
+})
+
+describe('op_gt (0x8038)', () => {
+    it('returns true when lhs > rhs', () => {
+        const vm = makeVM([5, 3])
+        exec(0x8038, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+})
+
+describe('op_lte (0x8035)', () => {
+    it('returns true when lhs <= rhs', () => {
+        const vm = makeVM([3, 3])
+        exec(0x8035, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+})
+
+describe('op_gte (0x8036)', () => {
+    it('returns true when lhs >= rhs', () => {
+        const vm = makeVM([5, 3])
+        exec(0x8036, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Logic opcodes
+// ---------------------------------------------------------------------------
+
+describe('op_not (0x8045)', () => {
+    it('negates a truthy value to false', () => {
+        const vm = makeVM([1])
+        exec(0x8045, vm)
+        expect(vm.pop()).toBe(false)
+    })
+
+    it('negates a falsy value to true', () => {
+        const vm = makeVM([0])
+        exec(0x8045, vm)
+        expect(vm.pop()).toBe(true)
+    })
+})
+
+describe('op_and (0x803e)', () => {
+    it('returns truthy when both operands are truthy', () => {
+        const vm = makeVM([1, 1])
+        exec(0x803e, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+
+    it('returns falsy when either operand is falsy', () => {
+        const vm = makeVM([1, 0])
+        exec(0x803e, vm)
+        expect(vm.pop()).toBeFalsy()
+    })
+})
+
+describe('op_or (0x803f)', () => {
+    it('returns truthy when at least one operand is truthy', () => {
+        const vm = makeVM([0, 1])
+        exec(0x803f, vm)
+        expect(vm.pop()).toBeTruthy()
+    })
+
+    it('returns falsy when both operands are falsy', () => {
+        const vm = makeVM([0, 0])
+        exec(0x803f, vm)
+        expect(vm.pop()).toBeFalsy()
+    })
+})
+
+describe('op_bwand (0x8040)', () => {
+    it('performs bitwise AND', () => {
+        const vm = makeVM([0b1100, 0b1010])
+        exec(0x8040, vm)
+        expect(vm.pop()).toBe(0b1000)
+    })
+})
+
+describe('op_bwor (0x8041)', () => {
+    it('performs bitwise OR', () => {
+        const vm = makeVM([0b1100, 0b1010])
+        exec(0x8041, vm)
+        expect(vm.pop()).toBe(0b1110)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Stack manipulation opcodes
+// ---------------------------------------------------------------------------
+
+describe('op_pop (0x801a)', () => {
+    it('removes the top of the data stack', () => {
+        const vm = makeVM([1, 2, 3])
+        exec(0x801a, vm)
+        expect(vm.dataStack).toEqual([1, 2])
+    })
+})
+
+describe('op_exit_prog (0x8010)', () => {
+    it('sets halted flag', () => {
+        const vm = makeVM()
+        exec(0x8010, vm)
+        expect(vm.halted).toBe(true)
+    })
+})
+
+describe('op_if (0x802f)', () => {
+    it('falls through (pops target) when condition is truthy', () => {
+        // Stack: [jumpTarget, condition]  (condition on top)
+        const vm = makeVM([999, 1])  // condition = 1 (truthy)
+        exec(0x802f, vm)
+        // When condition is truthy we pop it and the jump target is also discarded
+        expect(vm.dataStack).toEqual([])
+        expect(vm.pc).toBe(0)  // pc unchanged
+    })
+
+    it('jumps when condition is falsy', () => {
+        const vm = makeVM([42, 0])  // condition = 0 (falsy)
+        exec(0x802f, vm)
+        expect(vm.pc).toBe(42)
+        expect(vm.dataStack).toEqual([])
+    })
+})
+
+describe('op_jmp (0x8004)', () => {
+    it('sets pc to popped value', () => {
+        const vm = makeVM([0x100])
+        exec(0x8004, vm)
+        expect(vm.pc).toBe(0x100)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// op_store / op_fetch (local variable access)
+// ---------------------------------------------------------------------------
+
+describe('op_store (0x8031) / op_fetch (0x8032)', () => {
+    it('stores a value at a local var index and fetches it back', () => {
+        const vm = makeVM()
+        vm.dvarBase = 0
+        // Grow the stack to accommodate 3 locals
+        vm.dataStack = [0, 0, 0]
+
+        // Store 42 at local[1]: push value, then push varIndex
+        vm.push(42)  // value
+        vm.push(1)   // varNum
+        exec(0x8031, vm)
+
+        // Fetch local[1]: push varIndex
+        vm.push(1)
+        exec(0x8032, vm)
+
+        expect(vm.pop()).toBe(42)
+    })
+})

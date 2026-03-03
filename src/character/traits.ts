@@ -55,7 +55,7 @@ export const TRAITS: Trait[] = [
 
     simpleTrait(1, 'Bruiser',
         '+2 Strength, -2 AP. Harder hitting, but slower in combat.',
-        { strengthMod: 2, maxAP: -2 }, {}),
+        { strengthMod: 2, maxAPMod: -2 }, {}),
 
     simpleTrait(2, 'Small Frame',
         '+1 Agility, -25 Carry Weight. Nimble but limited in cargo.',

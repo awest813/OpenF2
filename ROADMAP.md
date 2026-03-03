@@ -13,8 +13,8 @@ OpenF2 aims to deliver:
 
 ## Current execution status
 
-- **Active phase:** Phase 0 — Stabilize Core Architecture
-- **Phase state:** Started
+- **Active phase:** Phase 1 — Playable Core RPG Loop
+- **Phase state:** Not started
 
 ## Baseline (today)
 
@@ -46,7 +46,7 @@ OpenF2 aims to deliver:
 - [x] Hardened event/message plumbing between subsystems
 - [x] Typed ECS coverage for actors/items/scripts
 - [x] Versioned save schema + migration strategy
-- [ ] Expanded regression tests for scripting and combat primitives
+- [x] Expanded regression tests for scripting and combat primitives
 
 ## Phase 1 — Playable Core RPG Loop
 

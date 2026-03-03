@@ -88,6 +88,8 @@ export interface StatsComponent extends BaseComponent {
     intelligenceMod: number
     agilityMod: number
     luckMod: number
+    /** Flat AP bonus/penalty from perks and traits (survives recomputeDerivedStats). */
+    maxAPMod: number
 
     // Derived (recomputed whenever primaries change)
     maxHp: number

@@ -143,13 +143,13 @@ export function computeToHitChance(
 
 export const HIT_LOCATION_PENALTY: Record<HitLocation, number> = {
     torso:      0,
-    head:      -40,
-    eyes:      -60,
-    groin:     -30,
-    left_arm:  -20,
-    right_arm: -20,
-    left_leg:  -20,
-    right_leg: -20,
+    head:      40,
+    eyes:      60,
+    groin:     30,
+    left_arm:  20,
+    right_arm: 20,
+    left_leg:  20,
+    right_leg: 20,
 }
 
 export function rollToHit(toHitChance: number): ToHitResult {

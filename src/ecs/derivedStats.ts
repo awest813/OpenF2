@@ -33,8 +33,8 @@ export function recomputeDerivedStats(s: StatsComponent): void {
     s.maxHp = 15 + str + 2 * end + hpFromLevels
     s.currentHp = Math.min(s.currentHp, s.maxHp)
 
-    // AP: 5 + ceil(AGI/2)
-    s.maxAP = 5 + Math.ceil(agi / 2)
+    // AP: 5 + ceil(AGI/2) + any flat modifier from perks/traits
+    s.maxAP = 5 + Math.ceil(agi / 2) + (s.maxAPMod ?? 0)
 
     // Armor Class: AGI (unarmored)
     s.armorClass = agi
