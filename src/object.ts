@@ -1031,6 +1031,7 @@ export class Critter extends Obj {
     crippledRightArm = false // Accuracy penalty
     blinded = false // Perception penalty
     onFire = false // Takes damage each turn
+    isFleeing = false // Currently fleeing combat
 
     static fromPID(pid: number, sid?: number): Critter {
         return Obj.fromPID_(new Critter(), pid, sid)

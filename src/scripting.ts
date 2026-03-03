@@ -37,6 +37,7 @@ import { centerCamera, objectOnScreen } from './renderer.js'
 import { fromTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { assert, BinaryReader, getFileBinarySync, getFileText, getRandomInt } from './util.js'
+import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
@@ -87,6 +88,27 @@ export module Scripting {
         6: 'LUK',
         35: 'HP',
         7: 'Max HP',
+    }
+
+    var skillNumToName: { [num: number]: string } = {
+        0: 'Small Guns',
+        1: 'Big Guns',
+        2: 'Energy Weapons',
+        3: 'Unarmed',
+        4: 'Melee Weapons',
+        5: 'Throwing',
+        6: 'First Aid',
+        7: 'Doctor',
+        8: 'Sneak',
+        9: 'Lockpick',
+        10: 'Steal',
+        11: 'Traps',
+        12: 'Science',
+        13: 'Repair',
+        14: 'Speech',
+        15: 'Barter',
+        16: 'Gambling',
+        17: 'Outdoorsman',
     }
 
     type DebugLogShowType = keyof typeof Config.scripting.debugLogShowType
@@ -493,6 +515,19 @@ export module Scripting {
             stub('get_critter_stat', arguments)
             return 5
         }
+        set_critter_stat(obj: Obj, stat: number, amount: number) {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_stat: not a critter: ' + obj, undefined, this)
+                return -1
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('set_critter_stat: unknown stat number: ' + stat, undefined, this)
+                return -1
+            }
+            ;(obj as Critter).stats.setBase(statName, amount)
+            return 0
+        }
         has_trait(traitType: number, obj: Obj, trait: number) {
             if (!isGameObject(obj)) {
                 warn('has_trait: not game object: ' + obj, undefined, this)
@@ -558,7 +593,20 @@ export module Scripting {
             return obj.money
         }
         item_caps_adjust(obj: Obj, amount: number) {
-            stub('item_caps_adjust', arguments)
+            const MONEY_PID = 41
+            if (!isGameObject(obj)) {
+                warn('item_caps_adjust: not a game object', undefined, this)
+                return
+            }
+            for (let i = obj.inventory.length - 1; i >= 0; i--) {
+                if (obj.inventory[i].pid === MONEY_PID) {
+                    obj.inventory[i].amount = Math.max(0, obj.inventory[i].amount + amount)
+                    if (obj.inventory[i].amount <= 0) obj.inventory.splice(i, 1)
+                    return
+                }
+            }
+            if (amount > 0)
+                warn('item_caps_adjust: no caps item found in inventory; amount discarded', undefined, this)
         }
         move_obj_inven_to_obj(obj: Obj, other: Obj) {
             if (obj === null || other === null) {
@@ -611,8 +659,24 @@ export module Scripting {
             obj.addInventoryItem(item, count)
         }
         rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
-            // Remove count copies of item from obj's inventory
-            stub('rm_mult_objs_from_inven', arguments)
+            // Remove up to count copies of item from obj's inventory
+            if (!isGameObject(obj)) {
+                warn('rm_mult_objs_from_inven: not a game object', undefined, this)
+                return 0
+            }
+            if (!isGameObject(item)) {
+                warn('rm_mult_objs_from_inven: item not a game object: ' + item, undefined, this)
+                return 0
+            }
+            for (let i = obj.inventory.length - 1; i >= 0; i--) {
+                if (obj.inventory[i].approxEq(item)) {
+                    const removed = Math.min(count, obj.inventory[i].amount)
+                    obj.inventory[i].amount -= removed
+                    if (obj.inventory[i].amount <= 0) obj.inventory.splice(i, 1)
+                    return removed
+                }
+            }
+            return 0
         }
         add_obj_to_inven(obj: Obj, item: Obj) {
             this.add_mult_objs_to_inven(obj, item, 1)
@@ -651,32 +715,57 @@ export module Scripting {
             /*stub("obj_can_hear_obj", arguments);*/ return 0
         }
         critter_mod_skill(obj: Obj, skill: number, amount: number) {
-            stub('critter_mod_skill', arguments)
-            return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_mod_skill: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const skillName = skillNumToName[skill]
+            if (!skillName) {
+                warn('critter_mod_skill: unknown skill number: ' + skill, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            critter.skills.setBase(skillName, critter.skills.getBase(skillName) + amount)
+            return critter.getSkill(skillName)
         }
         using_skill(obj: Obj, skill: number) {
-            stub('using_skill', arguments)
-            return 0
+            return this.has_skill(obj, skill)
         }
         has_skill(obj: Obj, skill: number) {
-            stub('has_skill', arguments)
-            return 100
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('has_skill: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const skillName = skillNumToName[skill]
+            if (!skillName) {
+                warn('has_skill: unknown skill number: ' + skill, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getSkill(skillName)
         }
         roll_vs_skill(obj: Obj, skill: number, bonus: number) {
-            stub('roll_vs_skill', arguments)
-            return 1
+            const skillValue = this.has_skill(obj, skill)
+            return toRollResult(rollSkillCheck(skillValue, bonus))
         }
         do_check(obj: Obj, check: number, modifier: number) {
-            stub('do_check', arguments)
-            return 1
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('do_check: not a critter: ' + obj, undefined, this)
+                return RollResult.FAILURE
+            }
+            const statName = statMap[check]
+            if (!statName) {
+                warn('do_check: unknown stat number: ' + check, undefined, this)
+                return RollResult.FAILURE
+            }
+            // SPECIAL stats are on a 1–10 scale; multiply by 10 for percentile roll
+            const statValue = (obj as Critter).getStat(statName) * 10
+            return toRollResult(rollSkillCheck(statValue, modifier))
         }
         is_success(roll: number) {
-            stub('is_success', arguments)
-            return 1
+            return rollResultIsSuccess(roll as any) ? 1 : 0
         }
         is_critical(roll: number) {
-            stub('is_critical', arguments)
-            return 0
+            return rollResultIsCritical(roll as any) ? 1 : 0
         }
         critter_inven_obj(obj: Critter, where: number) {
             if (!isGameObject(obj)) throw 'critter_inven_obj: not game object'
@@ -743,14 +832,45 @@ export module Scripting {
             }
         }
         critter_injure(obj: Obj, how: number) {
-            stub('critter_injure', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_injure: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (how & 1) critter.knockedOut = true
+            if (how & 2) critter.knockedDown = true
+            if (how & 4) critter.crippledLeftLeg = true
+            if (how & 8) critter.crippledRightLeg = true
+            if (how & 16) critter.crippledLeftArm = true
+            if (how & 32) critter.crippledRightArm = true
+            if (how & 64) critter.blinded = true
+            if (how & 128) critterKill(critter)
+            if (how & 256) critter.onFire = true
         }
         critter_is_fleeing(obj: Obj) {
-            stub('critter_is_fleeing', arguments)
-            return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_is_fleeing: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).isFleeing ? 1 : 0
         }
         wield_obj_critter(obj: Obj, item: Obj) {
-            stub('wield_obj_critter', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('wield_obj_critter: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (!isGameObject(item)) {
+                warn('wield_obj_critter: item not a game object: ' + item, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (item.subtype === 'weapon') {
+                critter.rightHand = item as any
+            } else if (item.subtype === 'armor') {
+                critter.equippedArmor = item
+            } else {
+                warn('wield_obj_critter: unhandled item subtype: ' + item.subtype, undefined, this)
+            }
         }
         critter_dmg(obj: Critter, damage: number, damageType: string) {
             if (!isGameObject(obj)) {
@@ -760,10 +880,22 @@ export module Scripting {
             critterDamage(obj, damage, this.self_obj as Critter, true, true, damageType)
         }
         critter_heal(obj: Obj, amount: number) {
-            stub('critter_heal', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_heal: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            const maxHP = critter.getStat('Max HP')
+            const currentHP = critter.getStat('HP')
+            const healAmount = Math.min(amount, maxHP - currentHP)
+            if (healAmount > 0) critter.stats.modifyBase('HP', healAmount)
         }
         poison(obj: Obj, amount: number) {
-            stub('poison', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('poison: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).stats.modifyBase('Poison Level', amount)
         }
         radiation_dec(obj: Obj, amount: number) {
             stub('radiation_dec', arguments)
@@ -793,7 +925,11 @@ export module Scripting {
             if (globalState.combat) globalState.combat.end()
         }
         critter_set_flee_state(obj: Obj, isFleeing: number) {
-            stub('critter_set_flee_state', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_set_flee_state: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).isFleeing = isFleeing !== 0
         }
 
         // objects
