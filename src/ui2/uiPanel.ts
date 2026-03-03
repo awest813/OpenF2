@@ -11,7 +11,157 @@
  *   hide()  → visible = false, stops receiving input
  *   render(ctx) → called every frame when visible
  *   onMouseDown/onKeyDown → input dispatch from UIManager
+ *
+ * BitmapFontRenderer provides pixel-accurate glyph rendering that matches
+ * the original Fallout .FON format. When a loaded Font is supplied, glyphs
+ * are drawn from the pre-built texture atlas; otherwise the renderer falls
+ * back to the system monospace font so that panels remain usable during
+ * development before assets are available.
  */
+
+import type { Font } from '../formats/fon.js'
+
+// ---------------------------------------------------------------------------
+// BitmapFontRenderer
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders text using a pre-parsed Fallout bitmap font (from formats/fon.ts).
+ *
+ * Usage:
+ *   const renderer = new BitmapFontRenderer(font)
+ *   renderer.drawText(ctx, 'Hello', 10, 20, FALLOUT_GREEN)
+ *
+ * When `font` is null the renderer falls back to a monospace system font so
+ * UI panels remain usable during development.
+ */
+export class BitmapFontRenderer {
+    private font: Font | null
+    /** Pre-built ImageData derived from font.textureData (one row of glyphs). */
+    private glyphCanvas: OffscreenCanvas | null = null
+    /** Total atlas width (sum of all glyph widths). */
+    private atlasWidth = 0
+    /**
+     * Per-glyph X offset within the atlas, indexed by character code.
+     * Pre-computed in the constructor for O(1) per-character lookup.
+     */
+    private glyphOffsets: number[] = []
+
+    constructor(font: Font | null = null) {
+        this.font = font
+        if (font) {
+            // Build the cumulative offset table in one pass.
+            let offset = 0
+            for (let i = 0; i < font.symbols.length; i++) {
+                this.glyphOffsets[i] = offset
+                offset += font.symbols[i]?.width ?? 0
+            }
+            this.atlasWidth = offset
+            this.glyphCanvas = this._buildAtlasCanvas(font)
+        }
+    }
+
+    /** Width in pixels of a single character, or 0 if the char is unknown. */
+    charWidth(ch: string): number {
+        if (!this.font) return 8  // monospace fallback
+        const code = ch.charCodeAt(0)
+        const sym = this.font.symbols[code]
+        return sym ? sym.width + (this.font.spacing ?? 1) : 0
+    }
+
+    /** Total pixel width of a string. */
+    measureText(text: string): number {
+        if (!this.font) return text.length * 8
+        let w = 0
+        for (const ch of text) w += this.charWidth(ch)
+        return w
+    }
+
+    /**
+     * Draw `text` at canvas position (x, y) using `color`.
+     * The `y` coordinate is the top of the glyph (not the baseline).
+     */
+    drawText(
+        ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        color: UIColor,
+    ): void {
+        if (!this.font || !this.glyphCanvas) {
+            // System-font fallback
+            ctx.font = `${this.fallbackSize()}px monospace`
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`
+            ctx.fillText(text, x, y + (this.fallbackSize() - 2))
+            return
+        }
+
+        const font = this.font
+        let cx = x
+        for (const ch of text) {
+            const code = ch.charCodeAt(0)
+            const sym = font.symbols[code]
+            if (!sym || sym.width === 0) {
+                cx += font.spacing ?? 1
+                continue
+            }
+
+            // Source X in the atlas is pre-computed in glyphOffsets for O(1) lookup
+            const srcX = this.glyphOffsets[code] ?? 0
+
+            // Tint the glyph with `color` via compositing
+            ctx.save()
+            ctx.globalCompositeOperation = 'source-over'
+
+            // Draw the glyph bitmap (white mask)
+            ctx.drawImage(
+                this.glyphCanvas,
+                srcX, 0, sym.width, font.height,
+                cx, y, sym.width, font.height,
+            )
+
+            // Multiply: replace white pixels with the requested color
+            ctx.globalCompositeOperation = 'source-atop'
+            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`
+            ctx.fillRect(cx, y, sym.width, font.height)
+
+            ctx.restore()
+            cx += sym.width + (font.spacing ?? 1)
+        }
+    }
+
+    private fallbackSize(): number {
+        return this.font ? this.font.height : 12
+    }
+
+    /**
+     * Convert the 1-bit texture atlas stored in `font.textureData` into an
+     * OffscreenCanvas RGBA image so it can be drawn via drawImage().
+     * Each set bit becomes white (255, 255, 255, 255); cleared bits are fully
+     * transparent so the background shows through.
+     */
+    private _buildAtlasCanvas(font: Font): OffscreenCanvas {
+        const canvas = new OffscreenCanvas(this.atlasWidth, font.height)
+        const ctx = canvas.getContext('2d')!
+        const imgData = ctx.createImageData(this.atlasWidth, font.height)
+        const { data } = imgData
+
+        for (let py = 0; py < font.height; py++) {
+            for (let px = 0; px < this.atlasWidth; px++) {
+                const idx = py * this.atlasWidth + px
+                const alpha = font.textureData[idx] ?? 0
+                const out = idx * 4
+                data[out]     = 255
+                data[out + 1] = 255
+                data[out + 2] = 255
+                data[out + 3] = alpha
+            }
+        }
+
+        ctx.putImageData(imgData, 0, 0)
+        return canvas
+    }
+}
 
 export interface Rect {
     x: number
