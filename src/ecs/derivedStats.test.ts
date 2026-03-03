@@ -127,6 +127,15 @@ describe('recomputeDerivedStats', () => {
         const s = makeStats({ agility: 5, agilityMod: 2 })  // effective AGI = 7
         expect(s.maxAP).toBe(5 + Math.ceil(7 / 2))  // 9
     })
+
+    it('sets xpToNextLevel to cumulative triangular threshold for current level', () => {
+        // Level 1: xpForLevel(2) = 1000
+        expect(makeStats({ level: 1 }).xpToNextLevel).toBe(1000)
+        // Level 2: xpForLevel(3) = 3000
+        expect(makeStats({ level: 2 }).xpToNextLevel).toBe(3000)
+        // Level 3: xpForLevel(4) = 6000
+        expect(makeStats({ level: 3 }).xpToNextLevel).toBe(6000)
+    })
 })
 
 // ---------------------------------------------------------------------------

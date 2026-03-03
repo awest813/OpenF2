@@ -63,8 +63,8 @@ export function recomputeDerivedStats(s: StatsComponent): void {
     // Critical Chance: LCK %
     s.criticalChance = lck
 
-    // XP to next level: level * 1000 (Fallout 2 formula)
-    s.xpToNextLevel = s.level * 1000
+    // XP to next level: cumulative triangular threshold (Fallout 2 formula)
+    s.xpToNextLevel = xpForLevel(s.level + 1)
 }
 
 /**

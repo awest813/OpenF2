@@ -49,14 +49,16 @@ function levelUp(
     hasTraitSkilled: boolean,
     educatedRanks: number,
 ): void {
+    const oldMaxHp = stats.maxHp
     stats.level++
     recomputeDerivedStats(stats)
 
-    // HP gain: 3 + floor(END/2) per level
-    const end = effectiveStat(stats.endurance, stats.enduranceMod)
-    const hpGain = 3 + Math.floor(end / 2)
-    stats.maxHp += hpGain
-    stats.currentHp = Math.min(stats.currentHp + hpGain, stats.maxHp)
+    // Restore HP by the amount gained from this level-up (recomputeDerivedStats
+    // has already updated maxHp; currentHp was capped to the old maxHp by it).
+    const hpGain = stats.maxHp - oldMaxHp
+    if (hpGain > 0) {
+        stats.currentHp = Math.min(stats.currentHp + hpGain, stats.maxHp)
+    }
 
     // Skill points: 5 + 2×INT, +5 from Skilled trait, +2 per Educated rank
     const int = effectiveStat(stats.intelligence, stats.intelligenceMod)
@@ -65,18 +67,11 @@ function levelUp(
     sp += educatedRanks * 2
     skills.availablePoints += sp
 
-    // Perk availability
-    let perksAvailable = 0
-    if (stats.level % PERK_EVERY_N_LEVELS === 0) {
-        perksAvailable = 1
-        if (hasTraitSkilled) {
-            // Skilled delays perks: only every 4th level
-            // (re-checked in perk availability logic)
-            perksAvailable = 0
-        }
-    }
+    // Perk availability: every 3rd level normally; every 4th with Skilled trait
+    const perkInterval = hasTraitSkilled ? 4 : PERK_EVERY_N_LEVELS
+    const perksAvailable = stats.level % perkInterval === 0 ? 1 : 0
 
-    EventBus.emit('player:levelUp', { newLevel: stats.level })
+    EventBus.emit('player:levelUp', { newLevel: stats.level, perksAvailable })
 }
 
 /**

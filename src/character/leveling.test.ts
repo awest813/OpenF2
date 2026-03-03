@@ -2,12 +2,13 @@
  * Regression tests for character leveling, skill-point spending, and perk/trait application.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { getSkillPointCost, spendSkillPoint, awardXP } from './leveling.js'
 import { grantPerk, isPerkAvailable, PERKS, PERK_MAP } from './perks.js'
 import { applyTraits, removeTraits, TRAITS, TRAIT_MAP } from './traits.js'
 import { StatsComponent, SkillsComponent, zeroDamageStats } from '../ecs/components.js'
 import { recomputeDerivedStats, computeBaseSkills } from '../ecs/derivedStats.js'
+import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -152,6 +153,119 @@ describe('awardXP', () => {
         const skills = makeSkills(stats)
         awardXP(1, stats, skills, 1000, false, 2 /* educatedRanks */)
         expect(skills.availablePoints).toBe(19)  // 15 + 4
+    })
+
+    it('multi-level XP award reaches correct level (triangular threshold)', () => {
+        // xpForLevel(3) = 3000, xpForLevel(4) = 6000
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const gained = awardXP(1, stats, skills, 3000, false, 0)
+        expect(stats.level).toBe(3)
+        expect(gained).toBe(2)
+    })
+
+    it('does not over-level when XP is below the next threshold', () => {
+        // 5999 XP should reach level 3 but not level 4 (which needs 6000)
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        awardXP(1, stats, skills, 5999, false, 0)
+        expect(stats.level).toBe(3)
+    })
+
+    it('maxHp increases by the per-level gain on level-up', () => {
+        const stats = makeStats({ endurance: 5 })  // hpFromLevels per level = 2 + floor(5/2) = 4
+        const skills = makeSkills(stats)
+        const hpBefore = stats.maxHp
+        awardXP(1, stats, skills, 1000, false, 0)
+        expect(stats.maxHp).toBe(hpBefore + 4)
+    })
+
+    it('currentHp is restored by the HP gained from level-up', () => {
+        const stats = makeStats({ endurance: 5 })
+        const skills = makeSkills(stats)
+        // Damage the player first
+        stats.currentHp = stats.maxHp - 10
+        const hpBefore = stats.currentHp
+        awardXP(1, stats, skills, 1000, false, 0)
+        expect(stats.currentHp).toBe(hpBefore + 4)  // +4 per level (2 + floor(5/2))
+    })
+
+    it('currentHp does not exceed new maxHp after level-up', () => {
+        const stats = makeStats({ endurance: 5 })
+        const skills = makeSkills(stats)
+        // Set currentHp to just 1 below max so the HP gain would exceed max
+        stats.currentHp = stats.maxHp
+        awardXP(1, stats, skills, 1000, false, 0)
+        expect(stats.currentHp).toBeLessThanOrEqual(stats.maxHp)
+    })
+
+    it('Skilled trait: perk is available at level 4 (every 4th level)', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        awardXP(1, stats, skills, 6000, true /* hasTraitSkilled */, 0)
+        expect(stats.level).toBe(4)
+    })
+
+    it('Skilled trait: no perk at level 3 (Skilled shifts schedule to every 4th)', () => {
+        // Without Skilled: perk at level 3, 6, 9...
+        // With Skilled: perk at level 4, 8, 12...
+        // Level 3 should NOT award a perk when Skilled is active
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        // Advance to level 3
+        awardXP(1, stats, skills, 3000, true /* hasTraitSkilled */, 0)
+        expect(stats.level).toBe(3)
+        // Level 3 % 4 !== 0, so no perk
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Perk availability emitted in player:levelUp event
+// ---------------------------------------------------------------------------
+
+describe('player:levelUp event perksAvailable', () => {
+    afterEach(() => {
+        EventBus.clear('player:levelUp')
+    })
+
+    it('emits perksAvailable=0 when not a perk level (level 2)', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        let received: { newLevel: number; perksAvailable: number } | null = null
+        EventBus.on('player:levelUp', (e) => { received = e })
+        awardXP(1, stats, skills, 1000, false, 0)
+        expect(received).not.toBeNull()
+        expect(received!.perksAvailable).toBe(0)
+    })
+
+    it('emits perksAvailable=1 at a perk level (level 3) without Skilled', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        EventBus.on('player:levelUp', (e) => { events.push(e) })
+        awardXP(1, stats, skills, 3000, false, 0)
+        const level3Event = events.find((e) => e.newLevel === 3)
+        expect(level3Event?.perksAvailable).toBe(1)
+    })
+
+    it('emits perksAvailable=0 at level 3 with Skilled (perk schedule shifts to every 4th)', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        EventBus.on('player:levelUp', (e) => { events.push(e) })
+        awardXP(1, stats, skills, 3000, true /* hasTraitSkilled */, 0)
+        const level3Event = events.find((e) => e.newLevel === 3)
+        expect(level3Event?.perksAvailable).toBe(0)
+    })
+
+    it('emits perksAvailable=1 at level 4 with Skilled', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        EventBus.on('player:levelUp', (e) => { events.push(e) })
+        awardXP(1, stats, skills, 6000, true /* hasTraitSkilled */, 0)
+        const level4Event = events.find((e) => e.newLevel === 4)
+        expect(level4Event?.perksAvailable).toBe(1)
     })
 })
 

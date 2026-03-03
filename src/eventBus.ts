@@ -40,7 +40,7 @@ export interface EngineEvents {
 
     // Player
     'player:move': { from: { x: number; y: number }; to: { x: number; y: number } }
-    'player:levelUp': { newLevel: number }
+    'player:levelUp': { newLevel: number; perksAvailable: number }
     'player:xpGain': { amount: number; total: number }
     'player:statChange': { stat: string; oldValue: number; newValue: number }
     'player:skillChange': { skill: string; oldValue: number; newValue: number }
