@@ -1,98 +1,92 @@
 # OpenF2
 
-OpenF2 is a browser-first reimplementation of the Fallout 2 engine (with long-term Fallout 1 compatibility goals).
+OpenF2 is a browser-first reimplementation of the classic Fallout engine runtime.
 
-> Historical note: this project was previously called **Harold** in older docs and code comments.
+- **Current target:** Fallout 2 feature parity and fidelity
+- **Secondary target:** Fallout 1 compatibility and shared engine behavior
+- **Historical note:** older docs may still reference the former name **Harold**
 
-The codebase is based on [darkfo](https://github.com/darkf/darkfo) and has been modernized around TypeScript + Python tooling.
+The project started from [darkfo](https://github.com/darkf/darkfo) and has been modernized around TypeScript + Python tooling.
 
-## Current status
+## Status snapshot
 
-Phase 1 (Playable Core RPG Loop) is complete. Phase 2 (Full Fallout 2 Completion) is complete. Phase 3 (Fallout 1 Compatibility) is complete. OpenF2 is now working through Phase 4 (Fidelity, Modding, and Tooling).
+OpenF2 has completed Phases 1–3 and is currently in **Phase 4: Fidelity, Modding, and Tooling**.
 
-### Implemented (partial or stable)
+### Working today (stable or partial)
 
-- Map loading and traversal
-- Walking/running movement
-- NPC dialogue and basic barter
-- Random encounters (partial)
-- Core scripting support (partial INT VM)
-- SPECIAL stats + full derived stats pipeline
-- Skills system with checks and progression
-- Traits and perks with prerequisite enforcement
-- Combat damage formula (armor DT/DR, ammo, criticals, AP rules)
-- Inventory and equipment management
-- Character leveling and XP flow
-- Quest tracking and reputation/karma
-- Lighting and WebGL rendering
+- Map loading, traversal, and movement
+- Dialogue/barter foundations
+- Core scripting runtime (partial INT VM coverage)
+- SPECIAL, derived stats, skills, traits, and perks
+- Combat formulas (DT/DR, ammo, AP rules, critical pathways)
+- Inventory/equipment management
+- Leveling, XP, quests, karma, and reputation tracking
+- WebGL rendering + lighting foundations
 - Versioned save/load with schema migration
 
-### Known gaps
+### Current gaps
 
-- UI still mixes DOM and WebGL; bitmap-font parity is incomplete
-- World map placement/travel still has bugs
-- Audio coverage is incomplete (effects, music logic, format handling)
-- Ending/intro/cinematic pipeline not yet implemented
-- Some animations and combat outcomes are inaccurate
-- Pip-Boy map and other UI systems are still missing
+- UI still split between DOM and WebGL paths
+- Some world map placement/travel behavior needs correction
+- Animation timing and edge-case combat fidelity still need polish
+- Pip-Boy map and selected legacy UI systems are incomplete
 
-See [ROADMAP.md](./ROADMAP.md) for the prioritized plan.
-See [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md) for the detailed developer guide, engine internals, file format references, and debugging tips.
+See [ROADMAP.md](./ROADMAP.md) for prioritized milestones and [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md) for in-depth contributor guidance.
 
 ## Requirements
 
-- A legal Fallout 2 installation
+- Legal Fallout 2 game data
 - Python 3.9+
 - [Pipenv](https://github.com/pypa/pipenv)
-- Node.js + npm (for TypeScript compile)
+- Node.js + npm
 
 Optional:
 
-- `acm2wav` if you want to run `convertAudio.py` for broader sound support
-- Homebrew users can run `brew bundle` to install many dependencies from `Brewfile`
+- `acm2wav` for broader audio conversion support in `convertAudio.py`
+- Homebrew users can run `brew bundle` from `Brewfile`
 
 ## Quick start
 
-1. Install JS dependencies:
-    ```bash
-    npm install
-    ```
+1. Install Node dependencies:
+   ```bash
+   npm install
+   ```
 2. Install Python dependencies:
-    ```bash
-    pipenv install
-    ```
-3. Prepare game assets:
-    ```bash
-    pipenv run python setup.py /path/to/Fallout2
-    ```
+   ```bash
+   pipenv install
+   ```
+3. Prepare assets from your Fallout 2 install:
+   ```bash
+   pipenv run python setup.py /path/to/Fallout2
+   ```
 4. Compile TypeScript:
-    ```bash
-    npx tsc
-    ```
-5. Run a local web server from the repo root:
-    ```bash
-    python -m http.server
-    ```
+   ```bash
+   npx tsc
+   ```
+5. Start a local web server from the repository root:
+   ```bash
+   python -m http.server
+   ```
 6. Open:
-    ```
-    http://localhost:8000/play.html?artemple
-    ```
+   ```
+   http://localhost:8000/play.html?artemple
+   ```
 
-If startup fails, check the browser console for missing assets or script errors.
+If startup fails, check browser console logs first for missing assets or script/runtime errors.
 
 ## Development notes
 
-- Main engine source: `src/`
-- Config toggles: `src/config.ts` (recompile after TS changes)
-- Asset conversion/utility scripts: repository root (`*.py`)
+- Engine/runtime source: `src/`
+- Config toggles: `src/config.ts` (recompile after TS edits)
+- Asset conversion + support scripts: repository root (`*.py`)
 
 ## Contributing
 
-Contributions are welcome, especially around:
+Contributions are especially helpful in:
 
-- Combat and equipment correctness
-- UI migration to full WebGL rendering
-- Save/load reliability
-- Fallout 1 asset/runtime support
+- Rendering/UI parity work
+- World map and travel correctness
+- Combat + animation fidelity
+- Modding ergonomics and debugging tools
 
-If you plan a major feature, open an issue first so roadmap priorities stay aligned.
+For major features, open an issue first so planning stays aligned with the roadmap.
