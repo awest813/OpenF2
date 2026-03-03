@@ -443,3 +443,34 @@ describe('getAvailablePerks', () => {
         expect(available.find((p) => p.id === 1)).toBeUndefined()
     })
 })
+
+// ---------------------------------------------------------------------------
+// Regression: combat AP formula must use ceil(AGI/2) not floor(AGI/2)
+// ---------------------------------------------------------------------------
+
+describe('combat AP formula consistency (regression)', () => {
+    it('AP matches derivedStats for odd AGI values', () => {
+        // AGI=7: canonical = 5 + ceil(7/2) = 5 + 4 = 9
+        // Bug used floor: 5 + floor(7/2) = 5 + 3 = 8
+        const stats = makeStats({ agility: 7 })
+        expect(stats.maxAP).toBe(9)  // derivedStats canonical
+    })
+
+    it('AP matches derivedStats for even AGI values', () => {
+        // AGI=6: 5 + ceil(6/2) = 5 + 3 = 8 (same with floor for even)
+        const stats = makeStats({ agility: 6 })
+        expect(stats.maxAP).toBe(8)
+    })
+
+    it('AGI=1 yields 6 AP (5 + ceil(1/2) = 5 + 1)', () => {
+        expect(makeStats({ agility: 1 }).maxAP).toBe(6)
+    })
+
+    it('AGI=10 yields 10 AP (5 + ceil(10/2) = 5 + 5)', () => {
+        expect(makeStats({ agility: 10 }).maxAP).toBe(10)
+    })
+
+    it('AGI=9 yields 10 AP (5 + ceil(9/2) = 5 + 5)', () => {
+        expect(makeStats({ agility: 9 }).maxAP).toBe(10)
+    })
+})

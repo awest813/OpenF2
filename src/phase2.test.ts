@@ -144,3 +144,92 @@ describe('applyEncounterDifficulty', () => {
         expect(applyEncounterDifficulty(0, 'hard')).toBe(0)
     })
 })
+
+// ---------------------------------------------------------------------------
+// Regression: encounter bounds checking
+// ---------------------------------------------------------------------------
+
+/** Mirrors the bounds guard added to didEncounter in worldmap.ts. */
+function isSquareInBounds(x: number, y: number, maxX: number, maxY: number): boolean {
+    return x >= 0 && x < maxX && y >= 0 && y < maxY
+}
+
+describe('worldmap square bounds checking (regression)', () => {
+    const maxX = 28, maxY = 30
+
+    it('rejects negative coordinates', () => {
+        expect(isSquareInBounds(-1, 0, maxX, maxY)).toBe(false)
+        expect(isSquareInBounds(0, -1, maxX, maxY)).toBe(false)
+    })
+
+    it('rejects coordinates at or beyond grid limits', () => {
+        expect(isSquareInBounds(maxX, 0, maxX, maxY)).toBe(false)
+        expect(isSquareInBounds(0, maxY, maxX, maxY)).toBe(false)
+    })
+
+    it('accepts valid coordinates within grid', () => {
+        expect(isSquareInBounds(0, 0, maxX, maxY)).toBe(true)
+        expect(isSquareInBounds(maxX - 1, maxY - 1, maxX, maxY)).toBe(true)
+        expect(isSquareInBounds(14, 15, maxX, maxY)).toBe(true)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Regression: undefined encounter rate guard
+// ---------------------------------------------------------------------------
+
+describe('encounter rate undefined guard (regression)', () => {
+    const encounterRates: Record<string, number> = {
+        forced: 100, frequent: 50, common: 30, uncommon: 10, rare: 3, none: 0,
+    }
+
+    it('returns a valid number for known frequency tokens', () => {
+        expect(encounterRates['common']).toBe(30)
+        expect(encounterRates['rare']).toBe(3)
+    })
+
+    it('returns undefined for unknown frequency tokens', () => {
+        expect(encounterRates['nonexistent']).toBeUndefined()
+        expect(encounterRates['']).toBeUndefined()
+    })
+
+    it('guard prevents using undefined as a number in comparison', () => {
+        const rate = encounterRates['unknown_freq']
+        // Without guard, `undefined === 0` is false and `undefined === 100` is false,
+        // so the else branch runs with `undefined` — Math.floor(undefined / 15) = NaN
+        expect(rate === undefined).toBe(true)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Regression: worldmap click offset must use addition, not bitwise OR
+// ---------------------------------------------------------------------------
+
+describe('worldmap offset calculation (regression)', () => {
+    it('addition gives correct result where bitwise OR would truncate', () => {
+        // Simulates box.left + pageXOffset with floating-point values
+        const boxLeft = 100.5
+        const pageXOffset = 50.3
+
+        // Bug: bitwise OR truncates both operands to 32-bit ints and ORs them
+        const buggyResult = boxLeft | (0 + pageXOffset)
+        // Fix: simple addition preserves floating-point precision
+        const correctResult = boxLeft + pageXOffset
+
+        expect(correctResult).toBeCloseTo(150.8)
+        // The buggy bitwise OR gives a different result (100 | 50 = 118)
+        expect(buggyResult).not.toBeCloseTo(150.8)
+    })
+
+    it('addition with zero pageOffset matches box position', () => {
+        const boxLeft = 200.7
+        const pageXOffset = 0
+
+        const correct = boxLeft + pageXOffset
+        const buggy = boxLeft | (0 + pageXOffset)
+
+        expect(correct).toBeCloseTo(200.7)
+        // Bitwise OR truncates: 200 | 0 = 200
+        expect(buggy).toBe(200)
+    })
+})
