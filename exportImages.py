@@ -25,8 +25,8 @@ def flatten(l):
 
 def main():
 	if len(sys.argv) < 4:
-		print "USAGE: %s PALETTE DATA_DIR OUT_DIR [--no-map] [--only-map] [--update]" % sys.argv[0]
-		print "PALETTE is likely data/color.pal, and DATA_DIR is likely data/"
+		print("USAGE: %s PALETTE DATA_DIR OUT_DIR [--no-map] [--only-map] [--update]" % sys.argv[0])
+		print("PALETTE is likely data/color.pal, and DATA_DIR is likely data/")
 		sys.exit(1)
 
 	PALETTE = sys.argv[1]
