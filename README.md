@@ -37,6 +37,7 @@ Phase 1 (Playable Core RPG Loop) is complete. Phase 2 (Full Fallout 2 Completion
 - Pip-Boy map and other UI systems are still missing
 
 See [ROADMAP.md](./ROADMAP.md) for the prioritized plan.
+See [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md) for the detailed developer guide, engine internals, file format references, and debugging tips.
 
 ## Requirements
 

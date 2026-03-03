@@ -49,7 +49,7 @@ export class ActionPoints {
         const bonusCombatAP = this.attachedCritter.stats.apBonus || 0
         const bonusMoveAP = 0 // Move AP is typically 0 in Fallout
 
-        return { combat: 5 + Math.floor(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
+        return { combat: 5 + Math.ceil(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
     }
 
     getAvailableMoveAP(): number {

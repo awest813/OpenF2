@@ -479,8 +479,11 @@ export module Worldmap {
     export function didEncounter(): boolean {
         const squarePos = positionToSquare(worldmapPlayer)
         if (!squarePos) return false
+        if (squarePos.x < 0 || squarePos.x >= NUM_SQUARES_X || squarePos.y < 0 || squarePos.y >= NUM_SQUARES_Y) return false
         const square = worldmap.squares[squarePos.x][squarePos.y]
+        if (!square) return false
         let encRate = worldmap.encounterRates[square.frequency]
+        if (encRate === undefined) return false
 
         //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
 
@@ -549,8 +552,8 @@ export module Worldmap {
         $worldmap.onclick = function (this: HTMLElement, e: MouseEvent) {
             // Calculate viewport-relative offset
             const box = this.getBoundingClientRect()
-            const offsetLeft = box.left | (0 + window.pageXOffset)
-            const offsetTop = box.top | (0 + window.pageYOffset)
+            const offsetLeft = box.left + window.pageXOffset
+            const offsetTop = box.top + window.pageYOffset
 
             const x = e.pageX - offsetLeft
             const y = e.pageY - offsetTop
@@ -690,7 +693,7 @@ export module Worldmap {
 
             const squarePos = positionToSquare(worldmapPlayer)
             // Guard: if the player is somehow out of the map bounds, skip movement
-            if (!squarePos) {
+            if (!squarePos || squarePos.x < 0 || squarePos.x >= NUM_SQUARES_X || squarePos.y < 0 || squarePos.y >= NUM_SQUARES_Y) {
                 worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
                 return
             }

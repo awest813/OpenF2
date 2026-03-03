@@ -13,8 +13,9 @@ OpenF2 aims to deliver:
 
 ## Current execution status
 
-- **Active phase:** Phase 3 — Fallout 1 Compatibility / Phase 4 setup
-- **Phase state:** Phase 3 complete; Phase 4 mod-manifest scaffold in place
+- **Active phase:** Phase 4 — Fidelity, Modding, and Tooling
+- **Phase state:** Phases 0–3 complete; Phase 4 in progress
+- **Recent:** Phase 1/2 debugging pass complete (AP formula fix, worldmap bounds fixes, encounter rate guards)
 
 ## Baseline (today)
 
