@@ -990,6 +990,7 @@ export class Critter extends Obj {
 
     leftHand?: WeaponObj // Left-hand object slot
     rightHand?: WeaponObj // Right-hand object slot
+    equippedArmor?: Obj | null = null // Equipped armor item
 
     type = 'critter'
     anim = 'idle'
@@ -1229,7 +1230,21 @@ export class Critter extends Obj {
     }
 
     getStat(stat: string) {
-        return this.stats.get(stat)
+        let statValue = this.stats.get(stat)
+        
+        // Add armor bonuses for DT/DR stats if armor is equipped
+        if (this.equippedArmor && this.equippedArmor.pro && this.equippedArmor.pro.extra) {
+            const armorStats = this.equippedArmor.pro.extra.stats
+            if (armorStats && armorStats[stat] !== undefined) {
+                statValue += armorStats[stat]
+            }
+            // Also add AC bonus from armor
+            if (stat === 'AC' && this.equippedArmor.pro.extra.AC !== undefined) {
+                statValue += this.equippedArmor.pro.extra.AC
+            }
+        }
+        
+        return statValue
     }
 
     getBase(): string {

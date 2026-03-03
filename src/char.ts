@@ -152,7 +152,7 @@ export class StatSet {
                 stats[stat] += bonusStats[stat];
         }
 
-        // TODO: armor, appears to be hardwired into the proto?
+        // Note: Armor DT/DR bonuses are added dynamically in Critter.getStat() when armor is equipped
 
         // Define Max HP = HP if it does not exist
         if(stats["Max HP"] === undefined && stats["HP"] !== undefined)

@@ -284,8 +284,8 @@ export class Combat {
         var RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
         var RB = 0 // ranged bonus (via perk)
         var CM = critModifer // critical hit damage multiplier
-        var ADR = target.getStat('DR ' + damageType) // damage resistance (TODO: armor)
-        var ADT = target.getStat('DT ' + damageType) // damage threshold (TODO: armor)
+        var ADR = target.getStat('DR ' + damageType) // damage resistance (includes equipped armor)
+        var ADT = target.getStat('DT ' + damageType) // damage threshold (includes equipped armor)
         var X = 2 // ammo dividend
         var Y = 1 // ammo divisor
         var RM = 0 // ammo resistance modifier
