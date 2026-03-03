@@ -77,6 +77,7 @@ export default {
     uiMode: UIMode.none,
 
     mapAreas: null,
+    markAreaKnown: null,
 } as {
     gMap: GameMap | null
     combat: Combat | null
@@ -127,4 +128,7 @@ export default {
     uiMode: UIMode
 
     mapAreas: AreaMap | null
+
+    /** Registered by Worldmap.init() to bridge mark_area_known scripting calls. */
+    markAreaKnown: ((areaID: number, markState: number) => void) | null
 }

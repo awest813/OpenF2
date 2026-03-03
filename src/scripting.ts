@@ -470,7 +470,15 @@ export module Scripting {
 
         // player
         give_exp_points(xp: number) {
-            stub('give_exp_points', arguments)
+            const player = globalState.player
+            if (!player) return
+            player.xp += xp
+            uiLog('You gain ' + xp + ' experience points.')
+            // Check for level-up: level N requires N*(N-1)/2 * 1000 XP
+            while (player.xp >= (player.level * (player.level + 1) / 2) * 1000) {
+                player.level++
+                uiLog('You have reached experience level ' + player.level + '.')
+            }
         }
 
         // critters
@@ -715,12 +723,18 @@ export module Scripting {
             return 0
         }
         get_pc_stat(pcstat: number) {
+            const player = globalState.player
             switch (pcstat) {
                 case 0: // PCSTAT_unspent_skill_points
+                    return player ? player.skills.skillPoints : 0
                 case 1: // PCSTAT_level
+                    return player ? player.level : 1
                 case 2: // PCSTAT_experience
+                    return player ? player.xp : 0
                 case 3: // PCSTAT_reputation
+                    return globalVars[0] !== undefined ? globalVars[0] : 0
                 case 4: // PCSTAT_karma
+                    return player ? player.karma : 0
                 case 5: // PCSTAT_max_pc_stat
                     stub('get_pc_stat', arguments)
                     return 0
@@ -1323,19 +1337,14 @@ export module Scripting {
         mark_area_known(areaType: number, area: number, markState: number) {
             if (areaType === 0) {
                 // MARK_TYPE_TOWN
-                switch (markState) {
-                    case 0:
-                        break // MARK_STATE_UNKNOWN
-                    case 1: // MARK_STATE_KNOWN
-                        info('TODO: Mark area ' + area + ' on map')
-                        return
-                    case 2:
-                        break // MARK_STATE_VISITED
-                    case -66:
-                        break // MARK_STATE_INVISIBLE
+                if (markState === -66) {
+                    // MARK_STATE_INVISIBLE — hide the area
+                    if (globalState.markAreaKnown) globalState.markAreaKnown(area, 0)
+                } else {
+                    // MARK_STATE_UNKNOWN (0), MARK_STATE_KNOWN (1), MARK_STATE_VISITED (2)
+                    if (globalState.markAreaKnown) globalState.markAreaKnown(area, markState)
+                    else stub('mark_area_known', arguments)
                 }
-
-                stub('mark_area_known', arguments)
             } else if (areaType === 1) {
                 // MARK_TYPE_MAP
                 stub('mark_area_known', arguments)
