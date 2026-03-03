@@ -18,13 +18,15 @@ import { Point } from './geometry.js'
 import globalState from './globalState.js'
 import { SerializedMap } from './map.js'
 import { deserializeObj, SerializedObj } from './object.js'
+import { SerializedQuestLog } from './quest/questLog.js'
+import { SerializedReputation } from './quest/reputation.js'
 
 // Saving and loading support
 
 let db: IDBDatabase
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 // Save game metadata + maps
 export interface SaveGame {
@@ -38,6 +40,11 @@ export interface SaveGame {
     player: { position: Point; orientation: number; inventory: SerializedObj[] }
     party: SerializedObj[]
     savedMaps: { [mapName: string]: SerializedMap }
+
+    /** Quest log — optional for backwards compat with version-1 saves. */
+    questLog?: SerializedQuestLog
+    /** Reputation and karma — optional for backwards compat with version-1 saves. */
+    reputation?: SerializedReputation
 }
 
 /**
@@ -59,6 +66,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
 
     // Fall-through intentional: each case upgrades one version.
     switch (save.version as number) {
+        case 1:
+            // v1 → v2: add empty questLog and reputation fields.
+            save.questLog = save.questLog ?? { entries: [] }
+            save.reputation = save.reputation ?? { karma: 0, reputations: {} }
+            save.version = 2
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
