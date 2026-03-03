@@ -20,6 +20,7 @@
  */
 
 import type { Font } from '../formats/fon.js'
+import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
 // BitmapFontRenderer
@@ -254,6 +255,8 @@ export class UIManagerImpl {
     private panels: UIPanel[] = []
     private offscreen: OffscreenCanvas
     private ctx: OffscreenCanvasRenderingContext2D
+    private _busOpenHandler: ((e: { panelName: string }) => void) | null = null
+    private _busCloseHandler: ((e: { panelName: string }) => void) | null = null
 
     constructor(width: number, height: number) {
         this.offscreen = new OffscreenCanvas(width, height)
@@ -322,5 +325,30 @@ export class UIManagerImpl {
             if (panel.onKeyDown(key)) return true
         }
         return false
+    }
+
+    /**
+     * Wire this UIManager to the engine EventBus so that `ui:openPanel` and
+     * `ui:closePanel` events automatically show/hide registered panels by name.
+     *
+     * Call once after all panels have been registered. Calling again is safe —
+     * existing handlers are removed before new ones are registered to prevent
+     * duplicate subscriptions.
+     */
+    connectEventBus(): void {
+        if (this._busOpenHandler) {
+            EventBus.off('ui:openPanel', this._busOpenHandler)
+            EventBus.off('ui:closePanel', this._busCloseHandler!)
+        }
+        this._busOpenHandler = ({ panelName }) => {
+            const panel = this.panels.find((p) => p.name === panelName)
+            panel?.show()
+        }
+        this._busCloseHandler = ({ panelName }) => {
+            const panel = this.panels.find((p) => p.name === panelName)
+            panel?.hide()
+        }
+        EventBus.on('ui:openPanel', this._busOpenHandler)
+        EventBus.on('ui:closePanel', this._busCloseHandler)
     }
 }

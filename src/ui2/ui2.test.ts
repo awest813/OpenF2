@@ -8,8 +8,10 @@
  *   - UIManagerImpl: register, get, isAnyPanelOpen
  *   - UIManagerImpl: handleMouseDown routing
  *   - UIManagerImpl: handleKeyDown routing
+ *   - UIManagerImpl: connectEventBus() wiring
  *   - EventBus: ui:openPanel / ui:closePanel events
- *   - PipBoyPanel: tab switching via keyboard
+ *   - PipBoyPanel: tab switching and scroll via keyboard
+ *   - GamePanel: HUD_BUTTONS layout and OPTIONS button
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -368,5 +370,170 @@ describe('EventBus ui panel events', () => {
         EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
         expect(opens).toEqual(['pipboy'])
         expect(closes).toEqual(['pipboy'])
+    })
+})
+
+// ---------------------------------------------------------------------------
+// UIManagerImpl — connectEventBus
+// ---------------------------------------------------------------------------
+
+describe('UIManagerImpl.connectEventBus', () => {
+    beforeEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    afterEach(() => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('shows a registered panel when ui:openPanel fires with matching name', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const panel = new TestPanel('pipboy', { x: 0, y: 0, width: 400, height: 500 }, 20)
+        mgr.register(panel)
+        mgr.connectEventBus()
+
+        expect(panel.visible).toBe(false)
+        EventBus.emit('ui:openPanel', { panelName: 'pipboy' })
+        expect(panel.visible).toBe(true)
+    })
+
+    it('hides a visible panel when ui:closePanel fires with matching name', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const panel = new TestPanel('pipboy', { x: 0, y: 0, width: 400, height: 500 }, 20)
+        panel.show()
+        mgr.register(panel)
+        mgr.connectEventBus()
+
+        expect(panel.visible).toBe(true)
+        EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
+        expect(panel.visible).toBe(false)
+    })
+
+    it('ignores ui:openPanel events for panels that are not registered', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const panel = new TestPanel('pipboy', { x: 0, y: 0, width: 400, height: 500 }, 20)
+        mgr.register(panel)
+        mgr.connectEventBus()
+
+        // firing for a different name should not affect our panel
+        EventBus.emit('ui:openPanel', { panelName: 'inventory' })
+        expect(panel.visible).toBe(false)
+    })
+
+    it('opening and closing via EventBus updates isAnyPanelOpen', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const panel = new TestPanel('char', { x: 100, y: 100, width: 300, height: 300 }, 10)
+        mgr.register(panel)
+        mgr.connectEventBus()
+
+        expect(mgr.isAnyPanelOpen()).toBe(false)
+        EventBus.emit('ui:openPanel', { panelName: 'char' })
+        expect(mgr.isAnyPanelOpen()).toBe(true)
+        EventBus.emit('ui:closePanel', { panelName: 'char' })
+        expect(mgr.isAnyPanelOpen()).toBe(false)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// PipBoyPanel — scroll support
+// ---------------------------------------------------------------------------
+
+import { PipBoyPanel } from './pipboy.js'
+import { QuestLog } from '../quest/questLog.js'
+import { EntityManager } from '../ecs/entityManager.js'
+
+describe('PipBoyPanel scroll and tab switching', () => {
+    it('ArrowRight cycles through tabs', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog)
+        panel.show()
+
+        // Default tab is 'status'
+        // ArrowRight → items
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+        // ArrowRight → map
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+        // ArrowRight → quests
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+        // ArrowRight wraps back → status
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+    })
+
+    it('ArrowLeft cycles through tabs in reverse', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog)
+        panel.show()
+
+        // Default: status. ArrowLeft → quests (wraps)
+        expect(panel.onKeyDown('ArrowLeft')).toBe(true)
+    })
+
+    it('Tab key advances to the next tab', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog)
+        panel.show()
+        expect(panel.onKeyDown('Tab')).toBe(true)
+    })
+
+    it('Escape hides the panel', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog)
+        panel.show()
+        expect(panel.visible).toBe(true)
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('P key hides the panel', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog)
+        panel.show()
+        expect(panel.onKeyDown('p')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('ArrowDown increments item scroll when on items tab', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog) as any
+        panel.show()
+        panel.activeTab = 'items'
+        panel._itemScrollOffset = 0
+        panel.onKeyDown('ArrowDown')
+        expect(panel._itemScrollOffset).toBe(1)
+    })
+
+    it('ArrowUp decrements item scroll but not below zero', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog) as any
+        panel.show()
+        panel.activeTab = 'items'
+        panel._itemScrollOffset = 0
+        panel.onKeyDown('ArrowUp')
+        expect(panel._itemScrollOffset).toBe(0)
+    })
+
+    it('ArrowDown increments quest scroll when on quests tab', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog) as any
+        panel.show()
+        panel.activeTab = 'quests'
+        panel._questScrollOffset = 2
+        panel.onKeyDown('ArrowDown')
+        expect(panel._questScrollOffset).toBe(3)
+    })
+
+    it('switching tabs resets scroll offsets', () => {
+        const questLog = new QuestLog()
+        const panel = new PipBoyPanel(800, 600, 1, questLog) as any
+        panel.show()
+        panel.activeTab = 'items'
+        panel._itemScrollOffset = 5
+        panel._questScrollOffset = 3
+        // Switch via ArrowRight
+        panel.onKeyDown('ArrowRight')
+        expect(panel._itemScrollOffset).toBe(0)
+        expect(panel._questScrollOffset).toBe(0)
     })
 })
