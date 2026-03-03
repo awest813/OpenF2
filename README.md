@@ -8,7 +8,7 @@ The codebase is based on [darkfo](https://github.com/darkf/darkfo) and has been 
 
 ## Current status
 
-OpenF2 is playable in parts, but still experimental and incomplete.
+Phase 1 (Playable Core RPG Loop) is complete. OpenF2 is now actively working through Phase 2 (Full Fallout 2 Completion). The engine is playable but still experimental.
 
 ### Implemented (partial or stable)
 
@@ -17,17 +17,24 @@ OpenF2 is playable in parts, but still experimental and incomplete.
 - NPC dialogue and basic barter
 - Random encounters (partial)
 - Core scripting support (partial INT VM)
-- Basic combat flow (limited weapons/content coverage)
+- SPECIAL stats + full derived stats pipeline
+- Skills system with checks and progression
+- Traits and perks with prerequisite enforcement
+- Combat damage formula (armor DT/DR, ammo, criticals, AP rules)
+- Inventory and equipment management
+- Character leveling and XP flow
+- Quest tracking and reputation/karma
 - Lighting and WebGL rendering
-- Alpha save/load
+- Versioned save/load with schema migration
 
 ### Known gaps
 
 - UI still mixes DOM and WebGL; bitmap-font parity is incomplete
-- Armor/equipment and ammo systems are incomplete
 - World map placement/travel still has bugs
+- Audio coverage is incomplete (effects, music logic, format handling)
+- Ending/intro/cinematic pipeline not yet implemented
 - Some animations and combat outcomes are inaccurate
-- Pip-Boy map and other systems are still missing
+- Pip-Boy map and other UI systems are still missing
 
 See [ROADMAP.md](./ROADMAP.md) for the prioritized plan.
 

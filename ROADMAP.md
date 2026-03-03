@@ -25,15 +25,21 @@ OpenF2 aims to deliver:
 - Dialogue + barter foundations
 - Partial scripting VM support
 - WebGL renderer with lighting support
-- Early save/load support
+- SPECIAL stats + full derived stats pipeline
+- Skills system with checks and progression
+- Traits and perks with prerequisite enforcement
+- Combat damage formula (armor DT/DR, ammo, criticals, AP rules)
+- Inventory and equipment management
+- Character leveling and XP flow
+- Quest tracking and reputation/karma
+- Versioned save/load with schema migration
 
 ### Major gaps
 
-- Incomplete combat systems (armor/ammo/depth)
-- Incomplete character progression (skills/perks/traits)
 - UI parity not reached (DOM/WebGL split)
 - World map placement/travel issues
 - Incomplete audio feature set
+- Ending/intro/cinematic pipeline not implemented
 - Missing Fallout 1 compatibility layer
 
 ---
@@ -93,11 +99,11 @@ OpenF2 aims to deliver:
 
 ## Near-term priorities
 
-1. Combat correctness (armor/ammo/AP/critical effects)
-2. UI migration away from mixed DOM rendering
-3. Save/load reliability and schema versioning
-4. Script runtime coverage + regression test expansion
-5. World map travel and entrance alignment fixes
+1. UI migration away from mixed DOM rendering
+2. World map travel and entrance alignment fixes
+3. Script runtime opcode/procedure coverage expansion
+4. Audio completeness (effects, music logic, format handling)
+5. Ending/intro/cinematic pipeline support
 
 ## Success criteria
 
