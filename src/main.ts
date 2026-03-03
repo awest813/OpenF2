@@ -24,7 +24,7 @@ import { initGame } from './init.js'
 import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
-import { Skills } from './skills.js'
+import { skillRequiresTarget, Skills } from './skills.js'
 import {
     uiCalledShot,
     uiCloseCalledShot,
@@ -54,26 +54,14 @@ function getSkillID(skill: Skills): number {
     return -1
 }
 
-// Is the skill passive, or does it require a targeted object to use?
-function isPassiveSkill(skill: Skills): boolean {
-    switch (skill) {
-        case Skills.Lockpick:
-            return false
-        case Skills.Repair:
-            return false
-        default:
-            throw `TODO: is passive skill ${skill}`
-    }
-}
-
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
 
-    if (!obj && !isPassiveSkill(skill)) {
+    if (!obj && skillRequiresTarget(skill)) {
         throw 'trying to use non-passive skill without a target'
     }
 
-    if (!isPassiveSkill(skill)) {
+    if (skillRequiresTarget(skill)) {
         // use the skill on the object
         Scripting.useSkillOn(globalState.player, getSkillID(skill), obj)
     } else {

@@ -18,6 +18,17 @@ export enum Skills {
     Repair,
 }
 
+export function skillRequiresTarget(skill: Skills): boolean {
+    switch (skill) {
+        case Skills.Lockpick:
+        case Skills.Repair:
+            return true
+        case Skills.None:
+        default:
+            return false
+    }
+}
+
 // Skill Dependencies system
 
 export enum StatType {
