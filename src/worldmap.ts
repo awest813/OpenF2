@@ -345,6 +345,53 @@ export module Worldmap {
         return worldmap.encounterGroups[groupName]
     }
 
+    /**
+     * Mark a world-map area as known/discovered from a script call.
+     * Corresponds to the scripting opcode mark_area_known(MARK_TYPE_TOWN, areaID, markState).
+     *
+     * markState:
+     *   0 = MARK_STATE_UNKNOWN  — hide the area
+     *   1 = MARK_STATE_KNOWN    — reveal on map (add DOM element if not present)
+     *   2 = MARK_STATE_VISITED  — same as KNOWN for display purposes
+     */
+    export function markAreaKnown(areaID: number, markState: number): void {
+        if (!globalState.mapAreas) return
+        const area = globalState.mapAreas[areaID]
+        if (!area) {
+            console.warn('markAreaKnown: unknown area id ' + areaID)
+            return
+        }
+
+        if (markState === 0) {
+            area.state = false
+            return
+        }
+
+        if (area.state === true) return // already visible
+
+        area.state = true
+
+        // Render the area on the world map DOM (mirrors the init() rendering logic)
+        if ($worldmap === null) return
+        const $area = makeEl('div', { classes: ['area'] })
+        $worldmap.appendChild($area)
+
+        const $el = makeEl('div', { classes: ['areaCircle', 'areaSize-' + area.size] })
+        $area.appendChild($el)
+
+        const x = area.worldPosition.x - $el.offsetWidth / 2
+        const y = area.worldPosition.y - $el.offsetHeight / 2
+        $area.style.left = x + 'px'
+        $area.style.top = y + 'px'
+
+        const $label = makeEl('div', {
+            classes: ['areaLabel'],
+            style: { left: '0px', top: 2 + $el.offsetHeight + 'px' },
+        })
+        $area.appendChild($label)
+        $label.textContent = area.name
+    }
+
     function positionToSquare(pos: Point): Point {
         return { x: Math.floor(pos.x / SQUARE_SIZE), y: Math.floor(pos.y / SQUARE_SIZE) }
     }
@@ -484,6 +531,10 @@ export module Worldmap {
         worldmap = parseWorldmap(getFileText('data/data/worldmap.txt'))
 
         if (!globalState.mapAreas) globalState.mapAreas = loadAreas()
+
+        // Register the markAreaKnown callback so scripting.ts can call it without a
+        // direct (circular) import of this module.
+        globalState.markAreaKnown = markAreaKnown
 
         $worldmap.onclick = function (this: HTMLElement, e: MouseEvent) {
             // Calculate viewport-relative offset

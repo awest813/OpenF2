@@ -14,63 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Point } from './geometry.js'
 import globalState from './globalState.js'
-import { SerializedMap } from './map.js'
-import { deserializeObj, SerializedObj } from './object.js'
+import { deserializeObj } from './object.js'
+import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
+
+export { SAVE_VERSION, SaveGame, migrateSave }
 
 // Saving and loading support
 
 let db: IDBDatabase
-
-/** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 1
-
-// Save game metadata + maps
-export interface SaveGame {
-    id?: number
-    version: number
-    name: string
-    timestamp: number
-    currentMap: string
-    currentElevation: number
-
-    player: { position: Point; orientation: number; inventory: SerializedObj[] }
-    party: SerializedObj[]
-    savedMaps: { [mapName: string]: SerializedMap }
-}
-
-/**
- * Migrate a raw save object from an older version to the current schema.
- *
- * Each `case` handles exactly one version step-up so migrations compose
- * correctly regardless of how old the save is.
- *
- * @returns The migrated save at SAVE_VERSION.
- * @throws If the version is unknown or cannot be migrated.
- */
-export function migrateSave(raw: Record<string, any>): SaveGame {
-    const save = { ...raw }
-
-    // Treat missing version as version 1 (the original schema).
-    if (save.version === undefined || save.version === null) {
-        save.version = 1
-    }
-
-    // Fall-through intentional: each case upgrades one version.
-    switch (save.version as number) {
-        case SAVE_VERSION:
-            // Already current — nothing to do.
-            break
-
-        default:
-            throw new Error(
-                `[SaveLoad] Unknown save version ${save.version}; cannot migrate to ${SAVE_VERSION}`
-            )
-    }
-
-    return save as SaveGame
-}
 
 function gatherSaveData(name: string): SaveGame {
     // Saves the game and returns the savegame
@@ -87,6 +39,9 @@ function gatherSaveData(name: string): SaveGame {
             position: globalState.player.position,
             orientation: globalState.player.orientation,
             inventory: globalState.player.inventory.map((obj) => obj.serialize()),
+            xp: globalState.player.xp,
+            level: globalState.player.level,
+            karma: globalState.player.karma,
         },
         party: globalState.gParty.serialize(),
         savedMaps: { [curMap.name]: curMap, ...globalState.dirtyMapCache },
@@ -184,6 +139,11 @@ export function load(id: number): void {
             globalState.player.position = save.player.position
             globalState.player.orientation = save.player.orientation
             globalState.player.inventory = save.player.inventory.map((obj) => deserializeObj(obj))
+            // xp/level/karma are guaranteed by migrateSave(); fallbacks guard against
+            // stale in-memory objects that bypassed migration.
+            globalState.player.xp = save.player.xp ?? 0
+            globalState.player.level = save.player.level ?? 1
+            globalState.player.karma = save.player.karma ?? 0
 
             globalState.gParty.deserialize(save.party)
 

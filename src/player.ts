@@ -41,6 +41,10 @@ export class Player extends Critter {
     gender = 'male'
     leftHand = <WeaponObj>createObjectWithPID(9)
 
+    xp: number = 0
+    level: number = 1
+    karma: number = 0
+
     inventory = [createObjectWithPID(41).setAmount(1337)]
 
     lightRadius = 4
