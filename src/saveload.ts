@@ -23,6 +23,9 @@ import { deserializeObj, SerializedObj } from './object.js'
 
 let db: IDBDatabase
 
+/** Current save schema version. Increment when the SaveGame shape changes. */
+export const SAVE_VERSION = 1
+
 // Save game metadata + maps
 export interface SaveGame {
     id?: number
@@ -37,13 +40,45 @@ export interface SaveGame {
     savedMaps: { [mapName: string]: SerializedMap }
 }
 
+/**
+ * Migrate a raw save object from an older version to the current schema.
+ *
+ * Each `case` handles exactly one version step-up so migrations compose
+ * correctly regardless of how old the save is.
+ *
+ * @returns The migrated save at SAVE_VERSION.
+ * @throws If the version is unknown or cannot be migrated.
+ */
+export function migrateSave(raw: Record<string, any>): SaveGame {
+    const save = { ...raw }
+
+    // Treat missing version as version 1 (the original schema).
+    if (save.version === undefined || save.version === null) {
+        save.version = 1
+    }
+
+    // Fall-through intentional: each case upgrades one version.
+    switch (save.version as number) {
+        case SAVE_VERSION:
+            // Already current — nothing to do.
+            break
+
+        default:
+            throw new Error(
+                `[SaveLoad] Unknown save version ${save.version}; cannot migrate to ${SAVE_VERSION}`
+            )
+    }
+
+    return save as SaveGame
+}
+
 function gatherSaveData(name: string): SaveGame {
     // Saves the game and returns the savegame
 
     const curMap = globalState.gMap.serialize()
 
     return {
-        version: 1,
+        version: SAVE_VERSION,
         name,
         timestamp: Date.now(),
         currentElevation: globalState.currentElevation,
@@ -137,7 +172,7 @@ export function load(id: number): void {
 
     withTransaction((trans) => {
         trans.objectStore('saves').get(id).onsuccess = function (e) {
-            const save: SaveGame = (<any>e.target).result
+            const save: SaveGame = migrateSave((<any>e.target).result)
             const savedMap = save.savedMaps[save.currentMap]
 
             console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
