@@ -122,8 +122,7 @@ function useExplosive(obj: Obj, source: Critter): void {
         obj: null,
         userdata: null,
         fn: function () {
-            // explode!
-            // TODO: explosion damage calculations
+            // Explosion with proper damage calculations
             obj.explode(source, 10 /* min dmg */, 25 /* max dmg */)
         },
     })
@@ -746,33 +745,51 @@ export class Obj {
     }
 
     explode(source: Obj, minDmg: number, maxDmg: number): void {
-        const damage = maxDmg
+        // Calculate explosion radius based on damage
+        // In Fallout, typical explosive radius is 2-4 hexes
+        const explosionRadius = Math.min(8, Math.max(2, Math.floor(maxDmg / 10)))
+        const damage = Math.floor((minDmg + maxDmg) / 2) // Average damage at center
+        
         const explosion = createObjectWithPID(makePID(5 /* misc */, 14 /* Explosion */), -1)
         explosion.position.x = this.position.x
         explosion.position.y = this.position.y
-        ;(<any>this).dmgType = 'explosion' // TODO: any (WeaponObj?)
+        ;(<any>this).dmgType = 'Explosive' // Explosive damage type
 
         lazyLoadImage(explosion.art, () => {
             globalState.gMap.addObject(explosion)
 
-            console.log('adding explosion')
+            console.log(`Explosion at (${this.position.x}, ${this.position.y}) with radius ${explosionRadius} and damage ${damage}`)
             explosion.singleAnimation(false, () => {
                 globalState.gMap.destroyObject(explosion)
 
-                // damage critters in a radius
-                const hexes = hexesInRadius(this.position, 8 /* explosion radius */) // TODO: radius
+                // Damage critters in a radius with falloff
+                const hexes = hexesInRadius(this.position, explosionRadius)
                 for (let i = 0; i < hexes.length; i++) {
+                    const distance = hexDistance(this.position, hexes[i])
+                    
+                    // Calculate damage falloff: full damage at center, linear decrease with distance
+                    // Damage = baseDamage * (1 - distance / (radius + 1))
+                    const damageFalloff = Math.max(0, 1 - distance / (explosionRadius + 1))
+                    const adjustedDamage = Math.max(1, Math.floor(damage * damageFalloff))
+                    
                     const objs = globalState.gMap.objectsAtPosition(hexes[i])
                     for (let j = 0; j < objs.length; j++) {
                         if (objs[j].type === 'critter') {
-                            console.log('todo: damage', (<Critter>objs[j]).name)
+                            const critter = <Critter>objs[j]
+                            console.log(`Explosion damages ${critter.name} for ${adjustedDamage} (distance: ${distance}, falloff: ${damageFalloff.toFixed(2)})`)
+                            
+                            // Import critterDamage to apply damage with explosive type
+                            import('./critter.js').then((module) => {
+                                module.critterDamage(critter, adjustedDamage, source as Critter, false, true, 'Explosive')
+                            })
                         }
 
-                        Scripting.damage(objs[j], this, this /*source*/, damage)
+                        // Also notify scripts
+                        Scripting.damage(objs[j], this, this /*source*/, adjustedDamage)
                     }
                 }
 
-                // remove explosive
+                // Remove explosive
                 globalState.gMap.destroyObject(this)
             })
         })
