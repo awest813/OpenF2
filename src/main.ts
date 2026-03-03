@@ -40,6 +40,11 @@ import { getFileJSON, getProtoMsg } from './util.js'
 import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
+import { UIManagerImpl } from './ui2/uiPanel.js'
+import { GamePanel } from './ui2/gamePanel.js'
+import { PipBoyPanel } from './ui2/pipboy.js'
+import { CharacterScreen } from './ui2/characterScreen.js'
+import { createPlayerEntity } from './ecs/entityFactory.js'
 
 // Return the skill ID used by the Fallout 2 engine
 function getSkillID(skill: Skills): number {
@@ -223,6 +228,28 @@ export function playerUse() {
     }
 }
 
+/**
+ * Create and wire the UIManagerImpl (ui2 WebGL/OffscreenCanvas path).
+ *
+ * Called once after the renderer is initialized. Creates the player ECS entity
+ * (for UI data), builds all panels, registers them, and connects the EventBus so
+ * that ui:openPanel / ui:closePanel events show/hide panels automatically.
+ */
+function initUIManager(): void {
+    const playerEntityId = createPlayerEntity({ name: 'VAULT DWELLER' })
+    globalState.playerEntityId = playerEntityId
+
+    const mgr = new UIManagerImpl(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+    mgr.register(new GamePanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
+    mgr.register(new PipBoyPanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog))
+    mgr.register(new CharacterScreen(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
+
+    mgr.connectEventBus()
+
+    globalState.uiManager = mgr
+}
+
 window.onload = async function () {
     globalState.isInitializing = true
 
@@ -245,6 +272,9 @@ window.onload = async function () {
     )
 
     globalState.renderer.init()
+
+    // initialize ui2 panel manager (unified WebGL/OffscreenCanvas UI path)
+    initUIManager()
 
     // initialize audio engine
     if (Config.engine.doAudio) {
@@ -290,7 +320,13 @@ window.onload = async function () {
 heart.mousepressed = (x: number, y: number, btn: string) => {
     if (globalState.isInitializing || globalState.isLoading || globalState.isWaitingOnRemote) {
         return
-    } else if (btn === 'l') {
+    }
+    // Route to ui2 UIManager first; if it consumes the event, stop game input processing.
+    if (globalState.uiManager && (btn === 'l' || btn === 'r') &&
+        globalState.uiManager.handleMouseDown(x, y, btn)) {
+        return
+    }
+    if (btn === 'l') {
         playerUse()
     } else if (btn === 'r') {
         // item context menu
@@ -303,6 +339,10 @@ heart.mousepressed = (x: number, y: number, btn: string) => {
 
 heart.keydown = (k: string) => {
     if (globalState.isLoading === true) {
+        return
+    }
+    // Route to ui2 UIManager first; if a panel consumes the key, skip game handling.
+    if (globalState.uiManager?.handleKeyDown(k)) {
         return
     }
     const mousePos = heart.mouse.getPosition()
@@ -519,6 +559,8 @@ heart.update = function () {
 
     if (globalState.gameHasFocus) {
         const mousePos = heart.mouse.getPosition()
+        // Route mouse move to ui2 panels for hover effects.
+        globalState.uiManager?.handleMouseMove(mousePos[0], mousePos[1])
         if (mousePos[0] <= Config.ui.scrollPadding) {
             globalState.cameraPosition.x -= 15
         }

@@ -25,6 +25,7 @@ import { Reputation } from './quest/reputation.js'
 import { Renderer } from './renderer.js'
 import { Skills } from './skills.js'
 import { UIMode } from './ui.js'
+import { UIManagerImpl } from './ui2/uiPanel.js'
 
 interface FloatMessage {
     msg: string
@@ -80,6 +81,9 @@ export default {
     reputation: new Reputation(),
 
     uiMode: UIMode.none,
+
+    uiManager: null,
+    playerEntityId: 0,
 
     mapAreas: null,
     markAreaKnown: null,
@@ -138,6 +142,11 @@ export default {
     uiMode: UIMode
 
     mapAreas: AreaMap | null
+
+    /** UIManager for the ui2 WebGL/offscreen-canvas panel system. */
+    uiManager: UIManagerImpl | null
+    /** ECS entity ID for the player (used by ui2 panels). */
+    playerEntityId: number
 
     /** Registered by Worldmap.init() to bridge mark_area_known scripting calls. */
     markAreaKnown: ((areaID: number, markState: number) => void) | null

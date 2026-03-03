@@ -169,6 +169,8 @@ export class Renderer {
             this.color(255, 0, 0, 50)
             this.rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         }
+
+        this.renderUIOverlay()
     }
 
     objectRenderInfo(obj: Obj): ObjectRenderInfo | null {
@@ -264,6 +266,8 @@ export class Renderer {
         this.renderImage(window.background, window.position.x, window.position.y, window.width, window.height)
     }
     renderFont(font: Font, x: number, y: number) {}
+    /** Composite the ui2 UIManagerImpl OffscreenCanvas on top of the scene. */
+    renderUIOverlay(): void {}
 }
 
 export function centerCamera(around: Point) {
