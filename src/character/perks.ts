@@ -81,7 +81,7 @@ export const PERKS: Perk[] = [
         id: 1, name: 'Bonus Move', ranks: 2,
         description: 'For each rank of this perk, you receive 2 free Action Points each combat turn that can only be used for movement.',
         prerequisites: { minLevel: 3 },
-        apply(s) { s.maxAP += 2 },
+        apply(s) { s.maxAPMod += 2; s.maxAP += 2 },
     },
     {
         id: 2, name: 'Empathy', ranks: 1,
@@ -119,7 +119,7 @@ export const PERKS: Perk[] = [
         id: 6, name: 'Action Boy', ranks: 2,
         description: '+1 AP per rank.',
         prerequisites: { minLevel: 12, minAgility: 5 },
-        apply(s) { s.maxAP += 1 },
+        apply(s) { s.maxAPMod += 1; s.maxAP += 1 },
     },
     {
         id: 7, name: 'Better Criticals', ranks: 1,

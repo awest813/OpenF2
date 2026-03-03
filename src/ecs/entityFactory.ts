@@ -61,6 +61,7 @@ function defaultStats(overrides: Partial<Omit<StatsComponent, 'componentType'>> 
         intelligenceMod: 0,
         agilityMod: 0,
         luckMod: 0,
+        maxAPMod: 0,
         // derived (recomputed below)
         maxHp: 0,
         currentHp: 0,
