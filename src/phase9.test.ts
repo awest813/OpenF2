@@ -75,6 +75,7 @@ function objSetLightLevel(obj: LightObj | null, intensity: number, distance: num
 
 describe('obj_set_light_level algorithm', () => {
     function makeObj(): LightObj {
+        // Default lightIntensity 655 matches Obj default in object.ts
         return { type: 'critter', lightIntensity: 655, lightRadius: 0 }
     }
 
