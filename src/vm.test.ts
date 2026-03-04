@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { opMap, VMContext } from './vm_opcodes.js'
+import { ScriptVM } from './vm.js'
 
 // ---------------------------------------------------------------------------
 // Minimal VM stub — only the fields / methods actually used by opMap handlers.
@@ -352,5 +353,44 @@ describe('op_store (0x8031) / op_fetch (0x8032)', () => {
         exec(0x8032, vm)
 
         expect(vm.pop()).toBe(42)
+    })
+})
+
+describe('op_pop_return (0x801c)', () => {
+    it('halts when popping top-level return sentinel (-1)', () => {
+        const vm = makeVM()
+        vm.retStack.push(-1)
+        exec(0x801c, vm)
+        expect(vm.halted).toBe(true)
+    })
+
+    it('jumps to the popped return address for nested returns', () => {
+        const vm = makeVM()
+        vm.retStack.push(0x1234)
+        exec(0x801c, vm)
+        expect(vm.halted).toBe(false)
+        expect(vm.pc).toBe(0x1234)
+    })
+})
+
+describe('ScriptVM.call argument handling', () => {
+    it('does not mutate caller-provided args array', () => {
+        class TestScriptVM extends ScriptVM {
+            run(): void {
+                this.push('return-value')
+            }
+        }
+
+        const vm = new TestScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            { procedures: { foo: { index: 0, offset: 0x40 } }, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        const args = [1, 2, 3]
+        const result = vm.call('foo', args)
+
+        expect(result).toBe('return-value')
+        expect(args).toEqual([1, 2, 3])
+        expect(vm.dataStack).toEqual([3, 2, 1, 3])
     })
 })

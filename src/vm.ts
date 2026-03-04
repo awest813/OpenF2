@@ -66,9 +66,9 @@ export class ScriptVM {
         // console.log("CALL " + procName + " @ " + proc.offset + " from " + this.scriptObj.scriptName)
         if (!proc) throw 'ScriptVM: unknown procedure ' + procName
 
-        // TODO: which way are args passed on the stack?
-        args.reverse()
-        args.forEach((arg) => this.push(arg))
+        // Args are passed in reverse order (stack-based calling convention).
+        const reversedArgs = [...args].reverse()
+        reversedArgs.forEach((arg) => this.push(arg))
         this.push(args.length)
 
         this.retStack.push(-1) // push return address (TODO: how is this handled?)
