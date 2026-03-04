@@ -41,7 +41,7 @@ import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResu
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
-import { getSfallGlobal, setSfallGlobal, SFALL_VER } from './sfallGlobals.js'
+import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER } from './sfallGlobals.js'
 
 export module Scripting {
     var gameObjects: Obj[] | null = null
@@ -813,8 +813,18 @@ export module Scripting {
             critterKill(obj)
         }
         get_poison(obj: Obj) {
-            stub('get_poison', arguments)
-            return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_poison: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats.getBase('Poison Level')
+        }
+        get_radiation(obj: Obj) {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_radiation: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats.getBase('Radiation Level')
         }
         get_pc_stat(pcstat: number) {
             const player = globalState.player
@@ -1500,6 +1510,12 @@ export module Scripting {
         }
         set_sfall_global(name: string, value: number): void {
             setSfallGlobal(name, value)
+        }
+        get_sfall_global_int(index: number): number {
+            return getSfallGlobalInt(index)
+        }
+        set_sfall_global_int(index: number, value: number): void {
+            setSfallGlobalInt(index, value)
         }
 
         // game

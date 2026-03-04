@@ -241,6 +241,13 @@ export module ScriptVMBridge {
        // sfall extended opcodes
        ,0x8157: bridged("get_sfall_global", 1)  // get_sfall_global(name) → value
        ,0x8158: bridged("set_sfall_global", 2, false)  // set_sfall_global(name, value)
+       ,0x8159: bridged("get_radiation", 1)  // get_radiation(obj) → radiation level
+       ,0x815A: bridged("get_sfall_global_int", 1)   // get_sfall_global_int(index) → value
+       ,0x815B: bridged("set_sfall_global_int", 2, false)  // set_sfall_global_int(index, value)
+       ,0x815C: function() {  // get_day_of_week: 0-6 from game epoch (0 = first day)
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            this.push(days % 7)
+        }
     }
     Object.assign(opMap, bridgeOpMap)
 

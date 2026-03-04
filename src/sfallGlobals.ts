@@ -45,3 +45,34 @@ export function getSfallGlobal(name: string): number {
 export function setSfallGlobal(name: string, value: number): void {
     sfallGlobals.set(name, value)
 }
+
+// ---------------------------------------------------------------------------
+// Integer-indexed global variable store
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum number of integer-indexed sfall global slots (matches real sfall
+ * default of 4096 entries).
+ */
+export const MAX_SFALL_INT_GLOBALS = 4096
+
+/** Internal storage for sfall integer-indexed globals. */
+const sfallGlobalInts: number[] = new Array(MAX_SFALL_INT_GLOBALS).fill(0)
+
+/**
+ * Get a sfall integer-indexed global variable.
+ * Returns `0` for out-of-range indices (matching sfall behaviour).
+ */
+export function getSfallGlobalInt(index: number): number {
+    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) return 0
+    return sfallGlobalInts[index]
+}
+
+/**
+ * Set a sfall integer-indexed global variable.
+ * Out-of-range indices are silently ignored (matching sfall behaviour).
+ */
+export function setSfallGlobalInt(index: number, value: number): void {
+    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) return
+    sfallGlobalInts[index] = value
+}
