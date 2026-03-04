@@ -237,9 +237,11 @@ export module ScriptVMBridge {
 
        ,0x8155: bridged("obj_get_rot", 1)
        ,0x8156: bridged("set_obj_rot", 2, false)
-    }
 
-    // update VM opMap with our bridgeOpMap
+       // sfall extended opcodes
+       ,0x8157: bridged("get_sfall_global", 1)  // get_sfall_global(name) → value
+       ,0x8158: bridged("set_sfall_global", 2, false)  // set_sfall_global(name, value)
+    }
     Object.assign(opMap, bridgeOpMap)
 
     // define a game-oriented Script VM that has a ScriptProto instance

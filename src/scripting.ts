@@ -41,6 +41,7 @@ import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResu
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
+import { getSfallGlobal, setSfallGlobal, SFALL_VER } from './sfallGlobals.js'
 
 export module Scripting {
     var gameObjects: Obj[] | null = null
@@ -444,6 +445,8 @@ export module Scripting {
                     return 0 // METARULE_CURRENT_TOWN (TODO: return current city ID)
                 case 48:
                     return 2 // METARULE_VIOLENCE_FILTER (2 = VLNCLVL_NORMAL)
+                case 56:
+                    return SFALL_VER // METARULE_SFALL_VER — sfall compatibility version
                 case 49: // METARULE_W_DAMAGE_TYPE
                     switch (objectGetDamageType(target)) {
                         case 'explosion':
@@ -580,9 +583,11 @@ export module Scripting {
                         ;(<Critter>obj).teamNum = amount
                         break
                     case 10:
-                        break // OBJECT_CUR_ROT (TODO)
+                        obj.orientation = ((amount % 6) + 6) % 6 // OBJECT_CUR_ROT
+                        break
                     case 666:
-                        break // OBJECT_VISIBILITY (TODO)
+                        obj.visible = amount !== 0 // OBJECT_VISIBILITY (0 = invisible, non-zero = visible)
+                        break
                     case 669:
                         break // OBJECT_CUR_WEIGHT (TODO)
                 }
@@ -1048,12 +1053,16 @@ export module Scripting {
             return obj.inAnim()
         }
         obj_art_fid(obj: Obj) {
-            stub('obj_art_fid', arguments)
-            return 0
+            if (!isGameObject(obj)) {
+                warn('obj_art_fid: not a game object: ' + obj)
+                return 0
+            }
+            return obj.frmPID ?? 0
         }
         art_anim(fid: number): number {
-            stub('art_anim', arguments)
-            return 0
+            // Extract the animation-type field (bits 23–16) from a Fallout FID.
+            // For critter FIDs this encodes the base animation (idle, walk, attack, etc.).
+            return (fid >>> 16) & 0xff
         }
         set_obj_visibility(obj: Obj, visibility: number) {
             if (!isGameObject(obj)) {
@@ -1483,6 +1492,14 @@ export module Scripting {
             log('game_time_advance', arguments)
             info('advancing time ' + ticks + ' ticks ' + '(' + ticks / 10 + ' seconds)')
             globalState.gameTickTime += ticks
+        }
+
+        // sfall extended API
+        get_sfall_global(name: string): number {
+            return getSfallGlobal(name)
+        }
+        set_sfall_global(name: string, value: number): void {
+            setSfallGlobal(name, value)
         }
 
         // game
