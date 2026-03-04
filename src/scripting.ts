@@ -1103,6 +1103,20 @@ export module Scripting {
             }
             return obj.pid
         }
+        obj_get_rot(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('obj_get_rot: not a game object: ' + obj)
+                return 0
+            }
+            return obj.orientation
+        }
+        set_obj_rot(obj: Obj, rotation: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_obj_rot: not a game object: ' + obj)
+                return
+            }
+            obj.orientation = ((rotation % 6) + 6) % 6
+        }
         obj_on_screen(obj: Obj) {
             log('obj_on_screen', arguments)
             if (!isGameObject(obj)) {
