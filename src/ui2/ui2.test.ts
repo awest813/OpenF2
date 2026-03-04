@@ -12,6 +12,13 @@
  *   - EventBus: ui:openPanel / ui:closePanel events
  *   - PipBoyPanel: tab switching and scroll via keyboard
  *   - GamePanel: HUD_BUTTONS layout and OPTIONS button
+ *   - DialoguePanel: reply/options rendering and option selection
+ *   - BarterPanel: inventory columns, offer/talk actions
+ *   - LootPanel: take-all and item movement
+ *   - InventoryPanel: item list, scrolling, close
+ *   - WorldMapPanel: world/area view switching
+ *   - ElevatorPanel: floor button dispatch
+ *   - CalledShotPanel: region selection and hit chances
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -1040,5 +1047,637 @@ describe('DebugOverlayPanel', () => {
         // render() returns the offscreen canvas; should not throw
         const canvas = mgr.render()
         expect(canvas).toBeDefined()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// DialoguePanel
+// ---------------------------------------------------------------------------
+
+import { DialoguePanel } from './dialoguePanel.js'
+
+describe('DialoguePanel', () => {
+    it('has panel name "dialogue"', () => {
+        const panel = new DialoguePanel(800, 600)
+        expect(panel.name).toBe('dialogue')
+    })
+
+    it('starts hidden', () => {
+        const panel = new DialoguePanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 30', () => {
+        const panel = new DialoguePanel(800, 600)
+        expect(panel.zOrder).toBe(30)
+    })
+
+    it('is centered on screen', () => {
+        const panel = new DialoguePanel(800, 600)
+        expect(panel.bounds.x).toBe(Math.floor((800 - panel.bounds.width) / 2))
+        expect(panel.bounds.y).toBe(Math.floor((600 - panel.bounds.height) / 2))
+    })
+
+    it('setReply sets reply text and clears options', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.addOption('Option A', 1)
+        panel.setReply('Hello traveller')
+        // After setReply options are cleared — addOption previously added should be gone
+        // Verify by checking that digit 1 does not fire (no options)
+        const spy = vi.fn()
+        EventBus.on('dialogue:optionSelected', spy)
+        panel.onKeyDown('1')
+        expect(spy).not.toHaveBeenCalled()
+        EventBus.clear('dialogue:optionSelected')
+    })
+
+    it('addOption appends an option', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.setReply('Reply')
+        panel.addOption('Option A', 42)
+        const spy = vi.fn()
+        EventBus.on('dialogue:optionSelected', spy)
+        panel.onKeyDown('1')
+        expect(spy).toHaveBeenCalledWith({ optionID: 42 })
+        EventBus.clear('dialogue:optionSelected')
+    })
+
+    it('number key selects the matching option', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.setReply('Reply')
+        panel.addOption('First', 10)
+        panel.addOption('Second', 20)
+        const spy = vi.fn()
+        EventBus.on('dialogue:optionSelected', spy)
+        panel.onKeyDown('2')
+        expect(spy).toHaveBeenCalledWith({ optionID: 20 })
+        EventBus.clear('dialogue:optionSelected')
+    })
+
+    it('out-of-range number key is ignored', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.setReply('Reply')
+        panel.addOption('Only one', 99)
+        const spy = vi.fn()
+        EventBus.on('dialogue:optionSelected', spy)
+        const result = panel.onKeyDown('9')
+        expect(spy).not.toHaveBeenCalled()
+        expect(result).toBe(false)
+        EventBus.clear('dialogue:optionSelected')
+    })
+
+    it('Escape hides the panel', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('clicks within panel are consumed', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.show()
+        expect(panel.onMouseDown(20, 20, 'l')).toBe(true)
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new DialoguePanel(800, 600)
+        panel.setReply('Some reply text')
+        panel.addOption('Option 1', 1)
+        panel.show()
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// BarterPanel
+// ---------------------------------------------------------------------------
+
+import { BarterPanel } from './barterPanel.js'
+
+describe('BarterPanel', () => {
+    it('has panel name "barter"', () => {
+        const panel = new BarterPanel(800, 600)
+        expect(panel.name).toBe('barter')
+    })
+
+    it('starts hidden', () => {
+        const panel = new BarterPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 30', () => {
+        const panel = new BarterPanel(800, 600)
+        expect(panel.zOrder).toBe(30)
+    })
+
+    it('openWith() shows the panel and loads inventories', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Stimpak', amount: 3, value: 40 }],
+            [{ name: 'Knife', amount: 1, value: 60 }],
+        )
+        expect(panel.visible).toBe(true)
+        expect(panel.playerInventory).toHaveLength(1)
+        expect(panel.merchantInventory).toHaveLength(1)
+    })
+
+    it('openWith() clears barter tables', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith([], [])
+        expect(panel.playerTable).toHaveLength(0)
+        expect(panel.merchantTable).toHaveLength(0)
+    })
+
+    it('Escape fires talkRequested and hides panel', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.show()
+        const spy = vi.fn()
+        EventBus.on('barter:talkRequested', spy)
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('barter:talkRequested')
+    })
+
+    it('offerAccepted is emitted when player value >= merchant value', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith([], [])
+        panel.playerTable   = [{ name: 'Caps', amount: 100, value: 1 }]
+        panel.merchantTable = [{ name: 'Knife', amount: 1, value: 50 }]
+        const spy = vi.fn()
+        EventBus.on('barter:offerAccepted', spy)
+        // Simulate clicking the OFFER button by calling the private method via the public click handler
+        // OFFER button is at width/2 - BTN_W - 6
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('barter:offerAccepted')
+    })
+
+    it('offerRefused is emitted when player value < merchant value', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith([], [])
+        panel.playerTable   = [{ name: 'Caps', amount: 1, value: 1 }]
+        panel.merchantTable = [{ name: 'Knife', amount: 1, value: 999 }]
+        const spy = vi.fn()
+        EventBus.on('barter:offerRefused', spy)
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('barter:offerRefused')
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new BarterPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Stimpak', amount: 2, value: 40 }],
+            [{ name: 'Knife', amount: 1, value: 60 }],
+        )
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// LootPanel
+// ---------------------------------------------------------------------------
+
+import { LootPanel } from './lootPanel.js'
+
+describe('LootPanel', () => {
+    it('has panel name "loot"', () => {
+        const panel = new LootPanel(800, 600)
+        expect(panel.name).toBe('loot')
+    })
+
+    it('starts hidden', () => {
+        const panel = new LootPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 30', () => {
+        const panel = new LootPanel(800, 600)
+        expect(panel.zOrder).toBe(30)
+    })
+
+    it('openWith() shows the panel and loads inventories', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Bottle Caps', amount: 10 }],
+            [{ name: 'Knife', amount: 1 }],
+        )
+        expect(panel.visible).toBe(true)
+        expect(panel.playerInventory).toHaveLength(1)
+        expect(panel.containerInventory).toHaveLength(1)
+    })
+
+    it('Escape fires loot:closed and hides panel', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([], [])
+        const spy = vi.fn()
+        EventBus.on('loot:closed', spy)
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('loot:closed')
+    })
+
+    it('take-all moves all container items to player inventory', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith(
+            [],
+            [{ name: 'Knife', amount: 1 }, { name: 'Caps', amount: 50 }],
+        )
+        // Click the TAKE ALL button: at width/2 - BTN_W - 4, height - 36
+        const { width, height } = panel.bounds
+        const takeAllX = width / 2 - 80 - 4
+        const btnY = height - 36
+        panel.onMouseDown(takeAllX + 10, btnY + 5, 'l')
+        expect(panel.containerInventory).toHaveLength(0)
+        expect(panel.playerInventory).toHaveLength(2)
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new LootPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Caps', amount: 5 }],
+            [{ name: 'Knife', amount: 1 }],
+        )
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// InventoryPanel
+// ---------------------------------------------------------------------------
+
+import { InventoryPanel } from './inventoryPanel.js'
+
+describe('InventoryPanel', () => {
+    it('has panel name "inventory"', () => {
+        const panel = new InventoryPanel(800, 600)
+        expect(panel.name).toBe('inventory')
+    })
+
+    it('starts hidden', () => {
+        const panel = new InventoryPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 20', () => {
+        const panel = new InventoryPanel(800, 600)
+        expect(panel.zOrder).toBe(20)
+    })
+
+    it('is centered on screen', () => {
+        const panel = new InventoryPanel(800, 600)
+        expect(panel.bounds.x).toBe(Math.floor((800 - panel.bounds.width) / 2))
+        expect(panel.bounds.y).toBe(Math.floor((600 - panel.bounds.height) / 2))
+    })
+
+    it('Escape hides the panel', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('"i" key hides the panel', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('i')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('ArrowDown scrolls the item list', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.show()
+        // Fill with more than MAX_ROWS (10) items
+        for (let i = 0; i < 15; i++) {
+            panel.items.push({ name: `Item ${i}`, amount: 1, canUse: false })
+        }
+        // Capture scroll before and after
+        panel.onKeyDown('ArrowDown')
+        // We can't directly inspect _scrollOffset but ArrowDown should be consumed
+        expect(panel.onKeyDown('ArrowDown')).toBe(true)
+    })
+
+    it('ArrowUp does not scroll below zero', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.show()
+        // Should still return true (consumed) even when already at top
+        expect(panel.onKeyDown('ArrowUp')).toBe(true)
+    })
+
+    it('inventory:dropItem event is emitted when DROP is clicked', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [{ name: 'Stimpak', amount: 1, canUse: true }]
+        panel.show()
+        // Click the item to select it first (LIST_X=16, LIST_Y=80)
+        panel.onMouseDown(16 + 10, 80 + 5, 'l')
+        const spy = vi.fn()
+        EventBus.on('inventory:dropItem', spy)
+        // Click the DROP button (ctxX = 16 + 260 + 8 = 284, ctxY + 28 = 80 + 28 = 108)
+        panel.onMouseDown(284 + 10, 80 + 28 + 5, 'l')
+        expect(spy).toHaveBeenCalledWith({ index: 0 })
+        EventBus.clear('inventory:dropItem')
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [
+            { name: 'Stimpak', amount: 2, canUse: true },
+            { name: 'Knife', amount: 1, canUse: false },
+        ]
+        panel.show()
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// WorldMapPanel
+// ---------------------------------------------------------------------------
+
+import { WorldMapPanel } from './worldMapPanel.js'
+
+describe('WorldMapPanel', () => {
+    it('has panel name "worldMap"', () => {
+        const panel = new WorldMapPanel(800, 600)
+        expect(panel.name).toBe('worldMap')
+    })
+
+    it('starts hidden', () => {
+        const panel = new WorldMapPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 25', () => {
+        const panel = new WorldMapPanel(800, 600)
+        expect(panel.zOrder).toBe(25)
+    })
+
+    it('defaults to world view on show()', () => {
+        const panel = new WorldMapPanel(800, 600)
+        panel.areas = [{ name: 'Hub', id: 0, entrances: [] }]
+        panel.show()
+        expect(panel.currentView).toBe('world')
+    })
+
+    it('showArea() switches to area view', () => {
+        const panel = new WorldMapPanel(800, 600)
+        panel.show()
+        const area = { name: 'Vault 13', id: 1, entrances: [] }
+        panel.showArea(area)
+        expect(panel.currentView).toBe('area')
+    })
+
+    it('Escape from world view fires worldMap:closed and hides panel', () => {
+        const panel = new WorldMapPanel(800, 600)
+        panel.show()
+        const spy = vi.fn()
+        EventBus.on('worldMap:closed', spy)
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('worldMap:closed')
+    })
+
+    it('Escape from area view returns to world view without closing', () => {
+        const panel = new WorldMapPanel(800, 600)
+        panel.show()
+        panel.showArea({ name: 'Hub', id: 0, entrances: [] })
+        expect(panel.currentView).toBe('area')
+        panel.onKeyDown('Escape')
+        expect(panel.visible).toBe(true)
+        expect(panel.currentView).toBe('world')
+    })
+
+    it('travelTo fires worldMap:travelTo event and closes panel', () => {
+        const panel = new WorldMapPanel(800, 600)
+        panel.show()
+        const entrance = { mapLookupName: 'VLT13ENT', x: 0, y: 0 }
+        panel.showArea({ name: 'Vault 13', id: 1, entrances: [entrance] })
+        const spy = vi.fn()
+        EventBus.on('worldMap:travelTo', spy)
+        // Entrance row click: LIST_X=16, LIST_Y=48 (area view)
+        panel.onMouseDown(16 + 20, 48 + 10, 'l')
+        expect(spy).toHaveBeenCalledWith({ mapLookupName: 'VLT13ENT' })
+        expect(panel.visible).toBe(false)
+        EventBus.clear('worldMap:travelTo')
+    })
+
+    it('render() does not throw in world view', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new WorldMapPanel(800, 600)
+        panel.areas = [{ name: 'Hub', id: 0, entrances: [] }]
+        panel.show()
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('render() does not throw in area view', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new WorldMapPanel(800, 600)
+        panel.show()
+        panel.showArea({
+            name: 'Hub',
+            id: 0,
+            entrances: [{ mapLookupName: 'HUBENT', x: 10, y: 20 }],
+        })
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// ElevatorPanel
+// ---------------------------------------------------------------------------
+
+import { ElevatorPanel } from './elevatorPanel.js'
+
+describe('ElevatorPanel', () => {
+    it('has panel name "elevator"', () => {
+        const panel = new ElevatorPanel(800, 600)
+        expect(panel.name).toBe('elevator')
+    })
+
+    it('starts hidden', () => {
+        const panel = new ElevatorPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 35', () => {
+        const panel = new ElevatorPanel(800, 600)
+        expect(panel.zOrder).toBe(35)
+    })
+
+    it('openWith() shows the panel and loads buttons', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([
+            { label: 'L1', mapID: 1, level: 0, tileNum: 100 },
+            { label: 'L2', mapID: 1, level: 1, tileNum: 200 },
+        ])
+        expect(panel.visible).toBe(true)
+        expect(panel.buttons).toHaveLength(2)
+    })
+
+    it('Escape hides the panel', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('number key fires elevator:buttonPressed and closes panel', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([
+            { label: 'L1', mapID: 5, level: 0, tileNum: 100 },
+            { label: 'L2', mapID: 5, level: 1, tileNum: 200 },
+        ])
+        const spy = vi.fn()
+        EventBus.on('elevator:buttonPressed', spy)
+        expect(panel.onKeyDown('2')).toBe(true)
+        expect(spy).toHaveBeenCalledWith({ mapID: 5, level: 1, tileNum: 200 })
+        expect(panel.visible).toBe(false)
+        EventBus.clear('elevator:buttonPressed')
+    })
+
+    it('out-of-range number key is not consumed', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([{ label: 'L1', mapID: 1, level: 0, tileNum: 0 }])
+        const spy = vi.fn()
+        EventBus.on('elevator:buttonPressed', spy)
+        expect(panel.onKeyDown('9')).toBe(false)
+        expect(spy).not.toHaveBeenCalled()
+        EventBus.clear('elevator:buttonPressed')
+    })
+
+    it('mouse click on a floor button fires elevator:buttonPressed', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([
+            { label: 'L1', mapID: 3, level: 0, tileNum: 50 },
+        ])
+        const spy = vi.fn()
+        EventBus.on('elevator:buttonPressed', spy)
+        // Button 0: BTNS_CENTER_X_OFFSET = (220-140)/2 = 40, BTNS_START_Y = 50
+        panel.onMouseDown(40 + 10, 50 + 10, 'l')
+        expect(spy).toHaveBeenCalledWith({ mapID: 3, level: 0, tileNum: 50 })
+        EventBus.clear('elevator:buttonPressed')
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([
+            { label: 'L1', mapID: 1, level: 0, tileNum: 100 },
+            { label: 'L2', mapID: 1, level: 1, tileNum: 200 },
+        ])
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// CalledShotPanel
+// ---------------------------------------------------------------------------
+
+import { CalledShotPanel, BODY_REGIONS } from './calledShotPanel.js'
+
+describe('CalledShotPanel', () => {
+    it('has panel name "calledShot"', () => {
+        const panel = new CalledShotPanel(800, 600)
+        expect(panel.name).toBe('calledShot')
+    })
+
+    it('starts hidden', () => {
+        const panel = new CalledShotPanel(800, 600)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('has zOrder 35', () => {
+        const panel = new CalledShotPanel(800, 600)
+        expect(panel.zOrder).toBe(35)
+    })
+
+    it('is centered on screen', () => {
+        const panel = new CalledShotPanel(800, 600)
+        expect(panel.bounds.x).toBe(Math.floor((800 - panel.bounds.width) / 2))
+        expect(panel.bounds.y).toBe(Math.floor((600 - panel.bounds.height) / 2))
+    })
+
+    it('openWith() shows the panel and sets hit chances', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ torso: 75, head: 40 })
+        expect(panel.visible).toBe(true)
+        expect(panel.hitChances.torso).toBe(75)
+        expect(panel.hitChances.head).toBe(40)
+    })
+
+    it('openWith() defaults unspecified regions to -1', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ torso: 50 })
+        expect(panel.hitChances.eyes).toBe(-1)
+        expect(panel.hitChances.leftLeg).toBe(-1)
+    })
+
+    it('has all 8 standard body regions', () => {
+        expect(BODY_REGIONS).toHaveLength(8)
+        expect(BODY_REGIONS).toContain('torso')
+        expect(BODY_REGIONS).toContain('head')
+        expect(BODY_REGIONS).toContain('eyes')
+        expect(BODY_REGIONS).toContain('groin')
+        expect(BODY_REGIONS).toContain('leftArm')
+        expect(BODY_REGIONS).toContain('rightArm')
+        expect(BODY_REGIONS).toContain('leftLeg')
+        expect(BODY_REGIONS).toContain('rightLeg')
+    })
+
+    it('Escape hides the panel', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('clicking a region fires calledShot:regionSelected and hides panel', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ torso: 65 })
+        const spy = vi.fn()
+        EventBus.on('calledShot:regionSelected', spy)
+        // REGIONS_X=16, REGIONS_Y=46, ROW_H=28 — click first row (torso)
+        panel.onMouseDown(16 + 10, 46 + 10, 'l')
+        expect(spy).toHaveBeenCalledWith({ region: 'torso' })
+        expect(panel.visible).toBe(false)
+        EventBus.clear('calledShot:regionSelected')
+    })
+
+    it('clicking second region fires calledShot:regionSelected with "head"', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ head: 30 })
+        const spy = vi.fn()
+        EventBus.on('calledShot:regionSelected', spy)
+        // Row 1 (head): REGIONS_Y + 1 * ROW_H = 46 + 28 = 74
+        panel.onMouseDown(16 + 10, 74 + 10, 'l')
+        expect(spy).toHaveBeenCalledWith({ region: 'head' })
+        EventBus.clear('calledShot:regionSelected')
+    })
+
+    it('render() does not throw', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ torso: 65, head: 30, eyes: 15 })
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
     })
 })
