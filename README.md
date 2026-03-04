@@ -12,6 +12,8 @@ The project started from [darkfo](https://github.com/darkf/darkfo) and has been 
 
 OpenF2 has completed Phases 1–3 and is currently in **Phase 4: Fidelity, Modding, and Tooling**.
 
+Recent debugging update: the typed `EngineEvents` catalogue now includes the emitted ui2 panel events, restoring a clean TypeScript compile for those flows.
+
 ### Working today (stable or partial)
 
 - Map loading, traversal, and movement
@@ -78,6 +80,7 @@ If startup fails, check browser console logs first for missing assets or script/
 - Engine/runtime source: `src/`
 - Config toggles: `src/config.ts` (recompile after TS edits)
 - Asset conversion + support scripts: repository root (`*.py`)
+- Validation commands: `npm test` and `npx tsc --noEmit`
 
 ## Contributing
 

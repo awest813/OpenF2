@@ -49,12 +49,15 @@ export interface EngineEvents {
     'dialogue:start': { npcId: number }
     'dialogue:end': { npcId: number }
     'dialogue:nodeChange': { nodeId: string }
+    'dialogue:optionSelected': { optionID: number }
 
     // Inventory
     'inventory:itemAdd': { entityId: number; itemPid: number; count: number }
     'inventory:itemRemove': { entityId: number; itemPid: number; count: number }
     'inventory:equip': { entityId: number; itemPid: number; slot: EquipSlot }
     'inventory:unequip': { entityId: number; slot: EquipSlot }
+    'inventory:useItem': { index: number }
+    'inventory:dropItem': { index: number }
 
     // Audio
     'audio:playSound': { soundId: string; position?: { x: number; y: number } }
@@ -73,6 +76,20 @@ export interface EngineEvents {
     // UI panels
     'ui:openPanel': { panelName: string }
     'ui:closePanel': { panelName: string }
+    'barter:talkRequested': {}
+    'barter:offerAccepted': {
+        playerTable: { name: string; amount: number; value: number }[]
+        merchantTable: { name: string; amount: number; value: number }[]
+    }
+    'barter:offerRefused': { playerVal: number; merchantVal: number }
+    'loot:closed': {
+        playerInventory: { name: string; amount: number }[]
+        containerInventory: { name: string; amount: number }[]
+    }
+    'worldMap:closed': {}
+    'worldMap:travelTo': { mapLookupName: string }
+    'elevator:buttonPressed': { mapID: number; level: number; tileNum: number }
+    'calledShot:regionSelected': { region: string }
 
     // Save / Load
     'game:saveToSlot': { slot: number }

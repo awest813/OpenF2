@@ -15,7 +15,7 @@ OpenF2 aims to deliver:
 
 - **Active phase:** Phase 4 — Fidelity, Modding, and Tooling
 - **Phase state:** Phases 0–3 complete; Phase 4 in progress
-- **Recent:** DAT override stacking and geometry correctness improvements landed
+- **Recent:** DAT override stacking, geometry correctness improvements, and ui2 EventBus typing fixes landed
 
 ## Baseline (today)
 
