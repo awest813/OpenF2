@@ -1,94 +1,172 @@
 # OpenF2
 
-OpenF2 is a browser-first reimplementation of the classic Fallout engine runtime.
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
+[![Phase](https://img.shields.io/badge/phase-4%20Fidelity%20%26%20Modding-orange.svg)](ROADMAP.md)
 
-- **Current target:** Fallout 2 feature parity and fidelity
-- **Secondary target:** Fallout 1 compatibility and shared engine behavior
-- **Historical note:** older docs may still reference the former name **Harold**
+OpenF2 is a **browser-first reimplementation** of the classic Fallout 1/2 engine runtime, built on TypeScript and Python tooling. It reads original game data files and runs entirely in the browser via WebGL.
 
-The project started from [darkfo](https://github.com/darkf/darkfo) and has been modernized around TypeScript + Python tooling.
+> **Note:** older docs may still reference the former project name **Harold**.
 
-## Status snapshot
+Origins: forked from [darkfo](https://github.com/darkf/darkfo) and extensively modernized.
 
-OpenF2 has completed Phases 1–3 and is currently in **Phase 4: Fidelity, Modding, and Tooling**.
+---
 
-Recent debugging update: the typed `EngineEvents` catalogue now includes the emitted ui2 panel events, restoring a clean TypeScript compile for those flows.
+![OpenF2 screenshot](screenshot.png)
 
-### Working today (stable or partial)
+---
 
-- Map loading, traversal, and movement
-- Dialogue/barter foundations
-- Core scripting runtime (partial INT VM coverage)
-- SPECIAL, derived stats, skills, traits, and perks
-- Combat formulas (DT/DR, ammo, AP rules, critical pathways)
-- Inventory/equipment management
-- Leveling, XP, quests, karma, and reputation tracking
-- WebGL rendering + lighting foundations
-- Versioned save/load with schema migration
+## Table of Contents
 
-### Current gaps
+1. [Status](#status)
+2. [Requirements](#requirements)
+3. [Quick Start](#quick-start)
+4. [Development Notes](#development-notes)
+5. [Testing](#testing)
+6. [Contributing](#contributing)
 
-- UI still split between DOM and WebGL paths (OptionsPanel/SaveLoadPanel/BitmapFontRenderer migrated to ui2; dialogue, barter, inventory, and world map overlay still use DOM)
-- Animation timing and edge-case combat fidelity still need polish
-- Pip-Boy map and selected legacy UI systems are incomplete
+---
 
-See [ROADMAP.md](./ROADMAP.md) for prioritized milestones and [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md) for in-depth contributor guidance.
+## Status
+
+**Active phase:** Phase 4 — Fidelity, Modding, and Tooling  
+Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone plan.
+
+### Working today
+
+| Area | State |
+|------|-------|
+| Map loading, traversal, and movement | ✅ Stable |
+| SPECIAL stats, derived stats pipeline | ✅ Stable |
+| Skills, traits, and perks | ✅ Stable |
+| Combat formulas (DT/DR, ammo, AP, criticals) | ✅ Stable |
+| Inventory and equipment management | ✅ Stable |
+| Leveling, XP, quests, karma, and reputation | ✅ Stable |
+| Versioned save/load with schema migration | ✅ Stable |
+| Core scripting VM (INT bytecode) | 🔶 Partial |
+| Dialogue and barter foundations | 🔶 Partial |
+| WebGL rendering + lighting | 🔶 Partial |
+| Fallout 1 compatibility layer | 🔶 Partial |
+
+### Known gaps
+
+- **UI split:** OptionsPanel/SaveLoadPanel/BitmapFontRenderer have moved to the `ui2` WebGL path; dialogue, barter, inventory, loot, world map overlay, elevator, and called-shot panels still use DOM rendering.
+- **Animation and rendering fidelity:** edge-case timing and correctness still need polish.
+- **In-browser tooling:** DebugOverlayPanel (F3/backtick) is available; full map/script authoring tools are future work.
+
+---
 
 ## Requirements
 
-- Legal Fallout 2 game data
-- Python 3.9+
-- [Pipenv](https://github.com/pypa/pipenv)
-- Node.js + npm
+| Requirement | Version |
+|-------------|---------|
+| Fallout 2 game data (legal copy) | — |
+| Python | 3.9+ |
+| [Pipenv](https://github.com/pypa/pipenv) | any |
+| Node.js + npm | any LTS |
 
-Optional:
+**Optional:**
+- `acm2wav` — broader audio format support for `convertAudio.py`
+- Homebrew users: `brew bundle` installs all system dependencies from `Brewfile`
 
-- `acm2wav` for broader audio conversion support in `convertAudio.py`
-- Homebrew users can run `brew bundle` from `Brewfile`
+---
 
-## Quick start
+## Quick Start
 
-1. Install Node dependencies:
+1. **Install Node dependencies:**
    ```bash
    npm install
    ```
-2. Install Python dependencies:
+
+2. **Install Python dependencies:**
    ```bash
    pipenv install
    ```
-3. Prepare assets from your Fallout 2 install:
+
+3. **Extract and convert game assets** from your Fallout 2 installation:
    ```bash
    pipenv run python setup.py /path/to/Fallout2
    ```
-4. Compile TypeScript:
+
+4. **Compile TypeScript:**
    ```bash
    npx tsc
    ```
-5. Start a local web server from the repository root:
+
+5. **Start a local web server** from the repository root:
    ```bash
    python -m http.server
    ```
-6. Open:
+
+6. **Open in your browser:**
    ```
    http://localhost:8000/play.html?artemple
    ```
 
-If startup fails, check browser console logs first for missing assets or script/runtime errors.
+If startup fails, open the browser developer console first — missing assets or runtime errors will be reported there.
 
-## Development notes
+---
 
-- Engine/runtime source: `src/`
-- Config toggles: `src/config.ts` (recompile after TS edits)
-- Asset conversion + support scripts: repository root (`*.py`)
-- Validation commands: `npm test` and `npx tsc --noEmit`
+## Development Notes
+
+| Area | Location |
+|------|----------|
+| Engine/runtime source | `src/` |
+| Configuration toggles | `src/config.ts` (recompile after changes) |
+| Asset conversion scripts | repository root (`*.py`) |
+| UI subsystems | `src/ui.ts` (DOM), `src/ui2/` (WebGL migration target) |
+| Mod support | `src/mods.ts` |
+
+**Validation commands:**
+
+```bash
+# Type-check without emitting
+npx tsc --noEmit
+
+# Run all tests
+npm test
+```
+
+---
+
+## Testing
+
+Tests use [Vitest](https://vitest.dev/) and live alongside source files in `src/`.
+
+```bash
+# Run the full test suite
+npm test
+
+# Run a specific test file
+npx vitest run src/phase1.test.ts
+
+# Watch mode during development
+npx vitest --watch
+```
+
+Key test files and what they cover:
+
+| File | Coverage |
+|------|----------|
+| `src/phase1.test.ts` | HP/AP formulas, skills, traits, perks, leveling |
+| `src/phase2.test.ts` | World map, encounters, game time, scripting |
+| `src/phase3.test.ts` | Audio, cinematics, Fallout 1 compatibility |
+| `src/phase4.test.ts` | Mod loading, pathfinding, geometry |
+| `src/vm.test.ts` | Script VM bytecode execution |
+| `src/skills.test.ts` | Skill calculations and checks |
+| `src/inventory.test.ts` | Item management and constraints |
+| `src/saveload.test.ts` | Save/load and schema migration |
+
+---
 
 ## Contributing
 
-Contributions are especially helpful in:
+Contributions are especially welcome in:
 
-- Rendering/UI parity work
-- World map and travel correctness
-- Combat + animation fidelity
-- Modding ergonomics and debugging tools
+- **UI migration** — moving remaining panels from DOM to `ui2` WebGL rendering
+- **Rendering and animation** — edge-case fidelity and timing polish
+- **Scripting VM** — opcode/procedure coverage expansion
+- **Modding ergonomics** — tooling and debug workflows
 
-For major features, open an issue first so planning stays aligned with the roadmap.
+For major features, open an issue first so the work stays aligned with the [roadmap](./ROADMAP.md).  
+For in-depth contributor guidance, architecture notes, and debugging tips, see [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md).
