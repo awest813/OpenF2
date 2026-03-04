@@ -17,6 +17,7 @@ limitations under the License.
 import globalState from "./globalState.js"
 import { IntFile } from "./intfile.js"
 import { Scripting } from "./scripting.js"
+import { UIMode } from "./ui.js"
 import { BinaryReader } from "./util.js"
 import { opMap, ScriptVM } from "./vm.js"
 
@@ -247,6 +248,12 @@ export module ScriptVMBridge {
        ,0x815C: function() {  // get_day_of_week: 0-6 from game epoch (0 = first day)
             const days = Math.floor(globalState.gameTickTime / (10 * 86400))
             this.push(days % 7)
+        }
+       ,0x815D: function() {  // get_game_time_in_seconds: whole-seconds elapsed since game epoch
+            this.push(Math.floor(globalState.gameTickTime / 10))
+        }
+       ,0x815E: function() {  // in_world_map: 1 when the world-map screen is open, 0 otherwise
+            this.push(globalState.uiMode === UIMode.worldMap ? 1 : 0)
         }
     }
     Object.assign(opMap, bridgeOpMap)

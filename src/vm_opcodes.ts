@@ -184,6 +184,8 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x803f: binop((x, y) => x || y),
     0x8040: binop((x, y) => x & y),
     0x8041: binop((x, y) => x | y),
+    0x8042: binop((x, y) => x ^ y), // op_bwxor
+    0x8043: function () { this.push(~this.pop()) }, // op_bwnot
     0x8039: binop((x, y) => x + y),
     0x803a: binop((x, y) => x - y),
     0x803b: binop((x, y) => x * y),

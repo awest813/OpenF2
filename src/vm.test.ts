@@ -257,6 +257,34 @@ describe('op_bwor (0x8041)', () => {
     })
 })
 
+describe('op_bwxor (0x8042)', () => {
+    it('performs bitwise XOR', () => {
+        const vm = makeVM([0b1100, 0b1010])
+        exec(0x8042, vm)
+        expect(vm.pop()).toBe(0b0110)
+    })
+
+    it('XOR of equal values is 0', () => {
+        const vm = makeVM([0xFF, 0xFF])
+        exec(0x8042, vm)
+        expect(vm.pop()).toBe(0)
+    })
+})
+
+describe('op_bwnot (0x8043)', () => {
+    it('inverts all bits (bitwise NOT)', () => {
+        const vm = makeVM([0])
+        exec(0x8043, vm)
+        expect(vm.pop()).toBe(~0)
+    })
+
+    it('bitwise NOT of 0xFF is ~0xFF', () => {
+        const vm = makeVM([0xFF])
+        exec(0x8043, vm)
+        expect(vm.pop()).toBe(~0xFF)
+    })
+})
+
 // ---------------------------------------------------------------------------
 // Stack manipulation opcodes
 // ---------------------------------------------------------------------------
