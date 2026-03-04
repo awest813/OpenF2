@@ -571,11 +571,8 @@ export module Worldmap {
 
             worldmapPlayer.target = { x: ax, y: ay }
             showv($worldmapPlayer)
-            Object.assign($worldmapTarget.style, {
-                backgroundImage: "url('art/intrface/wmaptarg.png')",
-                left: ax + 'px',
-                top: ay + 'px',
-            })
+            $worldmapTarget.style.backgroundImage = "url('art/intrface/wmaptarg.png')"
+            centerWorldmapTarget(ax, ay)
             console.log('targeting: ' + ax + ', ' + ay)
         }
 
@@ -646,8 +643,7 @@ export module Worldmap {
             y: globalState.mapAreas[0].worldPosition.y,
             target: null,
         }
-        $worldmapTarget.style.left = worldmapPlayer.x + 'px'
-        $worldmapTarget.style.top = worldmapPlayer.y + 'px'
+        centerWorldmapTarget(worldmapPlayer.x, worldmapPlayer.y)
 
         setSquareStateAt(positionToSquare(worldmapPlayer), WORLDMAP_DISCOVERED)
 
@@ -721,8 +717,8 @@ export module Worldmap {
             // center the worldmap to the player
             const width = $worldmap.offsetWidth
             const height = $worldmap.offsetHeight
-            const sx = clamp(0, width, Math.floor(worldmapPlayer.x - width / 2))
-            const sy = clamp(0, height, Math.floor(worldmapPlayer.y - height / 2))
+            const sx = clamp(0, $worldmap.scrollWidth - width, Math.floor(worldmapPlayer.x - width / 2))
+            const sy = clamp(0, $worldmap.scrollHeight - height, Math.floor(worldmapPlayer.y - height / 2))
 
             $worldmap.scrollLeft = sx
             $worldmap.scrollTop = sy

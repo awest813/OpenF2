@@ -20,6 +20,7 @@ export const Config = {
         showBoundingBox: false, // show bounding boxes around objects?
         showSpatials: true, // show spatial script triggers?
         showFonts: false, // show all fonts for debugging?
+        showDebugOverlay: false, // show in-browser debug overlay (HP, AP, entity count)?
     },
 
     engine: {

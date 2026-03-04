@@ -26,8 +26,7 @@ OpenF2 has completed Phases 1–3 and is currently in **Phase 4: Fidelity, Moddi
 
 ### Current gaps
 
-- UI still split between DOM and WebGL paths
-- Some world map placement/travel behavior needs correction
+- UI still split between DOM and WebGL paths (OptionsPanel/SaveLoadPanel/BitmapFontRenderer migrated to ui2; dialogue, barter, inventory, and world map overlay still use DOM)
 - Animation timing and edge-case combat fidelity still need polish
 - Pip-Boy map and selected legacy UI systems are incomplete
 
