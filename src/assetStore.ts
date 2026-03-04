@@ -137,3 +137,93 @@ export class AssetStoreImpl {
 }
 
 export const AssetStore = new AssetStoreImpl()
+
+// ---------------------------------------------------------------------------
+// AssetCache — LRU in-memory cache for fetched asset data
+// ---------------------------------------------------------------------------
+
+export interface CacheStats {
+    hits: number
+    misses: number
+    evictions: number
+}
+
+/**
+ * A generic LRU (Least-Recently-Used) cache keyed by string.
+ *
+ * Backed by a JavaScript `Map`, which preserves insertion order so the
+ * first entry in the Map is always the least-recently-used.  Both `get`
+ * and `set` run in amortised O(1).
+ *
+ * Usage:
+ *   const cache = new AssetCache<ImageData>(256)
+ *   cache.set('art/critters/hmjmpsna.png', imageData)
+ *   const img = cache.get('art/critters/hmjmpsna.png')  // hits
+ *   const stats = cache.stats  // { hits: 1, misses: 0, evictions: 0 }
+ */
+export class AssetCache<T> {
+    private _cache: Map<string, T> = new Map()
+    private _maxEntries: number
+    private _stats: CacheStats = { hits: 0, misses: 0, evictions: 0 }
+
+    constructor(maxEntries: number) {
+        if (maxEntries < 1) throw new RangeError('AssetCache: maxEntries must be at least 1')
+        this._maxEntries = maxEntries
+    }
+
+    get maxEntries(): number {
+        return this._maxEntries
+    }
+
+    get size(): number {
+        return this._cache.size
+    }
+
+    get stats(): Readonly<CacheStats> {
+        return this._stats
+    }
+
+    get(key: string): T | undefined {
+        const value = this._cache.get(key)
+        if (value === undefined) {
+            this._stats.misses++
+            return undefined
+        }
+        // Promote to most-recently-used by re-inserting at the tail.
+        this._cache.delete(key)
+        this._cache.set(key, value)
+        this._stats.hits++
+        return value
+    }
+
+    set(key: string, value: T): void {
+        if (this._cache.has(key)) {
+            // Update in place: remove then re-insert to move to tail.
+            this._cache.delete(key)
+        } else if (this._cache.size >= this._maxEntries) {
+            // Evict the least-recently-used entry (Map head = oldest).
+            const iter = this._cache.keys().next()
+            if (!iter.done) {
+                this._cache.delete(iter.value)
+                this._stats.evictions++
+            }
+        }
+        this._cache.set(key, value)
+    }
+
+    has(key: string): boolean {
+        return this._cache.has(key)
+    }
+
+    delete(key: string): boolean {
+        return this._cache.delete(key)
+    }
+
+    clear(): void {
+        this._cache.clear()
+    }
+
+    resetStats(): void {
+        this._stats = { hits: 0, misses: 0, evictions: 0 }
+    }
+}
