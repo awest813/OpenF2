@@ -82,6 +82,7 @@ export module ScriptVMBridge {
        ,0x810E: bridged("reg_anim_func", 2, false)
        ,0x8126: bridged("reg_anim_animate_forever", 2, false)
        ,0x810F: bridged("reg_anim_animate", 3, false)
+       ,0x8110: bridged("reg_anim_obj_move_to_tile", 3, false)
        ,0x810C: bridged("anim", 3, false)
        ,0x80E7: bridged("anim_busy", 1)
        ,0x810B: bridged("metarule", 2)
@@ -227,6 +228,15 @@ export module ScriptVMBridge {
 
             this.scriptObj.giq_option(iqTest, msgList, msgId, targetFn, reaction)
         }
+
+       ,0x811b: function() { // get_year: compute current game year from gameTickTime
+            // Game starts in year 2241. Uses 360-day years (12 × 30-day months).
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            this.push(2241 + Math.floor(days / 360))
+        }
+
+       ,0x8155: bridged("obj_get_rot", 1)
+       ,0x8156: bridged("set_obj_rot", 2, false)
     }
 
     // update VM opMap with our bridgeOpMap

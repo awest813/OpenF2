@@ -560,7 +560,7 @@ export class Obj {
         } else {
             this.frame = 0
         }
-        this.lastFrameTime = 0
+        this.lastFrameTime = window.performance.now()
         this.anim = reversed ? 'reverse' : 'single'
         this.animCallback =
             callback ||
@@ -1377,7 +1377,7 @@ export class Critter extends Obj {
     staticAnimation(anim: string, callback?: () => void, waitForLoad = true): void {
         this.art = this.getAnimation(anim)
         this.frame = 0
-        this.lastFrameTime = 0
+        this.lastFrameTime = window.performance.now()
 
         if (waitForLoad) {
             lazyLoadImage(this.art, () => {

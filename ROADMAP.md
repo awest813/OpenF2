@@ -21,7 +21,7 @@ OpenF2 aims to deliver:
 |------|--------|
 | **Active phase** | Phase 4 — Fidelity, Modding, and Tooling |
 | **Completed phases** | 0 · 1 · 2 · 3 |
-| **Next milestone** | Rendering polish, scripting coverage, and authoring tools |
+| **Next milestone** | Performance (batching, asset streaming, WebGL caching) |
 
 ### What works today
 
@@ -38,12 +38,15 @@ OpenF2 aims to deliver:
 - DAT override stacking and mod manifests (`src/mods.ts`)
 - In-browser debug overlay (DebugOverlayPanel, toggled with F3 / backtick)
 - All gameplay panels (dialogue, barter, loot, inventory, world map overlay, elevator, called-shot) rendering via the `ui2` WebGL path
+- Animation first-frame timing corrected (`singleAnimation`/`staticAnimation`)
+- Scripting opcodes: `reg_anim_obj_move_to_tile` (0x8110), `get_year` (0x811b), `obj_get_rot` (0x8155), `set_obj_rot` (0x8156)
+- In-browser authoring tools: MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
 
 ### Remaining gaps
 
-- **Animation and rendering:** edge-case timing and fidelity polish still needed
-- **Scripting VM:** partial opcode coverage; some Fallout 2 procedures not yet bridged
-- **Authoring tools:** map editor, script debugger, and prototype inspector are future work
+- **Performance:** rendering batch optimization, asset streaming, WebGL caching
+- **Scripting VM:** some Fallout 2 procedures remain stubs; sfall extended opcodes not started
+- **Authoring tools:** full map editor, script step-debugger are future work
 
 ---
 
@@ -108,7 +111,9 @@ OpenF2 aims to deliver:
 - [x] World map target placement centering and scroll-bounds correction
 - [x] In-browser debug overlay (DebugOverlayPanel — HP/AP/entity count/frame counter)
 - [x] **UI migration:** move remaining DOM panels to `ui2` WebGL rendering (dialogue, barter, loot, inventory, world map overlay, elevator, called shot)
-- [ ] Rendering edge-case parity and animation timing polish
+- [x] Rendering edge-case parity and animation timing polish (`singleAnimation`/`staticAnimation` first-frame timing fixed)
+- [x] **Scripting coverage:** `reg_anim_obj_move_to_tile` (0x8110), `get_year` (0x811b), `obj_get_rot` (0x8155), `set_obj_rot` (0x8156) added to `vm_bridge.ts` + `scripting.ts`
+- [x] **Authoring tools:** MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7) added to `ui2/`
 - [ ] Performance: batching, asset streaming, WebGL caching
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
@@ -116,10 +121,10 @@ OpenF2 aims to deliver:
 
 ## Near-Term Priorities
 
-1. **Rendering polish** — Fix edge-case animation timing and visual fidelity gaps
-2. **Scripting coverage** — Expand opcode and procedure support in `vm_bridge.ts`
+1. **Rendering polish** — ✅ Fixed animation first-frame timing (`singleAnimation`/`staticAnimation`)
+2. **Scripting coverage** — ✅ Added `reg_anim_obj_move_to_tile`, `get_year`, `obj_get_rot`, `set_obj_rot` to `vm_bridge.ts`
 3. **Performance** — Rendering batch optimization, asset streaming, WebGL caching
-4. **Debug/authoring tools** — Map viewer, script debugger, prototype inspector (builds on DebugOverlayPanel)
+4. **Debug/authoring tools** — ✅ MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
 
 ---
 
