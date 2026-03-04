@@ -42,6 +42,7 @@ Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone
 | Combat formulas (DT/DR, ammo, AP, criticals) | ✅ Stable |
 | Inventory and equipment management | ✅ Stable |
 | Leveling, XP, quests, karma, and reputation | ✅ Stable |
+| Gameplay UI panels on `ui2` WebGL path | ✅ Stable |
 | Versioned save/load with schema migration | ✅ Stable |
 | Core scripting VM (INT bytecode) | 🔶 Partial |
 | Dialogue and barter foundations | 🔶 Partial |
@@ -50,9 +51,9 @@ Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone
 
 ### Known gaps
 
-- **UI split:** OptionsPanel/SaveLoadPanel/BitmapFontRenderer have moved to the `ui2` WebGL path; dialogue, barter, inventory, loot, world map overlay, elevator, and called-shot panels still use DOM rendering.
+- **UI fidelity/polish:** gameplay panels now render through `ui2`; edge-case visual and interaction parity work continues.
 - **Animation and rendering fidelity:** edge-case timing and correctness still need polish.
-- **In-browser tooling:** DebugOverlayPanel (F3/backtick) is available; full map/script authoring tools are future work.
+- **In-browser tooling:** DebugOverlayPanel (F3/backtick), MapViewerPanel (F5), ScriptDebuggerPanel (F6), and PrototypeInspectorPanel (F7) are available; full map/script authoring tools are future work.
 
 ---
 

@@ -88,7 +88,7 @@ OpenF2 aims to deliver:
 - [x] Quest tracking and reputation/karma consistency
 - [x] Audio completeness baseline: effects, music logic, format handling
 - [x] Ending/intro/cinematic pipeline baseline
-- [ ] Full UI migration to bitmap-faithful rendering *(complete — Phase 4)*
+- [x] Full UI migration to bitmap-faithful rendering *(complete — Phase 4)*
 
 ---
 
