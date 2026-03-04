@@ -578,6 +578,12 @@ export class WebGLRenderer extends Renderer {
         if (!uiManager) return
 
         const canvas = uiManager.render()
+
+        // When showFonts is enabled, overlay a font debug sample via the UIManager.
+        if (Config.ui.showFonts) {
+            uiManager.renderFontDebug()
+        }
+
         // transferToImageBitmap() transfers the rendered content to a new ImageBitmap and
         // resets the canvas to blank.  This is safe because UIManagerImpl.render() always
         // clears and fully redraws the canvas on every call, so the next frame starts fresh.

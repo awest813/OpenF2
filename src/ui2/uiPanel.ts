@@ -257,6 +257,8 @@ export class UIManagerImpl {
     private ctx: OffscreenCanvasRenderingContext2D
     private _busOpenHandler: ((e: { panelName: string }) => void) | null = null
     private _busCloseHandler: ((e: { panelName: string }) => void) | null = null
+    /** Optional bitmap font renderer for pixel-accurate Fallout fonts. */
+    fontRenderer: BitmapFontRenderer | null = null
 
     constructor(width: number, height: number) {
         this.offscreen = new OffscreenCanvas(width, height)
@@ -292,6 +294,16 @@ export class UIManagerImpl {
             this.ctx.restore()
         }
         return this.offscreen
+    }
+
+    /**
+     * Render a debug preview of the bitmap font atlas onto the overlay canvas.
+     * Call from the render loop when Config.ui.showFonts is enabled.
+     */
+    renderFontDebug(): void {
+        if (!this.fontRenderer) return
+        const sample = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%'
+        this.fontRenderer.drawText(this.ctx, sample, 4, 4, FALLOUT_GREEN)
     }
 
     handleMouseDown(x: number, y: number, button: 'l' | 'r'): boolean {

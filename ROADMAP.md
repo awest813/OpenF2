@@ -37,7 +37,7 @@ OpenF2 aims to deliver:
 
 ### Major gaps
 
-- UI parity not reached (DOM/WebGL split)
+- UI parity not reached (DOM/WebGL split — OptionsPanel, SaveLoadPanel, font debug now migrated to ui2)
 - World map placement/travel issues
 - Animation timing and edge-case rendering parity still incomplete
 - In-browser debugging and authoring tools still minimal
@@ -72,7 +72,7 @@ OpenF2 aims to deliver:
 - [x] World map correctness and travel balancing
 - [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
-- [ ] UI migration toward full bitmap-faithful rendering (in progress; ui2/ module scaffolded)
+- [ ] UI migration toward full bitmap-faithful rendering (in progress; ui2/ module scaffolded, OptionsPanel/SaveLoadPanel/BitmapFontRenderer wired)
 - [x] Audio completeness baseline: effects, music logic, format handling
 - [x] Ending/intro/cinematic pipeline baseline (scaffold)
 
@@ -100,7 +100,7 @@ OpenF2 aims to deliver:
 
 ## Near-term priorities
 
-1. UI migration away from mixed DOM rendering
+1. UI migration away from mixed DOM rendering (OptionsPanel, SaveLoadPanel, BitmapFontRenderer in ui2 — remaining: dialogue, barter, loot, inventory, world map, elevator, called shot)
 2. World map travel and entrance alignment fixes
 3. Rendering edge-case parity and animation timing polish
 4. In-browser debugging and content tooling foundation
