@@ -82,6 +82,9 @@ export default {
 
     uiMode: UIMode.none,
 
+    ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
+    gameUIDisabled: false, // True when scripts have disabled UI interaction
+
     uiManager: null,
     playerEntityId: 0,
 
@@ -140,6 +143,11 @@ export default {
     reputation: Reputation
 
     uiMode: UIMode
+
+    /** Ambient light level: 0 = fully dark, 65536 = fully lit. */
+    ambientLightLevel: number
+    /** True when scripts have temporarily disabled the game UI. */
+    gameUIDisabled: boolean
 
     mapAreas: AreaMap | null
 

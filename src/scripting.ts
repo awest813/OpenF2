@@ -1105,10 +1105,18 @@ export module Scripting {
 
         // environment
         set_light_level(level: number) {
-            stub('set_light_level', arguments)
+            log('set_light_level', arguments)
+            // Clamp to the valid range 0–65536 and store on globalState.
+            globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
         }
         obj_set_light_level(obj: Obj, intensity: number, distance: number) {
-            stub('obj_set_light_level', arguments)
+            log('obj_set_light_level', arguments)
+            if (!isGameObject(obj)) {
+                warn('obj_set_light_level: not a game object: ' + obj)
+                return
+            }
+            obj.lightIntensity = Math.max(0, Math.min(65536, intensity))
+            obj.lightRadius = Math.max(0, distance)
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {
             log('override_map_start', arguments)
@@ -1547,6 +1555,46 @@ export module Scripting {
             setSfallGlobalInt(index, value)
         }
 
+        // sfall extended opcodes — PC/critter stat helpers
+        get_pc_base_stat(stat: number): number {
+            const player = globalState.player
+            if (!player) return 0
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('get_pc_base_stat: unknown stat number: ' + stat, undefined, this)
+                return 0
+            }
+            return player.stats.getBase(statName)
+        }
+        set_pc_base_stat(stat: number, value: number): void {
+            const player = globalState.player
+            if (!player) return
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('set_pc_base_stat: unknown stat number: ' + stat, undefined, this)
+                return
+            }
+            player.stats.setBase(statName, value)
+        }
+        set_critter_current_ap(obj: Obj, ap: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_current_ap: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (critter.AP) {
+                critter.AP.combat = Math.max(0, ap)
+            }
+        }
+        get_npc_level(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_npc_level: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            return critter.stats.getBase('Level')
+        }
+
         // game
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
@@ -1577,10 +1625,12 @@ export module Scripting {
             stub('wm_area_set_pos', arguments)
         }
         game_ui_disable() {
-            stub('game_ui_disable', arguments)
+            log('game_ui_disable', arguments)
+            globalState.gameUIDisabled = true
         }
         game_ui_enable() {
-            stub('game_ui_enable', arguments)
+            log('game_ui_enable', arguments)
+            globalState.gameUIDisabled = false
         }
 
         // sound
