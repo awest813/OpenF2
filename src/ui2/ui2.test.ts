@@ -945,3 +945,100 @@ describe('UIManager full integration with all panels', () => {
         expect(mgr.get('options').visible).toBe(false)
     })
 })
+
+// ---------------------------------------------------------------------------
+// DebugOverlayPanel
+// ---------------------------------------------------------------------------
+
+import { DebugOverlayPanel } from './debugOverlay.js'
+
+describe('DebugOverlayPanel', () => {
+    it('has name "debug" and zOrder 50', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        expect(panel.name).toBe('debug')
+        expect(panel.zOrder).toBe(50)
+    })
+
+    it('starts hidden', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        expect(panel.visible).toBe(false)
+    })
+
+    it('show/hide lifecycle works', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        panel.show()
+        expect(panel.visible).toBe(true)
+        panel.hide()
+        expect(panel.visible).toBe(false)
+    })
+
+    it('mapName defaults to null', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        expect(panel.mapName).toBeNull()
+    })
+
+    it('mapName can be set externally', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        panel.mapName = 'artemple'
+        expect(panel.mapName).toBe('artemple')
+    })
+
+    it('render() does not throw', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        panel.show()
+        const mgr = new UIManagerImpl(800, 600)
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('backtick key toggles the panel', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        expect(panel.visible).toBe(false)
+        const consumed = panel.onKeyDown('`')
+        expect(consumed).toBe(true)
+        expect(panel.visible).toBe(true)
+        panel.onKeyDown('`')
+        expect(panel.visible).toBe(false)
+    })
+
+    it('F3 key toggles the panel', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        const consumed = panel.onKeyDown('F3')
+        expect(consumed).toBe(true)
+        expect(panel.visible).toBe(true)
+    })
+
+    it('other keys are not consumed', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        expect(panel.onKeyDown('Escape')).toBe(false)
+        expect(panel.onKeyDown('Enter')).toBe(false)
+    })
+
+    it('is positioned in the top-right corner', () => {
+        const pid = EntityManager.create()
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        // Should be near the right edge
+        expect(panel.bounds.x).toBeGreaterThan(400)
+        expect(panel.bounds.y).toBeLessThan(50)
+    })
+
+    it('renders correctly into UIManager pipeline', () => {
+        const pid = createPlayerEntity({ name: 'DEBUG TEST' })
+        const panel = new DebugOverlayPanel(800, 600, pid)
+        panel.show()
+        const mgr = new UIManagerImpl(800, 600)
+        mgr.register(panel)
+        // render() returns the offscreen canvas; should not throw
+        const canvas = mgr.render()
+        expect(canvas).toBeDefined()
+    })
+})

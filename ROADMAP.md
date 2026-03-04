@@ -37,10 +37,9 @@ OpenF2 aims to deliver:
 
 ### Major gaps
 
-- UI parity not reached (DOM/WebGL split — OptionsPanel, SaveLoadPanel, font debug now migrated to ui2)
-- World map placement/travel issues
+- UI parity not fully reached — OptionsPanel, SaveLoadPanel, and BitmapFontRenderer are now in ui2; remaining panels (dialogue, barter, loot, inventory, world map overlay, elevator, called shot) still use DOM rendering
 - Animation timing and edge-case rendering parity still incomplete
-- In-browser debugging and authoring tools still minimal
+- In-browser debugging and authoring tools minimal (DebugOverlayPanel added; full authoring tooling still future work)
 
 ---
 
@@ -72,7 +71,7 @@ OpenF2 aims to deliver:
 - [x] World map correctness and travel balancing
 - [x] Broader opcode/procedure coverage in scripting runtime
 - [x] Quest tracking and reputation/karma consistency
-- [ ] UI migration toward full bitmap-faithful rendering (in progress; ui2/ module scaffolded, OptionsPanel/SaveLoadPanel/BitmapFontRenderer wired)
+- [ ] UI migration toward full bitmap-faithful rendering (OptionsPanel/SaveLoadPanel/BitmapFontRenderer done in ui2; remaining: dialogue, barter, loot, inventory, world map overlay, elevator, called shot)
 - [x] Audio completeness baseline: effects, music logic, format handling
 - [x] Ending/intro/cinematic pipeline baseline (scaffold)
 
@@ -93,18 +92,19 @@ OpenF2 aims to deliver:
 - [x] DAT override stacking + structured mod manifests (`src/mods.ts`, `ModRegistry`)
 - [x] Pathfinding and line-of-sight correctness improvements (`hexLine` cube-lerp, `hexesInRadius` ring algorithm)
 - [ ] Rendering edge-case parity and animation timing polish
-- [ ] In-browser editing/debugging tools (long-term)
+- [x] World map target placement centering and scroll-bounds correction
+- [x] In-browser debug overlay (DebugOverlayPanel — HP/AP/entity count/frame counter, toggleable via F3/backtick)
+- [ ] Full in-browser editing/authoring tools (long-term)
 - [ ] Performance work: batching, streaming, caching
 
 ---
 
 ## Near-term priorities
 
-1. UI migration away from mixed DOM rendering (OptionsPanel, SaveLoadPanel, BitmapFontRenderer in ui2 — remaining: dialogue, barter, loot, inventory, world map, elevator, called shot)
-2. World map travel and entrance alignment fixes
-3. Rendering edge-case parity and animation timing polish
-4. In-browser debugging and content tooling foundation
-5. Performance work: batching, streaming, and caching
+1. UI migration away from mixed DOM rendering (OptionsPanel, SaveLoadPanel, BitmapFontRenderer in ui2 — remaining: dialogue, barter, loot, inventory, world map overlay, elevator, called shot)
+2. Rendering edge-case parity and animation timing polish
+3. Full in-browser debugging and content tooling (DebugOverlayPanel landed; deeper map/script authoring tools next)
+4. Performance work: batching, streaming, and caching
 
 ## Success criteria
 
