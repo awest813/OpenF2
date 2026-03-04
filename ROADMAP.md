@@ -21,7 +21,7 @@ OpenF2 aims to deliver:
 |------|--------|
 | **Active phase** | Phase 4 — Fidelity, Modding, and Tooling |
 | **Completed phases** | 0 · 1 · 2 · 3 |
-| **Next milestone** | Performance (batching, asset streaming, WebGL caching) |
+| **Next milestone** | Scripting VM (Fallout 2 procedure stubs, sfall extended opcodes) |
 
 ### What works today
 
@@ -41,10 +41,10 @@ OpenF2 aims to deliver:
 - Animation first-frame timing corrected (`singleAnimation`/`staticAnimation`)
 - Scripting opcodes: `reg_anim_obj_move_to_tile` (0x8110), `get_year` (0x811b), `obj_get_rot` (0x8155), `set_obj_rot` (0x8156)
 - In-browser authoring tools: MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
+- Performance: `SpriteBatch` draw-call batching (`src/renderBatch.ts`), `AssetCache` LRU streaming cache (`src/assetStore.ts`)
 
 ### Remaining gaps
 
-- **Performance:** rendering batch optimization, asset streaming, WebGL caching
 - **Scripting VM:** some Fallout 2 procedures remain stubs; sfall extended opcodes not started
 - **Authoring tools:** full map editor, script step-debugger are future work
 
@@ -114,7 +114,7 @@ OpenF2 aims to deliver:
 - [x] Rendering edge-case parity and animation timing polish (`singleAnimation`/`staticAnimation` first-frame timing fixed)
 - [x] **Scripting coverage:** `reg_anim_obj_move_to_tile` (0x8110), `get_year` (0x811b), `obj_get_rot` (0x8155), `set_obj_rot` (0x8156) added to `vm_bridge.ts` + `scripting.ts`
 - [x] **Authoring tools:** MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7) added to `ui2/`
-- [ ] Performance: batching, asset streaming, WebGL caching
+- [x] **Performance:** `SpriteBatch` draw-call batching (`src/renderBatch.ts`), `AssetCache` LRU streaming cache (`src/assetStore.ts`)
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
 ---
@@ -123,7 +123,7 @@ OpenF2 aims to deliver:
 
 1. **Rendering polish** — ✅ Fixed animation first-frame timing (`singleAnimation`/`staticAnimation`)
 2. **Scripting coverage** — ✅ Added `reg_anim_obj_move_to_tile`, `get_year`, `obj_get_rot`, `set_obj_rot` to `vm_bridge.ts`
-3. **Performance** — Rendering batch optimization, asset streaming, WebGL caching
+3. **Performance** — ✅ `SpriteBatch` batching (`src/renderBatch.ts`), `AssetCache` LRU cache (`src/assetStore.ts`)
 4. **Debug/authoring tools** — ✅ MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
 
 ---
