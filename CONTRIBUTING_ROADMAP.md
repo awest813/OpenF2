@@ -43,7 +43,7 @@ OpenF2 is a **browser-first reimplementation** of the Fallout 2 engine, based on
 | Layer | Technology |
 |-------|-----------|
 | Engine core | TypeScript (strict, ES2021 target) |
-| Rendering | WebGL + DOM (migrating to full WebGL) |
+| Rendering | WebGL (all gameplay panels via `ui2`) |
 | Audio | HTML5 Audio API |
 | Asset extraction | Python 3.9+ (NumPy, Pillow) |
 | Testing | Vitest |
@@ -171,8 +171,8 @@ src/
 ├── quest/
 │   └── questLog.ts      # Quest state machine and tracking
 │
-├── ui.ts                # DOM-based UI
-├── ui2/                 # WebGL-based UI (migration target)
+├── ui.ts                # DOM-based UI (legacy; gameplay panels migrated to ui2)
+├── ui2/                 # WebGL-based UI (all gameplay panels)
 │
 ├── map.ts               # Map loading and traversal
 ├── geometry.ts          # Hex grid geometry, pathfinding, line-of-sight
@@ -524,11 +524,10 @@ These projects provide invaluable cross-reference for understanding engine behav
 
 | Priority | Area | Description | Key Files |
 |----------|------|-------------|-----------|
-| 1 | UI Migration | Move from DOM/WebGL split to full bitmap-faithful rendering | `src/ui.ts`, `src/ui2/` |
-| 2 | World Map | Travel and entrance alignment fixes | `src/worldmap.ts` |
-| 3 | Scripting | Opcode/procedure coverage expansion | `src/vm_bridge.ts`, `src/vm_opcodes.ts` |
-| 4 | Audio | Effects, music logic, format handling completeness | `src/audio.ts` |
-| 5 | Cinematics | Ending/intro/cinematic pipeline with real assets | `src/cinematic.ts` |
+| 1 | World Map | Travel and entrance alignment fixes | `src/worldmap.ts` |
+| 2 | Scripting | Opcode/procedure coverage expansion | `src/vm_bridge.ts`, `src/vm_opcodes.ts` |
+| 3 | Audio | Effects, music logic, format handling completeness | `src/audio.ts` |
+| 4 | Cinematics | Ending/intro/cinematic pipeline with real assets | `src/cinematic.ts` |
 
 ### Medium-Term Goals
 
