@@ -21,7 +21,7 @@ OpenF2 aims to deliver:
 |------|--------|
 | **Active phase** | Phase 4 — Fidelity, Modding, and Tooling |
 | **Completed phases** | 0 · 1 · 2 · 3 |
-| **Next milestone** | Complete UI migration away from DOM rendering |
+| **Next milestone** | Rendering polish, scripting coverage, and authoring tools |
 
 ### What works today
 
@@ -37,10 +37,10 @@ OpenF2 aims to deliver:
 - Fallout 1 compatibility layer (`src/compat/fallout1.ts`)
 - DAT override stacking and mod manifests (`src/mods.ts`)
 - In-browser debug overlay (DebugOverlayPanel, toggled with F3 / backtick)
+- All gameplay panels (dialogue, barter, loot, inventory, world map overlay, elevator, called-shot) rendering via the `ui2` WebGL path
 
 ### Remaining gaps
 
-- **UI split:** OptionsPanel/SaveLoadPanel/BitmapFontRenderer are in `ui2`; dialogue, barter, loot, inventory, world map overlay, elevator, and called-shot panels still render via DOM
 - **Animation and rendering:** edge-case timing and fidelity polish still needed
 - **Scripting VM:** partial opcode coverage; some Fallout 2 procedures not yet bridged
 - **Authoring tools:** map editor, script debugger, and prototype inspector are future work
@@ -83,7 +83,7 @@ OpenF2 aims to deliver:
 - [x] Quest tracking and reputation/karma consistency
 - [x] Audio completeness baseline: effects, music logic, format handling
 - [x] Ending/intro/cinematic pipeline baseline
-- [ ] Full UI migration to bitmap-faithful rendering *(in progress — Phase 4)*
+- [ ] Full UI migration to bitmap-faithful rendering *(complete — Phase 4)*
 
 ---
 
@@ -107,7 +107,7 @@ OpenF2 aims to deliver:
 - [x] Pathfinding and line-of-sight correctness (`hexLine` cube-lerp, `hexesInRadius` ring algorithm)
 - [x] World map target placement centering and scroll-bounds correction
 - [x] In-browser debug overlay (DebugOverlayPanel — HP/AP/entity count/frame counter)
-- [ ] **UI migration:** move remaining DOM panels to `ui2` WebGL rendering (dialogue, barter, loot, inventory, world map overlay, elevator, called shot)
+- [x] **UI migration:** move remaining DOM panels to `ui2` WebGL rendering (dialogue, barter, loot, inventory, world map overlay, elevator, called shot)
 - [ ] Rendering edge-case parity and animation timing polish
 - [ ] Performance: batching, asset streaming, WebGL caching
 - [ ] Full in-browser map/script authoring tools *(long-term)*
@@ -116,11 +116,10 @@ OpenF2 aims to deliver:
 
 ## Near-Term Priorities
 
-1. **UI migration** — Complete the move of all remaining DOM panels to `ui2` bitmap-faithful WebGL rendering
-2. **Rendering polish** — Fix edge-case animation timing and visual fidelity gaps
-3. **Scripting coverage** — Expand opcode and procedure support in `vm_bridge.ts`
-4. **Performance** — Rendering batch optimization, asset streaming, WebGL caching
-5. **Debug/authoring tools** — Map viewer, script debugger, prototype inspector (builds on DebugOverlayPanel)
+1. **Rendering polish** — Fix edge-case animation timing and visual fidelity gaps
+2. **Scripting coverage** — Expand opcode and procedure support in `vm_bridge.ts`
+3. **Performance** — Rendering batch optimization, asset streaming, WebGL caching
+4. **Debug/authoring tools** — Map viewer, script debugger, prototype inspector (builds on DebugOverlayPanel)
 
 ---
 
@@ -131,5 +130,5 @@ OpenF2 will be considered **1.0 ready** when:
 - [ ] Fallout 2 is completable start-to-finish without major blockers
 - [ ] Save/load is reliable across long campaigns
 - [ ] Core combat, skills, and progression match expected Fallout 2 behavior
-- [ ] All primary UI panels render through the `ui2` WebGL path (no DOM fallback for gameplay panels)
+- [x] All primary UI panels render through the `ui2` WebGL path (no DOM fallback for gameplay panels)
 - [ ] UI and tooling are stable enough for community mod work
