@@ -44,6 +44,9 @@ OpenF2 aims to deliver:
 - Performance: `SpriteBatch` draw-call batching (`src/renderBatch.ts`), `AssetCache` LRU streaming cache (`src/assetStore.ts`)
 - **Scripting VM milestone:** `obj_art_fid`, `art_anim` procedures implemented; sfall global variable store (`src/sfallGlobals.ts`); sfall v4 version detection via `metarule(56, 0)`; `get_sfall_global` (0x8157) / `set_sfall_global` (0x8158) opcodes; `critter_add_trait` OBJECT_CUR_ROT and OBJECT_VISIBILITY side-effects
 - **Scripting VM continued:** `get_poison` (0x8123) and `get_radiation` (0x8159) critter status getters implemented; integer-indexed sfall globals (`getSfallGlobalInt` / `setSfallGlobalInt`, opcodes 0x815A–0x815B); `get_day_of_week` game-clock opcode (0x815C)
+- **VM opcode completeness:** `op_bwxor` (0x8042) and `op_bwnot` (0x8043) added to `vm_opcodes.ts` completing the bitwise-operation set; regression tests added in `vm.test.ts`
+- **Scripting procedures:** `play_sfx` now delegates to `audioEngine.playSfx`; `reg_anim_obj_move_to_tile` and `animate_stand_obj` de-stubbed with real `walkTo`/frame-reset implementations
+- **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
 
 ### Remaining gaps
 
@@ -119,6 +122,9 @@ OpenF2 aims to deliver:
 - [x] **Performance:** `SpriteBatch` draw-call batching (`src/renderBatch.ts`), `AssetCache` LRU streaming cache (`src/assetStore.ts`)
 - [x] **Scripting VM milestone:** `obj_art_fid`, `art_anim` procedures; sfall global store (`src/sfallGlobals.ts`); sfall v4 version via `metarule(56, 0)`; `get_sfall_global` (0x8157) / `set_sfall_global` (0x8158) opcodes; `critter_add_trait` OBJECT_CUR_ROT / OBJECT_VISIBILITY
 - [x] **Scripting VM continued:** `get_poison` (0x8123) and `get_radiation` (0x8159) critter status getters; integer-indexed sfall globals (`getSfallGlobalInt`/`setSfallGlobalInt`, opcodes 0x815A–0x815B, `MAX_SFALL_INT_GLOBALS = 4096`); `get_day_of_week` game-clock opcode (0x815C)
+- [x] **VM opcode completeness:** `op_bwxor` (0x8042) and `op_bwnot` (0x8043) added to `vm_opcodes.ts`; full bitwise-operation suite covered with regression tests
+- [x] **Scripting procedures:** `play_sfx` delegates to `audioEngine.playSfx`; `reg_anim_obj_move_to_tile` and `animate_stand_obj` de-stubbed (real movement / frame-reset)
+- [x] **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
 ---
@@ -131,6 +137,7 @@ OpenF2 aims to deliver:
 4. **Debug/authoring tools** — ✅ MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
 5. **Scripting VM milestone** — ✅ `obj_art_fid`, `art_anim`, sfall globals, `metarule(56, 0)` version, sfall opcodes 0x8157–0x8158, `critter_add_trait` trait side-effects
 6. **Scripting VM continued** — ✅ `get_poison`/`get_radiation` critter status getters, integer-indexed sfall globals (0x815A–0x815B), `get_day_of_week` opcode (0x815C)
+7. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
 
 ---
 

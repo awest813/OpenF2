@@ -1437,12 +1437,41 @@ export module Scripting {
             }
         }
         reg_anim_obj_move_to_tile(obj: Obj, tileNum: number, delay: number) {
-            stub('reg_anim_obj_move_to_tile', arguments, 'movement')
+            log('reg_anim_obj_move_to_tile', arguments, 'movement')
+            if (!isGameObject(obj)) {
+                warn('reg_anim_obj_move_to_tile: not a game object', 'movement', this)
+                return
+            }
+            if (isNaN(tileNum) || tileNum < 0) {
+                warn('reg_anim_obj_move_to_tile: invalid tile num', 'movement', this)
+                return
+            }
+            const tile = fromTileNum(tileNum)
+            if (tile.x < 0 || tile.x >= 200 || tile.y < 0 || tile.y >= 200) {
+                warn(
+                    'reg_anim_obj_move_to_tile: invalid tile: ' + tile.x + ', ' + tile.y + ' (' + tileNum + ')',
+                    'movement',
+                    this
+                )
+                return
+            }
+            if (!(obj as Critter).walkTo) {
+                warn('reg_anim_obj_move_to_tile: object cannot walk', 'movement', this)
+                return
+            }
+            if (!(obj as Critter).walkTo(tile, false)) {
+                warn('reg_anim_obj_move_to_tile: no path', 'movement', this)
+            }
         }
 
         animate_stand_obj(obj: Critter) {
-            stub('animate_stand_obj', arguments, 'animation')
-            // TODO: Play idle animation (animation 0)
+            log('animate_stand_obj', arguments, 'animation')
+            if (!isGameObject(obj)) {
+                warn('animate_stand_obj: not a game object', undefined, this)
+                return
+            }
+            // Reset to idle (frame 0 of the standing animation)
+            obj.frame = 0
         }
 
         explosion(tile: number, elevation: number, damage: number) {
@@ -1556,7 +1585,8 @@ export module Scripting {
 
         // sound
         play_sfx(sfx: string) {
-            stub('play_sfx', arguments)
+            log('play_sfx', arguments)
+            globalState.audioEngine.playSfx(sfx)
         }
 
         // party
