@@ -90,6 +90,16 @@ export class ScriptVM {
 
         const isTopLevel = this.currentProcedureName === null
         const previousProcedure = this.currentProcedureName
+        const previousPc = this.pc
+        const previousHalted = this.halted
+        const previousRetDepth = this.retStack.length
+
+        // Continuation calls (e.g. resumed script events) already have an
+        // active return chain on retStack and must not add a new top-level
+        // sentinel. Nested direct VM.call() invocations do get a sentinel so
+        // each call frame can terminate independently.
+        const shouldPushTopLevelReturnSentinel = previousProcedure !== null || previousRetDepth === 0
+
         this.currentProcedureName = procName
 
         // Args are passed in reverse order (stack-based calling convention).
@@ -97,15 +107,25 @@ export class ScriptVM {
         reversedArgs.forEach((arg) => this.push(arg))
         this.push(args.length)
 
-        this.retStack.push(-1) // push return address (TODO: how is this handled?)
+        if (shouldPushTopLevelReturnSentinel) this.retStack.push(-1)
 
         const t0 = isTopLevel ? performance.now() : 0
+        let completed = false
         try {
             // run procedure code
+            this.halted = false
             this.pc = proc.offset
             this.run()
+            completed = true
             return this.pop()
         } finally {
+            if (!completed) {
+                // A throwing procedure should not leak/consume return frames.
+                this.retStack.length = previousRetDepth
+                this.pc = previousPc
+                this.halted = previousHalted
+            }
+
             // Keep debugger state consistent even when a procedure throws.
             this.currentProcedureName = previousProcedure
             if (isTopLevel) {

@@ -480,6 +480,99 @@ describe('ScriptVM.call argument handling', () => {
         expect(() => vm.call('foo')).toThrow('boom')
         expect(vm.currentProcedureName).toBeNull()
     })
+
+    it('preserves nested call state and return-stack balance', () => {
+        class NestedScriptVM extends ScriptVM {
+            run(): void {
+                if (this.currentProcedureName === 'outer') {
+                    this.stepCount++
+                    const nested = this.call('inner')
+                    this.stepCount++
+                    this.push(`outer:${nested}`)
+                    opMap[0x801c].call(this)
+                    return
+                }
+
+                if (this.currentProcedureName === 'inner') {
+                    this.stepCount++
+                    this.push('inner-value')
+                    opMap[0x801c].call(this)
+                    return
+                }
+
+                throw new Error('unexpected procedure')
+            }
+        }
+
+        const vm = new NestedScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            {
+                procedures: {
+                    outer: { index: 0, offset: 0x10 },
+                    inner: { index: 1, offset: 0x20 },
+                },
+                proceduresTable: [],
+                strings: {},
+                identifiers: {},
+            } as any
+        )
+
+        const result = vm.call('outer')
+        expect(result).toBe('outer:inner-value')
+        expect(vm.currentProcedureName).toBeNull()
+        expect(vm.retStack).toEqual([])
+        expect(vm.stepCount).toBe(3)
+    })
+
+    it('does not inject a new top-level sentinel for continuation event calls', () => {
+        class ContinuationScriptVM extends ScriptVM {
+            run(): void {
+                // Return from the option target procedure.
+                this.push('from-option')
+                opMap[0x801c].call(this)
+
+                // Then return from the resumed cleanup frame.
+                this.push('cleanup-complete')
+                opMap[0x801c].call(this)
+            }
+        }
+
+        const vm = new ContinuationScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            { procedures: { option_proc: { index: 0, offset: 0x30 } }, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        // Simulate a paused chain: top-level sentinel + saved resume address.
+        vm.retStack.push(-1, 0x120)
+
+        const result = vm.call('option_proc')
+        expect(result).toBe('cleanup-complete')
+        expect(vm.retStack).toEqual([])
+        expect(vm.halted).toBe(true)
+    })
+
+    it('restores return stack and execution state when a continuation call throws', () => {
+        class ThrowingScriptVM extends ScriptVM {
+            run(): void {
+                throw new Error('call failed')
+            }
+        }
+
+        const vm = new ThrowingScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            { procedures: { option_proc: { index: 0, offset: 0x30 } }, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        vm.retStack.push(-1, 0x120)
+        vm.pc = 0x99
+        vm.halted = true
+
+        expect(() => vm.call('option_proc')).toThrow('call failed')
+        expect(vm.retStack).toEqual([-1, 0x120])
+        expect(vm.pc).toBe(0x99)
+        expect(vm.halted).toBe(true)
+        expect(vm.currentProcedureName).toBeNull()
+    })
 })
 
 // ---------------------------------------------------------------------------
