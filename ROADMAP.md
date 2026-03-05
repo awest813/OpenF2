@@ -151,6 +151,87 @@ OpenF2 aims to deliver:
 
 ---
 
+
+## Safe Impact Roadmap (Performance + High/Medium ROI Fixes)
+
+This backlog focuses on changes that are **safe to ship incrementally**: low behavioral risk, easy to review, and straightforward to verify with existing tests and profiling.
+
+### Safety guardrails
+
+- Land work in small PRs (one subsystem at a time).
+- Keep behavior-preserving refactors separate from functional changes.
+- Require before/after metrics for performance items (frame time, draw calls, memory, load time).
+- Add regression tests for bug fixes in combat, scripting, save/load, and pathfinding.
+
+### High-impact safe fixes (P0/P1)
+
+1. **Renderer hot-path profiling and micro-optimizations** *(P0, high)*  
+   - Audit per-frame allocations in `renderer.ts`, `webglrenderer.ts`, and `renderBatch.ts`.  
+   - Reuse temporary vectors/arrays and avoid object churn inside render loops.  
+   - Cache repeated state lookups during frame assembly.  
+   - **Exit criteria:** measurable frame-time reduction on dense maps with no visual regressions.
+
+2. **Asset I/O and decode pipeline tuning** *(P0, high)*  
+   - Extend `AssetCache` telemetry (hit/miss, eviction reason, decode latency).  
+   - Prioritize prefetch of near-camera assets and common UI atlases.  
+   - Move expensive decode steps off critical interaction paths where possible.  
+   - **Exit criteria:** reduced hitching during movement/zone transitions.
+
+3. **Pathfinding performance budget controls** *(P1, high)*  
+   - Introduce bounded work per tick for expensive searches.  
+   - Cache short-lived path results for repeated move intents in the same local area.  
+   - Add lightweight instrumentation to track worst-case path solve times.  
+   - **Exit criteria:** fewer long frame spikes during multi-actor movement.
+
+4. **Script VM execution safeguards** *(P1, high)*  
+   - Add per-script execution counters and warn-level telemetry for pathological scripts.  
+   - Ensure opcode helpers avoid repeated expensive lookups within tight loops.  
+   - Expand opcode regression tests alongside each de-stubbed procedure/opcode.  
+   - **Exit criteria:** lower VM-related frame variance and no behavior regressions in script tests.
+
+5. **Save/load reliability hardening** *(P1, high)*  
+   - Add corruption-tolerant guards and clearer migration diagnostics in save schema handling.  
+   - Add round-trip fixtures for long-campaign state (quests, reputations, inventories, world map).  
+   - **Exit criteria:** deterministic round-trip test pass and migration confidence across versions.
+
+### Medium-impact safe fixes (P2)
+
+1. **UI2 incremental render invalidation** *(medium)*  
+   - Re-render only dirty panels/regions when static UI state has not changed.  
+   - Avoid redundant texture/state binding for unchanged widgets.
+
+2. **Audio scheduling and cache polish** *(medium)*  
+   - Add simple voice/SFX de-duplication windows to reduce burst spam.  
+   - Track decode/play latency metrics for common effects.
+
+3. **Event bus backpressure visibility** *(medium)*  
+   - Add queue depth counters and slow-handler logging hooks.  
+   - Surface metrics in debug tooling for real-time diagnosis.
+
+4. **Data loading parse cost reductions** *(medium)*  
+   - Memoize repeat parse transforms for static LUT/data resources.  
+   - Defer non-critical parsing until first use.
+
+5. **Test-suite impact amplification** *(medium)*  
+   - Add focused regression tests for recently completed opcode families and combat edge cases.  
+   - Add perf smoke checks (non-gating) for render/pathfinding/script loops in CI reporting.
+
+### Suggested rollout order (safe sequencing)
+
+1. Instrumentation first (profiling + telemetry), no behavior changes.
+2. Renderer + asset pipeline micro-optimizations.
+3. Pathfinding and VM budget controls.
+4. Save/load hardening and additional round-trip fixtures.
+5. UI/audio/event-bus medium-impact polish items.
+
+### Definition of done for each item
+
+- Before/after numbers captured and attached to PR.
+- No new failing tests in `vitest` suites.
+- At least one regression test added for each non-trivial bug fix.
+- Debug overlay/tooling updated when new telemetry is introduced.
+
+
 ## Success Criteria (1.0)
 
 OpenF2 will be considered **1.0 ready** when:
