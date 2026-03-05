@@ -468,3 +468,100 @@ describe('ScriptVM.call argument handling', () => {
         expect(vm.currentProcedureName).toBeNull()
     })
 })
+
+// ---------------------------------------------------------------------------
+// ScriptVM — call execution-time telemetry
+// ---------------------------------------------------------------------------
+
+describe('ScriptVM — call execution-time telemetry', () => {
+    /** Minimal ScriptVM stub whose run() is a no-op (so call() completes immediately). */
+    class InstantScriptVM extends ScriptVM {
+        run(): void {
+            // no-op — overrides the real run() so we don't need real opcodes
+            this.halted = true
+        }
+    }
+
+    function makeTimingVM(): InstantScriptVM {
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = {
+            procedures: { testProc: { index: 0, offset: 0x10 } },
+            proceduresTable: [],
+            strings: {},
+            identifiers: {},
+        } as any
+        const vm = new InstantScriptVM(script, intfile)
+        // Prime the data stack so pop() in call() succeeds
+        vm.push(undefined)
+        return vm
+    }
+
+    it('lastCallTimeMs starts at 0', () => {
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        expect(new ScriptVM(script, intfile).lastCallTimeMs).toBe(0)
+    })
+
+    it('totalCallTimeMs starts at 0', () => {
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        expect(new ScriptVM(script, intfile).totalCallTimeMs).toBe(0)
+    })
+
+    it('lastCallTimeMs is non-negative after a call()', () => {
+        const vm = makeTimingVM()
+        vm.call('testProc')
+        expect(vm.lastCallTimeMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('lastCallTimeMs is a finite number after a call()', () => {
+        const vm = makeTimingVM()
+        vm.call('testProc')
+        expect(Number.isFinite(vm.lastCallTimeMs)).toBe(true)
+    })
+
+    it('totalCallTimeMs accumulates across multiple calls()', () => {
+        const vm = makeTimingVM()
+        // Give additional stack entries so each call's pop() can succeed
+        vm.push(undefined)
+        vm.call('testProc')
+        const after1 = vm.totalCallTimeMs
+        expect(after1).toBeGreaterThanOrEqual(0)
+
+        vm.push(undefined)
+        vm.call('testProc')
+        const after2 = vm.totalCallTimeMs
+        expect(after2).toBeGreaterThanOrEqual(after1)
+    })
+
+    it('lastCallTimeMs is updated on each call()', () => {
+        const vm = makeTimingVM()
+        vm.call('testProc')
+        const t1 = vm.lastCallTimeMs
+        vm.push(undefined)
+        vm.call('testProc')
+        const t2 = vm.lastCallTimeMs
+        // Both are finite non-negative numbers
+        expect(Number.isFinite(t1)).toBe(true)
+        expect(Number.isFinite(t2)).toBe(true)
+    })
+
+    it('lastCallTimeMs is still set when call() throws', () => {
+        class ThrowingScriptVM extends ScriptVM {
+            run(): void {
+                throw new Error('vm error')
+            }
+        }
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = {
+            procedures: { boom: { index: 0, offset: 0x10 } },
+            proceduresTable: [],
+            strings: {},
+            identifiers: {},
+        } as any
+        const vm = new ThrowingScriptVM(script, intfile)
+        expect(() => vm.call('boom')).toThrow('vm error')
+        expect(vm.lastCallTimeMs).toBeGreaterThanOrEqual(0)
+        expect(Number.isFinite(vm.lastCallTimeMs)).toBe(true)
+    })
+})

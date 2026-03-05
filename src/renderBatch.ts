@@ -45,17 +45,25 @@ export interface BatchStats {
     uniqueTextures: number
     /** Estimated texture-bind calls saved vs. unordered submission. */
     bindsSaved: number
+    /**
+     * Wall-clock time between the matching begin() and end() calls, in
+     * milliseconds.  Measures frame-assembly cost on the CPU side.
+     * 0 when no frame has been completed yet.
+     */
+    frameTimeMs: number
 }
 
 export class SpriteBatch {
     private _commands: DrawCommand[] = []
     private _open = false
-    private _lastStats: BatchStats = { drawCount: 0, uniqueTextures: 0, bindsSaved: 0 }
+    private _beginTime = 0
+    private _lastStats: BatchStats = { drawCount: 0, uniqueTextures: 0, bindsSaved: 0, frameTimeMs: 0 }
 
     /** Open a new frame.  Must be called before draw(). */
     begin(): void {
         if (this._open) throw new Error('SpriteBatch.begin() called while batch is already open')
         this._commands = []
+        this._beginTime = performance.now()
         this._open = true
     }
 
@@ -105,8 +113,9 @@ export class SpriteBatch {
         const drawCount = this._commands.length
         const uniqueTextures = new Set(this._commands.map((c) => c.textureKey)).size
         const bindsSaved = Math.max(0, drawCount - uniqueTextures)
+        const frameTimeMs = performance.now() - this._beginTime
 
-        this._lastStats = { drawCount, uniqueTextures, bindsSaved }
+        this._lastStats = { drawCount, uniqueTextures, bindsSaved, frameTimeMs }
 
         const result = this._commands
         this._commands = []

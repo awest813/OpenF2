@@ -413,3 +413,123 @@ describe('SpriteBatch — stats', () => {
         expect(batch.stats.drawCount).toBe(2)
     })
 })
+
+// ---------------------------------------------------------------------------
+// 3. AssetCache — extended telemetry (decode latency + eviction reason)
+// ---------------------------------------------------------------------------
+
+describe('AssetCache — decode latency telemetry', () => {
+    it('starts with totalDecodeLatencyMs = 0 and decodeCount = 0', () => {
+        const cache = new AssetCache<string>(10)
+        expect(cache.stats.totalDecodeLatencyMs).toBe(0)
+        expect(cache.stats.decodeCount).toBe(0)
+    })
+
+    it('avgDecodeLatencyMs returns 0 when no samples recorded', () => {
+        expect(new AssetCache<string>(10).avgDecodeLatencyMs).toBe(0)
+    })
+
+    it('recordDecodeLatency accumulates totalDecodeLatencyMs', () => {
+        const cache = new AssetCache<string>(10)
+        cache.recordDecodeLatency(10)
+        cache.recordDecodeLatency(20)
+        expect(cache.stats.totalDecodeLatencyMs).toBe(30)
+    })
+
+    it('recordDecodeLatency increments decodeCount', () => {
+        const cache = new AssetCache<string>(10)
+        cache.recordDecodeLatency(5)
+        cache.recordDecodeLatency(15)
+        expect(cache.stats.decodeCount).toBe(2)
+    })
+
+    it('avgDecodeLatencyMs equals total / count', () => {
+        const cache = new AssetCache<string>(10)
+        cache.recordDecodeLatency(10)
+        cache.recordDecodeLatency(30)
+        expect(cache.avgDecodeLatencyMs).toBe(20)
+    })
+
+    it('resetStats clears decode latency fields', () => {
+        const cache = new AssetCache<string>(10)
+        cache.recordDecodeLatency(42)
+        cache.resetStats()
+        expect(cache.stats.totalDecodeLatencyMs).toBe(0)
+        expect(cache.stats.decodeCount).toBe(0)
+        expect(cache.avgDecodeLatencyMs).toBe(0)
+    })
+})
+
+describe('AssetCache — eviction reason telemetry', () => {
+    it('lastEvictionReason starts as null', () => {
+        expect(new AssetCache<string>(10).stats.lastEvictionReason).toBeNull()
+    })
+
+    it('capacity overflow sets lastEvictionReason to "capacity"', () => {
+        const cache = new AssetCache<number>(2)
+        cache.set('a', 1)
+        cache.set('b', 2)
+        cache.set('c', 3)  // evicts 'a'
+        expect(cache.stats.lastEvictionReason).toBe('capacity')
+    })
+
+    it('explicit delete sets lastEvictionReason to "explicit"', () => {
+        const cache = new AssetCache<number>(10)
+        cache.set('a', 1)
+        cache.delete('a')
+        expect(cache.stats.lastEvictionReason).toBe('explicit')
+    })
+
+    it('explicit delete after capacity eviction updates lastEvictionReason', () => {
+        const cache = new AssetCache<number>(1)
+        cache.set('a', 1)
+        cache.set('b', 2)  // evicts 'a' → capacity
+        cache.set('c', 3)  // evicts 'b' → capacity
+        cache.delete('c')  // explicit
+        expect(cache.stats.lastEvictionReason).toBe('explicit')
+    })
+
+    it('resetStats clears lastEvictionReason', () => {
+        const cache = new AssetCache<number>(1)
+        cache.set('a', 1)
+        cache.set('b', 2)
+        cache.resetStats()
+        expect(cache.stats.lastEvictionReason).toBeNull()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// 4. SpriteBatch — frame-time telemetry
+// ---------------------------------------------------------------------------
+
+describe('SpriteBatch — frame-time telemetry', () => {
+    it('initial frameTimeMs is 0', () => {
+        expect(new SpriteBatch().stats.frameTimeMs).toBe(0)
+    })
+
+    it('frameTimeMs is non-negative after completing a frame', () => {
+        const batch = new SpriteBatch()
+        batch.begin()
+        batch.draw('a', 0, 0, 32, 32)
+        batch.end()
+        expect(batch.stats.frameTimeMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('frameTimeMs is a finite number after end()', () => {
+        const batch = new SpriteBatch()
+        batch.begin()
+        batch.end()
+        expect(Number.isFinite(batch.stats.frameTimeMs)).toBe(true)
+    })
+
+    it('frameTimeMs is refreshed on each successive frame', () => {
+        const batch = new SpriteBatch()
+        batch.begin()
+        batch.end()
+
+        batch.begin()
+        batch.end()
+        expect(typeof batch.stats.frameTimeMs).toBe('number')
+        expect(batch.stats.frameTimeMs).toBeGreaterThanOrEqual(0)
+    })
+})
