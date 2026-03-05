@@ -136,7 +136,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         const cond = this.pop()
         if (!cond) {
             this.pc = this.pop()
-        }
+        } else this.pop()
     },
 
     0x8028: function () {
