@@ -324,6 +324,22 @@ describe('op_if (0x802f)', () => {
     })
 })
 
+describe('op_while (0x8030)', () => {
+    it('falls through (pops target) when condition is truthy', () => {
+        const vm = makeVM([999, 1])
+        exec(0x8030, vm)
+        expect(vm.dataStack).toEqual([])
+        expect(vm.pc).toBe(0)
+    })
+
+    it('jumps when condition is falsy', () => {
+        const vm = makeVM([42, 0])
+        exec(0x8030, vm)
+        expect(vm.pc).toBe(42)
+        expect(vm.dataStack).toEqual([])
+    })
+})
+
 describe('op_jmp (0x8004)', () => {
     it('sets pc to popped value', () => {
         const vm = makeVM([0x100])
