@@ -23,6 +23,7 @@ import { createObjectWithPID } from './object.js'
 import { hidev, makeEl, showv, uiCloseWorldMap, uiWorldMapShowArea } from './ui.js'
 import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js'
 import { Config } from './config.js'
+import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
 
 // World Map system
 
@@ -34,6 +35,7 @@ export module Worldmap {
     let $worldmapTarget: HTMLElement | null = null
     let worldmapTimer: number = -1
     let lastEncounterCheck = 0
+    let isEncounterTransitionPending = false
 
     const WORLDMAP_UNDISCOVERED = 0
     const WORLDMAP_DISCOVERED = 1
@@ -44,12 +46,38 @@ export module Worldmap {
     const SQUARE_SIZE = 51
 
     const WORLDMAP_SPEED = 2 // speed scalar
-    const WORLDMAP_ENCOUNTER_CHECK_RATE = 800 // ms (TODO: find right value)
+    const WORLDMAP_ENCOUNTER_CHECK_RATE_F2 = 750 // ms
+    const WORLDMAP_ENCOUNTER_CHECK_RATE_F1 = 650 // ms
 
     /** Minimum adjusted encounter rate (prevents difficulty modifier from making encounters impossible). */
     const MIN_ENCOUNTER_RATE = 1
     /** Maximum adjusted encounter rate (prevents difficulty modifier from forcing encounters). */
     const MAX_ENCOUNTER_RATE = 99
+
+    function getGridConfig() {
+        return worldGridConfig()
+    }
+
+    function worldPixelBounds(): { maxX: number; maxY: number } {
+        const grid = getGridConfig()
+        return {
+            maxX: grid.columns * grid.cellSize - 1,
+            maxY: grid.rows * grid.cellSize - 1,
+        }
+    }
+
+    function clampPointToWorldBounds(point: Point): Point {
+        const bounds = worldPixelBounds()
+        return {
+            x: clamp(0, bounds.maxX, point.x),
+            y: clamp(0, bounds.maxY, point.y),
+        }
+    }
+
+    function getEncounterCheckRateMs(): number {
+        const grid = worldGridConfig()
+        return grid.columns === 20 ? WORLDMAP_ENCOUNTER_CHECK_RATE_F1 : WORLDMAP_ENCOUNTER_CHECK_RATE_F2
+    }
 
     interface Square {
         terrainType: string //"mountain" | "ocean" | "desert" | "city" | "ocean"
@@ -398,11 +426,13 @@ export module Worldmap {
     }
 
     function positionToSquare(pos: Point): Point {
-        return { x: Math.floor(pos.x / SQUARE_SIZE), y: Math.floor(pos.y / SQUARE_SIZE) }
+        const grid = getGridConfig()
+        return { x: Math.floor(pos.x / grid.cellSize), y: Math.floor(pos.y / grid.cellSize) }
     }
 
     function setSquareStateAt(squarePos: Point, newState: number, seeAdjacent: boolean = true): void {
-        if (squarePos.x < 0 || squarePos.x >= NUM_SQUARES_X || squarePos.y < 0 || squarePos.y >= NUM_SQUARES_Y) return
+        const grid = getGridConfig()
+        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) return
 
         const oldState = worldmap.squares[squarePos.x][squarePos.y].state
         worldmap.squares[squarePos.x][squarePos.y].state = newState
@@ -479,11 +509,13 @@ export module Worldmap {
     export function didEncounter(): boolean {
         const squarePos = positionToSquare(worldmapPlayer)
         if (!squarePos) return false
-        if (squarePos.x < 0 || squarePos.x >= NUM_SQUARES_X || squarePos.y < 0 || squarePos.y >= NUM_SQUARES_Y) return false
+        const grid = getGridConfig()
+        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) return false
         const square = worldmap.squares[squarePos.x][squarePos.y]
         if (!square) return false
-        let encRate = worldmap.encounterRates[square.frequency]
-        if (encRate === undefined) return false
+        const tableRate = worldmap.encounterRates[square.frequency]
+        let encRate = tableRate === undefined ? encounterRateForFrequency(square.frequency) : tableRate
+        if (!Number.isFinite(encRate)) return false
 
         //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
 
@@ -515,6 +547,12 @@ export module Worldmap {
         return false
     }
 
+
+    function setWorldmapInteractionLocked(locked: boolean): void {
+        if ($worldmap) $worldmap.style.pointerEvents = locked ? 'none' : 'auto'
+        if ($worldmapTarget) $worldmapTarget.style.pointerEvents = locked ? 'none' : 'auto'
+    }
+
     function centerWorldmapTarget(x: number, y: number): void {
         $worldmapTarget.style.left = ((x - $worldmapTarget.offsetWidth / 2) | 0) + 'px'
         $worldmapTarget.style.top = ((y - $worldmapTarget.offsetHeight / 2) | 0) + 'px'
@@ -542,6 +580,8 @@ export module Worldmap {
         $worldmap = document.getElementById('worldmap')
 
         worldmap = parseWorldmap(getFileText('data/data/worldmap.txt'))
+        isEncounterTransitionPending = false
+        setWorldmapInteractionLocked(false)
 
         if (!globalState.mapAreas) globalState.mapAreas = loadAreas()
 
@@ -550,6 +590,7 @@ export module Worldmap {
         globalState.markAreaKnown = markAreaKnown
 
         $worldmap.onclick = function (this: HTMLElement, e: MouseEvent) {
+            if (isEncounterTransitionPending) return
             // Calculate viewport-relative offset
             const box = this.getBoundingClientRect()
             const offsetLeft = box.left + window.pageXOffset
@@ -569,14 +610,16 @@ export module Worldmap {
                 ay = clickedArea.worldPosition.y
             }
 
-            worldmapPlayer.target = { x: ax, y: ay }
+            const clampedTarget = clampPointToWorldBounds({ x: ax, y: ay })
+            worldmapPlayer.target = clampedTarget
             showv($worldmapPlayer)
             $worldmapTarget.style.backgroundImage = "url('art/intrface/wmaptarg.png')"
-            centerWorldmapTarget(ax, ay)
+            centerWorldmapTarget(clampedTarget.x, clampedTarget.y)
             console.log('targeting: ' + ax + ', ' + ay)
         }
 
         $worldmapTarget.onclick = function (e: MouseEvent) {
+            if (isEncounterTransitionPending) return
             const area = withinArea(worldmapPlayer)
             if (area !== null) {
                 // we're on a hotspot, visit the area map
@@ -616,8 +659,11 @@ export module Worldmap {
             $label.textContent = area.name
         }
 
-        for (let x = 0; x < NUM_SQUARES_X; x++) {
-            for (let y = 0; y < NUM_SQUARES_Y; y++) {
+        const grid = getGridConfig()
+        const columns = Math.min(grid.columns, worldmap.squares.length)
+        const rows = Math.min(grid.rows, worldmap.squares[0].length)
+        for (let x = 0; x < columns; x++) {
+            for (let y = 0; y < rows; y++) {
                 let state: string | number = worldmap.squares[x][y].state
                 if (state === WORLDMAP_UNDISCOVERED) state = 'undiscovered'
                 else if (state === WORLDMAP_DISCOVERED) state = 'discovered'
@@ -626,8 +672,8 @@ export module Worldmap {
                 const $el = makeEl('div', {
                     classes: ['worldmapSquare', 'worldmapSquare-' + state],
                     style: {
-                        left: x * SQUARE_SIZE + 'px',
-                        top: y * SQUARE_SIZE + 'px',
+                        left: x * grid.cellSize + 'px',
+                        top: y * grid.cellSize + 'px',
                     },
                     attrs: {
                         'square-x': x + '',
@@ -689,7 +735,8 @@ export module Worldmap {
 
             const squarePos = positionToSquare(worldmapPlayer)
             // Guard: if the player is somehow out of the map bounds, skip movement
-            if (!squarePos || squarePos.x < 0 || squarePos.x >= NUM_SQUARES_X || squarePos.y < 0 || squarePos.y >= NUM_SQUARES_Y) {
+            const grid = getGridConfig()
+            if (!squarePos || squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {
                 worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
                 return
             }
@@ -697,8 +744,9 @@ export module Worldmap {
             const speed = WORLDMAP_SPEED / worldmap.terrainSpeed[currentSquare.terrainType]
 
             if (len < speed) {
-                worldmapPlayer.x = worldmapPlayer.target.x
-                worldmapPlayer.y = worldmapPlayer.target.y
+                const destination = clampPointToWorldBounds(worldmapPlayer.target)
+                worldmapPlayer.x = destination.x
+                worldmapPlayer.y = destination.y
                 worldmapPlayer.target = null
 
                 hidev($worldmapPlayer)
@@ -717,8 +765,9 @@ export module Worldmap {
             // center the worldmap to the player
             const width = $worldmap.offsetWidth
             const height = $worldmap.offsetHeight
-            const sx = clamp(0, $worldmap.scrollWidth - width, Math.floor(worldmapPlayer.x - width / 2))
-            const sy = clamp(0, $worldmap.scrollHeight - height, Math.floor(worldmapPlayer.y - height / 2))
+            const bounds = worldPixelBounds()
+            const sx = clamp(0, Math.max(0, bounds.maxX - width + 1), Math.floor(worldmapPlayer.x - width / 2))
+            const sy = clamp(0, Math.max(0, bounds.maxY - height + 1), Math.floor(worldmapPlayer.y - height / 2))
 
             $worldmap.scrollLeft = sx
             $worldmap.scrollTop = sy
@@ -727,19 +776,22 @@ export module Worldmap {
 
             // check for encounters
             const time = window.performance.now()
-            if (Config.engine.doEncounters === true && time >= lastEncounterCheck + WORLDMAP_ENCOUNTER_CHECK_RATE) {
+            if (!isEncounterTransitionPending && Config.engine.doEncounters === true && time >= lastEncounterCheck + getEncounterCheckRateMs()) {
                 lastEncounterCheck = time
 
                 const hadEncounter = didEncounter()
                 if (hadEncounter === true) {
                     $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmapfgt0.png')"
 
-                    // TODO: Disable Worldmap UI while waiting on this!
+                    isEncounterTransitionPending = true
+                    setWorldmapInteractionLocked(true)
 
                     setTimeout(function () {
                         doEncounter()
                         uiCloseWorldMap()
                         $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmaploc.png')"
+                        isEncounterTransitionPending = false
+                        setWorldmapInteractionLocked(false)
                     }, 1000)
 
                     clearTimeout(worldmapTimer)

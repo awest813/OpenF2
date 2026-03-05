@@ -114,6 +114,14 @@ function applyEncounterDifficulty(encRate: number, difficulty: 'easy' | 'normal'
     return encRate
 }
 
+function clampAdjustedEncounterRate(encRate: number): number {
+    return Math.max(1, Math.min(99, encRate))
+}
+
+function encounterCheckRateMs(isF1Mode: boolean): number {
+    return isF1Mode ? 650 : 750
+}
+
 describe('applyEncounterDifficulty', () => {
     it('does not change rate on normal difficulty', () => {
         expect(applyEncounterDifficulty(30, 'normal')).toBe(30)
@@ -143,6 +151,22 @@ describe('applyEncounterDifficulty', () => {
         expect(applyEncounterDifficulty(0, 'easy')).toBe(0)
         expect(applyEncounterDifficulty(0, 'hard')).toBe(0)
     })
+
+    it('clamps adjusted rates into [1, 99] guard range', () => {
+        expect(clampAdjustedEncounterRate(0)).toBe(1)
+        expect(clampAdjustedEncounterRate(100)).toBe(99)
+        expect(clampAdjustedEncounterRate(42)).toBe(42)
+    })
+})
+
+describe('encounter polling interval', () => {
+    it('uses Fallout 2 timing in default mode', () => {
+        expect(encounterCheckRateMs(false)).toBe(750)
+    })
+
+    it('uses faster Fallout 1 timing in compatibility mode', () => {
+        expect(encounterCheckRateMs(true)).toBe(650)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -155,22 +179,24 @@ function isSquareInBounds(x: number, y: number, maxX: number, maxY: number): boo
 }
 
 describe('worldmap square bounds checking (regression)', () => {
-    const maxX = 28, maxY = 30
-
     it('rejects negative coordinates', () => {
-        expect(isSquareInBounds(-1, 0, maxX, maxY)).toBe(false)
-        expect(isSquareInBounds(0, -1, maxX, maxY)).toBe(false)
+        expect(isSquareInBounds(-1, 0, 28, 30)).toBe(false)
+        expect(isSquareInBounds(0, -1, 28, 30)).toBe(false)
     })
 
-    it('rejects coordinates at or beyond grid limits', () => {
-        expect(isSquareInBounds(maxX, 0, maxX, maxY)).toBe(false)
-        expect(isSquareInBounds(0, maxY, maxX, maxY)).toBe(false)
+    it('rejects coordinates at or beyond F2 grid limits', () => {
+        expect(isSquareInBounds(28, 0, 28, 30)).toBe(false)
+        expect(isSquareInBounds(0, 30, 28, 30)).toBe(false)
     })
 
-    it('accepts valid coordinates within grid', () => {
-        expect(isSquareInBounds(0, 0, maxX, maxY)).toBe(true)
-        expect(isSquareInBounds(maxX - 1, maxY - 1, maxX, maxY)).toBe(true)
-        expect(isSquareInBounds(14, 15, maxX, maxY)).toBe(true)
+    it('rejects coordinates at or beyond F1 grid limits', () => {
+        expect(isSquareInBounds(20, 0, 20, 16)).toBe(false)
+        expect(isSquareInBounds(0, 16, 20, 16)).toBe(false)
+    })
+
+    it('accepts valid coordinates within both F2 and F1 grids', () => {
+        expect(isSquareInBounds(27, 29, 28, 30)).toBe(true)
+        expect(isSquareInBounds(19, 15, 20, 16)).toBe(true)
     })
 })
 
