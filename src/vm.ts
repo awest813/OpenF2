@@ -41,6 +41,10 @@ export class ScriptVM {
     lastCallTimeMs: number = 0
     /** Cumulative wall-clock time spent in all top-level call() invocations, in milliseconds. */
     totalCallTimeMs: number = 0
+    /** Number of top-level call() invocations that exceeded the configured slow-call threshold. */
+    slowCallCount: number = 0
+    /** Wall-clock time of the most recent top-level call() that exceeded the slow-call threshold, in milliseconds. */
+    lastSlowCallTimeMs: number = 0
 
     constructor(script: BinaryReader, intfile: IntFile) {
         this.script = script
@@ -98,6 +102,17 @@ export class ScriptVM {
                 const elapsed = performance.now() - t0
                 this.lastCallTimeMs = elapsed
                 this.totalCallTimeMs += elapsed
+                if (elapsed >= Config.engine.vmSlowCallWarnThresholdMs) {
+                    this.slowCallCount++
+                    this.lastSlowCallTimeMs = elapsed
+                    console.warn(
+                        '[ScriptVM] slow top-level call: %s took %dms (threshold=%dms, slowCallCount=%d)',
+                        procName,
+                        elapsed,
+                        Config.engine.vmSlowCallWarnThresholdMs,
+                        this.slowCallCount
+                    )
+                }
             }
         }
     }

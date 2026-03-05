@@ -52,6 +52,7 @@ OpenF2 aims to deliver:
 - **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165); `critter_attempt_placement` de-stubbed
 - **VM debug fields:** `stepCount` + `currentProcedureName` on `ScriptVM`; `ScriptDebuggerPanel` surfaces step count and active procedure name
 - **Performance instrumentation (Safe Impact Roadmap — step 1):** `AssetCache` extended with decode-latency telemetry (`recordDecodeLatency`, `avgDecodeLatencyMs`) and eviction-reason tracking (`lastEvictionReason`); `SpriteBatch` extended with frame-time telemetry (`frameTimeMs` in `BatchStats`); `ScriptVM.call()` instruments top-level call duration (`lastCallTimeMs`, `totalCallTimeMs`); `GameMap.recalcPath()` wrapped with `PathfindingTelemetry` counters (`totalCalls`, `totalTimeMs`, `worstCaseTimeMs`, `lastSolveTimeMs`)
+- **Performance safeguards (Safe Impact Roadmap — step 2):** `ScriptVM.call()` now tracks slow-call telemetry (`slowCallCount`, `lastSlowCallTimeMs`) and emits warn-level logs when top-level procedure runtime exceeds `Config.engine.vmSlowCallWarnThresholdMs`
 
 ### Remaining gaps
 
@@ -189,8 +190,8 @@ This backlog focuses on changes that are **safe to ship incrementally**: low beh
 
 4. **Script VM execution safeguards** *(P1, high)*  
    - ✅ `ScriptVM.call()` now tracks `lastCallTimeMs` and `totalCallTimeMs` for top-level procedure invocations.  
+   - ✅ Added warn-level slow-script telemetry: `ScriptVM` now tracks `slowCallCount`/`lastSlowCallTimeMs` and logs calls that exceed `Config.engine.vmSlowCallWarnThresholdMs`.  
    - Ensure opcode helpers avoid repeated expensive lookups within tight loops.  
-   - Add warn-level telemetry for pathologically slow scripts (frame-budget threshold).  
    - Expand opcode regression tests alongside each de-stubbed procedure/opcode.  
    - **Exit criteria:** lower VM-related frame variance and no behavior regressions in script tests.
 

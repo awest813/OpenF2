@@ -7,9 +7,14 @@
  * isolation and is stable against changes to game-data loading paths.
  */
 
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Config } from './config.js'
 import { opMap, VMContext } from './vm_opcodes.js'
 import { ScriptVM } from './vm.js'
+
+afterEach(() => {
+    vi.restoreAllMocks()
+})
 
 // ---------------------------------------------------------------------------
 // Minimal VM stub — only the fields / methods actually used by opMap handlers.
@@ -563,5 +568,66 @@ describe('ScriptVM — call execution-time telemetry', () => {
         expect(() => vm.call('boom')).toThrow('vm error')
         expect(vm.lastCallTimeMs).toBeGreaterThanOrEqual(0)
         expect(Number.isFinite(vm.lastCallTimeMs)).toBe(true)
+    })
+})
+
+describe('ScriptVM — slow-call warning telemetry', () => {
+    class InstantScriptVM extends ScriptVM {
+        run(): void {
+            this.halted = true
+        }
+    }
+
+    function makeTimingVM(): InstantScriptVM {
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = {
+            procedures: { testProc: { index: 0, offset: 0x10 } },
+            proceduresTable: [],
+            strings: {},
+            identifiers: {},
+        } as any
+        const vm = new InstantScriptVM(script, intfile)
+        vm.push(undefined)
+        return vm
+    }
+
+    it('slow-call counters start at 0', () => {
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new ScriptVM(script, intfile)
+        expect(vm.slowCallCount).toBe(0)
+        expect(vm.lastSlowCallTimeMs).toBe(0)
+    })
+
+    it('records a slow-call warning when threshold is exceeded', () => {
+        const vm = makeTimingVM()
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        const oldThreshold = Config.engine.vmSlowCallWarnThresholdMs
+        Config.engine.vmSlowCallWarnThresholdMs = 0
+
+        try {
+            vm.call('testProc')
+            expect(vm.slowCallCount).toBe(1)
+            expect(vm.lastSlowCallTimeMs).toBeGreaterThanOrEqual(0)
+            expect(warnSpy).toHaveBeenCalledTimes(1)
+        } finally {
+            Config.engine.vmSlowCallWarnThresholdMs = oldThreshold
+        }
+    })
+
+    it('does not warn when call duration is below threshold', () => {
+        const vm = makeTimingVM()
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        const oldThreshold = Config.engine.vmSlowCallWarnThresholdMs
+        Config.engine.vmSlowCallWarnThresholdMs = Number.MAX_SAFE_INTEGER
+
+        try {
+            vm.call('testProc')
+            expect(vm.slowCallCount).toBe(0)
+            expect(vm.lastSlowCallTimeMs).toBe(0)
+            expect(warnSpy).not.toHaveBeenCalled()
+        } finally {
+            Config.engine.vmSlowCallWarnThresholdMs = oldThreshold
+        }
     })
 })
