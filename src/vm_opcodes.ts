@@ -81,6 +81,13 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         this.retStack.push(a)
         this.retStack.push(b)
     },
+    0x8018: function () {
+        // op_swap
+        const a = this.pop()
+        const b = this.pop()
+        this.push(a)
+        this.push(b)
+    },
     0x802a: function () {
         this.dataStack.splice(this.dvarBase)
     }, // op_pop_to_base

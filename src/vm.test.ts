@@ -305,6 +305,14 @@ describe('op_bwnot (0x8043)', () => {
 // Stack manipulation opcodes
 // ---------------------------------------------------------------------------
 
+describe('op_swap (0x8018)', () => {
+    it('swaps the top two data-stack values', () => {
+        const vm = makeVM([1, 2, 3])
+        exec(0x8018, vm)
+        expect(vm.dataStack).toEqual([1, 3, 2])
+    })
+})
+
 describe('op_pop (0x801a)', () => {
     it('removes the top of the data stack', () => {
         const vm = makeVM([1, 2, 3])
@@ -629,5 +637,43 @@ describe('ScriptVM — slow-call warning telemetry', () => {
         } finally {
             Config.engine.vmSlowCallWarnThresholdMs = oldThreshold
         }
+    })
+})
+
+
+describe('ScriptVM unsupported operation buffer', () => {
+    it('records unimplemented opcode context in FIFO order', () => {
+        const script = {
+            offset: 0,
+            seek(pos: number) { this.offset = pos },
+            read16() { return 0xDEAD },
+        } as any
+        const intfile = { name: 'stub.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new ScriptVM(script, intfile)
+        vm.currentProcedureName = 'map_enter_p_proc'
+
+        expect(vm.step()).toBe(false)
+        expect(vm.unsupportedOperations).toEqual([
+            { opcode: 0xDEAD, pc: 0, scriptName: 'stub.int', procedureName: 'map_enter_p_proc' },
+        ])
+    })
+
+    it('drainUnsupportedOperations returns and clears the buffer', () => {
+        const script = {
+            offset: 0,
+            seek(pos: number) { this.offset = pos },
+            read16() { return 0xBEEF },
+        } as any
+        const intfile = { name: 'stub.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new ScriptVM(script, intfile)
+
+        vm.recordUnsupportedOpcode(0xABCD, 123)
+        vm.recordUnsupportedProcedure(0x80B4, 'random')
+
+        expect(vm.drainUnsupportedOperations()).toEqual([
+            { opcode: 0xABCD, pc: 123, scriptName: 'stub.int', procedureName: null },
+            { opcode: 0x80B4, pc: 0, scriptName: 'stub.int', procedureName: null, bridgedProcedureName: 'random' },
+        ])
+        expect(vm.unsupportedOperations).toEqual([])
     })
 })

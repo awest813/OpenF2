@@ -32,7 +32,13 @@ export module ScriptVMBridge {
                 args.push(this.pop())
             args.reverse()
 
-            var r = (<any>this.scriptObj)[procName].apply(this.scriptObj, args)
+            const targetFn = (<any>this.scriptObj)[procName]
+            if(typeof targetFn !== "function") {
+                this.recordUnsupportedProcedure(this.lastOpcode, procName)
+                throw new Error(`ScriptVMBridge: missing procedure implementation ${procName} for opcode 0x${this.lastOpcode.toString(16)}`)
+            }
+
+            var r = targetFn.apply(this.scriptObj, args)
             if(pushResult)
                 this.push(r)
         }
@@ -268,6 +274,15 @@ export module ScriptVMBridge {
     // define a game-oriented Script VM that has a ScriptProto instance
     export class GameScriptVM extends ScriptVM {
         scriptObj = new Scripting.Script()
+        lastOpcode: number = -1
+
+        step(): boolean {
+            if (this.halted) return false
+            this.script.seek(this.pc)
+            this.lastOpcode = this.script.read16()
+            this.script.seek(this.pc)
+            return super.step()
+        }
 
         constructor(script: BinaryReader, intfile: IntFile) {
             super(script, intfile)
