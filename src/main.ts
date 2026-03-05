@@ -41,11 +41,7 @@ import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
 import { UIManagerImpl, BitmapFontRenderer } from './ui2/uiPanel.js'
-import { GamePanel } from './ui2/gamePanel.js'
-import { PipBoyPanel } from './ui2/pipboy.js'
-import { CharacterScreen } from './ui2/characterScreen.js'
-import { OptionsPanel } from './ui2/optionsPanel.js'
-import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
+import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 
 // Return the skill ID used by the Fallout 2 engine
@@ -250,11 +246,7 @@ function initUIManager(): void {
         mgr.fontRenderer = new BitmapFontRenderer(fonts[0])
     }
 
-    mgr.register(new GamePanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
-    mgr.register(new PipBoyPanel(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog))
-    mgr.register(new CharacterScreen(SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId))
-    mgr.register(new OptionsPanel(SCREEN_WIDTH, SCREEN_HEIGHT))
-    mgr.register(new SaveLoadPanel(SCREEN_WIDTH, SCREEN_HEIGHT))
+    registerDefaultPanels(mgr, SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog)
 
     mgr.connectEventBus()
 
