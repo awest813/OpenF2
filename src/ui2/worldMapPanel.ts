@@ -57,6 +57,7 @@ export class WorldMapPanel extends UIPanel {
     currentView: 'world' | 'area' = 'world'
     private _currentArea: WorldMapArea | null = null
     private _scrollOffset = 0
+    private _isTransitionLocked = false
 
     constructor(screenWidth: number, screenHeight: number) {
         super('worldMap', {
@@ -72,6 +73,7 @@ export class WorldMapPanel extends UIPanel {
         this.currentView  = 'world'
         this._currentArea  = null
         this._scrollOffset = 0
+        this._isTransitionLocked = false
     }
 
     /** Switch to area view for the given area. */
@@ -79,6 +81,12 @@ export class WorldMapPanel extends UIPanel {
         this._currentArea  = area
         this.currentView   = 'area'
         this._scrollOffset = 0
+        this._isTransitionLocked = false
+    }
+
+
+    setTransitionLocked(locked: boolean): void {
+        this._isTransitionLocked = locked
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -173,6 +181,7 @@ export class WorldMapPanel extends UIPanel {
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
+        if (this._isTransitionLocked) return true
         const { width, height } = this.bounds
 
         // Close button
@@ -206,7 +215,7 @@ export class WorldMapPanel extends UIPanel {
             // Entrance clicks
             for (let i = 0; i < area.entrances.length; i++) {
                 const ey = LIST_Y + i * ENTRANCE_ROW_H
-                if (y >= ey && y < ey + ENTRANCE_ROW_H && x >= LIST_X) {
+                if (y >= ey && y < ey + ENTRANCE_ROW_H && x >= LIST_X && x < LIST_X + LIST_W) {
                     EventBus.emit('worldMap:travelTo', { mapLookupName: area.entrances[i].mapLookupName })
                     this.hide()
                     return true
@@ -218,6 +227,7 @@ export class WorldMapPanel extends UIPanel {
     }
 
     override onKeyDown(key: string): boolean {
+        if (this._isTransitionLocked) return true
         if (key === 'Escape') {
             if (this.currentView === 'area') {
                 this.currentView  = 'world'
