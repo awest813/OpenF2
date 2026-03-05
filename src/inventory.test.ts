@@ -20,6 +20,7 @@ import {
     ArmorEquipStats,
 } from './inventory.js'
 import { zeroDamageStats } from './ecs/components.js'
+import { applyEncounterCritterLoadout, EncounterLoadoutCritter } from './encounterLoadout.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -341,5 +342,82 @@ describe('computeCarriedWeight', () => {
         addItem(playerId, 101, 3, 4)  // 3 × 4 lbs = 12
         const inv = EntityManager.get(playerId, 'inventory')!
         expect(computeCarriedWeight(inv)).toBe(12)
+    })
+})
+
+
+// ---------------------------------------------------------------------------
+// Worldmap encounter loadout regression
+// ---------------------------------------------------------------------------
+
+describe('Worldmap.applyEncounterCritterLoadout', () => {
+    function makeSpawnedCritter() {
+        return {
+            inventory: [] as any[],
+            leftHand: null as any,
+            rightHand: null as any,
+            equippedArmor: null as any,
+            dead: false,
+            anim: 'idle',
+            art: 'idle',
+            addInventoryItem(item: any, count = 1) {
+                const existing = this.inventory.find((inv: any) => inv.pid === item.pid)
+                if (existing) {
+                    existing.amount += count
+                    return
+                }
+                this.inventory.push({ ...item, amount: count })
+            },
+            getAnimation(name: string) {
+                return `anim-${name}`
+            },
+        }
+    }
+
+    it('applies ambush critter inventory and wielded weapon state from encounter data', () => {
+        const spawned = makeSpawnedCritter()
+        const ambushCritter: EncounterLoadoutCritter = {
+            dead: false,
+            items: [
+                { pid: 0x00000011, amount: 2, wielded: false },
+                { pid: 0x00000007, amount: 1, wielded: true },
+            ],
+        }
+
+        applyEncounterCritterLoadout(spawned, ambushCritter, {
+            createItem: (pid) => ({
+                pid,
+                pro: { extra: {} },
+                weapon: pid === 0x00000007 ? {} : undefined,
+            }),
+            isWeapon: (item) => item?.weapon !== undefined,
+        })
+
+        expect(spawned.inventory.find((x: any) => x.pid === 0x00000011)?.amount).toBe(2)
+        expect(spawned.leftHand?.pid).toBe(0x00000007)
+        expect(spawned.art).toBe('anim-idle')
+    })
+
+    it('applies fighting encounter loadout including armor equip and dead flag', () => {
+        const spawned = makeSpawnedCritter()
+        const fightingCritter: EncounterLoadoutCritter = {
+            dead: true,
+            items: [
+                { pid: 0x000000e1, amount: 1, wielded: true },
+                { pid: 0x00000020, amount: 3, wielded: false },
+            ],
+        }
+
+        applyEncounterCritterLoadout(spawned, fightingCritter, {
+            createItem: (pid) => ({
+                pid,
+                pro: pid === 0x000000e1 ? { extra: { stats: { 'DT Normal': 2 } } } : { extra: {} },
+            }),
+            isWeapon: () => false,
+        })
+
+        expect(spawned.dead).toBe(true)
+        expect(spawned.equippedArmor?.pid).toBe(0x000000e1)
+        expect(spawned.inventory.find((x: any) => x.pid === 0x00000020)?.amount).toBe(3)
     })
 })

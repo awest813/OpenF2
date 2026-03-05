@@ -19,11 +19,12 @@ import { loadAreas, lookupMapFromLookup } from './data.js'
 import { Encounters } from './encounters.js'
 import { Point, pointIntersectsCircle } from './geometry.js'
 import globalState from './globalState.js'
-import { createObjectWithPID } from './object.js'
+import { createObjectWithPID, objectIsWeapon } from './object.js'
 import { hidev, makeEl, showv, uiCloseWorldMap, uiWorldMapShowArea } from './ui.js'
 import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js'
 import { Config } from './config.js'
 import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
+import { applyEncounterCritterLoadout } from './encounterLoadout.js'
 
 // World Map system
 
@@ -486,7 +487,10 @@ export module Worldmap {
                     const obj = createObjectWithPID(critter.pid, critter.script ? critter.script : undefined)
                     //console.log("obj: %o", obj)
 
-                    // TODO: items & equipping
+                    applyEncounterCritterLoadout(obj, critter, {
+                        createItem: (pid) => createObjectWithPID(pid),
+                        isWeapon: objectIsWeapon,
+                    })
                     globalState.gMap.addObject(obj)
                     obj.move(critter.position)
                 })
