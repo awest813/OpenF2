@@ -24,6 +24,14 @@ import { opMap } from './vm_opcodes.js'
 
 export { opMap }
 
+export interface UnsupportedVmOperation {
+    opcode: number
+    scriptName: string
+    procedureName: string | null
+    pc: number
+    bridgedProcedureName?: string
+}
+
 export class ScriptVM {
     script: BinaryReader
     intfile: IntFile
@@ -45,6 +53,8 @@ export class ScriptVM {
     slowCallCount: number = 0
     /** Wall-clock time of the most recent top-level call() that exceeded the slow-call threshold, in milliseconds. */
     lastSlowCallTimeMs: number = 0
+    /** Deterministic FIFO log of unsupported VM operations encountered during execution. */
+    unsupportedOperations: UnsupportedVmOperation[] = []
 
     constructor(script: BinaryReader, intfile: IntFile) {
         this.script = script
@@ -128,6 +138,7 @@ export class ScriptVM {
         // dispatch based on opMap
         if (opMap[opcode] !== undefined) opMap[opcode].call(this)
         else {
+            this.recordUnsupportedOpcode(opcode, this.pc)
             console.warn(
                 'unimplemented opcode %s (pc=%s) in %s',
                 opcode.toString(16),
@@ -151,5 +162,30 @@ export class ScriptVM {
     run(): void {
         this.halted = false
         while (this.step()) {}
+    }
+
+    recordUnsupportedOpcode(opcode: number, pc: number): void {
+        this.unsupportedOperations.push({
+            opcode,
+            pc,
+            scriptName: this.intfile.name,
+            procedureName: this.currentProcedureName,
+        })
+    }
+
+    recordUnsupportedProcedure(opcode: number, procName: string): void {
+        this.unsupportedOperations.push({
+            opcode,
+            pc: this.pc,
+            scriptName: this.intfile.name,
+            procedureName: this.currentProcedureName,
+            bridgedProcedureName: procName,
+        })
+    }
+
+    drainUnsupportedOperations(): UnsupportedVmOperation[] {
+        const buffered = [...this.unsupportedOperations]
+        this.unsupportedOperations.length = 0
+        return buffered
     }
 }
