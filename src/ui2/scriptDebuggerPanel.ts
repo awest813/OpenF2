@@ -19,7 +19,7 @@
 import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
 
 const PANEL_WIDTH  = 260
-const PANEL_HEIGHT = 160
+const PANEL_HEIGHT = 190
 const PAD = 8
 const LINE_H = 14
 const MAX_LOG_LINES = 8
@@ -30,6 +30,10 @@ const MAX_LOG_LINES = 8
 
 export class ScriptDebuggerPanel extends UIPanel {
     private _log: string[] = []
+    /** Current VM step count, updated by the engine via setVMInfo(). */
+    private _stepCount: number = 0
+    /** Name of the procedure the VM is currently executing, or null. */
+    private _currentProcedure: string | null = null
 
     constructor(screenWidth: number, screenHeight: number) {
         super('scriptDebugger', {
@@ -39,6 +43,15 @@ export class ScriptDebuggerPanel extends UIPanel {
             height: PANEL_HEIGHT,
         })
         this.zOrder = 52
+    }
+
+    /**
+     * Update the VM execution state shown in the panel header.
+     * Call this from the engine after each scripting tick.
+     */
+    setVMInfo(stepCount: number, currentProcedure: string | null): void {
+        this._stepCount = stepCount
+        this._currentProcedure = currentProcedure
     }
 
     /**
@@ -73,6 +86,8 @@ export class ScriptDebuggerPanel extends UIPanel {
 
         const header: Array<[string, UIColor]> = [
             ['SCRIPT DEBUGGER', FALLOUT_GREEN],
+            [`Steps: ${this._stepCount}`, FALLOUT_AMBER],
+            [`Proc: ${this._currentProcedure ?? 'none'}`, FALLOUT_AMBER],
             [`Log (${this._log.length}/${MAX_LOG_LINES}):`, FALLOUT_AMBER],
         ]
 

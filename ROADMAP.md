@@ -49,6 +49,8 @@ OpenF2 aims to deliver:
 - **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
 - **De-stubbed procedures:** `set_light_level` (ambient light clamped 0–65536), `obj_set_light_level` (per-object intensity/radius), `game_ui_disable`/`game_ui_enable` (UI state toggling via `globalState.gameUIDisabled`)
 - **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
+- **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165); `critter_attempt_placement` de-stubbed
+- **VM debug fields:** `stepCount` + `currentProcedureName` on `ScriptVM`; `ScriptDebuggerPanel` surfaces step count and active procedure name
 
 ### Remaining gaps
 
@@ -129,6 +131,8 @@ OpenF2 aims to deliver:
 - [x] **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
 - [x] **De-stubbed procedures:** `set_light_level` (ambient light clamped 0–65536), `obj_set_light_level` (per-object intensity/radius), `game_ui_disable`/`game_ui_enable` (UI state toggling via `globalState.gameUIDisabled`)
 - [x] **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
+- [x] **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed (delegates to `move_to` without spurious warning)
+- [x] **VM debug fields:** `stepCount` (incremented each `step()`) and `currentProcedureName` (set/restored in `call()`) added to `ScriptVM`; `ScriptDebuggerPanel` now surfaces step count and active procedure name
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
 ---
@@ -143,6 +147,7 @@ OpenF2 aims to deliver:
 6. **Scripting VM continued** — ✅ `get_poison`/`get_radiation` critter status getters, integer-indexed sfall globals (0x815A–0x815B), `get_day_of_week` opcode (0x815C)
 7. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
 8. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
+9. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
 
 ---
 

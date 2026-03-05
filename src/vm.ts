@@ -33,6 +33,10 @@ export class ScriptVM {
     svarBase: number = 0
     dvarBase: number = 0
     halted: boolean = false
+    /** Total number of opcode steps executed by this VM instance. */
+    stepCount: number = 0
+    /** Name of the procedure currently being executed, or null when idle. */
+    currentProcedureName: string | null = null
 
     constructor(script: BinaryReader, intfile: IntFile) {
         this.script = script
@@ -66,6 +70,9 @@ export class ScriptVM {
         // console.log("CALL " + procName + " @ " + proc.offset + " from " + this.scriptObj.scriptName)
         if (!proc) throw 'ScriptVM: unknown procedure ' + procName
 
+        const previousProcedure = this.currentProcedureName
+        this.currentProcedureName = procName
+
         // Args are passed in reverse order (stack-based calling convention).
         const reversedArgs = [...args].reverse()
         reversedArgs.forEach((arg) => this.push(arg))
@@ -77,6 +84,7 @@ export class ScriptVM {
         this.pc = proc.offset
         this.run()
 
+        this.currentProcedureName = previousProcedure
         return this.pop()
     }
 
@@ -104,6 +112,7 @@ export class ScriptVM {
             return false
         }
 
+        this.stepCount++
         if (this.pc === pc)
             // PC wasn't explicitly set, let's advance it to the current file offset
             this.pc = this.script.offset
