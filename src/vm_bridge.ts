@@ -255,6 +255,10 @@ export module ScriptVMBridge {
        ,0x815E: function() {  // in_world_map: 1 when the world-map screen is open, 0 otherwise
             this.push(globalState.uiMode === UIMode.worldMap ? 1 : 0)
         }
+       ,0x815F: bridged("get_pc_base_stat", 1)       // get_pc_base_stat(stat) → value
+       ,0x8160: bridged("set_pc_base_stat", 2, false) // set_pc_base_stat(stat, value)
+       ,0x8161: bridged("set_critter_current_ap", 2, false) // set_critter_current_ap(obj, ap)
+       ,0x8162: bridged("get_npc_level", 1)            // get_npc_level(obj) → level
     }
     Object.assign(opMap, bridgeOpMap)
 

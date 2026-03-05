@@ -47,6 +47,8 @@ OpenF2 aims to deliver:
 - **VM opcode completeness:** `op_bwxor` (0x8042) and `op_bwnot` (0x8043) added to `vm_opcodes.ts` completing the bitwise-operation set; regression tests added in `vm.test.ts`
 - **Scripting procedures:** `play_sfx` now delegates to `audioEngine.playSfx`; `reg_anim_obj_move_to_tile` and `animate_stand_obj` de-stubbed with real `walkTo`/frame-reset implementations
 - **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
+- **De-stubbed procedures:** `set_light_level` (ambient light clamped 0–65536), `obj_set_light_level` (per-object intensity/radius), `game_ui_disable`/`game_ui_enable` (UI state toggling via `globalState.gameUIDisabled`)
+- **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
 
 ### Remaining gaps
 
@@ -125,6 +127,8 @@ OpenF2 aims to deliver:
 - [x] **VM opcode completeness:** `op_bwxor` (0x8042) and `op_bwnot` (0x8043) added to `vm_opcodes.ts`; full bitwise-operation suite covered with regression tests
 - [x] **Scripting procedures:** `play_sfx` delegates to `audioEngine.playSfx`; `reg_anim_obj_move_to_tile` and `animate_stand_obj` de-stubbed (real movement / frame-reset)
 - [x] **sfall opcodes:** `get_game_time_in_seconds` (0x815D) and `in_world_map` (0x815E) added to `vm_bridge.ts`
+- [x] **De-stubbed procedures:** `set_light_level` (ambient light clamped 0–65536), `obj_set_light_level` (per-object intensity/radius), `game_ui_disable`/`game_ui_enable` (UI state toggling via `globalState.gameUIDisabled`)
+- [x] **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
 ---
@@ -138,6 +142,7 @@ OpenF2 aims to deliver:
 5. **Scripting VM milestone** — ✅ `obj_art_fid`, `art_anim`, sfall globals, `metarule(56, 0)` version, sfall opcodes 0x8157–0x8158, `critter_add_trait` trait side-effects
 6. **Scripting VM continued** — ✅ `get_poison`/`get_radiation` critter status getters, integer-indexed sfall globals (0x815A–0x815B), `get_day_of_week` opcode (0x815C)
 7. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
+8. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
 
 ---
 
