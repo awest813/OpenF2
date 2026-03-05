@@ -37,6 +37,10 @@ export class ScriptVM {
     stepCount: number = 0
     /** Name of the procedure currently being executed, or null when idle. */
     currentProcedureName: string | null = null
+    /** Wall-clock time spent in the most recent top-level call(), in milliseconds. */
+    lastCallTimeMs: number = 0
+    /** Cumulative wall-clock time spent in all top-level call() invocations, in milliseconds. */
+    totalCallTimeMs: number = 0
 
     constructor(script: BinaryReader, intfile: IntFile) {
         this.script = script
@@ -70,6 +74,7 @@ export class ScriptVM {
         // console.log("CALL " + procName + " @ " + proc.offset + " from " + this.scriptObj.scriptName)
         if (!proc) throw 'ScriptVM: unknown procedure ' + procName
 
+        const isTopLevel = this.currentProcedureName === null
         const previousProcedure = this.currentProcedureName
         this.currentProcedureName = procName
 
@@ -80,6 +85,7 @@ export class ScriptVM {
 
         this.retStack.push(-1) // push return address (TODO: how is this handled?)
 
+        const t0 = isTopLevel ? performance.now() : 0
         try {
             // run procedure code
             this.pc = proc.offset
@@ -88,6 +94,11 @@ export class ScriptVM {
         } finally {
             // Keep debugger state consistent even when a procedure throws.
             this.currentProcedureName = previousProcedure
+            if (isTopLevel) {
+                const elapsed = performance.now() - t0
+                this.lastCallTimeMs = elapsed
+                this.totalCallTimeMs += elapsed
+            }
         }
     }
 

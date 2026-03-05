@@ -34,6 +34,18 @@ declare let PF: any
 // TODO: Spatial type
 type Spatial = any
 
+/** Telemetry counters for the A* pathfinding solver. */
+export interface PathfindingTelemetry {
+    /** Total number of recalcPath calls made. */
+    totalCalls: number
+    /** Cumulative wall-clock time spent in recalcPath, in milliseconds. */
+    totalTimeMs: number
+    /** Wall-clock time of the single most expensive recalcPath call, in milliseconds. */
+    worstCaseTimeMs: number
+    /** Wall-clock time of the most recent recalcPath call, in milliseconds. */
+    lastSolveTimeMs: number
+}
+
 export interface SerializedMap {
     name: string
     mapID: number
@@ -66,6 +78,14 @@ export class GameMap {
 
     mapObj: any = null
     mapID: number
+
+    /** Live pathfinding telemetry — updated after every recalcPath call. */
+    pathfindingTelemetry: PathfindingTelemetry = {
+        totalCalls: 0,
+        totalTimeMs: 0,
+        worstCaseTimeMs: 0,
+        lastSolveTimeMs: 0,
+    }
 
     getObjects(level?: number): Obj[] {
         return this.objects[level === undefined ? this.currentElevation : level]
@@ -467,6 +487,8 @@ export class GameMap {
     }
 
     recalcPath(start: Point, goal: Point, isGoalBlocking?: boolean) {
+        const t0 = performance.now()
+
         const matrix = new Array(HEX_GRID_SIZE)
 
         for (let y = 0; y < HEX_GRID_SIZE; y++) {
@@ -484,7 +506,17 @@ export class GameMap {
 
         const grid = new PF.Grid(HEX_GRID_SIZE, HEX_GRID_SIZE, matrix)
         const finder = new PF.AStarFinder()
-        return finder.findPath(start.x, start.y, goal.x, goal.y, grid)
+        const path = finder.findPath(start.x, start.y, goal.x, goal.y, grid)
+
+        const elapsed = performance.now() - t0
+        this.pathfindingTelemetry.totalCalls++
+        this.pathfindingTelemetry.totalTimeMs += elapsed
+        this.pathfindingTelemetry.lastSolveTimeMs = elapsed
+        if (elapsed > this.pathfindingTelemetry.worstCaseTimeMs) {
+            this.pathfindingTelemetry.worstCaseTimeMs = elapsed
+        }
+
+        return path
     }
 
     serialize(): SerializedMap {

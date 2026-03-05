@@ -142,10 +142,19 @@ export const AssetStore = new AssetStoreImpl()
 // AssetCache — LRU in-memory cache for fetched asset data
 // ---------------------------------------------------------------------------
 
+/** Reason a cache entry was removed. */
+export type EvictionReason = 'capacity' | 'explicit'
+
 export interface CacheStats {
     hits: number
     misses: number
     evictions: number
+    /** Cumulative time spent in timed decode operations, in milliseconds. */
+    totalDecodeLatencyMs: number
+    /** Number of timed decode samples recorded (for computing an average). */
+    decodeCount: number
+    /** The reason the most recent LRU eviction occurred, or null if no eviction has happened yet. */
+    lastEvictionReason: EvictionReason | null
 }
 
 /**
@@ -159,12 +168,24 @@ export interface CacheStats {
  *   const cache = new AssetCache<ImageData>(256)
  *   cache.set('art/critters/hmjmpsna.png', imageData)
  *   const img = cache.get('art/critters/hmjmpsna.png')  // hits
- *   const stats = cache.stats  // { hits: 1, misses: 0, evictions: 0 }
+ *   const stats = cache.stats  // { hits: 1, misses: 0, evictions: 0, ... }
+ *
+ * Decode-latency telemetry:
+ *   cache.recordDecodeLatency(12.5)  // call after completing an async decode
+ *   // stats.totalDecodeLatencyMs === 12.5, stats.decodeCount === 1
+ *   // avgDecodeLatencyMs === stats.totalDecodeLatencyMs / stats.decodeCount
  */
 export class AssetCache<T> {
     private _cache: Map<string, T> = new Map()
     private _maxEntries: number
-    private _stats: CacheStats = { hits: 0, misses: 0, evictions: 0 }
+    private _stats: CacheStats = {
+        hits: 0,
+        misses: 0,
+        evictions: 0,
+        totalDecodeLatencyMs: 0,
+        decodeCount: 0,
+        lastEvictionReason: null,
+    }
 
     constructor(maxEntries: number) {
         if (maxEntries < 1) throw new RangeError('AssetCache: maxEntries must be at least 1')
@@ -181,6 +202,16 @@ export class AssetCache<T> {
 
     get stats(): Readonly<CacheStats> {
         return this._stats
+    }
+
+    /**
+     * Average decode latency across all recorded samples, in milliseconds.
+     * Returns 0 when no samples have been recorded yet.
+     */
+    get avgDecodeLatencyMs(): number {
+        return this._stats.decodeCount === 0
+            ? 0
+            : this._stats.totalDecodeLatencyMs / this._stats.decodeCount
     }
 
     get(key: string): T | undefined {
@@ -206,6 +237,7 @@ export class AssetCache<T> {
             if (!iter.done) {
                 this._cache.delete(iter.value)
                 this._stats.evictions++
+                this._stats.lastEvictionReason = 'capacity'
             }
         }
         this._cache.set(key, value)
@@ -216,14 +248,42 @@ export class AssetCache<T> {
     }
 
     delete(key: string): boolean {
-        return this._cache.delete(key)
+        const deleted = this._cache.delete(key)
+        if (deleted) {
+            this._stats.lastEvictionReason = 'explicit'
+        }
+        return deleted
     }
 
     clear(): void {
         this._cache.clear()
     }
 
+    /**
+     * Record a decode latency sample (in milliseconds).
+     *
+     * Call this after completing an async decode step so that the cache can
+     * accumulate average and total decode-latency telemetry.
+     *
+     * Example:
+     *   const t0 = performance.now()
+     *   const data = await expensiveDecode(buffer)
+     *   cache.recordDecodeLatency(performance.now() - t0)
+     *   cache.set(key, data)
+     */
+    recordDecodeLatency(latencyMs: number): void {
+        this._stats.totalDecodeLatencyMs += latencyMs
+        this._stats.decodeCount++
+    }
+
     resetStats(): void {
-        this._stats = { hits: 0, misses: 0, evictions: 0 }
+        this._stats = {
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            totalDecodeLatencyMs: 0,
+            decodeCount: 0,
+            lastEvictionReason: null,
+        }
     }
 }

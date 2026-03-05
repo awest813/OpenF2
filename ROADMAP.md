@@ -51,6 +51,7 @@ OpenF2 aims to deliver:
 - **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
 - **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165); `critter_attempt_placement` de-stubbed
 - **VM debug fields:** `stepCount` + `currentProcedureName` on `ScriptVM`; `ScriptDebuggerPanel` surfaces step count and active procedure name
+- **Performance instrumentation (Safe Impact Roadmap — step 1):** `AssetCache` extended with decode-latency telemetry (`recordDecodeLatency`, `avgDecodeLatencyMs`) and eviction-reason tracking (`lastEvictionReason`); `SpriteBatch` extended with frame-time telemetry (`frameTimeMs` in `BatchStats`); `ScriptVM.call()` instruments top-level call duration (`lastCallTimeMs`, `totalCallTimeMs`); `GameMap.recalcPath()` wrapped with `PathfindingTelemetry` counters (`totalCalls`, `totalTimeMs`, `worstCaseTimeMs`, `lastSolveTimeMs`)
 
 ### Remaining gaps
 
@@ -133,6 +134,7 @@ OpenF2 aims to deliver:
 - [x] **sfall opcodes continued:** `get_pc_base_stat` (0x815F), `set_pc_base_stat` (0x8160), `set_critter_current_ap` (0x8161), `get_npc_level` (0x8162) added to `vm_bridge.ts` + `scripting.ts`
 - [x] **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed (delegates to `move_to` without spurious warning)
 - [x] **VM debug fields:** `stepCount` (incremented each `step()`) and `currentProcedureName` (set/restored in `call()`) added to `ScriptVM`; `ScriptDebuggerPanel` now surfaces step count and active procedure name
+- [x] **Performance instrumentation:** `AssetCache` extended with `recordDecodeLatency`/`avgDecodeLatencyMs` and `lastEvictionReason`; `SpriteBatch.BatchStats` gains `frameTimeMs`; `ScriptVM.call()` tracks `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` exposes `pathfindingTelemetry` (`PathfindingTelemetry`) updated on every `recalcPath` call
 - [ ] Full in-browser map/script authoring tools *(long-term)*
 
 ---
@@ -148,6 +150,7 @@ OpenF2 aims to deliver:
 7. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
 8. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
 9. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
+10. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
 
 ---
 
@@ -166,26 +169,28 @@ This backlog focuses on changes that are **safe to ship incrementally**: low beh
 ### High-impact safe fixes (P0/P1)
 
 1. **Renderer hot-path profiling and micro-optimizations** *(P0, high)*  
+   - ✅ `SpriteBatch.BatchStats` now includes `frameTimeMs` (CPU frame-assembly cost).  
    - Audit per-frame allocations in `renderer.ts`, `webglrenderer.ts`, and `renderBatch.ts`.  
    - Reuse temporary vectors/arrays and avoid object churn inside render loops.  
    - Cache repeated state lookups during frame assembly.  
    - **Exit criteria:** measurable frame-time reduction on dense maps with no visual regressions.
 
 2. **Asset I/O and decode pipeline tuning** *(P0, high)*  
-   - Extend `AssetCache` telemetry (hit/miss, eviction reason, decode latency).  
+   - ✅ `AssetCache` telemetry extended: `recordDecodeLatency`/`avgDecodeLatencyMs` for decode latency, `lastEvictionReason` (`'capacity'` | `'explicit'`) for eviction reason.  
    - Prioritize prefetch of near-camera assets and common UI atlases.  
    - Move expensive decode steps off critical interaction paths where possible.  
    - **Exit criteria:** reduced hitching during movement/zone transitions.
 
 3. **Pathfinding performance budget controls** *(P1, high)*  
+   - ✅ `GameMap.pathfindingTelemetry` (`PathfindingTelemetry`) tracks `totalCalls`, `totalTimeMs`, `worstCaseTimeMs`, and `lastSolveTimeMs` — updated on every `recalcPath` call.  
    - Introduce bounded work per tick for expensive searches.  
    - Cache short-lived path results for repeated move intents in the same local area.  
-   - Add lightweight instrumentation to track worst-case path solve times.  
    - **Exit criteria:** fewer long frame spikes during multi-actor movement.
 
 4. **Script VM execution safeguards** *(P1, high)*  
-   - Add per-script execution counters and warn-level telemetry for pathological scripts.  
+   - ✅ `ScriptVM.call()` now tracks `lastCallTimeMs` and `totalCallTimeMs` for top-level procedure invocations.  
    - Ensure opcode helpers avoid repeated expensive lookups within tight loops.  
+   - Add warn-level telemetry for pathologically slow scripts (frame-budget threshold).  
    - Expand opcode regression tests alongside each de-stubbed procedure/opcode.  
    - **Exit criteria:** lower VM-related frame variance and no behavior regressions in script tests.
 
@@ -218,7 +223,7 @@ This backlog focuses on changes that are **safe to ship incrementally**: low beh
 
 ### Suggested rollout order (safe sequencing)
 
-1. Instrumentation first (profiling + telemetry), no behavior changes.
+1. ✅ Instrumentation first (profiling + telemetry), no behavior changes.
 2. Renderer + asset pipeline micro-optimizations.
 3. Pathfinding and VM budget controls.
 4. Save/load hardening and additional round-trip fixtures.
