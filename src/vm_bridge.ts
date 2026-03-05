@@ -259,6 +259,9 @@ export module ScriptVMBridge {
        ,0x8160: bridged("set_pc_base_stat", 2, false) // set_pc_base_stat(stat, value)
        ,0x8161: bridged("set_critter_current_ap", 2, false) // set_critter_current_ap(obj, ap)
        ,0x8162: bridged("get_npc_level", 1)            // get_npc_level(obj) → level
+       ,0x8163: bridged("get_critter_current_ap", 1)   // get_critter_current_ap(obj) → current combat AP
+       ,0x8164: bridged("get_critter_max_hp", 1)       // get_critter_max_hp(obj) → max HP
+       ,0x8165: bridged("get_pc_level", 0)             // get_pc_level() → PC level
     }
     Object.assign(opMap, bridgeOpMap)
 

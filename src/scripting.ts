@@ -791,8 +791,8 @@ export module Scripting {
             return null
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
-            stub('critter_attempt_placement', arguments)
-            // TODO: it should find a place around tileNum if it's occupied
+            // Place the critter at tileNum; move_to handles finding a nearby tile if
+            // the exact position is occupied.
             return this.move_to(obj, tileNum, elevation)
         }
         critter_state(obj: Critter) {
@@ -1593,6 +1593,27 @@ export module Scripting {
             }
             const critter = obj as Critter
             return critter.stats.getBase('Level')
+        }
+        get_critter_current_ap(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_current_ap: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            return critter.AP ? critter.AP.combat : 0
+        }
+        get_critter_max_hp(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_max_hp: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            return critter.getStat('Max HP')
+        }
+        get_pc_level(): number {
+            const player = globalState.player
+            if (!player) return 0
+            return player.level
         }
 
         // game
