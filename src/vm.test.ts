@@ -90,6 +90,11 @@ describe('op_div (0x803c)', () => {
         exec(0x803c, vm)
         expect(vm.pop()).toBe(-3)
     })
+
+    it('throws on division by zero', () => {
+        const vm = makeVM([10, 0])
+        expect(() => exec(0x803c, vm)).toThrow('division by zero')
+    })
 })
 
 describe('op_mod (0x803d)', () => {
@@ -97,6 +102,11 @@ describe('op_mod (0x803d)', () => {
         const vm = makeVM([10, 3])
         exec(0x803d, vm)
         expect(vm.pop()).toBe(1)
+    })
+
+    it('throws on modulo by zero', () => {
+        const vm = makeVM([10, 0])
+        expect(() => exec(0x803d, vm)).toThrow('modulo by zero')
     })
 })
 
@@ -295,6 +305,19 @@ describe('op_pop (0x801a)', () => {
         const vm = makeVM([1, 2, 3])
         exec(0x801a, vm)
         expect(vm.dataStack).toEqual([1, 2])
+    })
+})
+
+describe('op_dup (0x801b)', () => {
+    it('duplicates the top of the data stack', () => {
+        const vm = makeVM([1, 2, 3])
+        exec(0x801b, vm)
+        expect(vm.dataStack).toEqual([1, 2, 3, 3])
+    })
+
+    it('throws on data stack underflow', () => {
+        const vm = makeVM()
+        expect(() => exec(0x801b, vm)).toThrow('data stack underflow')
     })
 })
 

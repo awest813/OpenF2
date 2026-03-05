@@ -127,6 +127,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         this.push(Math.floor(this.pop()))
     }, // op_floor
     0x801b: function () {
+        if (this.dataStack.length === 0) throw 'data stack underflow'
         this.push(this.dataStack[this.dataStack.length - 1])
     }, // op_dup
 
@@ -189,6 +190,12 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x8039: binop((x, y) => x + y),
     0x803a: binop((x, y) => x - y),
     0x803b: binop((x, y) => x * y),
-    0x803d: binop((x, y) => x % y),
-    0x803c: binop((x, y) => (x / y) | 0), // integer division (truncate toward zero)
+    0x803d: binop((x, y) => {
+        if (y === 0) throw 'modulo by zero'
+        return x % y
+    }),
+    0x803c: binop((x, y) => {
+        if (y === 0) throw 'division by zero'
+        return (x / y) | 0
+    }), // integer division (truncate toward zero)
 }
