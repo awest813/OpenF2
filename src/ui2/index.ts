@@ -18,3 +18,5 @@ export * from './calledShotPanel.js'
 export * from './mapViewerPanel.js'
 export * from './scriptDebuggerPanel.js'
 export * from './prototypeInspectorPanel.js'
+
+export * from './registerPanels.js'
