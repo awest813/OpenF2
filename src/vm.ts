@@ -80,12 +80,15 @@ export class ScriptVM {
 
         this.retStack.push(-1) // push return address (TODO: how is this handled?)
 
-        // run procedure code
-        this.pc = proc.offset
-        this.run()
-
-        this.currentProcedureName = previousProcedure
-        return this.pop()
+        try {
+            // run procedure code
+            this.pc = proc.offset
+            this.run()
+            return this.pop()
+        } finally {
+            // Keep debugger state consistent even when a procedure throws.
+            this.currentProcedureName = previousProcedure
+        }
     }
 
     step(): boolean {

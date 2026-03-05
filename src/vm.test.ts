@@ -432,4 +432,39 @@ describe('ScriptVM.call argument handling', () => {
         expect(args).toEqual([1, 2, 3])
         expect(vm.dataStack).toEqual([3, 2, 1, 3])
     })
+
+    it('restores currentProcedureName when run throws', () => {
+        class ThrowingScriptVM extends ScriptVM {
+            run(): void {
+                throw new Error('boom')
+            }
+        }
+
+        const vm = new ThrowingScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            { procedures: { foo: { index: 0, offset: 0x40 } }, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        vm.currentProcedureName = 'outer_proc'
+
+        expect(() => vm.call('foo', [1])).toThrow('boom')
+        expect(vm.currentProcedureName).toBe('outer_proc')
+    })
+
+    it('restores currentProcedureName to null when top-level call throws', () => {
+        class ThrowingScriptVM extends ScriptVM {
+            run(): void {
+                throw new Error('boom')
+            }
+        }
+
+        const vm = new ThrowingScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            { procedures: { foo: { index: 0, offset: 0x40 } }, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        expect(vm.currentProcedureName).toBeNull()
+        expect(() => vm.call('foo')).toThrow('boom')
+        expect(vm.currentProcedureName).toBeNull()
+    })
 })
