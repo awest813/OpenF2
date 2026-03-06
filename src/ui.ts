@@ -810,7 +810,12 @@ export function uiContextMenu(obj: Obj, evt: any) {
         top: `${evt.clientY}px`,
     })
     const cancelBtn = button(obj, 'cancel')
-    const lookBtn = button(obj, 'look', () => uiLog('You see: ' + obj.getDescription()))
+    const lookBtn = button(obj, 'look', () => {
+        const didOverride = Scripting.lookAt(obj, globalState.player)
+        if (!didOverride) {
+            uiLog('You see: ' + obj.getDescription())
+        }
+    })
     const useBtn = button(obj, 'use', () => playerUseHandler()) // TODO: playerUse should take an object
     const talkBtn = button(obj, 'talk', () => {
         console.log('talking to ' + obj.name)

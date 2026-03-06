@@ -549,3 +549,87 @@ describe('Phase 12-H — quest-state save/load fidelity', () => {
         expect(save2.questLog).toEqual(save1.questLog)
     })
 })
+
+// ===========================================================================
+// Phase 12-I — Fallout 2 procedure hooks: map_exit/look_at/description
+// ===========================================================================
+
+interface FakeScriptProcCtx {
+    cur_map_index: number | null
+    _didOverride: boolean
+    callLog: string[]
+    map_exit_p_proc?: () => void
+    look_at_p_proc?: () => void
+    description_p_proc?: () => void
+}
+
+function runMapExitProc(script: FakeScriptProcCtx | null, mapID: number): void {
+    if (!script?.map_exit_p_proc) return
+    script.cur_map_index = mapID
+    script.map_exit_p_proc()
+}
+
+function runLookAtProc(script: FakeScriptProcCtx | null, mapID: number): boolean | null {
+    if (!script?.look_at_p_proc) return null
+    script.cur_map_index = mapID
+    script._didOverride = false
+    script.look_at_p_proc()
+    return script._didOverride
+}
+
+function runDescriptionProc(script: FakeScriptProcCtx | null, mapID: number): boolean | null {
+    if (!script?.description_p_proc) return null
+    script.cur_map_index = mapID
+    script._didOverride = false
+    script.description_p_proc()
+    return script._didOverride
+}
+
+describe('Phase 12-I — map_exit/look_at/description procedure wiring', () => {
+    it('map_exit_p_proc receives the current map ID before execution', () => {
+        const script: FakeScriptProcCtx = {
+            cur_map_index: null,
+            _didOverride: false,
+            callLog: [],
+            map_exit_p_proc() {
+                this.callLog.push(`exit:${this.cur_map_index}`)
+            },
+        }
+        runMapExitProc(script, 17)
+        expect(script.callLog).toEqual(['exit:17'])
+    })
+
+    it('look_at_p_proc returns null when the procedure is absent', () => {
+        const script: FakeScriptProcCtx = { cur_map_index: null, _didOverride: false, callLog: [] }
+        expect(runLookAtProc(script, 3)).toBeNull()
+    })
+
+    it('look_at_p_proc resets _didOverride to false before running', () => {
+        const script: FakeScriptProcCtx = {
+            cur_map_index: null,
+            _didOverride: true,
+            callLog: [],
+            look_at_p_proc() {
+                this.callLog.push(`look:${this.cur_map_index}`)
+            },
+        }
+        const didOverride = runLookAtProc(script, 9)
+        expect(didOverride).toBe(false)
+        expect(script.callLog).toEqual(['look:9'])
+    })
+
+    it('description_p_proc can explicitly override default behaviour', () => {
+        const script: FakeScriptProcCtx = {
+            cur_map_index: null,
+            _didOverride: false,
+            callLog: [],
+            description_p_proc() {
+                this._didOverride = true
+                this.callLog.push(`desc:${this.cur_map_index}`)
+            },
+        }
+        const didOverride = runDescriptionProc(script, 22)
+        expect(didOverride).toBe(true)
+        expect(script.callLog).toEqual(['desc:22'])
+    })
+})
