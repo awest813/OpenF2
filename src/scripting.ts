@@ -2134,7 +2134,6 @@ export module Scripting {
             if (script !== undefined && script.map_exit_p_proc !== undefined) {
                 script.self_obj = gameObjects[i] as ScriptableObj
                 script.game_time = Math.max(1, globalState.gameTickTime)
-                script.game_time_hour = 1200
                 script.cur_map_index = mapID
                 trackScriptTrigger(script, 'map_exit_p_proc')
                 script.map_exit_p_proc()
