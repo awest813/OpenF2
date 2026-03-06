@@ -167,5 +167,67 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             )
     }
 
+    // Final normalization pass: tolerate partially corrupted saves that carry
+    // malformed field shapes/types while still preserving usable campaign data.
+    save.scriptGlobalVars = sanitizeNumericRecord(save.scriptGlobalVars)
+    save.gameTickTime = sanitizeGameTickTime(save.gameTickTime)
+    save.critterKillCounts = sanitizeNumericRecord(save.critterKillCounts)
+    save.mapVars = sanitizeNestedNumericRecord(save.mapVars)
+    save.mapAreaStates = sanitizeBooleanRecord(save.mapAreaStates)
+
     return save as SaveGame
+}
+
+function sanitizeGameTickTime(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return 0
+    }
+
+    // Game ticks should be integer and non-negative.
+    return Math.max(0, Math.floor(value))
+}
+
+function sanitizeNumericRecord(value: unknown): Record<number, number> {
+    if (typeof value !== 'object' || value === null) {
+        return {}
+    }
+
+    const out: Record<number, number> = {}
+    for (const [key, rawEntry] of Object.entries(value)) {
+        const numericKey = Number(key)
+        if (!Number.isInteger(numericKey)) continue
+        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) continue
+        out[numericKey] = rawEntry
+    }
+    return out
+}
+
+function sanitizeNestedNumericRecord(value: unknown): Record<string, Record<number, number>> {
+    if (typeof value !== 'object' || value === null) {
+        return {}
+    }
+
+    const out: Record<string, Record<number, number>> = {}
+    for (const [mapScript, mapVars] of Object.entries(value)) {
+        const sanitized = sanitizeNumericRecord(mapVars)
+        out[mapScript] = sanitized
+    }
+
+    return out
+}
+
+function sanitizeBooleanRecord(value: unknown): Record<number, boolean> {
+    if (typeof value !== 'object' || value === null) {
+        return {}
+    }
+
+    const out: Record<number, boolean> = {}
+    for (const [key, rawEntry] of Object.entries(value)) {
+        const numericKey = Number(key)
+        if (!Number.isInteger(numericKey)) continue
+        if (typeof rawEntry !== 'boolean') continue
+        out[numericKey] = rawEntry
+    }
+
+    return out
 }
