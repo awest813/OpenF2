@@ -54,6 +54,20 @@ describe('DialoguePanel interaction parity', () => {
         panel.onMouseDown(485, 160, 'l')
         expect(emitSpy).toHaveBeenCalledWith('dialogue:optionSelected', { optionID: 77 })
     })
+
+    it('setReply clears stale options between dialogue exchanges', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.addOption('Old option', 55)
+
+        panel.onMouseDown(200, 160, 'l')
+        expect(emitSpy).toHaveBeenCalledWith('dialogue:optionSelected', { optionID: 55 })
+
+        emitSpy.mockClear()
+        panel.setReply('New NPC line')
+        panel.onMouseDown(200, 160, 'l')
+
+        expect(emitSpy).not.toHaveBeenCalledWith('dialogue:optionSelected', { optionID: 55 })
+    })
 })
 
 describe('BarterPanel interaction parity', () => {

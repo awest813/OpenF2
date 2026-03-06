@@ -41,10 +41,10 @@ Gate: **PASS** when early-game path is repeatable without softlock/state corrupt
 
 ## Phase 3 — Dialogue/barter/interactions
 
-- [ ] Dialogue branch transitions stable
-- [ ] Barter transactions and pricing stable
-- [ ] Loot/inventory/panel lifecycle stability verified
-- [ ] Interaction regressions covered by automated tests
+- [x] Dialogue branch transitions stable
+- [x] Barter transactions and pricing stable
+- [x] Loot/inventory/panel lifecycle stability verified
+- [x] Interaction regressions covered by automated tests
 
 Gate: **PASS** when repeated interaction loops maintain consistent state.
 
