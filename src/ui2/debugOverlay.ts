@@ -20,7 +20,7 @@ import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK
 import { EntityManager } from '../ecs/entityManager.js'
 
 const PANEL_WIDTH  = 200
-const PANEL_HEIGHT = 120
+const PANEL_HEIGHT = 170
 const PAD = 8
 const LINE_H = 16
 
@@ -33,6 +33,7 @@ export class DebugOverlayPanel extends UIPanel {
     private _frameCount = 0
     /** Optional map name set by the engine when a new map loads. */
     mapName: string | null = null
+    private _scriptRuntimeProvider: (() => { currentProcedure: string | null, recentLog: readonly string[] }) | null = null
 
     constructor(screenWidth: number, screenHeight: number, playerEntityId: number) {
         super('debug', {
@@ -43,6 +44,10 @@ export class DebugOverlayPanel extends UIPanel {
         })
         this.playerEntityId = playerEntityId
         this.zOrder = 50
+    }
+
+    setScriptRuntimeProvider(provider: (() => { currentProcedure: string | null, recentLog: readonly string[] }) | null): void {
+        this._scriptRuntimeProvider = provider
     }
 
     override render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -66,6 +71,11 @@ export class DebugOverlayPanel extends UIPanel {
         let entityCount = 0
         for (const _id of EntityManager.allIds()) entityCount++
 
+        const runtime = this._scriptRuntimeProvider?.()
+        const recentLog = runtime && runtime.recentLog.length > 0
+            ? runtime.recentLog[runtime.recentLog.length - 1]
+            : undefined
+
         const lines: Array<[string, UIColor]> = [
             ['DEBUG OVERLAY', FALLOUT_GREEN],
             [`HP: ${stats ? `${stats.currentHp}/${stats.maxHp}` : 'n/a'}`, stats ? hpColor(stats.currentHp, stats.maxHp) : FALLOUT_DARK_GRAY],
@@ -73,6 +83,8 @@ export class DebugOverlayPanel extends UIPanel {
             [`Entities: ${entityCount}`, FALLOUT_GREEN],
             [`Frame: ${this._frameCount}`, FALLOUT_GREEN],
             [`Map: ${this.mapName ?? 'none'}`, FALLOUT_GREEN],
+            [`Proc: ${runtime?.currentProcedure ?? 'none'}`, FALLOUT_AMBER],
+            [`ScriptLog: ${truncate(recentLog ?? '(no messages)', 26)}`, FALLOUT_DARK_GRAY],
         ]
 
         for (let i = 0; i < lines.length; i++) {
@@ -104,4 +116,9 @@ function hpColor(current: number, max: number): UIColor {
     if (ratio > 0.66) return FALLOUT_GREEN
     if (ratio > 0.33) return FALLOUT_AMBER
     return { r: 195, g: 0, b: 0, a: 255 }
+}
+
+function truncate(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text
+    return `${text.slice(0, Math.max(0, maxLen - 3))}...`
 }

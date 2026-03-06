@@ -18,6 +18,16 @@ describe('ui2 primary gameplay panel registration parity', () => {
             expect(() => mgr.get(panelName)).not.toThrow()
         }
     })
+
+    it('registers contributor cockpit panels', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+
+        expect(() => mgr.get('debug')).not.toThrow()
+        expect(() => mgr.get('mapViewer')).not.toThrow()
+        expect(() => mgr.get('scriptDebugger')).not.toThrow()
+        expect(() => mgr.get('protoInspector')).not.toThrow()
+    })
 })
 
 describe('DialoguePanel interaction parity', () => {

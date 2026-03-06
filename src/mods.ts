@@ -36,6 +36,13 @@ export interface ModManifest {
     overrides?: Record<string, string>
 }
 
+export interface ResolvedModOverride {
+    canonicalPath: string
+    resolvedPath: string
+    winnerModId: string
+    overriddenModIds: string[]
+}
+
 // ---------------------------------------------------------------------------
 // ModRegistry
 // ---------------------------------------------------------------------------
@@ -67,6 +74,11 @@ export class ModRegistry {
         return this.mods
     }
 
+    /** Returns active mods in priority order (highest priority first). */
+    getActiveByPriority(): readonly ModManifest[] {
+        return [...this.mods].reverse()
+    }
+
     /**
      * Resolve an asset path against the mod stack.
      *
@@ -86,6 +98,43 @@ export class ModRegistry {
     /** Remove all registered mods. */
     clear(): void {
         this.mods = []
+    }
+
+    /**
+     * Build the final resolved override table visible to contributors.
+     *
+     * For each canonical path this reports the winning mod and the list of
+     * lower-priority mods that were overridden for that same path.
+     */
+    getResolvedOverrides(limit?: number): ResolvedModOverride[] {
+        const resolved = new Map<string, ResolvedModOverride>()
+
+        for (const mod of this.mods) {
+            if (!mod.overrides) continue
+
+            for (const [canonicalPath, resolvedPath] of Object.entries(mod.overrides)) {
+                const existing = resolved.get(canonicalPath)
+                if (existing) {
+                    existing.overriddenModIds.push(existing.winnerModId)
+                    existing.winnerModId = mod.id
+                    existing.resolvedPath = resolvedPath
+                    continue
+                }
+
+                resolved.set(canonicalPath, {
+                    canonicalPath,
+                    resolvedPath,
+                    winnerModId: mod.id,
+                    overriddenModIds: [],
+                })
+            }
+        }
+
+        const items = [...resolved.values()].sort((a, b) => a.canonicalPath.localeCompare(b.canonicalPath))
+        if (typeof limit === 'number' && limit >= 0) {
+            return items.slice(0, limit)
+        }
+        return items
     }
 }
 

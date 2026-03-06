@@ -372,6 +372,17 @@ npx vitest run src/phase2.test.ts
 npx vitest --watch
 ```
 
+### Contributor Cockpit (Phase 4 Tooling)
+
+OpenF2 now ships a browser-native contributor cockpit that can stay open while reproducing map/script/mod regressions:
+
+- **F3 / backtick — DebugOverlayPanel**: live HP/AP, entity count, map name, current script procedure, and latest script log line.
+- **F5 — MapViewerPanel**: cursor hex/tile/elevation + nearby objects + active mod list (high→low priority) + resolved override winners.
+- **F6 — ScriptDebuggerPanel**: current VM procedure and rolling script log.
+- **F7 — PrototypeInspectorPanel**: selected PRO metadata/stats for map and script verification.
+
+For regression debugging, keep F3+F5+F6 visible while reproducing and include screenshots/log excerpts in issue reports.
+
 ### Common Debugging Scenarios
 
 #### "A SPECIAL-derived stat seems wrong"
@@ -400,6 +411,14 @@ npx vitest --watch
 2. If unimplemented, the VM will hit `doDisasmOnUnimplOp` and dump a disassembly
 3. Check stack order: many opcodes pop arguments in reverse order
 4. Compare with the sfall source for the expected behavior
+5. Keep **F6** open while reproducing and record the `Proc:` and recent log lines
+
+#### "A mod override is not being applied"
+
+1. Open **F5 (MapViewerPanel)** and inspect the **Mods (high→low)** list
+2. Check the **Overrides** section for the canonical path winner
+3. If a winner appears wrong, confirm registration order in `src/mods.ts`
+4. Add/adjust a test in `src/phase4.test.ts` to lock in the expected stacking behavior
 
 #### "An item/critter/object doesn't load correctly"
 

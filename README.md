@@ -53,7 +53,7 @@ Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone
 
 - **UI fidelity/polish:** gameplay panels now render through `ui2`; edge-case visual and interaction parity work continues.
 - **Animation and rendering fidelity:** edge-case timing and correctness still need polish.
-- **In-browser tooling:** DebugOverlayPanel (F3/backtick), MapViewerPanel (F5), ScriptDebuggerPanel (F6), and PrototypeInspectorPanel (F7) are available; full map/script authoring tools are future work.
+- **In-browser tooling:** contributor cockpit panels are available now: DebugOverlayPanel (F3/backtick), MapViewerPanel (F5), ScriptDebuggerPanel (F6), and PrototypeInspectorPanel (F7). They expose live HP/AP/entity/map/script data plus mod priority/override visibility for regression debugging.
 
 ---
 

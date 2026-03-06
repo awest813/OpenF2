@@ -42,8 +42,11 @@ import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
 import { UIManagerImpl, BitmapFontRenderer } from './ui2/uiPanel.js'
 import { ScriptDebuggerPanel } from './ui2/scriptDebuggerPanel.js'
+import { DebugOverlayPanel } from './ui2/debugOverlay.js'
 import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
+import { EventBus } from './eventBus.js'
+import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 
 // Return the skill ID used by the Fallout 2 engine
 function getSkillID(skill: Skills): number {
@@ -251,6 +254,12 @@ function initUIManager(): void {
 
     const scriptDebuggerPanel = mgr.get<ScriptDebuggerPanel>('scriptDebugger')
     Scripting.setScriptDebuggerSink(scriptDebuggerPanel)
+
+    const debugOverlayPanel = mgr.get<DebugOverlayPanel>('debug')
+    debugOverlayPanel.setScriptRuntimeProvider(() => scriptDebuggerPanel.getRuntimeSnapshot())
+    EventBus.on('map:loaded', ({ mapName }) => {
+        debugOverlayPanel.mapName = mapName
+    })
 
     mgr.connectEventBus()
 
