@@ -423,6 +423,11 @@ describe('op_pop_return (0x801c)', () => {
         expect(vm.halted).toBe(false)
         expect(vm.pc).toBe(0x1234)
     })
+
+    it('throws on return stack underflow', () => {
+        const vm = makeVM()
+        expect(() => exec(0x801c, vm)).toThrow('return stack underflow')
+    })
 })
 
 describe('ScriptVM.call argument handling', () => {
@@ -522,6 +527,78 @@ describe('ScriptVM.call argument handling', () => {
         expect(vm.currentProcedureName).toBeNull()
         expect(vm.retStack).toEqual([])
         expect(vm.stepCount).toBe(3)
+    })
+
+    it('tracks and restores topLevelCallerProcedureName across nested calls', () => {
+        class NestedScriptVM extends ScriptVM {
+            observedTopLevelCallerInInner: string | null = null
+
+            run(): void {
+                if (this.currentProcedureName === 'outer') {
+                    this.call('inner')
+                    this.push('done')
+                    opMap[0x801c].call(this)
+                    return
+                }
+
+                if (this.currentProcedureName === 'inner') {
+                    this.observedTopLevelCallerInInner = this.topLevelCallerProcedureName
+                    this.push('inner')
+                    opMap[0x801c].call(this)
+                    return
+                }
+            }
+        }
+
+        const vm = new NestedScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            {
+                procedures: {
+                    outer: { index: 0, offset: 0x10 },
+                    inner: { index: 1, offset: 0x20 },
+                },
+                proceduresTable: [],
+                strings: {},
+                identifiers: {},
+            } as any
+        )
+
+        expect(vm.topLevelCallerProcedureName).toBeNull()
+        vm.call('outer')
+        expect(vm.observedTopLevelCallerInInner).toBe('outer')
+        expect(vm.topLevelCallerProcedureName).toBeNull()
+    })
+
+    it('restores topLevelCallerProcedureName when nested call throws', () => {
+        class ThrowingNestedScriptVM extends ScriptVM {
+            run(): void {
+                if (this.currentProcedureName === 'outer') {
+                    this.call('inner')
+                    this.push('done')
+                    opMap[0x801c].call(this)
+                    return
+                }
+
+                throw new Error('inner failed')
+            }
+        }
+
+        const vm = new ThrowingNestedScriptVM(
+            { seek() {}, read16() { return 0 }, offset: 0 } as any,
+            {
+                procedures: {
+                    outer: { index: 0, offset: 0x10 },
+                    inner: { index: 1, offset: 0x20 },
+                },
+                proceduresTable: [],
+                strings: {},
+                identifiers: {},
+            } as any
+        )
+
+        expect(() => vm.call('outer')).toThrow('inner failed')
+        expect(vm.currentProcedureName).toBeNull()
+        expect(vm.topLevelCallerProcedureName).toBeNull()
     })
 
     it('does not inject a new top-level sentinel for continuation event calls', () => {
@@ -745,9 +822,21 @@ describe('ScriptVM unsupported operation buffer', () => {
         const vm = new ScriptVM(script, intfile)
         vm.currentProcedureName = 'map_enter_p_proc'
 
-        expect(vm.step()).toBe(false)
+        const oldDisasmOnUnimpl = Config.engine.doDisasmOnUnimplOp
+        Config.engine.doDisasmOnUnimplOp = false
+        try {
+            expect(vm.step()).toBe(false)
+        } finally {
+            Config.engine.doDisasmOnUnimplOp = oldDisasmOnUnimpl
+        }
         expect(vm.unsupportedOperations).toEqual([
-            { opcode: 0xDEAD, pc: 0, scriptName: 'stub.int', procedureName: 'map_enter_p_proc' },
+            {
+                opcode: 0xDEAD,
+                pc: 0,
+                scriptName: 'stub.int',
+                procedureName: 'map_enter_p_proc',
+                topLevelCallerProcedureName: null,
+            },
         ])
     })
 
@@ -764,9 +853,75 @@ describe('ScriptVM unsupported operation buffer', () => {
         vm.recordUnsupportedProcedure(0x80B4, 'random')
 
         expect(vm.drainUnsupportedOperations()).toEqual([
-            { opcode: 0xABCD, pc: 123, scriptName: 'stub.int', procedureName: null },
-            { opcode: 0x80B4, pc: 0, scriptName: 'stub.int', procedureName: null, bridgedProcedureName: 'random' },
+            {
+                opcode: 0xABCD,
+                pc: 123,
+                scriptName: 'stub.int',
+                procedureName: null,
+                topLevelCallerProcedureName: null,
+            },
+            {
+                opcode: 0x80B4,
+                pc: 0,
+                scriptName: 'stub.int',
+                procedureName: null,
+                topLevelCallerProcedureName: null,
+                bridgedProcedureName: 'random',
+            },
         ])
         expect(vm.unsupportedOperations).toEqual([])
+    })
+
+    it('records top-level caller context for unsupported operations', () => {
+        const script = {
+            offset: 0,
+            seek(pos: number) { this.offset = pos },
+            read16() { return 0xDEAD },
+        } as any
+
+        class UnknownOpcodeVM extends ScriptVM {
+            run(): void {
+                if (this.currentProcedureName === 'outer') {
+                    this.call('inner')
+                    this.push('done')
+                    opMap[0x801c].call(this)
+                    return
+                }
+
+                this.step()
+                this.push('inner-failed')
+                opMap[0x801c].call(this)
+            }
+        }
+
+        const intfile = {
+            name: 'stub.int',
+            procedures: {
+                outer: { index: 0, offset: 0x10 },
+                inner: { index: 1, offset: 0x20 },
+            },
+            proceduresTable: [],
+            strings: {},
+            identifiers: {},
+        } as any
+
+        const vm = new UnknownOpcodeVM(script, intfile)
+        const oldDisasmOnUnimpl = Config.engine.doDisasmOnUnimplOp
+        Config.engine.doDisasmOnUnimplOp = false
+        try {
+            vm.call('outer')
+        } finally {
+            Config.engine.doDisasmOnUnimplOp = oldDisasmOnUnimpl
+        }
+
+        expect(vm.unsupportedOperations).toEqual([
+            {
+                opcode: 0xDEAD,
+                pc: 0x20,
+                scriptName: 'stub.int',
+                procedureName: 'inner',
+                topLevelCallerProcedureName: 'outer',
+            },
+        ])
     })
 })
