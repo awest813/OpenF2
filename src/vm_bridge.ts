@@ -297,6 +297,11 @@ export module ScriptVMBridge {
        ,0x817A: bridged("get_weapon_ammo_count", 1)    // get_weapon_ammo_count(weapon) → rounds loaded
        ,0x817B: bridged("set_weapon_ammo_count", 2, false) // set_weapon_ammo_count(weapon, count) — set rounds loaded
        ,0x817C: bridged("get_mouse_tile_num", 0)       // get_mouse_tile_num() → tile under mouse (-1 if none)
+
+       // sfall extended opcodes 0x817D–0x817F — object names, game mode, global script repeat
+       ,0x817D: bridged("get_critter_name", 1)         // get_critter_name(obj) → display name string of object
+       ,0x817E: bridged("get_game_mode", 0)            // get_game_mode() → current game mode bitmask (partial: 0)
+       ,0x817F: bridged("set_global_script_repeat", 1, false) // set_global_script_repeat(ms) — set global-script tick interval (partial: no-op)
     }
     Object.assign(opMap, bridgeOpMap)
 

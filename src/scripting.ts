@@ -613,13 +613,30 @@ export module Scripting {
                 case 24:
                     // METARULE_PARTY_COUNT: return number of NPCs currently in the party
                     return globalState.gParty ? globalState.gParty.getPartyMembers().length : 0
+                case 30: {
+                    // METARULE_CHECK_WEAPON_LOADED: 1 if the weapon object has ammo loaded, 0 otherwise.
+                    const wLoaded = isGameObject(target) ? ((target as any).extra?.ammoLoaded ?? 0) : 0
+                    return wLoaded > 0 ? 1 : 0
+                }
+                case 35:
+                    // METARULE_COMBAT_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
+                    return 1
+                case 44:
+                    // METARULE_WHO_ON_DRUGS: 1 if the critter is currently under drug influence.
+                    // No drug system implemented; always return 0 (partial).
+                    return 0
                 case 46:
                     // METARULE_CURRENT_TOWN: return the current map/area ID as the town identifier
                     return currentMapID !== null ? currentMapID : 0
+                case 47:
+                    // METARULE_MAP_KNOWN: 1 if the world-map area with the given ID is discovered.
+                    // Identical logic to case 17 but keyed by a numeric map ID argument.
+                    if (globalState.mapAreas && globalState.mapAreas[target] !== undefined) {
+                        return globalState.mapAreas[target].state === true ? 1 : 0
+                    }
+                    return 0
                 case 48:
                     return 2 // METARULE_VIOLENCE_FILTER (2 = VLNCLVL_NORMAL)
-                case 56:
-                    return SFALL_VER // METARULE_SFALL_VER — sfall compatibility version
                 case 49: // METARULE_W_DAMAGE_TYPE
                     switch (objectGetDamageType(target)) {
                         case 'explosion':
@@ -627,6 +644,11 @@ export module Scripting {
                         default:
                             throw 'unknown damage type'
                     }
+                case 55:
+                    // METARULE_GAME_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
+                    return 1
+                case 56:
+                    return SFALL_VER // METARULE_SFALL_VER — sfall compatibility version
                 default:
                     stub('metarule', arguments)
                     break
@@ -643,6 +665,12 @@ export module Scripting {
                         return
                     }
                 }
+            } else if (id === 101) {
+                // METARULE3_RAND: random integer in range [obj..userdata] (inclusive).
+                // Used by many encounter scripts for randomised script behaviour.
+                const min = typeof obj === 'number' ? obj : 0
+                const max = typeof userdata === 'number' ? userdata : 0
+                return getRandomInt(min, max)
             } else if (id === 106) {
                 // METARULE3_TILE_GET_NEXT_CRITTER
                 // As far as I know, with lastCritter == 0, it just grabs the critter that is not the player at the tile. TODO: Test this!
@@ -656,6 +684,11 @@ export module Scripting {
                     if (objs[i].type === 'critter' && !(<Critter>objs[i]).isPlayer) return objs[i]
                 }
                 return 0 // no critter found at that position (TODO: test)
+            } else if (id === 107) {
+                // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
+                // No fog-of-war system implemented yet; always return 1 (partial).
+                log('metarule3 107 (tile_visible)', arguments, 'tiles')
+                return 1
             }
 
             stub('metarule3', arguments)
@@ -722,6 +755,14 @@ export module Scripting {
                     case 0:
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).equippedArmor ? 1 : 0 // INVEN_TYPE_WORN
+                    case 1: // INVEN_TYPE_RIGHT_HAND — 1 if critter has a right-hand item equipped
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).rightHand ? 1 : 0
+                    case 2: // INVEN_TYPE_LEFT_HAND — 1 if critter has a left-hand item equipped
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).leftHand ? 1 : 0
+                    case 3: // INVEN_TYPE_INV_COUNT — total number of items in inventory
+                        return obj.inventory ? obj.inventory.length : 0
                     case 5:
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).aiNum // OBJECT_AI_PACKET
@@ -732,6 +773,10 @@ export module Scripting {
                         return obj.orientation // OBJECT_CUR_ROT
                     case 666: // OBJECT_VISIBILITY
                         return obj.visible === false ? 0 : 1 // 1 = visible, 0 = invisible
+                    case 667: // OBJECT_IS_FLAT — 1 if object is flat (rendered below critters)
+                        return (obj as any).extra?.isFlat ? 1 : 0
+                    case 668: // OBJECT_NO_BLOCK — 1 if object does not block movement
+                        return (obj as any).extra?.noBlock ? 1 : 0
                     case 669: // OBJECT_CUR_WEIGHT — total carried weight in lbs
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).stats.getBase('Carry')
@@ -774,6 +819,14 @@ export module Scripting {
                         return
                     case 666: // OBJECT_VISIBILITY
                         obj.visible = amount !== 0
+                        return
+                    case 667: // OBJECT_IS_FLAT — mark object as flat (rendered below critters)
+                        if (!(obj as any).extra) (obj as any).extra = {}
+                        ;(obj as any).extra.isFlat = amount !== 0
+                        return
+                    case 668: // OBJECT_NO_BLOCK — mark object as non-blocking for movement
+                        if (!(obj as any).extra) (obj as any).extra = {}
+                        ;(obj as any).extra.noBlock = amount !== 0
                         return
                     case 669: // OBJECT_CUR_WEIGHT — set the critter's carry weight
                         ;(obj as Critter).stats.setBase('Carry', Math.max(0, amount))
@@ -2197,6 +2250,25 @@ export module Scripting {
             // "no tile under cursor" — the same value the original engine returns
             // when the mouse is outside the map area.
             return -1
+        }
+
+        // sfall extended opcode — get the display name of any game object (0x817D)
+        get_critter_name(obj: Obj): string {
+            if (!isGameObject(obj)) return ''
+            return (obj as any).name ?? ''
+        }
+
+        // sfall extended opcode — current game mode bitmask (0x817E).
+        // Returns 0 in the scripting VM context (no special mode flags active).
+        // Partial: the engine does not maintain a mode-flags register.
+        get_game_mode(): number {
+            return 0
+        }
+
+        // sfall extended opcode — set the repeat interval for the global map script (0x817F).
+        // Partial: the engine does not run a global script ticker; this is a no-op.
+        set_global_script_repeat(intervalMs: number): void {
+            log('set_global_script_repeat', arguments)
         }
 
         load_map(map: number | string, startLocation: number) {
