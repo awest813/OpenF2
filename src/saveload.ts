@@ -18,6 +18,7 @@ import globalState from './globalState.js'
 import { deserializeObj } from './object.js'
 import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
+import { Scripting } from './scripting.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
@@ -150,6 +151,10 @@ export function debugSave(): void {
 export function save(name: string, slot = -1, callback?: () => void): void {
     const save = snapshotSaveData(name, Date.now(), SAVE_VERSION, globalState)
 
+    // Snapshot Fallout 2 script global variables (GVAR_*) so that quest flags,
+    // faction states, and world-event flags survive across save/load cycles.
+    save.scriptGlobalVars = { ...Scripting.getGlobalVars() }
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -192,6 +197,11 @@ export function load(id: number): void {
 
                 console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                 hydrateStateFromSave(save, globalState, deserializeObj)
+                // Restore script global variables (GVAR_*) so quest flags and
+                // world state set before the save are fully intact on resume.
+                if (save.scriptGlobalVars) {
+                    Scripting.setGlobalVars(save.scriptGlobalVars)
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -221,6 +231,10 @@ export function load(id: number): void {
 
                     console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                     hydrateStateFromSave(save, globalState, deserializeObj)
+                    // Restore script global variables (GVAR_*).
+                    if (save.scriptGlobalVars) {
+                        Scripting.setGlobalVars(save.scriptGlobalVars)
+                    }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                         error,

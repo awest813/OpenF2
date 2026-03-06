@@ -84,6 +84,7 @@ export default {
 
     ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
     gameUIDisabled: false, // True when scripts have disabled UI interaction
+    critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
 
     uiManager: null,
     playerEntityId: 0,
@@ -148,6 +149,14 @@ export default {
     ambientLightLevel: number
     /** True when scripts have temporarily disabled the game UI. */
     gameUIDisabled: boolean
+
+    /**
+     * Per-kill-type kill counts for the player session.
+     * Indexed by KILL_TYPE_* constants (0 = men, 3 = super mutants, …).
+     * Used by sfall `get_critter_kills` / `set_critter_kills` opcodes and
+     * persisted across save/load via `scriptGlobalVars` in the save schema.
+     */
+    critterKillCounts: Record<number, number> | null
 
     mapAreas: AreaMap | null
 

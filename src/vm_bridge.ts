@@ -278,6 +278,13 @@ export module ScriptVMBridge {
        ,0x816D: bridged("string_length", 1)            // string_length(str) → length of string
        ,0x816E: bridged("pow", 2)                      // pow(base, exp) → base^exp
        ,0x816F: bridged("obj_is_valid", 1)             // obj_is_valid(obj) → 1 if obj is a valid game object
+
+       // sfall extended opcodes — kill counts, body type, floor2, obj count
+       ,0x8170: bridged("get_critter_kills", 1)        // get_critter_kills(kill_type) → kill count
+       ,0x8171: bridged("set_critter_kills", 2, false) // set_critter_kills(kill_type, amount)
+       ,0x8172: bridged("get_critter_body_type", 1)    // get_critter_body_type(obj) → body type index
+       ,0x8173: bridged("floor2", 1)                   // floor2(x) → math floor of x
+       ,0x8174: bridged("obj_count_by_pid", 1)         // obj_count_by_pid(pid) → count of live objects with matching PID
     }
     Object.assign(opMap, bridgeOpMap)
 
