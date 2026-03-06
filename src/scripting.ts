@@ -41,6 +41,7 @@ import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER } from './sfallGlobals.js'
+import { recordStubHit } from './scriptingChecklist.js'
 
 export module Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -171,6 +172,7 @@ export module Scripting {
             if (i === args.length - 1) a += args[i]
             else a += args[i] + ', '
         console.log('STUB: ' + name + ': ' + a)
+        recordStubHit(name, a)
     }
 
     function log(name: string, args: IArguments, type?: DebugLogShowType) {
@@ -488,8 +490,11 @@ export module Scripting {
                     useElevatorHandler()
                     break
                 case 17:
-                    stub('metarule', arguments)
-                    return 0 // is area known? (TODO)
+                    // METARULE_IS_AREA_KNOWN: 1 if the area with ID `target` has been discovered
+                    if (globalState.mapAreas && globalState.mapAreas[target] !== undefined) {
+                        return globalState.mapAreas[target].state === true ? 1 : 0
+                    }
+                    return 0 // unknown area ID — treat as undiscovered
                 case 18:
                     return 0 // is the critter under the influence of drugs? (TODO)
                 case 22:
