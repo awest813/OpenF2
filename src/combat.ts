@@ -234,8 +234,9 @@ export class Combat {
         var AC = target.getStat('AC') + bonusAC
         var bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
         var baseCrit = obj.getStat('Critical Chance') + bonusCrit
-        var hitChance = weaponSkill - AC - CriticalEffects.regionHitChanceDecTable[region] - hitDistanceModifier
-        var critChance = baseCrit + CriticalEffects.regionHitChanceDecTable[region]
+        const regionPenalty = CriticalEffects.regionHitChanceDecTable[region] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
+        var hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
+        var critChance = baseCrit + regionPenalty
 
         if (isNaN(hitChance)) throw 'something went wrong with hit chance calculation'
 

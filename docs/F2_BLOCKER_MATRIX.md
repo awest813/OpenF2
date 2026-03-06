@@ -26,6 +26,7 @@ Status guidance:
 | BLK-007 | HIGH | Quest Consequences | reputation/global-var branch continuity | consequence gate evaluation + persistence | No dedicated regression suite verified that cross-town consequence gates (karma/reputation + GVAR conditions) stay consistent after save/load. | Apply consequence actions (quest globals + reputation changes), save, load, re-evaluate branch gates. | Consequence-driven branch gates remain stable and deterministic across save/load. | `src/phase31.test.ts` | @engine | CLOSED | Added consequence harness covering NCR/Vault City/Broken Hills gate unlock/revoke + persistence. |
 | BLK-008 | HIGH | Cinematics | slide timing robustness | `CinematicPlayer._showSlide` duration handling | Invalid slide durations (negative/NaN) could produce undefined playback timing behavior in ending/intro sequences. | Play cinematic sequence with malformed slide duration values. | Invalid durations fall back to deterministic default timing; valid durations still honored. | `src/phase32.test.ts`, `src/phase3.test.ts` | @engine | CLOSED | Added duration validation fallback to default 4000 ms plus regression tests. |
 | BLK-009 | HIGH | Certification | artifact consistency | critical-path docs/checkpoints consistency | No automated check ensured region checklist, blocker matrix, and phase checkpoint artifacts stayed synchronized and structurally complete. | Run consistency assertions against docs for required regions, blocker states, and phase 0-8 checkpoint completeness. | Certification artifacts stay in sync and fail loudly in CI when structure drifts. | `src/phase33.test.ts` | @engine | CLOSED | Added certification artifact integrity suite for region list + blocker/checkpoint consistency. |
+| BLK-010 | HIGH | Combat | called-shot robustness | `Combat.getHitChance` region handling | Unknown called-shot region keys could produce NaN hit calculations and throw, risking runtime combat interruption in scripts/modded inputs. | Call hit/roll with an unrecognized region string. | Unknown regions safely fall back to torso modifiers without throwing. | `src/phase30.test.ts`, `src/combat.integration.test.ts` | @engine | CLOSED | Added torso-fallback handling in hit-chance computation + regression coverage. |
 
 ---
 
@@ -39,6 +40,7 @@ Status guidance:
 - Quest consequence suite (`src/phase31.test.ts`) passed for karma/reputation/global-var gate persistence.
 - Cinematic timing suite (`src/phase32.test.ts`) passed with malformed-duration guard coverage.
 - Certification scaffolding suite (`src/phase33.test.ts`) passed for docs/checkpoint/blocker consistency.
+- Phase 27/29/30 suites (`src/phase27.test.ts`, `src/phase29.test.ts`, `src/phase30.test.ts`) passed for interaction lifecycle, long-campaign save/load drift checks, and combat region fallback safety.
 
 ## Closure checklist (required)
 
