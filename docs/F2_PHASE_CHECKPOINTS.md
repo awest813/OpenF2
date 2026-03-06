@@ -108,7 +108,7 @@ Gate: **PASS** when ending flow completes without runtime interruption.
 
 ## Phase 9 — Region-by-region certification
 
-- [ ] Each region marked `CERTIFIED` in critical-path checklist
+- [x] Each region marked `CERTIFIED` in critical-path checklist
 - [x] No unresolved `CRITICAL` blockers in matrix
 - [x] Region-specific regression coverage in place
 

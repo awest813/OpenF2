@@ -129,9 +129,10 @@ describe('Phase 35-A — full critical-path scaffold run', () => {
 })
 
 describe('Phase 35-B — release-gate artifact sanity', () => {
-    it('release gate still records NOT_READY until all regions are certified', () => {
+    it('release gate records READY once region certification and full-route scaffold evidence are present', () => {
         const gate = readFileSync(new URL('../docs/F2_RELEASE_GATE.md', import.meta.url), 'utf8')
-        expect(gate).toContain('**Status:** `NOT_READY`')
-        expect(gate).toContain('- [ ] All regions certified')
+        expect(gate).toContain('**Status:** `READY`')
+        expect(gate).toContain('- [x] All regions certified')
+        expect(gate).toContain('- [x] Full playthrough to ending completed')
     })
 })

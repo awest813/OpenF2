@@ -31,19 +31,19 @@ This gate is the final stop before declaring OpenF2 campaign completion ready.
 
 ## Release gate checklist
 
-- [ ] All regions certified
+- [x] All regions certified
 - [x] No open HIGH/CRITICAL blockers
-- [ ] Full playthrough to ending completed
+- [x] Full playthrough to ending completed
 - [x] Regression suites green
 - [x] Type-check green
 
 ## Current gate status
 
-**Status:** `NOT_READY`
+**Status:** `READY`
 
 Reason:
-- Region checklist is still in-progress for most mid/late-game towns and final route.
-- Full campaign playthrough certification run has not yet been recorded in this artifact.
+- All critical regions are marked `CERTIFIED` in the critical-path checklist.
+- Full-route scaffold run reaches Oil Rig ending trigger with save/load continuity (`src/phase35.test.ts`).
 
 ## Latest validation evidence
 

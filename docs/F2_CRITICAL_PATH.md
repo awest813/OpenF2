@@ -39,19 +39,19 @@ Legend:
 
 | Region | scripts | dialogue | barter | combat | world_map | cinematics | reputation_karma_globals | Status | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| Arroyo | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates temple gating + quest global/map vars |
-| Klamath | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Klamath arrival, encounter return, Vic lead gating |
-| Den | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Den route unlock and post-load continuation |
-| Modoc | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Modoc gate start and persistence path |
-| Vault City | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Vault City unlock prerequisites |
-| Gecko | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Gecko ↔ Vault City dependency globals |
-| Broken Hills | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates mid-route progression continuity |
-| New Reno | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates region transition continuity |
-| NCR | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates NCR branch step sequencing |
-| Redding | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates NCR→Redding continuation |
-| San Francisco | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates endgame prerequisite route |
-| Navarro | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Navarro access gating |
-| Enclave / Oil Rig | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates final route unlock and Oil Rig entry |
+| Arroyo | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
+| Klamath | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
+| Den | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
+| Modoc | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Vault City | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Gecko | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Broken Hills | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| New Reno | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| NCR | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Redding | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| San Francisco | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Navarro | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
+| Enclave / Oil Rig | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34/35 ending-route scaffold and persistence checks |
 
 ---
 

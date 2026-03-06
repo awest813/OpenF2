@@ -36,11 +36,26 @@ describe('Phase 33-A — critical-path checklist integrity', () => {
         }
     })
 
-    it('marks early certified route regions as actively tracked', () => {
+    it('marks all critical regions as CERTIFIED', () => {
         const criticalPathDoc = readDoc('../docs/F2_CRITICAL_PATH.md')
-        expect(criticalPathDoc).toMatch(/\| Arroyo \|.*\| (IN_PROGRESS|CERTIFIED) \|/)
-        expect(criticalPathDoc).toMatch(/\| Klamath \|.*\| (IN_PROGRESS|CERTIFIED) \|/)
-        expect(criticalPathDoc).toMatch(/\| Den \|.*\| (IN_PROGRESS|CERTIFIED) \|/)
+        const requiredRegions = [
+            'Arroyo',
+            'Klamath',
+            'Den',
+            'Modoc',
+            'Vault City',
+            'Gecko',
+            'Broken Hills',
+            'New Reno',
+            'NCR',
+            'Redding',
+            'San Francisco',
+            'Navarro',
+            'Enclave / Oil Rig',
+        ]
+        for (const region of requiredRegions) {
+            expect(criticalPathDoc).toMatch(new RegExp(`\\| ${region.replace('/', '\\/')} \\|.*\\| CERTIFIED \\|`))
+        }
     })
 })
 
@@ -51,9 +66,8 @@ describe('Phase 33-B — blocker and checkpoint gate consistency', () => {
         expect(openHighOrCritical).toBeNull()
     })
 
-    it('has no unchecked boxes in Phase 0-8 checkpoint sections', () => {
+    it('has no unchecked boxes in phase checkpoints', () => {
         const checkpointDoc = readDoc('../docs/F2_PHASE_CHECKPOINTS.md')
-        const prePhase9 = checkpointDoc.split('## Phase 9')[0]
-        expect(prePhase9).not.toContain('- [ ]')
+        expect(checkpointDoc).not.toContain('- [ ]')
     })
 })
