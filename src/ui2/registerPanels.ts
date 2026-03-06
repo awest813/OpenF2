@@ -12,6 +12,9 @@ import { WorldMapPanel } from './worldMapPanel.js'
 import { ElevatorPanel } from './elevatorPanel.js'
 import { CalledShotPanel } from './calledShotPanel.js'
 import { ScriptDebuggerPanel } from './scriptDebuggerPanel.js'
+import { DebugOverlayPanel } from './debugOverlay.js'
+import { MapViewerPanel } from './mapViewerPanel.js'
+import { PrototypeInspectorPanel } from './prototypeInspectorPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 
 export const PRIMARY_GAMEPLAY_PANEL_NAMES = [
@@ -45,4 +48,7 @@ export function registerDefaultPanels(
     manager.register(new ElevatorPanel(screenWidth, screenHeight))
     manager.register(new CalledShotPanel(screenWidth, screenHeight))
     manager.register(new ScriptDebuggerPanel(screenWidth, screenHeight))
+    manager.register(new DebugOverlayPanel(screenWidth, screenHeight, playerEntityId))
+    manager.register(new MapViewerPanel(screenWidth, screenHeight))
+    manager.register(new PrototypeInspectorPanel(screenWidth, screenHeight))
 }

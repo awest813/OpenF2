@@ -70,6 +70,14 @@ export class ScriptDebuggerPanel extends UIPanel {
         this._log.length = 0
     }
 
+    /** Snapshot used by other contributor tooling panels (e.g. DebugOverlayPanel). */
+    getRuntimeSnapshot(): { currentProcedure: string | null, recentLog: readonly string[] } {
+        return {
+            currentProcedure: this._currentProcedure,
+            recentLog: this._log,
+        }
+    }
+
     override render(ctx: OffscreenCanvasRenderingContext2D): void {
         const { width, height } = this.bounds
 

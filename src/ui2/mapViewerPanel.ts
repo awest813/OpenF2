@@ -15,12 +15,15 @@
  */
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { modRegistry } from '../mods.js'
 
 const PANEL_WIDTH  = 220
-const PANEL_HEIGHT = 140
+const PANEL_HEIGHT = 240
 const PAD = 8
 const LINE_H = 16
 const MAX_NEARBY = 5
+const MAX_MODS = 3
+const MAX_RESOLVED_OVERRIDES = 3
 
 export interface MapViewerCursorInfo {
     /** Hex grid coordinates under the cursor. */
@@ -85,6 +88,27 @@ export class MapViewerPanel extends UIPanel {
             lines.push(['no cursor data', FALLOUT_DARK_GRAY])
         }
 
+        const modsByPriority = modRegistry.getActiveByPriority().slice(0, MAX_MODS)
+        lines.push(['Mods (high→low):', FALLOUT_GREEN])
+        if (modsByPriority.length === 0) {
+            lines.push(['  (none)', FALLOUT_DARK_GRAY])
+        } else {
+            for (const mod of modsByPriority) {
+                lines.push([`  ${mod.id}@${mod.version}`, FALLOUT_AMBER])
+            }
+        }
+
+        const resolvedOverrides = modRegistry.getResolvedOverrides(MAX_RESOLVED_OVERRIDES)
+        lines.push(['Overrides:', FALLOUT_GREEN])
+        if (resolvedOverrides.length === 0) {
+            lines.push(['  (none)', FALLOUT_DARK_GRAY])
+        } else {
+            for (const o of resolvedOverrides) {
+                const conflictSuffix = o.overriddenModIds.length > 0 ? ` [>${o.overriddenModIds.join(',')}]` : ''
+                lines.push([`  ${basename(o.canonicalPath)}→${o.winnerModId}${conflictSuffix}`, FALLOUT_DARK_GRAY])
+            }
+        }
+
         for (let i = 0; i < lines.length; i++) {
             const [text, color] = lines[i]
             ctx.fillStyle = cssColor(color)
@@ -107,4 +131,9 @@ export class MapViewerPanel extends UIPanel {
 
 function cssColor(c: UIColor): string {
     return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
+}
+
+function basename(path: string): string {
+    const idx = path.lastIndexOf('/')
+    return idx === -1 ? path : path.slice(idx + 1)
 }

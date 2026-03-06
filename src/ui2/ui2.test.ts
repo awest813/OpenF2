@@ -1041,6 +1041,10 @@ describe('DebugOverlayPanel', () => {
     it('renders correctly into UIManager pipeline', () => {
         const pid = createPlayerEntity({ name: 'DEBUG TEST' })
         const panel = new DebugOverlayPanel(800, 600, pid)
+        panel.setScriptRuntimeProvider(() => ({
+            currentProcedure: 'map_enter_p_proc',
+            recentLog: ['VAULT.int: map_enter_p_proc'],
+        }))
         panel.show()
         const mgr = new UIManagerImpl(800, 600)
         mgr.register(panel)

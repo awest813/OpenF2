@@ -318,4 +318,52 @@ describe('ModRegistry — asset path resolution', () => {
         reg.unregister('hi_res')
         expect(reg.resolveAsset('data/art/foo.frm')).toBe('data/art/foo.frm')
     })
+
+    it('getActiveByPriority returns mods highest-priority first', () => {
+        const reg = new ModRegistry()
+        reg.register({ id: 'low', name: 'Low', version: '1.0.0' })
+        reg.register({ id: 'high', name: 'High', version: '1.0.0' })
+
+        expect(reg.getActiveByPriority().map((m) => m.id)).toEqual(['high', 'low'])
+    })
+
+    it('getResolvedOverrides reports winner and overridden mod ids', () => {
+        const reg = new ModRegistry()
+        reg.register({
+            id: 'low',
+            name: 'Low',
+            version: '1.0.0',
+            overrides: { 'data/art/foo.frm': 'mods/low/foo.frm' },
+        })
+        reg.register({
+            id: 'high',
+            name: 'High',
+            version: '1.0.0',
+            overrides: { 'data/art/foo.frm': 'mods/high/foo.frm' },
+        })
+
+        expect(reg.getResolvedOverrides()).toEqual([
+            {
+                canonicalPath: 'data/art/foo.frm',
+                resolvedPath: 'mods/high/foo.frm',
+                winnerModId: 'high',
+                overriddenModIds: ['low'],
+            },
+        ])
+    })
+
+    it('getResolvedOverrides supports limit parameter', () => {
+        const reg = new ModRegistry()
+        reg.register({
+            id: 'm',
+            name: 'M',
+            version: '1.0.0',
+            overrides: {
+                'data/art/a.frm': 'mods/m/a.frm',
+                'data/art/b.frm': 'mods/m/b.frm',
+            },
+        })
+
+        expect(reg.getResolvedOverrides(1)).toHaveLength(1)
+    })
 })
