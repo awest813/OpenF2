@@ -21,6 +21,8 @@ export const Config = {
         showSpatials: true, // show spatial script triggers?
         showFonts: false, // show all fonts for debugging?
         showDebugOverlay: false, // show in-browser debug overlay (HP, AP, entity count)?
+        forceUI2OnlyGameplayPanels: (globalThis as any)?.process?.env?.UI2_ONLY_GAMEPLAY_PANELS === '1',
+        // When true, legacy DOM gameplay-panel codepaths throw instead of rendering.
     },
 
     engine: {
