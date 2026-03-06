@@ -302,6 +302,11 @@ export module ScriptVMBridge {
        ,0x817D: bridged("get_critter_name", 1)         // get_critter_name(obj) → display name string of object
        ,0x817E: bridged("get_game_mode", 0)            // get_game_mode() → current game mode bitmask (partial: 0)
        ,0x817F: bridged("set_global_script_repeat", 1, false) // set_global_script_repeat(ms) — set global-script tick interval (partial: no-op)
+
+       // sfall extended opcodes 0x8180–0x8182 — skill access and light level
+       ,0x8180: bridged("get_critter_skill", 2)         // get_critter_skill(critter, skill) → derived skill value
+       ,0x8181: bridged("set_critter_skill_points", 3, false) // set_critter_skill_points(critter, skill, value) — set base skill
+       ,0x8182: bridged("get_light_level", 0)           // get_light_level() → current ambient light level (0–65536)
     }
     Object.assign(opMap, bridgeOpMap)
 

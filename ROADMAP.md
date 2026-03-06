@@ -178,6 +178,13 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
   - **sfall opcodes 0x817D–0x817F:** `get_critter_name` (0x817D → obj.name string), `get_game_mode` (0x817E → 0 partial), `set_global_script_repeat` (0x817F → no-op partial)
   - **Checklist updated:** 13 new entries added (5 implemented, 8 partial)
   - **51 new regression tests** in `phase20.test.ts`
+- [x] **Phase 21 — Scripting fidelity: inventory count de-stub, proto_data armor DR, sfall 0x8180–0x8182:**
+  - **`critter_inven_obj` INVEN_TYPE_INV_COUNT (-2) de-stubbed:** now returns `obj.inventory.length` instead of emitting a warning and returning 0 — eliminates incorrect inventory-count results in NPC barter and dialogue scripts
+  - **`proto_data` armor DR fields extended:** cases 34 (DR Laser — disambiguated from weapon burst_rounds by subType), 35 (DR Fire), 36 (DR Plasma), 37 (DR Electrical), 38 (DR EMP), 39 (DR Explosive) — covers full armor damage-resistance matrix
+  - **`obj_item_subtype` fallback de-stubbed:** returns 0 silently instead of emitting a stub hit when an item has no proto and no recognized string subtype — removes spurious console noise in item scripts
+  - **sfall opcodes 0x8180–0x8182:** `get_critter_skill` (0x8180 → critter.getSkill()), `set_critter_skill_points` (0x8181 → sets base skill), `get_light_level` (0x8182 → globalState.ambientLightLevel)
+  - **Checklist updated:** 6 new entries added (all implemented)
+  - **40 new regression tests** in `phase21.test.ts`
 - [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
 - [ ] Dialogue + barter edge-case fidelity *(critical path)*
 - [ ] Save/load reliability hardening and long-campaign round-trip fixtures
@@ -216,6 +223,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 13. **Phase 17 — Scripting completeness & save reliability** — ✅ `statMap` extended to all 34 stat constants; `gsay_end`/`end_dialogue` de-stubbed; `anim` stub noise eliminated; `set_exit_grids`, `tile_contains_pid_obj`, `wm_area_set_pos`, `mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6: `gameTickTime` and `critterKillCounts` now persist across save/load
 14. **Phase 19 — Scripting fidelity: ammo/weapon state, anim de-stub, proto_data extensions** — ✅ `anim()` silent for ANIM_* codes 0–99; `get_pc_stat(5)` returns 5; `inven_cmds` FIRST/LAST/PREV/NEXT navigation; `proto_data` extended (animCode, attack modes, projPID, minST, armor AC/DR, burst rounds); sfall opcodes 0x8178–0x817C (ammo PID/count getters/setters + mouse tile); 37 new regression tests
 15. **Phase 20 — Scripting fidelity: metarule completeness, has_trait extensions, sfall 0x817D–0x817F** — ✅ `metarule` IDs 30/35/44/47/55 de-stubbed; `metarule3` IDs 101 (bounded random) and 107 (tile visible) de-stubbed; `has_trait` TRAIT_OBJECT cases 1/2/3/667/668 added; `critter_add_trait` TRAIT_OBJECT cases 667/668 added; sfall opcodes 0x817D–0x817F (`get_critter_name`, `get_game_mode`, `set_global_script_repeat`); 51 new regression tests
+16. **Phase 21 — Scripting fidelity: inventory count, armor DR, obj_item_subtype, sfall 0x8180–0x8182** — ✅ `critter_inven_obj` INVEN_TYPE_INV_COUNT (-2) de-stubbed (returns inventory length); `proto_data` armor DR cases 34–39 added (Laser/Fire/Plasma/Electrical/EMP/Explosive, case 34 disambiguated by subType); `obj_item_subtype` silent 0-fallback (no stub noise); sfall opcodes 0x8180–0x8182 (`get_critter_skill`, `set_critter_skill_points`, `get_light_level`); 40 new regression tests
 
 ---
 
