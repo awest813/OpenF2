@@ -480,11 +480,12 @@ describe('Phase 18-D — obj_item_subtype string subtype fallback', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('stubs when subtype is unrecognized', () => {
+    it('returns 0 without stub when subtype is unrecognized', () => {
         const script = new Scripting.Script()
         const obj: any = { type: 'item', pid: 1, inventory: [], visible: true, orientation: 0, subtype: 'unknown_type' }
-        script.obj_item_subtype(obj)
-        expect(stubHitCount()).toBe(1)
+        const result = script.obj_item_subtype(obj)
+        expect(result).toBe(0)
+        expect(stubHitCount()).toBe(0)
     })
 })
 

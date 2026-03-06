@@ -635,6 +635,59 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 21 — critter_inven_obj INV_COUNT, proto_data armor DR, obj_item_subtype,
+    //            sfall 0x8180–0x8182
+    // -----------------------------------------------------------------------
+    {
+        id: 'critter_inven_obj_inv_count',
+        kind: 'procedure',
+        description: 'critter_inven_obj(critter, INVEN_TYPE_INV_COUNT=-2): return total number of items in critter inventory. Was returning 0 with a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'proto_data_armor_dr',
+        kind: 'procedure',
+        description: 'proto_data data_member 34-39: ARMOR_DATA_DR_LASER/FIRE/PLASMA/ELECTRICAL/EMP/EXPLOSIVE. Case 34 dispatches by subtype to disambiguate weapon burst_rounds vs armor DR Laser.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'obj_item_subtype_fallback',
+        kind: 'procedure',
+        description: 'obj_item_subtype: silent fallback returns 0 (rather than stub) when object has no pro and no recognized string subtype.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'get_critter_skill',
+        kind: 'opcode',
+        description: 'sfall 0x8180: get_critter_skill(critter, skill_num) → derived skill value for any critter. Mirrors has_skill().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_critter_skill_points',
+        kind: 'opcode',
+        description: 'sfall 0x8181: set_critter_skill_points(critter, skill_num, value) — set base skill allocation directly on any critter.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_light_level',
+        kind: 'opcode',
+        description: 'sfall 0x8182: get_light_level() → current ambient light level (0–65536). Reads globalState.ambientLightLevel.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

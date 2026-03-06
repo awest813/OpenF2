@@ -1025,8 +1025,8 @@ export module Scripting {
             else if (where === 1) return obj.rightHand // INVEN_TYPE_RIGHT_HAND
             else if (where === 2) return obj.leftHand // INVEN_TYPE_LEFT_HAND
             else if (where === -2) {
-                warn('INVEN_TYPE_INV_COUNT', 'inventory', this)
-                return 0 /*throw "INVEN_TYPE_INV_COUNT"*/
+                // INVEN_TYPE_INV_COUNT — return the number of items in the critter's inventory
+                return obj.inventory ? obj.inventory.length : 0
             }
             stub('critter_inven_obj', arguments)
             return null
@@ -1367,7 +1367,10 @@ export module Scripting {
                     // WEAPON_DATA_MAX_AMMO — magazine capacity
                     return pro.extra?.maxAmmo ?? 0
                 case 34:
-                    // WEAPON_DATA_BURST_ROUNDS — rounds fired per burst attack
+                    // WEAPON_DATA_BURST_ROUNDS (weapons) / ARMOR_DATA_DR_LASER (armor).
+                    // Disambiguate by item sub-type: subType 0 = armor, 3 = weapon.
+                    if (pro.extra?.subType === 0)
+                        return pro.extra?.stats?.['DR Laser'] ?? 0
                     return pro.extra?.rounds ?? 0
 
                 // --- Armor-specific item fields ---
@@ -1377,6 +1380,21 @@ export module Scripting {
                 case 33:
                     // ARMOR_DATA_DR_NORMAL — Damage Resistance vs Normal damage
                     return pro.extra?.stats?.['DR Normal'] ?? 0
+                case 35:
+                    // ARMOR_DATA_DR_FIRE — Damage Resistance vs Fire damage
+                    return pro.extra?.stats?.['DR Fire'] ?? 0
+                case 36:
+                    // ARMOR_DATA_DR_PLASMA — Damage Resistance vs Plasma damage
+                    return pro.extra?.stats?.['DR Plasma'] ?? 0
+                case 37:
+                    // ARMOR_DATA_DR_ELECTRICAL — Damage Resistance vs Electrical damage
+                    return pro.extra?.stats?.['DR Electrical'] ?? 0
+                case 38:
+                    // ARMOR_DATA_DR_EMP — Damage Resistance vs EMP damage
+                    return pro.extra?.stats?.['DR EMP'] ?? 0
+                case 39:
+                    // ARMOR_DATA_DR_EXPLOSIVE — Damage Resistance vs Explosive damage
+                    return pro.extra?.stats?.['DR Explosive'] ?? 0
 
                 // --- Common extended flags ---
                 case 7:
@@ -1462,8 +1480,11 @@ export module Scripting {
                 return subtypeIntMap[obj.subtype]
             }
 
-            stub('obj_item_subtype', arguments)
-            return null
+            // Last-resort fallback: return 0 (armor/misc) without emitting a stub.
+            // Scripts that call obj_item_subtype on an object with no type information
+            // are handled gracefully rather than producing console noise.
+            log('obj_item_subtype: unknown subtype for pid=' + (obj.pid ?? '?'), 'inventory')
+            return 0
         }
         anim_busy(obj: Obj) {
             log('anim_busy', arguments)
@@ -2269,6 +2290,43 @@ export module Scripting {
         // Partial: the engine does not run a global script ticker; this is a no-op.
         set_global_script_repeat(intervalMs: number): void {
             log('set_global_script_repeat', arguments)
+        }
+
+        // sfall extended opcode — get a critter's derived skill value (0x8180).
+        // Mirrors has_skill() but exposed as a dedicated sfall opcode.
+        get_critter_skill(obj: Obj, skill: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_skill: not a critter: ' + obj)
+                return 0
+            }
+            const skillName = skillNumToName[skill]
+            if (!skillName) {
+                warn('get_critter_skill: unknown skill number: ' + skill)
+                return 0
+            }
+            return (obj as Critter).getSkill(skillName)
+        }
+
+        // sfall extended opcode — set a critter's base skill point allocation (0x8181).
+        // Sets the base skill value directly (does not add; use critter_mod_skill to adjust).
+        set_critter_skill_points(obj: Obj, skill: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_skill_points: not a critter: ' + obj)
+                return
+            }
+            const skillName = skillNumToName[skill]
+            if (!skillName) {
+                warn('set_critter_skill_points: unknown skill number: ' + skill)
+                return
+            }
+            ;(obj as Critter).skills.setBase(skillName, value)
+        }
+
+        // sfall extended opcode — get current ambient light level (0x8182).
+        // Returns the engine's ambient light level in the range 0–65536.
+        // (0 = fully dark, 65536 = fully lit.)
+        get_light_level(): number {
+            return globalState.ambientLightLevel ?? 65536
         }
 
         load_map(map: number | string, startLocation: number) {
