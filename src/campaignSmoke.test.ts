@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { migrateSave, SaveGame } from './saveSchema.js'
+import { Config } from './config.js'
 import { opMap, VMContext } from './vm_opcodes.js'
+
+import { BinaryReader } from './util.js'
+import { ScriptVM } from './vm.js'
 
 type ScriptVMStub = VMContext & { literalQueue: number[] }
 
@@ -163,4 +167,28 @@ describe('campaign smoke test: critical campaign progression', () => {
             opMap[0xc001] = originalPush
         }
     })
+
+    it('throws when unknown opcode appears during smoke run with strict mode enabled', () => {
+        const previousFailOnUnknown = Config.engine.failOnUnknownVmOpcode
+        const previousDisasm = Config.engine.doDisasmOnUnimplOp
+
+        Config.engine.failOnUnknownVmOpcode = true
+        Config.engine.doDisasmOnUnimplOp = false
+
+        // 0xFFFF is intentionally unknown.
+        const scriptData = new DataView(new ArrayBuffer(2))
+        scriptData.setUint16(0, 0xffff)
+        const vm = new ScriptVM(
+            new BinaryReader(scriptData),
+            { name: 'campaign_unknown_opcode.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        )
+
+        try {
+            expect(() => vm.step()).toThrow(/unknown opcode/i)
+        } finally {
+            Config.engine.failOnUnknownVmOpcode = previousFailOnUnknown
+            Config.engine.doDisasmOnUnimplOp = previousDisasm
+        }
+    })
+
 })

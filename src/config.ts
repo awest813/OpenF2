@@ -45,6 +45,7 @@ export const Config = {
         doLogLazyLoads: false, // Log lazy-loading of images? (Noisy)
         doLogScriptLoads: false, // Log script loads? (Noisy)
         doDisasmOnUnimplOp: true, // Disassemble script upon reaching unimplemented opcode?
+        failOnUnknownVmOpcode: false, // Throw immediately when script VM hits an unknown opcode?
         vmSlowCallWarnThresholdMs: 8, // Warn when a top-level script call exceeds this frame-budget threshold
     },
 
