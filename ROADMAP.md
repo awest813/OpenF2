@@ -170,6 +170,14 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
   - **sfall opcodes 0x8178–0x817C:** `get_weapon_ammo_pid` (0x8178), `set_weapon_ammo_pid` (0x8179), `get_weapon_ammo_count` (0x817A), `set_weapon_ammo_count` (0x817B), `get_mouse_tile_num` (0x817C) added to `vm_bridge.ts` + `scripting.ts`; ammo state stored in `weapon.extra.ammoType`/`ammoLoaded` (persisted via `SerializedObj.extra`)
   - **Checklist updated:** 10 new entries added (7 implemented, 2 partial, 1 partial)
   - **37 new regression tests** in `phase19.test.ts`
+- [x] **Phase 20 — Scripting fidelity: metarule completeness, has_trait extensions, sfall 0x817D–0x817F:**
+  - **`metarule` de-stubs:** IDs 30 (CHECK_WEAPON_LOADED → `extra.ammoLoaded > 0`), 35 (COMBAT_DIFFICULTY → 1 normal), 44 (WHO_ON_DRUGS → 0), 47 (MAP_KNOWN → mirrors case 17 area-discovery logic), 55 (GAME_DIFFICULTY → 1 normal) — eliminates common stub noise in NPC and combat scripts
+  - **`metarule3` de-stubs:** ID 101 (METARULE3_RAND → `getRandomInt(min, max)`) and ID 107 (METARULE3_TILE_VISIBLE → 1 partial) — bounded random used pervasively in encounter scripts
+  - **`has_trait` TRAIT_OBJECT extended:** cases 1 (INVEN_TYPE_RIGHT_HAND), 2 (INVEN_TYPE_LEFT_HAND), 3 (INVEN_TYPE_INV_COUNT → inventory length), 667 (OBJECT_IS_FLAT → extra.isFlat), 668 (OBJECT_NO_BLOCK → extra.noBlock)
+  - **`critter_add_trait` TRAIT_OBJECT extended:** cases 667 (OBJECT_IS_FLAT) and 668 (OBJECT_NO_BLOCK) write to `obj.extra`, initialising it if absent; full has_trait round-trip verified
+  - **sfall opcodes 0x817D–0x817F:** `get_critter_name` (0x817D → obj.name string), `get_game_mode` (0x817E → 0 partial), `set_global_script_repeat` (0x817F → no-op partial)
+  - **Checklist updated:** 13 new entries added (5 implemented, 8 partial)
+  - **51 new regression tests** in `phase20.test.ts`
 - [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
 - [ ] Dialogue + barter edge-case fidelity *(critical path)*
 - [ ] Save/load reliability hardening and long-campaign round-trip fixtures
@@ -207,6 +215,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 12. **Save reliability + proto_data + sfall 0x8170–0x8174** — ✅ Save schema v5: GVAR_* script globals now persist across save/load (`scriptGlobalVars`); `proto_data` de-stubbed for common data members (item weight/cost/size, weapon stats, critter flags); `gfade_in/out` and `play_gmovie` no longer flood console; `get_critter_kills`, `set_critter_kills`, `get_critter_body_type`, `floor2`, `obj_count_by_pid` (0x8170–0x8174) added
 13. **Phase 17 — Scripting completeness & save reliability** — ✅ `statMap` extended to all 34 stat constants; `gsay_end`/`end_dialogue` de-stubbed; `anim` stub noise eliminated; `set_exit_grids`, `tile_contains_pid_obj`, `wm_area_set_pos`, `mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6: `gameTickTime` and `critterKillCounts` now persist across save/load
 14. **Phase 19 — Scripting fidelity: ammo/weapon state, anim de-stub, proto_data extensions** — ✅ `anim()` silent for ANIM_* codes 0–99; `get_pc_stat(5)` returns 5; `inven_cmds` FIRST/LAST/PREV/NEXT navigation; `proto_data` extended (animCode, attack modes, projPID, minST, armor AC/DR, burst rounds); sfall opcodes 0x8178–0x817C (ammo PID/count getters/setters + mouse tile); 37 new regression tests
+15. **Phase 20 — Scripting fidelity: metarule completeness, has_trait extensions, sfall 0x817D–0x817F** — ✅ `metarule` IDs 30/35/44/47/55 de-stubbed; `metarule3` IDs 101 (bounded random) and 107 (tile visible) de-stubbed; `has_trait` TRAIT_OBJECT cases 1/2/3/667/668 added; `critter_add_trait` TRAIT_OBJECT cases 667/668 added; sfall opcodes 0x817D–0x817F (`get_critter_name`, `get_game_mode`, `set_global_script_repeat`); 51 new regression tests
 
 ---
 
