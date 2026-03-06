@@ -378,13 +378,14 @@ export class Combat {
     walkUpTo(obj: Critter, idx: number, target: Point, maxDistance: number, callback: () => void): boolean {
         // Walk up to `maxDistance` hexes, adjusting AP to fit
         if (obj.walkTo(target, false, callback, maxDistance)) {
+            const moveCost = Math.max(0, obj.path.path.length - 1)
             // OK
-            if (obj.AP!.subtractMoveAP(obj.path.path.length - 1) === false)
+            if (obj.AP!.subtractMoveAP(moveCost) === false)
                 throw (
                     'subtraction issue: has AP: ' +
                     obj.AP!.getAvailableMoveAP() +
                     ' needs AP:' +
-                    obj.path.path.length +
+                    moveCost +
                     ' and maxDist was:' +
                     maxDistance
                 )
@@ -463,7 +464,9 @@ export class Combat {
             var maxDistance = Math.min(AP.getAvailableMoveAP(), distance - fireDistance)
             this.maybeTaunt(obj, 'move', messageRoll)
 
-            // TODO: check nearest direction first
+            // Prefer neighbors nearest to our current position so movement is less erratic.
+            neighbors.sort((a, b) => hexDistance(obj.position, a) - hexDistance(obj.position, b))
+
             var didCreep = false
             for (var i = 0; i < neighbors.length; i++) {
                 if (
@@ -479,12 +482,13 @@ export class Combat {
                 ) {
                     // OK
                     didCreep = true
-                    if (AP.subtractMoveAP(obj.path.path.length - 1) === false)
+                    const moveCost = Math.max(0, obj.path.path.length - 1)
+                    if (AP.subtractMoveAP(moveCost) === false)
                         throw (
                             'subtraction issue: has AP: ' +
                             AP.getAvailableMoveAP() +
                             ' needs AP:' +
-                            obj.path.path.length +
+                            moveCost +
                             ' and maxDist was:' +
                             maxDistance
                         )
@@ -500,7 +504,10 @@ export class Combat {
         } else if (AP.getAvailableCombatAP() >= 4) {
             // if we are in range, do we have enough AP to attack?
             this.log('[ATTACKING]')
-            AP.subtractCombatAP(4)
+            if (AP.subtractCombatAP(4) === false) {
+                this.log('[AI ATTACK ABORTED: AP desync]')
+                return this.nextTurn()
+            }
 
             if (obj.equippedWeapon === null) throw 'combatant has no equipped weapon'
 
