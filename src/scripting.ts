@@ -367,6 +367,7 @@ export module Scripting {
     export class Script {
         // Stuff we hacked in
         _didOverride = false // Did the procedure call override the default action?
+        _barterMod: number = 0 // One-time barter modifier set by gdialog_set_barter_mod
 
         scriptName!: string
         lvars!: { [lvar: number]: any }
@@ -500,7 +501,8 @@ export module Scripting {
                 case 22:
                     return 0 // is_game_loading
                 case 46:
-                    return 0 // METARULE_CURRENT_TOWN (TODO: return current city ID)
+                    // METARULE_CURRENT_TOWN: return the current map/area ID as the town identifier
+                    return currentMapID !== null ? currentMapID : 0
                 case 48:
                     return 2 // METARULE_VIOLENCE_FILTER (2 = VLNCLVL_NORMAL)
                 case 56:
@@ -615,8 +617,6 @@ export module Scripting {
             return 0
         }
         critter_add_trait(obj: Obj, traitType: number, trait: number, amount: number) {
-            stub('critter_add_trait', arguments)
-
             if (!isGameObject(obj)) {
                 warn('critter_add_trait: not game object: ' + obj, undefined, this)
                 return
@@ -631,25 +631,26 @@ export module Scripting {
                 // TRAIT_OBJECT
                 switch (trait) {
                     case 5: // OBJECT_AI_PACKET
-                        // Set critter's AI packet number
                         info('Setting critter AI packet to ' + amount, undefined, this)
                         ;(<Critter>obj).aiNum = amount
-                        break
+                        return
                     case 6: // OBJECT_TEAM_NUM
-                        // Set critter's team number
                         info('Setting critter team to ' + amount, undefined, this)
                         ;(<Critter>obj).teamNum = amount
-                        break
-                    case 10:
-                        obj.orientation = ((amount % 6) + 6) % 6 // OBJECT_CUR_ROT
-                        break
-                    case 666:
-                        obj.visible = amount !== 0 // OBJECT_VISIBILITY (0 = invisible, non-zero = visible)
-                        break
-                    case 669:
-                        break // OBJECT_CUR_WEIGHT (TODO)
+                        return
+                    case 10: // OBJECT_CUR_ROT
+                        obj.orientation = ((amount % 6) + 6) % 6
+                        return
+                    case 666: // OBJECT_VISIBILITY
+                        obj.visible = amount !== 0
+                        return
+                    case 669: // OBJECT_CUR_WEIGHT
+                        stub('critter_add_trait', arguments)
+                        return
                 }
             }
+
+            stub('critter_add_trait', arguments)
         }
         item_caps_total(obj: Obj) {
             if (!isGameObject(obj)) throw 'item_caps_total: not game object'
@@ -1366,7 +1367,8 @@ export module Scripting {
             dialogueExit()
         }
         gdialog_set_barter_mod(mod: number) {
-            stub('gdialog_set_barter_mod', arguments)
+            log('gdialog_set_barter_mod', arguments)
+            this._barterMod = mod
         }
         gdialog_mod_barter(mod: number) {
             // switch to barter mode
@@ -1384,7 +1386,9 @@ export module Scripting {
             //stub("start_gdialog", arguments)
         }
         gsay_start() {
-            stub('gSay_Start', arguments)
+            log('gsay_start', arguments)
+            // Prepare for a new dialogue exchange: clear pending options
+            dialogueOptionProcs = []
         }
         //gSay_Option(msgList, msgID, target, reaction) { stub("gSay_Option", arguments) },
         gsay_reply(msgList: number, msgID: string | number) {
@@ -1395,18 +1399,14 @@ export module Scripting {
             uiSetDialogueReply(msg)
         }
         gsay_message(msgList: number, msgID: string | number, reaction: number) {
-            // TODO: update this for ui
             log('gsay_message', arguments)
-            /*
-            // message with [Done] option
-            var msg = msgID
-            if(typeof msgID !== "string")
-                msg = getScriptMessage(msgList, msgID)
-            */
-
-            // TODO: XXX: This has bitrotted, #dialogue no longer exists. [Done] needs testing.
-            // $("#dialogue").append("&nbsp;&nbsp;\"" + msg + "\"<br><a href=\"javascript:dialogueEnd()\">[Done]</a><br>")
-            // appendHTML($id("dialogue"), `&nbsp;&nbsp;"${msg}"<br><a href="javascript:dialogueEnd()">[Done]</a><br>`);
+            const msg = getScriptMessage(msgList, msgID)
+            if (msg === null) {
+                warn('gsay_message: msg is null', undefined, this)
+                return
+            }
+            info('GSAY MESSAGE: ' + msg, 'dialogue')
+            uiSetDialogueReply(msg)
         }
         gsay_end() {
             stub('gSay_End', arguments)
@@ -1721,6 +1721,24 @@ export module Scripting {
         }
         in_combat(): number {
             return globalState.inCombat ? 1 : 0
+        }
+        get_current_town(): number {
+            return currentMapID !== null ? currentMapID : 0
+        }
+        critter_is_dead(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('critter_is_dead: not a game object', undefined, this)
+                return 0
+            }
+            if (obj.type !== 'critter') {
+                warn('critter_is_dead: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const hp = (obj as Critter).getStat('HP')
+            return hp <= 0 ? 1 : 0
+        }
+        get_dialogue_active(): number {
+            return currentDialogueObject !== null ? 1 : 0
         }
 
         load_map(map: number | string, startLocation: number) {

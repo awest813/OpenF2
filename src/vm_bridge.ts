@@ -271,6 +271,9 @@ export module ScriptVMBridge {
        ,0x8166: bridged("get_critter_base_stat", 2)    // get_critter_base_stat(critter, stat) → base stat value
        ,0x8167: bridged("set_critter_base_stat", 3, false) // set_critter_base_stat(critter, stat, value)
        ,0x8168: bridged("in_combat", 0)                // in_combat() → 1 if engine is in combat, 0 otherwise
+       ,0x8169: bridged("get_current_town", 0)         // get_current_town() → current map/area ID (sfall-style shortcut for metarule(46, 0))
+       ,0x816A: bridged("critter_is_dead", 1)          // critter_is_dead(obj) → 1 if critter HP <= 0
+       ,0x816B: bridged("get_dialogue_active", 0)      // get_dialogue_active() → 1 if dialogue is currently active
     }
     Object.assign(opMap, bridgeOpMap)
 
