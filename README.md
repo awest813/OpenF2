@@ -66,7 +66,7 @@ Phases 0–3 are complete. The engine can load and run Fallout 2 maps with worki
 | Core scripting VM (INT bytecode) | 🔶 Partial |
 | Dialogue and barter foundations | 🔶 Partial |
 | WebGL rendering + lighting | 🔶 Partial |
-| Fallout 1 compatibility layer | 🔶 Partial |
+| Fallout 1 compatibility layer (`src/compat/fallout1.ts`) | 🔶 Partial |
 
 ### Known gaps
 
@@ -110,14 +110,16 @@ Phases 0–3 are complete. The engine can load and run Fallout 2 maps with worki
    ```
 
 4. **Compile TypeScript:**
-   ```bash
-   npx tsc
-   ```
+    ```bash
+    npx tsc
+    ```
+
+   **Current repo note:** the test suite passes, but `npx tsc` is presently blocked by existing type errors in `src/scripting.ts`. That prevents a clean browser build from a fresh checkout until those errors are resolved.
 
 5. **Start a local web server** from the repository root:
-   ```bash
-   python -m http.server
-   ```
+    ```bash
+    python -m http.server
+    ```
 
 6. **Open in your browser:**
    ```
@@ -148,6 +150,8 @@ npx tsc --noEmit
 npm test
 ```
 
+At the moment, `npm test` passes, while `npx tsc --noEmit` reports existing TypeScript errors in `src/scripting.ts`.
+
 ---
 
 ## Testing
@@ -165,18 +169,19 @@ npx vitest run src/phase1.test.ts
 npx vitest --watch
 ```
 
-Key test files and what they cover:
+The current suite covers 42 test files across phase milestones and core systems. Representative entry points include:
 
 | File | Coverage |
 |------|----------|
-| `src/phase1.test.ts` | HP/AP formulas, skills, traits, perks, leveling |
-| `src/phase2.test.ts` | World map, encounters, game time, scripting |
-| `src/phase3.test.ts` | Audio, cinematics, Fallout 1 compatibility |
-| `src/phase4.test.ts` | Mod loading, pathfinding, geometry |
+| `src/phase1.test.ts` through `src/phase24.test.ts` | Roadmap milestone regressions and scripting fidelity work |
 | `src/vm.test.ts` | Script VM bytecode execution |
-| `src/skills.test.ts` | Skill calculations and checks |
+| `src/ui2/ui2.test.ts` and `src/ui2/panelParity.test.ts` | UI2 rendering and gameplay panel parity |
+| `src/combat.integration.test.ts` and `src/combat/damageFormula.test.ts` | Combat integration and damage math |
+| `src/skills.test.ts` and `src/skillCheck.test.ts` | Skill calculations and checks |
 | `src/inventory.test.ts` | Item management and constraints |
 | `src/saveload.test.ts` | Save/load and schema migration |
+
+For the full suite, browse `src/**/*.test.ts`.
 
 ---
 
