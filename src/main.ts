@@ -34,6 +34,7 @@ import {
     uiLoot,
     UIMode,
     uiSaveLoad,
+    setPlayerUseHandler,
     uiWorldMap,
 } from './ui.js'
 import { getFileJSON, getProtoMsg } from './util.js'
@@ -229,6 +230,8 @@ export function playerUse() {
         globalState.player.walkInFrontOf(obj.position, callback)
     }
 }
+
+setPlayerUseHandler(playerUse)
 
 /**
  * Create and wire the UIManagerImpl (ui2 WebGL/OffscreenCanvas path).
@@ -730,3 +733,5 @@ export function useElevator(): void {
 
     uiElevator(elevator)
 }
+
+Scripting.setUseElevatorHandler(useElevator)
