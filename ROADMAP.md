@@ -162,6 +162,14 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 - [x] **De-stubbed — gfade/movie:** `gfade_in`, `gfade_out`, and `play_gmovie` now log silently (no FMV pipeline yet) instead of emitting console stub warnings; checklist entries added as 'partial'
 - [x] **sfall opcodes 0x8170–0x8174:** `get_critter_kills` (0x8170), `set_critter_kills` (0x8171), `get_critter_body_type` (0x8172), `floor2` (0x8173), `obj_count_by_pid` (0x8174) added; `globalState.critterKillCounts` added for session-scoped kill tracking
 - [x] **Phase 17 — Scripting completeness & save reliability:** extended `statMap` (stats 8–33 including AC/AP/carry/DT/DR); `gsay_end` and `end_dialogue` de-stubbed; `anim` stub noise eliminated for handled cases; `set_exit_grids`/`tile_contains_pid_obj`/`wm_area_set_pos`/`mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6 adds `gameTickTime` and `critterKillCounts` persistence
+- [x] **Phase 19 — Scripting fidelity: ammo/weapon state, anim de-stub, proto_data extensions:**
+  - **`anim()` de-stub:** codes 0 (ANIM_stand → frame reset) and 1–99 (standard ANIM_* constants) are now handled silently via `log()` instead of calling `stub()` — eliminates the largest source of console noise during map entry
+  - **`get_pc_stat(5)` fixed:** PCSTAT_max_pc_stat now returns 5 (the count of valid PC stat indices 0–4) instead of emitting a stub warning
+  - **`inven_cmds` navigation commands:** INVEN_CMD_FIRST (0), INVEN_CMD_LAST (1), INVEN_CMD_PREV (2), and INVEN_CMD_NEXT (3) implemented for inventory cursor traversal; unknown commands still record a stub hit
+  - **`proto_data` extended:** data_member 12 (WEAPON_DATA_ANIMATION_CODE → animCode), 17 (attack_mode_1 low nibble), 18 (attack_mode_2 high nibble), 19 (projPID), 20 (minST), 32 (ARMOR_DATA_AC), 33 (ARMOR_DATA_DR_NORMAL), 34 (WEAPON_DATA_BURST_ROUNDS → rounds) — all return 0 gracefully when proMap is unavailable
+  - **sfall opcodes 0x8178–0x817C:** `get_weapon_ammo_pid` (0x8178), `set_weapon_ammo_pid` (0x8179), `get_weapon_ammo_count` (0x817A), `set_weapon_ammo_count` (0x817B), `get_mouse_tile_num` (0x817C) added to `vm_bridge.ts` + `scripting.ts`; ammo state stored in `weapon.extra.ammoType`/`ammoLoaded` (persisted via `SerializedObj.extra`)
+  - **Checklist updated:** 10 new entries added (7 implemented, 2 partial, 1 partial)
+  - **37 new regression tests** in `phase19.test.ts`
 - [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
 - [ ] Dialogue + barter edge-case fidelity *(critical path)*
 - [ ] Save/load reliability hardening and long-campaign round-trip fixtures
@@ -198,6 +206,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 11. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
 12. **Save reliability + proto_data + sfall 0x8170–0x8174** — ✅ Save schema v5: GVAR_* script globals now persist across save/load (`scriptGlobalVars`); `proto_data` de-stubbed for common data members (item weight/cost/size, weapon stats, critter flags); `gfade_in/out` and `play_gmovie` no longer flood console; `get_critter_kills`, `set_critter_kills`, `get_critter_body_type`, `floor2`, `obj_count_by_pid` (0x8170–0x8174) added
 13. **Phase 17 — Scripting completeness & save reliability** — ✅ `statMap` extended to all 34 stat constants; `gsay_end`/`end_dialogue` de-stubbed; `anim` stub noise eliminated; `set_exit_grids`, `tile_contains_pid_obj`, `wm_area_set_pos`, `mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6: `gameTickTime` and `critterKillCounts` now persist across save/load
+14. **Phase 19 — Scripting fidelity: ammo/weapon state, anim de-stub, proto_data extensions** — ✅ `anim()` silent for ANIM_* codes 0–99; `get_pc_stat(5)` returns 5; `inven_cmds` FIRST/LAST/PREV/NEXT navigation; `proto_data` extended (animCode, attack modes, projPID, minST, armor AC/DR, burst rounds); sfall opcodes 0x8178–0x817C (ammo PID/count getters/setters + mouse tile); 37 new regression tests
 
 ---
 
