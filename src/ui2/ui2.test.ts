@@ -1222,6 +1222,33 @@ describe('BarterPanel', () => {
         EventBus.clear('barter:offerAccepted')
     })
 
+    it('accepted offer commits exchanged items to opposing inventories', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Stimpak', amount: 1, value: 100 }],
+            [{ name: 'Knife', amount: 1, value: 50 }],
+        )
+
+        // Move player item -> player table
+        panel.onMouseDown(12, 42, 'l')
+        panel.onMouseDown(150, 42, 'l')
+        // Move merchant item -> merchant table
+        panel.onMouseDown(432, 42, 'l')
+        panel.onMouseDown(300, 42, 'l')
+
+        // Accept trade
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+
+        expect(panel.playerTable).toHaveLength(0)
+        expect(panel.merchantTable).toHaveLength(0)
+        expect(panel.playerInventory).toContainEqual({ name: 'Knife', amount: 1, value: 50 })
+        expect(panel.playerInventory).not.toContainEqual({ name: 'Stimpak', amount: 1, value: 100 })
+        expect(panel.merchantInventory).toContainEqual({ name: 'Stimpak', amount: 1, value: 100 })
+    })
+
     it('offerRefused is emitted when player value < merchant value', () => {
         const panel = new BarterPanel(800, 600)
         panel.openWith([], [])
@@ -1235,6 +1262,26 @@ describe('BarterPanel', () => {
         panel.onMouseDown(offerX + 10, btnY + 5, 'l')
         expect(spy).toHaveBeenCalled()
         EventBus.clear('barter:offerRefused')
+    })
+
+    it('refused offer keeps inventories and tables unchanged', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Caps', amount: 2, value: 1 }],
+            [{ name: 'Rifle', amount: 1, value: 500 }],
+        )
+        panel.playerTable = [{ name: 'Caps', amount: 1, value: 1 }]
+        panel.merchantTable = [{ name: 'Rifle', amount: 1, value: 500 }]
+
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+
+        expect(panel.playerInventory).toEqual([{ name: 'Caps', amount: 2, value: 1 }])
+        expect(panel.merchantInventory).toEqual([{ name: 'Rifle', amount: 1, value: 500 }])
+        expect(panel.playerTable).toEqual([{ name: 'Caps', amount: 1, value: 1 }])
+        expect(panel.merchantTable).toEqual([{ name: 'Rifle', amount: 1, value: 500 }])
     })
 
     it('render() does not throw', () => {

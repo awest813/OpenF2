@@ -268,14 +268,29 @@ export class BarterPanel extends UIPanel {
         const playerVal   = totalValue(this.playerTable)
         const merchantVal = totalValue(this.merchantTable)
         if (playerVal >= merchantVal) {
+            // Commit the exchange in-panel so repeated barter rounds keep
+            // accurate ownership state without requiring an immediate panel
+            // rebuild from external event consumers.
+            this._mergeItemsInto(this.playerInventory, this.merchantTable)
+            this._mergeItemsInto(this.merchantInventory, this.playerTable)
+
             EventBus.emit('barter:offerAccepted', {
                 playerTable:   this.playerTable.slice(),
                 merchantTable: this.merchantTable.slice(),
             })
             this.playerTable   = []
             this.merchantTable = []
+            this._selected = null
         } else {
             EventBus.emit('barter:offerRefused', { playerVal, merchantVal })
+        }
+    }
+
+    private _mergeItemsInto(dest: BarterItem[], items: BarterItem[]): void {
+        for (const item of items) {
+            const existing = dest.find(i => i.name === item.name && i.value === item.value)
+            if (existing) existing.amount += item.amount
+            else dest.push({ ...item })
         }
     }
 }

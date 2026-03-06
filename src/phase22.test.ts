@@ -9,9 +9,10 @@
  *   E. Checklist — metarule_17 promoted to implemented; Phase 22 entries correct
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
+import globalState from './globalState.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -169,10 +170,19 @@ describe('Phase 22-B — proto_data perk (47) + critter XP/kill (48-49)', () => 
 
 describe('Phase 22-C — metarule3 IDs 102-105 de-stub', () => {
     let script: Scripting.Script
+    let originalInCombat: boolean
+    let originalCombat: any
 
     beforeEach(() => {
         drainStubHits()
         script = new (Scripting as any).Script()
+        originalInCombat = globalState.inCombat
+        originalCombat = globalState.combat
+    })
+
+    afterEach(() => {
+        globalState.inCombat = originalInCombat
+        globalState.combat = originalCombat
     })
 
     // ID 102 — METARULE3_CHECK_WALKING_ALLOWED
@@ -199,6 +209,31 @@ describe('Phase 22-C — metarule3 IDs 102-105 de-stub', () => {
     it('metarule3(103, ...) returns 0 when not in combat', () => {
         // globalState.inCombat is falsy in test context
         expect(script.metarule3(103, 0, 0, 0)).toBe(0)
+        expect(stubHitCount()).toBe(0)
+    })
+
+    it('metarule3(103, critter, ...) returns 1 when critter is in active combat roster', () => {
+        const critter = makeCritter()
+        globalState.inCombat = true
+        globalState.combat = { combatants: [critter] } as any
+        expect(script.metarule3(103, critter, 0, 0)).toBe(1)
+        expect(stubHitCount()).toBe(0)
+    })
+
+    it('metarule3(103, critter, ...) returns 0 when critter is not in active combat roster', () => {
+        const critter = makeCritter()
+        const other = makeCritter({ pid: 999 })
+        globalState.inCombat = true
+        globalState.combat = { combatants: [other] } as any
+        expect(script.metarule3(103, critter, 0, 0)).toBe(0)
+        expect(stubHitCount()).toBe(0)
+    })
+
+    it('metarule3(103, critter, ...) falls back to global inCombat when no combat roster exists', () => {
+        const critter = makeCritter()
+        globalState.inCombat = true
+        globalState.combat = null as any
+        expect(script.metarule3(103, critter, 0, 0)).toBe(1)
         expect(stubHitCount()).toBe(0)
     })
 
@@ -390,9 +425,10 @@ describe('Phase 22-E — checklist entries', () => {
         expect(e).toBeDefined()
     })
 
-    it('metarule3_103 is in the checklist', () => {
+    it('metarule3_103 is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'metarule3_103')
         expect(e).toBeDefined()
+        expect(e!.status).toBe('implemented')
     })
 
     it('metarule3_104 is in the checklist', () => {

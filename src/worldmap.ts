@@ -75,6 +75,20 @@ export module Worldmap {
         }
     }
 
+    /**
+     * Resolve the initial world-map cursor/player position for a session.
+     *
+     * If a saved world position is available (from save/load), it is clamped to
+     * current world-grid bounds and used. Otherwise the provided fallback
+     * (typically Arroyo) is used.
+     */
+    export function normalizeWorldPositionForWorldmap(saved: Point | undefined, fallback: Point): Point {
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+            return clampPointToWorldBounds(saved)
+        }
+        return clampPointToWorldBounds(fallback)
+    }
+
     function getEncounterCheckRateMs(): number {
         const grid = worldGridConfig()
         return grid.columns === 20 ? WORLDMAP_ENCOUNTER_CHECK_RATE_F1 : WORLDMAP_ENCOUNTER_CHECK_RATE_F2
@@ -703,11 +717,17 @@ export module Worldmap {
             }
         }
 
-        worldmapPlayer = {
+        const defaultWorldPos = {
             x: globalState.mapAreas[0].worldPosition.x,
             y: globalState.mapAreas[0].worldPosition.y,
+        }
+        const initialWorldPos = normalizeWorldPositionForWorldmap(globalState.worldPosition, defaultWorldPos)
+        worldmapPlayer = {
+            x: initialWorldPos.x,
+            y: initialWorldPos.y,
             target: null,
         }
+        globalState.worldPosition = { ...initialWorldPos }
         centerWorldmapTarget(worldmapPlayer.x, worldmapPlayer.y)
 
         setSquareStateAt(positionToSquare(worldmapPlayer), WORLDMAP_DISCOVERED)
@@ -747,6 +767,9 @@ export module Worldmap {
         $worldmapPlayer.style.left = worldmapPlayer.x + 'px'
         $worldmapPlayer.style.top = worldmapPlayer.y + 'px'
 
+        // Keep persistent world-map position in sync for save/load continuity.
+        globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
+
         if (worldmapPlayer.target) {
             let dx = worldmapPlayer.target.x - worldmapPlayer.x
             let dy = worldmapPlayer.target.y - worldmapPlayer.y
@@ -756,6 +779,7 @@ export module Worldmap {
             // Guard: if the player is somehow out of the map bounds, skip movement
             const grid = getGridConfig()
             if (!squarePos || squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {
+                globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
                 worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
                 return
             }
@@ -767,6 +791,7 @@ export module Worldmap {
                 worldmapPlayer.x = destination.x
                 worldmapPlayer.y = destination.y
                 worldmapPlayer.target = null
+                globalState.worldPosition = { ...destination }
 
                 hidev($worldmapPlayer)
                 $worldmapTarget.style.backgroundImage = "url('art/intrface/hotspot1.png')"

@@ -152,6 +152,21 @@ describe('called-shot combat + UI integration', () => {
         expect(ap.move).toBe(0)
         expect(ap.combat).toBe(0)
     })
+
+    it('ActionPoints rejects negative spend values as no-ops (no AP gain exploit)', () => {
+        const critter: any = {
+            getStat: vi.fn().mockReturnValue(6),
+            stats: {},
+        }
+        const ap = new ActionPoints(critter)
+        ap.combat = 4
+        ap.move = 0
+
+        expect(ap.subtractCombatAP(-2)).toBe(true)
+        expect(ap.subtractMoveAP(-3)).toBe(true)
+        expect(ap.combat).toBe(4)
+        expect(ap.move).toBe(0)
+    })
 })
 
 describe('hit-chance fidelity regression tests', () => {
