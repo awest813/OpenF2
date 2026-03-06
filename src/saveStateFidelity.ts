@@ -6,6 +6,10 @@ export interface SaveDataState {
     currentElevation: number
     /** World-map position of the player (undefined when inside a local map). */
     worldPosition?: { x: number; y: number }
+    /** Current game clock in engine ticks (10 ticks = 1 second). */
+    gameTickTime: number
+    /** Per-kill-type kill counts indexed by KILL_TYPE_* constants. */
+    critterKillCounts: Record<number, number> | null
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -37,6 +41,10 @@ export interface LoadDataState {
     }
     /** World-map position of the player (written on load when present in save). */
     worldPosition?: { x: number; y: number }
+    /** Current game clock in engine ticks. Restored from save so the calendar is correct. */
+    gameTickTime: number
+    /** Per-kill-type kill counts. Restored from save so lifetime stats are preserved. */
+    critterKillCounts: Record<number, number> | null
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -63,6 +71,8 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         currentElevation: state.currentElevation,
         worldPosition: state.worldPosition !== undefined ? { ...state.worldPosition } : undefined,
         currentMap: curMap.name,
+        gameTickTime: state.gameTickTime,
+        critterKillCounts: state.critterKillCounts ? { ...state.critterKillCounts } : {},
         player: {
             position: state.player.position,
             orientation: state.player.orientation,
@@ -103,6 +113,12 @@ export function hydrateStateFromSave(
         // cannot persist when loading a save from inside a local map.
         state.worldPosition = undefined
     }
+
+    // Restore game clock so quest timers and the calendar are correct.
+    state.gameTickTime = save.gameTickTime ?? 0
+
+    // Restore kill counts so lifetime stats and karma calculations are correct.
+    state.critterKillCounts = save.critterKillCounts ? { ...save.critterKillCounts } : {}
 
     state.gParty.deserialize(save.party)
 

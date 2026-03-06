@@ -149,7 +149,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'anim',
         kind: 'procedure',
-        description: 'Trigger an arbitrary scripted animation on an object. Handles rotation (1000) and frame-set (1010) but otherwise stubs.',
+        description: 'Trigger an arbitrary scripted animation on an object. Handles rotation (1000) and frame-set (1010) cleanly; stubs unknown animation codes.',
         status: 'partial',
         frequency: 'medium',
         impact: 'medium',
@@ -333,8 +333,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'critter_add_trait_weight',
         kind: 'procedure',
-        description: 'critter_add_trait OBJECT_CUR_WEIGHT (669): set critter\'s carry weight. Silently ignored.',
-        status: 'stub',
+        description: 'critter_add_trait OBJECT_CUR_WEIGHT (669): set critter carry weight via stats.setBase(\'Carry\', amount). Clamped to >= 0.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

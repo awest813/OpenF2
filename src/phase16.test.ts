@@ -20,8 +20,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
-    it('SAVE_VERSION is now 5', () => {
-        expect(SAVE_VERSION).toBe(5)
+    it('SAVE_VERSION is at least 5 (was bumped to 5 in phase 16)', () => {
+        expect(SAVE_VERSION).toBeGreaterThanOrEqual(5)
     })
 
     it('migrating a v4 save adds empty scriptGlobalVars', () => {
@@ -36,7 +36,7 @@ describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(5)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.scriptGlobalVars).toBeDefined()
         expect(migrated.scriptGlobalVars).toEqual({})
     })
@@ -55,7 +55,7 @@ describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
             reputation: { karma: 0, reputations: {} },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(5)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.scriptGlobalVars).toEqual({})
     })
 
@@ -71,11 +71,11 @@ describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(5)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.scriptGlobalVars).toEqual({})
     })
 
-    it('a v5 save preserves existing scriptGlobalVars through no-op migration', () => {
+    it('a v5 save migrates to current version preserving scriptGlobalVars', () => {
         const raw = {
             version: 5,
             name: 'Current',
@@ -90,7 +90,7 @@ describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
             scriptGlobalVars: { 0: 42, 531: 1, 616: 3 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(5)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.scriptGlobalVars).toEqual({ 0: 42, 531: 1, 616: 3 })
     })
 })

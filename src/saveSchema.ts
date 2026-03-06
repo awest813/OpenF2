@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export interface SaveGame {
     id?: number
@@ -33,6 +33,23 @@ export interface SaveGame {
      * Without this, every save/load wipes quest-critical state set by scripts.
      */
     scriptGlobalVars?: Record<number, number>
+
+    /**
+     * Game clock in engine ticks at the time of the save (added in v6).
+     *
+     * 10 ticks = 1 second.  Without this, the calendar and all time-based
+     * script checks (quest deadlines, NPC schedules) reset to epoch on load.
+     */
+    gameTickTime?: number
+
+    /**
+     * Per-kill-type kill counts for the player session (added in v6).
+     *
+     * Indexed by KILL_TYPE_* constants (0 = men, 3 = super mutants, …).
+     * Used by the sfall `get_critter_kills` / `set_critter_kills` opcodes and
+     * by karma/perk calculations that depend on lifetime kill counts.
+     */
+    critterKillCounts?: Record<number, number>
 
     player: {
         position: Point
@@ -97,6 +114,15 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // clean slate (default values) rather than throwing on missing gvars.
             if (save.scriptGlobalVars === undefined) save.scriptGlobalVars = {}
             save.version = 5
+            // falls through
+        case 5:
+            // v5 → v6: add gameTickTime and critterKillCounts.
+            // gameTickTime defaults to 0 (game epoch) so the calendar reads
+            // the correct starting year/month/day for old saves.
+            // critterKillCounts defaults to {} (no kills recorded yet).
+            if (save.gameTickTime === undefined) save.gameTickTime = 0
+            if (save.critterKillCounts === undefined) save.critterKillCounts = {}
+            save.version = 6
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
