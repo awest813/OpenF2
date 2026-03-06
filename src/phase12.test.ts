@@ -404,10 +404,10 @@ describe('Phase 12-F — get_dialogue_active logic', () => {
 // ===========================================================================
 
 describe('Phase 12-G — checklist accuracy: metarule_17 upgraded to partial', () => {
-    it('metarule_17 entry is "partial" (not "stub")', () => {
+    it('metarule_17 entry is at least "partial" (promoted to implemented in Phase 22)', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule_17')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry!.status)
     })
 
     it('checklist summary has fewer stubs than before this phase', () => {

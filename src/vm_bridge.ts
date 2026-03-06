@@ -307,6 +307,11 @@ export module ScriptVMBridge {
        ,0x8180: bridged("get_critter_skill", 2)         // get_critter_skill(critter, skill) → derived skill value
        ,0x8181: bridged("set_critter_skill_points", 3, false) // set_critter_skill_points(critter, skill, value) — set base skill
        ,0x8182: bridged("get_light_level", 0)           // get_light_level() → current ambient light level (0–65536)
+
+       // sfall extended opcodes 0x8183–0x8185 — HP helpers and max AP
+       ,0x8183: bridged("get_critter_hp", 1)            // get_critter_hp(obj) → current HP of critter
+       ,0x8184: bridged("set_critter_hp", 2, false)     // set_critter_hp(obj, hp) — set current HP of critter
+       ,0x8185: bridged("get_critter_max_ap", 1)        // get_critter_max_ap(obj) → max action points for critter
     }
     Object.assign(opMap, bridgeOpMap)
 
