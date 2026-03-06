@@ -88,6 +88,7 @@ export default {
     mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
     playerCharTraits: [], // player character-creation trait IDs (TRAIT_* constants 0–15)
+    playerPerkRanks: {}, // player perk ranks granted by scripts (perkID → rank)
 
     uiManager: null,
     playerEntityId: 0,
@@ -176,6 +177,12 @@ export default {
      * Persisted in save v9+.  Used by `has_trait(TRAIT_CHAR=2, …)` checks.
      */
     playerCharTraits: number[]
+
+    /**
+     * Player perk ranks granted by scripts (keyed by perk ID, values are ranks).
+     * Persisted in save v10+.  Used so perk-based stat bonuses survive save/load.
+     */
+    playerPerkRanks: Record<number, number>
 
     mapAreas: AreaMap | null
 

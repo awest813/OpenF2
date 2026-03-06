@@ -23,8 +23,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', () => {
-    it('SAVE_VERSION is now 9 (v9 adds playerCharTraits)', () => {
-        expect(SAVE_VERSION).toBe(9)
+    it('SAVE_VERSION is now 10 (v10 adds playerPerkRanks)', () => {
+        expect(SAVE_VERSION).toBe(10)
     })
 
     it('migrating a v5 save adds gameTickTime=0, empty critterKillCounts, and empty mapVars', () => {

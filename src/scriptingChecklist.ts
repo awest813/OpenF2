@@ -994,6 +994,183 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 25 — anim mid-range, proto_data 50-64, get_critter_stat fallback,
+    //            has_trait/critter_add_trait extended TRAIT_OBJECT, metarule3 116+,
+    //            critter_inven_obj silent fallback, sfall 0x818B-0x818F,
+    //            perkRanks serialization, save schema v10
+    // -----------------------------------------------------------------------
+    {
+        id: 'anim_mid_range_1001_1009',
+        kind: 'procedure',
+        description:
+            'anim(): codes 1001–1009 (between rotation marker 1000 and frame-set marker 1010) ' +
+            'now log silently instead of emitting a stub hit. Eliminates console noise from ' +
+            'scripts using engine-internal animation constants.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'proto_data_50_64',
+        kind: 'procedure',
+        description:
+            'proto_data(): field indices 50–64 now return 0 silently (logged at debug level) ' +
+            'instead of emitting a stub hit. These indices appear in modded or sfall-extended ' +
+            'scripts but are not defined in vanilla Fallout 2 PRO headers.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_critter_stat_graceful_fallback',
+        kind: 'procedure',
+        description:
+            'get_critter_stat(): unknown stat numbers (> 35) now emit a warning and return 0 ' +
+            'instead of calling stub(). Prevents console flooding from scripts that probe ' +
+            'optional or sfall-extended stat IDs.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'has_trait_trait_object_extended',
+        kind: 'procedure',
+        description:
+            'has_trait(TRAIT_OBJECT): added cases 4 (object type code), 7 (locked state), ' +
+            '8 (open state), 9 (PID), 11 (SID). Unknown sub-cases now return 0 silently ' +
+            'instead of stubbing, preventing console noise from scripts probing optional ' +
+            'object attributes.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_add_trait_trait_object_extended',
+        kind: 'procedure',
+        description:
+            'critter_add_trait(TRAIT_OBJECT): added cases 7 (locked state) and 8 (open state). ' +
+            'Unknown sub-cases now return silently instead of stubbing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'has_trait_unknown_traittype',
+        kind: 'procedure',
+        description:
+            'has_trait(): unknown traitType values (not 0=PERK, 1=OBJECT, 2=CHAR) now log ' +
+            'silently and return 0 instead of emitting a stub hit.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'critter_add_trait_unknown_traittype',
+        kind: 'procedure',
+        description:
+            'critter_add_trait(): unknown traitType values now log silently and return without ' +
+            'action instead of emitting a stub hit.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'metarule3_116_plus',
+        kind: 'metarule',
+        description:
+            'metarule3(): IDs above 115 now return 0 silently instead of emitting a stub hit. ' +
+            'Prevents crashes from scripts using future or sfall-specific metarule3 extensions ' +
+            'not yet defined in the vanilla Fallout 2 engine.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'critter_inven_obj_silent_fallback',
+        kind: 'procedure',
+        description:
+            'critter_inven_obj(): unknown where values now return null with a silent log ' +
+            'instead of emitting a stub hit.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_object_art_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x818B: get_object_art_fid(obj) → returns the current art FID ' +
+            '(frmType<<24 | frmPID) of the given object. Used by appearance and disguise scripts ' +
+            'to read which sprite a critter or item currently uses.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'set_object_art_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x818C: set_object_art_fid(obj, fid) — sets the object\'s art FID so it ' +
+            'renders a different sprite. Used by disguise and appearance-change scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'get_critter_combat_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x818D: get_critter_combat_ap(obj) → returns critter.AP.combat (current ' +
+            'in-combat action points). Returns 0 outside of combat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_critter_combat_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x818E: set_critter_combat_ap(obj, ap) — sets critter.AP.combat to the given ' +
+            'value (clamped to 0). Used by combat scripts that adjust AP mid-turn.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'get_script_return_value',
+        kind: 'opcode',
+        description:
+            'sfall 0x818F: get_script_return_value() → last hook-script return value. ' +
+            'Hook scripts are not implemented in the browser build; returns 0 (partial).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'critter_perk_ranks_serialization',
+        kind: 'procedure',
+        description:
+            'Critter perkRanks (script-granted perks) are now included in SERIALIZED_CRITTER_PROPS ' +
+            'and round-trip through save/load. Older saves with missing perkRanks default to {}. ' +
+            'Fixes stat-bonus perks (Action Boy, Toughness, etc.) being silently dropped on reload.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'save_schema_v10_player_perk_ranks',
+        kind: 'procedure',
+        description:
+            'Save schema v10: playerPerkRanks (Record<number,number>) added to SaveGame. ' +
+            'Persists script-granted player perks across save/load cycles so perk-based ' +
+            'stat bonuses (e.g. Action Boy +AP) remain correct in long campaigns. ' +
+            'v9→v10 migration sets playerPerkRanks={}.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
 ])
 
 // ---------------------------------------------------------------------------

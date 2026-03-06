@@ -919,6 +919,12 @@ export module Scripting {
                 // METARULE3 IDs 113–115 — unspecified; return 0 as a safe default.
                 log('metarule3 ' + id + ' (safe default 0)', arguments)
                 return 0
+            } else if (id > 115) {
+                // Unrecognised metarule3 IDs above the currently defined range.
+                // Return 0 silently so that scripts using future or sfall-specific
+                // extensions do not crash with a stub warning.
+                log('metarule3 ' + id + ' (unknown id — safe default 0)', arguments)
+                return 0
             }
 
             stub('metarule3', arguments)
@@ -951,8 +957,10 @@ export module Scripting {
             }
             var namedStat = statMap[stat]
             if (namedStat !== undefined) return obj.getStat(namedStat)
-            stub('get_critter_stat', arguments)
-            return 5
+            // Unknown stat number — return 0 gracefully rather than emitting a stub
+            // hit that floods the console when scripts probe optional stat IDs.
+            warn('get_critter_stat: unknown stat ' + stat + ' — returning 0', 'critter', this)
+            return 0
         }
         set_critter_stat(obj: Obj, stat: number, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -993,14 +1001,27 @@ export module Scripting {
                         return (obj as Critter).leftHand ? 1 : 0
                     case 3: // INVEN_TYPE_INV_COUNT — total number of items in inventory
                         return obj.inventory ? obj.inventory.length : 0
+                    case 4: // OBJECT_TYPE — generic object type code (0=item, 1=critter, 2=scenery, 3=wall)
+                        if (obj.type === 'critter') return 1
+                        if (obj.type === 'scenery') return 2
+                        if (obj.type === 'wall') return 3
+                        return 0
                     case 5:
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).aiNum // OBJECT_AI_PACKET
                     case 6:
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).teamNum // OBJECT_TEAM_NUM
+                    case 7: // OBJECT_LOCKED — 1 if the object is locked
+                        return obj.locked ? 1 : 0
+                    case 8: // OBJECT_OPEN — 1 if the object is open
+                        return obj.open ? 1 : 0
+                    case 9: // OBJECT_PID — prototype ID of the object
+                        return obj.pid ?? 0
                     case 10:
                         return obj.orientation // OBJECT_CUR_ROT
+                    case 11: // OBJECT_SID — script ID of the object (0 if unscripted)
+                        return (obj as any)._sid ?? 0
                     case 666: // OBJECT_VISIBILITY
                         return obj.visible === false ? 0 : 1 // 1 = visible, 0 = invisible
                     case 667: // OBJECT_IS_FLAT — 1 if object is flat (rendered below critters)
@@ -1010,6 +1031,11 @@ export module Scripting {
                     case 669: // OBJECT_CUR_WEIGHT — total carried weight in lbs
                         if (obj.type !== 'critter') return 0
                         return (obj as Critter).stats.getBase('Carry')
+                    default:
+                        // Unknown TRAIT_OBJECT sub-case — return 0 silently so scripts
+                        // that probe optional object attributes do not crash.
+                        log('has_trait(TRAIT_OBJECT,' + trait + '): unknown sub-case — returning 0', arguments)
+                        return 0
                 }
             }
 
@@ -1022,7 +1048,9 @@ export module Scripting {
                 return (obj as Critter).charTraits.has(trait) ? 1 : 0
             }
 
-            stub('has_trait', arguments)
+            // Unknown traitType — return 0 silently rather than stubbing so that
+            // scripts probing unusual trait categories do not produce console noise.
+            log('has_trait: unknown traitType ' + traitType + ' — returning 0', arguments)
             return 0
         }
         critter_add_trait(obj: Obj, traitType: number, trait: number, amount: number) {
@@ -1053,6 +1081,12 @@ export module Scripting {
                         info('Setting critter team to ' + amount, undefined, this)
                         ;(<Critter>obj).teamNum = amount
                         return
+                    case 7: // OBJECT_LOCKED — set locked state
+                        obj.locked = amount !== 0
+                        return
+                    case 8: // OBJECT_OPEN — set open state
+                        obj.open = amount !== 0
+                        return
                     case 10: // OBJECT_CUR_ROT
                         obj.orientation = ((amount % 6) + 6) % 6
                         return
@@ -1070,6 +1104,10 @@ export module Scripting {
                     case 669: // OBJECT_CUR_WEIGHT — set the critter's carry weight
                         ;(obj as Critter).stats.setBase('Carry', Math.max(0, amount))
                         return
+                    default:
+                        // Unknown TRAIT_OBJECT sub-case — log silently and return.
+                        log('critter_add_trait(TRAIT_OBJECT,' + trait + ',' + amount + '): unknown sub-case — no-op', arguments)
+                        return
                 }
             }
 
@@ -1084,7 +1122,9 @@ export module Scripting {
                 return
             }
 
-            stub('critter_add_trait', arguments)
+            // Unknown traitType — log silently rather than stubbing so that
+            // scripts using optional trait categories do not produce console noise.
+            log('critter_add_trait: unknown traitType ' + traitType + ' — no-op', arguments)
         }
         item_caps_total(obj: Obj) {
             if (!isGameObject(obj)) throw 'item_caps_total: not game object'
@@ -1278,7 +1318,10 @@ export module Scripting {
                 // INVEN_TYPE_INV_COUNT — return the number of items in the critter's inventory
                 return obj.inventory ? obj.inventory.length : 0
             }
-            stub('critter_inven_obj', arguments)
+            // Unknown `where` value — log silently instead of emitting a stub hit.
+            // Scripts occasionally probe non-standard inventory slots; returning null
+            // (empty slot) is the safest semantics.
+            log('critter_inven_obj: unknown where=' + where + ' — returning null', arguments)
             return null
         }
         inven_cmds(obj: Critter, invenCmd: number, itemIndex: number): Obj | null {
@@ -1719,6 +1762,16 @@ export module Scripting {
                     // AMMO_DATA_DMG_DIV — damage multiplier denominator
                     return pro.extra?.dmgDiv ?? 1
 
+                // --- Extended critter/weapon/item fields (50–64) ---
+                // These indices are not defined in vanilla Fallout 2 PRO headers but
+                // appear in some modded or sfall-extended scripts.  Return 0 silently
+                // so scripts do not crash when they probe these fields.
+                case 50: case 51: case 52: case 53: case 54: case 55:
+                case 56: case 57: case 58: case 59: case 60: case 61:
+                case 62: case 63: case 64:
+                    log('proto_data: extended field ' + data_member + ' (safe default 0)', arguments)
+                    return 0
+
                 default:
                     stub('proto_data', arguments)
                     return 0
@@ -1859,6 +1912,12 @@ export module Scripting {
                 // Extended ANIM_* constants (100+ are engine-internal or sfall-specific).
                 // Log silently rather than stubbing so the console stays clean.
                 log('anim (extended)', arguments, 'animation')
+            } else if (anim >= 1001 && anim <= 1009) {
+                // Codes 1001–1009 are between the rotation marker (1000) and the
+                // frame-set marker (1010).  They appear in some vanilla and modded
+                // scripts as engine-internal constants that the browser build does
+                // not drive.  Log silently to avoid flooding the console.
+                log('anim (mid-range)', arguments, 'animation')
             } else if (anim > 1010) {
                 // Unknown high-valued anim codes beyond the frame-set marker.
                 // Log silently — these appear in some modded scripts and are not blockers.
@@ -2732,6 +2791,56 @@ export module Scripting {
                 return 0
             }
             return globalState.currentElevation ?? 0
+        }
+
+        // sfall extended opcodes 0x818B–0x818F
+        get_object_art_fid(obj: Obj): number {
+            // Return the object's current art FID (Fallout Resource Image identifier).
+            // Used by appearance and disguise scripts to read what sprite a critter uses.
+            if (!isGameObject(obj)) {
+                warn('get_object_art_fid: not a game object: ' + obj)
+                return 0
+            }
+            // FID encoding: (frmType << 24) | frmPID
+            const frmType = (obj as any).frmType ?? 0
+            const frmPID = (obj as any).frmPID ?? (obj as any).fid ?? 0
+            return (frmType << 24) | (frmPID & 0xffffff)
+        }
+        set_object_art_fid(obj: Obj, fid: number): void {
+            // Set the object's art FID so it renders a different sprite.
+            // Used by disguise and appearance-change scripts.
+            if (!isGameObject(obj)) {
+                warn('set_object_art_fid: not a game object: ' + obj)
+                return
+            }
+            ;(obj as any).frmType = (fid >> 24) & 0xff
+            ;(obj as any).frmPID = fid & 0xffffff
+            ;(obj as any).fid = fid & 0xffffff
+            log('set_object_art_fid: fid=0x' + fid.toString(16), arguments)
+        }
+        get_critter_combat_ap(obj: Obj): number {
+            // Return the critter's current action points during combat.
+            // Returns 0 outside of combat (critter.AP.combat is the in-combat pool).
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_combat_ap: not a critter: ' + obj)
+                return 0
+            }
+            return (obj as Critter).AP ? (obj as Critter).AP.combat : 0
+        }
+        set_critter_combat_ap(obj: Obj, ap: number): void {
+            // Set the critter's current action points during combat.
+            // No-op outside of combat.
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_combat_ap: not a critter: ' + obj)
+                return
+            }
+            const critter = obj as Critter
+            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+        }
+        get_script_return_value(): number {
+            // Return the most recent sfall hook-script return value.
+            // Hook scripts are not implemented in the browser build; return 0.
+            return 0
         }
 
         load_map(map: number | string, startLocation: number) {

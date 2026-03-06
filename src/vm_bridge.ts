@@ -321,6 +321,13 @@ export module ScriptVMBridge {
        // sfall extended opcodes 0x8189–0x818A — tile navigation and object elevation
        ,0x8189: bridged("tile_num_in_direction", 3)     // tile_num_in_direction(tile, dir, count) → tile N steps in direction dir
        ,0x818A: bridged("get_obj_elevation", 1)         // get_obj_elevation(obj) → elevation index of the given object
+
+       // sfall extended opcodes 0x818B–0x818F — art FID, combat AP, hook return value
+       ,0x818B: bridged("get_object_art_fid", 1)        // get_object_art_fid(obj) → current art FID of the object
+       ,0x818C: bridged("set_object_art_fid", 2, false) // set_object_art_fid(obj, fid) — change object art sprite FID
+       ,0x818D: bridged("get_critter_combat_ap", 1)     // get_critter_combat_ap(obj) → current in-combat AP
+       ,0x818E: bridged("set_critter_combat_ap", 2, false) // set_critter_combat_ap(obj, ap) — set in-combat AP
+       ,0x818F: bridged("get_script_return_value", 0)   // get_script_return_value() → last hook-script return value (partial: 0)
     }
     Object.assign(opMap, bridgeOpMap)
 

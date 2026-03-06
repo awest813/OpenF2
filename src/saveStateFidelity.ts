@@ -19,6 +19,11 @@ export interface SaveDataState {
      * values 0–15 corresponding to Fallout 2 TRAIT_* constants).
      */
     playerCharTraits: number[]
+    /**
+     * Player perk ranks granted by scripts (keyed by perk ID, values are ranks).
+     * Persisted so that scripted perks survive save/load cycles.
+     */
+    playerPerkRanks: Record<number, number>
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -63,6 +68,11 @@ export interface LoadDataState {
      * Restored from save so trait-based script checks are correct after load.
      */
     playerCharTraits: number[]
+    /**
+     * Player perk ranks from scripts. Restored from save so perk-based stats
+     * (e.g. Action Boy +AP, Toughness +DT) remain correct after load.
+     */
+    playerPerkRanks: Record<number, number>
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -94,6 +104,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         mapVars: state.mapVars ? JSON.parse(JSON.stringify(state.mapVars)) : {},
         mapAreaStates: state.mapAreaStates ? { ...state.mapAreaStates } : {},
         playerCharTraits: state.playerCharTraits ? [...state.playerCharTraits] : [],
+        playerPerkRanks: state.playerPerkRanks ? { ...state.playerPerkRanks } : {},
         player: {
             position: state.player.position,
             orientation: state.player.orientation,
@@ -155,6 +166,10 @@ export function hydrateStateFromSave(
     // Restore player character-creation traits so trait-based script checks
     // (has_trait TRAIT_CHAR) return correct results after loading a save.
     state.playerCharTraits = save.playerCharTraits ? [...save.playerCharTraits] : []
+
+    // Restore player perk ranks so perk-based stat bonuses (Action Boy, Toughness, etc.)
+    // are correctly applied after loading a save.
+    state.playerPerkRanks = save.playerPerkRanks ? { ...save.playerPerkRanks } : {}
 
     state.gParty.deserialize(save.party)
 
