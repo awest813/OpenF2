@@ -25,7 +25,6 @@ import { formatSaveDate, load, save, SaveGame, saveList } from './saveload.js'
 import { Scripting } from './scripting.js'
 import { Skills } from './skills.js'
 import { fromTileNum } from './tile.js'
-import { playerUse } from './main.js'
 import { pad } from './util.js'
 import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
@@ -34,6 +33,12 @@ import { lazyLoadImage } from './images.js'
 import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
 
 // UI system
+
+let playerUseHandler: () => void = () => {}
+
+export function setPlayerUseHandler(handler: () => void): void {
+    playerUseHandler = handler
+}
 
 // TODO: reduce code duplication, circular references,
 //       and general badness/unmaintainability.
@@ -806,7 +811,7 @@ export function uiContextMenu(obj: Obj, evt: any) {
     })
     const cancelBtn = button(obj, 'cancel')
     const lookBtn = button(obj, 'look', () => uiLog('You see: ' + obj.getDescription()))
-    const useBtn = button(obj, 'use', () => playerUse()) // TODO: playerUse should take an object
+    const useBtn = button(obj, 'use', () => playerUseHandler()) // TODO: playerUse should take an object
     const talkBtn = button(obj, 'talk', () => {
         console.log('talking to ' + obj.name)
         if (!obj._script) {

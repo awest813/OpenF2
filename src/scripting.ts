@@ -29,7 +29,6 @@ import {
 } from './geometry.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
-import { useElevator } from './main.js'
 import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
 import { makePID } from './pro.js'
@@ -44,6 +43,12 @@ import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER } from './sfallGlobals.js'
 
 export module Scripting {
+    let useElevatorHandler: () => void = () => {}
+
+    export function setUseElevatorHandler(handler: () => void): void {
+        useElevatorHandler = handler
+    }
+
     export interface ScriptDebuggerSink {
         setVMInfo(stepCount: number, currentProcedure: string | null): void
         pushMessage(msg: string): void
@@ -480,7 +485,7 @@ export module Scripting {
                     return mapFirstRun // map_first_run
                 case 15: // elevator
                     if (target !== -1) throw 'elevator given explicit type'
-                    useElevator()
+                    useElevatorHandler()
                     break
                 case 17:
                     stub('metarule', arguments)
