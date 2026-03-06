@@ -75,10 +75,10 @@ Gate: **PASS** when campaign-critical state survives save/load across phases.
 
 ## Phase 6 — Combat edge-case fidelity
 
-- [ ] AP/turn flow integrity verified
-- [ ] Critical effects tables and outcomes validated
-- [ ] Combat exits back to quest scripts cleanly
-- [ ] Quest-linked combat outcomes produce correct state
+- [x] AP/turn flow integrity verified
+- [x] Critical effects tables and outcomes validated
+- [x] Combat exits back to quest scripts cleanly
+- [x] Quest-linked combat outcomes produce correct state
 
 Gate: **PASS** when combat no longer causes critical-path divergence.
 

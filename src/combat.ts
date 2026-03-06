@@ -61,6 +61,7 @@ export class ActionPoints {
     }
 
     subtractMoveAP(value: number): boolean {
+        if (value <= 0) return true
         if (this.getAvailableMoveAP() < value) return false
 
         this.move -= value
@@ -76,6 +77,7 @@ export class ActionPoints {
     }
 
     subtractCombatAP(value: number): boolean {
+        if (value <= 0) return true
         if (this.combat < value) return false
 
         this.combat -= value
