@@ -277,6 +277,82 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     },
 
     // -----------------------------------------------------------------------
+    // Phase 19 — weapon ammo state, anim de-stub, proto_data extensions
+    // -----------------------------------------------------------------------
+    {
+        id: 'get_weapon_ammo_pid',
+        kind: 'opcode',
+        description: 'sfall 0x8178: get_weapon_ammo_pid(weapon) → ammo type PID loaded in weapon. Falls back to proto ammoPID when no runtime ammo set.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_weapon_ammo_pid',
+        kind: 'opcode',
+        description: 'sfall 0x8179: set_weapon_ammo_pid(weapon, pid) — set the ammo type PID loaded in a weapon. Stored in weapon.extra.ammoType.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_weapon_ammo_count',
+        kind: 'opcode',
+        description: 'sfall 0x817A: get_weapon_ammo_count(weapon) → rounds currently loaded in the weapon. Reads weapon.extra.ammoLoaded.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_weapon_ammo_count',
+        kind: 'opcode',
+        description: 'sfall 0x817B: set_weapon_ammo_count(weapon, count) — set rounds loaded in a weapon. Writes weapon.extra.ammoLoaded.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_mouse_tile_num',
+        kind: 'opcode',
+        description: 'sfall 0x817C: get_mouse_tile_num() → tile number under mouse cursor (-1 if none). Returns -1 in VM context.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'anim_standard_codes',
+        kind: 'procedure',
+        description: 'anim() with standard ANIM_* constants (0=stand, 1=walk, 2-99). Code 0 resets to idle; codes 1-99 are logged silently without stub warnings.',
+        status: 'partial',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'get_pc_stat_max',
+        kind: 'procedure',
+        description: 'get_pc_stat(PCSTAT_max_pc_stat=5): returns 5 (the count of valid PC stat indices 0–4).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'inven_cmds_nav',
+        kind: 'procedure',
+        description: 'inven_cmds INVEN_CMD_FIRST(0), INVEN_CMD_LAST(1), INVEN_CMD_PREV(2), INVEN_CMD_NEXT(3): inventory cursor navigation commands.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'proto_data_weapon_extended',
+        kind: 'procedure',
+        description: 'proto_data data_member 12 (animCode), 17 (attack_mode_1), 18 (attack_mode_2), 19 (projPID), 20 (minST), 32 (armor AC), 33 (armor DR Normal), 34 (burst rounds).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // -----------------------------------------------------------------------
     // sfall opcodes — implemented
     // -----------------------------------------------------------------------
     {

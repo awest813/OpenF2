@@ -984,21 +984,28 @@ export module Scripting {
                 return null
             }
 
-            if (invenCmd === 11 /* INVEN_CMD_LEFT_HAND */) {
-                return (obj as Critter).leftHand ?? null
+            switch (invenCmd) {
+                case 0: // INVEN_CMD_FIRST
+                    return obj.inventory.length > 0 ? obj.inventory[0] : null
+                case 1: // INVEN_CMD_LAST
+                    return obj.inventory.length > 0 ? obj.inventory[obj.inventory.length - 1] : null
+                case 2: // INVEN_CMD_PREV — item before itemIndex; null when at the start
+                    if (itemIndex <= 0) return null
+                    return itemIndex - 1 < obj.inventory.length ? obj.inventory[itemIndex - 1] : null
+                case 3: // INVEN_CMD_NEXT — item after itemIndex; null when at the end
+                    if (itemIndex < 0 || itemIndex + 1 >= obj.inventory.length) return null
+                    return obj.inventory[itemIndex + 1]
+                case 11: // INVEN_CMD_LEFT_HAND
+                    return (obj as Critter).leftHand ?? null
+                case 12: // INVEN_CMD_RIGHT_HAND
+                    return (obj as Critter).rightHand ?? null
+                case 13: // INVEN_CMD_INDEX_PTR
+                    if (itemIndex < 0 || itemIndex >= obj.inventory.length) return null
+                    return obj.inventory[itemIndex]
+                default:
+                    stub('inven_cmds', arguments, 'inventory')
+                    return null
             }
-
-            if (invenCmd === 12 /* INVEN_CMD_RIGHT_HAND */) {
-                return (obj as Critter).rightHand ?? null
-            }
-
-            if (invenCmd !== 13 /* INVEN_CMD_INDEX_PTR */) {
-                stub('inven_cmds', arguments, 'inventory')
-                return null
-            }
-
-            if (itemIndex < 0 || itemIndex >= obj.inventory.length) return null
-            return obj.inventory[itemIndex]
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
             // Place the critter at tileNum; move_to handles finding a nearby tile if
@@ -1049,9 +1056,8 @@ export module Scripting {
                     return globalVars[0] !== undefined ? globalVars[0] : 0
                 case 4: // PCSTAT_karma
                     return globalState.reputation.getKarma()
-                case 5: // PCSTAT_max_pc_stat
-                    stub('get_pc_stat', arguments)
-                    return 0
+                case 5: // PCSTAT_max_pc_stat — the number of valid pcstat indices (0–4), so 5
+                    return 5
                 default:
                     throw `get_pc_stat: unhandled ${pcstat}`
             }
@@ -1267,6 +1273,10 @@ export module Scripting {
                     return pro.extra?.size ?? 0
 
                 // --- Weapon-specific item fields ---
+                case 12:
+                    // WEAPON_DATA_ANIMATION_CODE — animation code (lookup key into
+                    // art/critters weapon suffix tables, e.g. 0=fists, 1=knife, 2=club…)
+                    return pro.extra?.animCode ?? 0
                 case 14:
                     // WEAPON_DATA_MIN_DMG — minimum damage roll
                     return pro.extra?.minDmg ?? 0
@@ -1276,6 +1286,18 @@ export module Scripting {
                 case 16:
                     // WEAPON_DATA_DMG_TYPE — damage type index
                     return pro.extra?.dmgType ?? 0
+                case 17:
+                    // WEAPON_DATA_ATTACK_MODE_1 — primary attack mode (lower nibble of attackMode byte)
+                    return (pro.extra?.attackMode ?? 0) & 0xf
+                case 18:
+                    // WEAPON_DATA_ATTACK_MODE_2 — secondary attack mode (upper nibble of attackMode byte)
+                    return ((pro.extra?.attackMode ?? 0) >> 4) & 0xf
+                case 19:
+                    // WEAPON_DATA_PROJ_PID — projectile prototype PID for ranged weapons
+                    return pro.extra?.projPID ?? 0
+                case 20:
+                    // WEAPON_DATA_MIN_ST — minimum Strength required to wield this weapon
+                    return pro.extra?.minST ?? 0
                 case 21:
                     // WEAPON_DATA_AP_COST_1 — AP cost for primary attack
                     return pro.extra?.APCost1 ?? 0
@@ -1291,6 +1313,17 @@ export module Scripting {
                 case 27:
                     // WEAPON_DATA_MAX_AMMO — magazine capacity
                     return pro.extra?.maxAmmo ?? 0
+                case 34:
+                    // WEAPON_DATA_BURST_ROUNDS — rounds fired per burst attack
+                    return pro.extra?.rounds ?? 0
+
+                // --- Armor-specific item fields ---
+                case 32:
+                    // ARMOR_DATA_AC — Armor Class bonus
+                    return pro.extra?.AC ?? 0
+                case 33:
+                    // ARMOR_DATA_DR_NORMAL — Damage Resistance vs Normal damage
+                    return pro.extra?.stats?.['DR Normal'] ?? 0
 
                 // --- Common extended flags ---
                 case 7:
@@ -1449,7 +1482,16 @@ export module Scripting {
             else if (anim === 1010)
                 // set frame
                 obj.frame = param
-            else {
+            else if (anim === 0)
+                // ANIM_stand — reset to idle standing frame
+                obj.frame = 0
+            else if (anim >= 1 && anim <= 99) {
+                // Standard ANIM_* animation constants (1=walk, 2=jump_begin, …, 50=fall_front_blood, etc.).
+                // The browser build does not yet drive a full frame-accurate animation state
+                // machine from scripted anim() calls, so these are silently logged instead
+                // of emitting stub warnings that flood the console during map entry.
+                log('anim', arguments, 'animation')
+            } else {
                 stub('anim', arguments)
                 warn('anim: unknown anim request: ' + anim)
             }
@@ -2102,6 +2144,59 @@ export module Scripting {
             // Returns milliseconds since the page was loaded.  Used by scripts
             // that want to measure real-world elapsed time (e.g. anti-exploit timers).
             return typeof performance !== 'undefined' ? Math.floor(performance.now()) : 0
+        }
+
+        // sfall extended opcodes — weapon ammo PID getter/setter (0x8178–0x8179)
+        get_weapon_ammo_pid(weapon: Obj): number {
+            // Return the ammo type PID currently loaded in the weapon.
+            // Uses the runtime ammoType field if set, otherwise falls back to
+            // the proto's required ammo PID (ammoPID).
+            if (!isGameObject(weapon)) {
+                warn('get_weapon_ammo_pid: not a game object: ' + weapon)
+                return -1
+            }
+            if (weapon.extra?.ammoType !== undefined && weapon.extra.ammoType !== -1) {
+                return weapon.extra.ammoType
+            }
+            return weapon.pro?.extra?.ammoPID ?? -1
+        }
+        set_weapon_ammo_pid(weapon: Obj, pid: number): void {
+            // Set the ammo type PID loaded in a weapon.  The change is stored in
+            // extra.ammoType so it survives map serialization.
+            if (!isGameObject(weapon)) {
+                warn('set_weapon_ammo_pid: not a game object: ' + weapon)
+                return
+            }
+            if (!weapon.extra) weapon.extra = {}
+            weapon.extra.ammoType = pid
+        }
+
+        // sfall extended opcodes — weapon ammo count getter/setter (0x817A–0x817B)
+        get_weapon_ammo_count(weapon: Obj): number {
+            // Return the number of rounds currently loaded in the weapon.
+            if (!isGameObject(weapon)) {
+                warn('get_weapon_ammo_count: not a game object: ' + weapon)
+                return 0
+            }
+            return weapon.extra?.ammoLoaded ?? 0
+        }
+        set_weapon_ammo_count(weapon: Obj, count: number): void {
+            // Set the number of rounds currently loaded in the weapon.
+            if (!isGameObject(weapon)) {
+                warn('set_weapon_ammo_count: not a game object: ' + weapon)
+                return
+            }
+            if (!weapon.extra) weapon.extra = {}
+            weapon.extra.ammoLoaded = Math.max(0, count)
+        }
+
+        // sfall extended opcode — tile number under mouse cursor (0x817C)
+        get_mouse_tile_num(): number {
+            // In a browser/VM context the mouse position is not directly available
+            // to scripts running without a live DOM event.  Return -1 to signal
+            // "no tile under cursor" — the same value the original engine returns
+            // when the mouse is outside the map area.
+            return -1
         }
 
         load_map(map: number | string, startLocation: number) {

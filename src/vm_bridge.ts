@@ -290,6 +290,13 @@ export module ScriptVMBridge {
        ,0x8175: bridged("string_compare", 3)           // string_compare(str1, str2, case_sensitive) → 0 if equal
        ,0x8176: bridged("substr", 3)                   // substr(str, start, len) → substring
        ,0x8177: bridged("get_uptime", 0)               // get_uptime() → session time in milliseconds
+
+       // sfall extended opcodes 0x8178–0x817C — weapon ammo state and mouse tile
+       ,0x8178: bridged("get_weapon_ammo_pid", 1)      // get_weapon_ammo_pid(weapon) → ammo type PID loaded
+       ,0x8179: bridged("set_weapon_ammo_pid", 2, false) // set_weapon_ammo_pid(weapon, pid) — set ammo type
+       ,0x817A: bridged("get_weapon_ammo_count", 1)    // get_weapon_ammo_count(weapon) → rounds loaded
+       ,0x817B: bridged("set_weapon_ammo_count", 2, false) // set_weapon_ammo_count(weapon, count) — set rounds loaded
+       ,0x817C: bridged("get_mouse_tile_num", 0)       // get_mouse_tile_num() → tile under mouse (-1 if none)
     }
     Object.assign(opMap, bridgeOpMap)
 
