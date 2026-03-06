@@ -213,6 +213,38 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    {
+        id: 'abs_value',
+        kind: 'opcode',
+        description: 'sfall 0x816C: abs_value(x) → |x|. Returns the absolute value of a number. Used by scripts performing distance/difference calculations.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'string_length',
+        kind: 'opcode',
+        description: 'sfall 0x816D: string_length(str) → length of string as integer. Used by scripts doing string manipulation or validation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'pow',
+        kind: 'opcode',
+        description: 'sfall 0x816E: pow(base, exp) → base^exp. Exponentiation for script formula calculations.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'obj_is_valid',
+        kind: 'opcode',
+        description: 'sfall 0x816F: obj_is_valid(obj) → 1 if obj is a valid game object, 0 otherwise. Used as a safe null-check before using objects in scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 
     // -----------------------------------------------------------------------
     // Procedures — lower frequency / lower impact

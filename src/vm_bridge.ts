@@ -274,6 +274,10 @@ export module ScriptVMBridge {
        ,0x8169: bridged("get_current_town", 0)         // get_current_town() → current map/area ID (sfall-style shortcut for metarule(46, 0))
        ,0x816A: bridged("critter_is_dead", 1)          // critter_is_dead(obj) → 1 if critter HP <= 0
        ,0x816B: bridged("get_dialogue_active", 0)      // get_dialogue_active() → 1 if dialogue is currently active
+       ,0x816C: bridged("abs_value", 1)                // abs_value(x) → |x|
+       ,0x816D: bridged("string_length", 1)            // string_length(str) → length of string
+       ,0x816E: bridged("pow", 2)                      // pow(base, exp) → base^exp
+       ,0x816F: bridged("obj_is_valid", 1)             // obj_is_valid(obj) → 1 if obj is a valid game object
     }
     Object.assign(opMap, bridgeOpMap)
 
