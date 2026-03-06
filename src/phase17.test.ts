@@ -23,11 +23,11 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', () => {
-    it('SAVE_VERSION is now 6', () => {
-        expect(SAVE_VERSION).toBe(6)
+    it('SAVE_VERSION is now 7 (v7 adds mapVars)', () => {
+        expect(SAVE_VERSION).toBe(7)
     })
 
-    it('migrating a v5 save adds gameTickTime=0 and empty critterKillCounts', () => {
+    it('migrating a v5 save adds gameTickTime=0, empty critterKillCounts, and empty mapVars', () => {
         const raw = {
             version: 5,
             name: 'V5 Save',
@@ -42,14 +42,15 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             scriptGlobalVars: { 0: 50 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(6)
+        expect(migrated.version).toBe(7)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
+        expect(migrated.mapVars).toEqual({})
         // scriptGlobalVars should be preserved through the migration
         expect(migrated.scriptGlobalVars).toEqual({ 0: 50 })
     })
 
-    it('migrating a v4 save adds scriptGlobalVars, gameTickTime, and critterKillCounts', () => {
+    it('migrating a v4 save adds scriptGlobalVars, gameTickTime, critterKillCounts, and mapVars', () => {
         const raw = {
             version: 4,
             name: 'V4 Save',
@@ -61,13 +62,14 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(6)
+        expect(migrated.version).toBe(7)
         expect(migrated.scriptGlobalVars).toEqual({})
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
+        expect(migrated.mapVars).toEqual({})
     })
 
-    it('migrating a v1 save migrates all the way to v6', () => {
+    it('migrating a v1 save migrates all the way to v7', () => {
         const raw = {
             version: 1,
             name: 'Old',
@@ -79,15 +81,16 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(6)
+        expect(migrated.version).toBe(7)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
+        expect(migrated.mapVars).toEqual({})
     })
 
-    it('a v6 save preserves existing gameTickTime and critterKillCounts through no-op migration', () => {
+    it('a v6 save with gameTickTime and critterKillCounts migrates to v7 with mapVars={}', () => {
         const raw = {
             version: 6,
-            name: 'Current',
+            name: 'V6 Save',
             timestamp: 9999,
             currentMap: 'artemple',
             currentElevation: 0,
@@ -101,9 +104,10 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             critterKillCounts: { 0: 7, 3: 15 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(6)
+        expect(migrated.version).toBe(7)
         expect(migrated.gameTickTime).toBe(123456)
         expect(migrated.critterKillCounts).toEqual({ 0: 7, 3: 15 })
+        expect(migrated.mapVars).toEqual({})
     })
 })
 
@@ -117,6 +121,7 @@ describe('Phase 17-B — saveStateFidelity round-trip for v6 fields', () => {
             currentElevation: 0,
             gameTickTime: overrides.gameTickTime ?? 5000,
             critterKillCounts: overrides.critterKillCounts ?? { 0: 3 },
+            mapVars: overrides.mapVars ?? {},
             worldPosition: undefined,
             gMap: {
                 name: 'artemple',

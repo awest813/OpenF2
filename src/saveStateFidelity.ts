@@ -10,6 +10,8 @@ export interface SaveDataState {
     gameTickTime: number
     /** Per-kill-type kill counts indexed by KILL_TYPE_* constants. */
     critterKillCounts: Record<number, number> | null
+    /** Per-map script variable store (scriptName → varIndex → value). */
+    mapVars: Record<string, Record<number, number>>
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -45,6 +47,8 @@ export interface LoadDataState {
     gameTickTime: number
     /** Per-kill-type kill counts. Restored from save so lifetime stats are preserved. */
     critterKillCounts: Record<number, number> | null
+    /** Per-map script variable store. Restored from save so map state is preserved. */
+    mapVars: Record<string, Record<number, number>>
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -73,6 +77,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         currentMap: curMap.name,
         gameTickTime: state.gameTickTime,
         critterKillCounts: state.critterKillCounts ? { ...state.critterKillCounts } : {},
+        mapVars: state.mapVars ? JSON.parse(JSON.stringify(state.mapVars)) : {},
         player: {
             position: state.player.position,
             orientation: state.player.orientation,
@@ -119,6 +124,13 @@ export function hydrateStateFromSave(
 
     // Restore kill counts so lifetime stats and karma calculations are correct.
     state.critterKillCounts = save.critterKillCounts ? { ...save.critterKillCounts } : {}
+
+    // Restore map variables so per-map script state survives across sessions.
+    if (save.mapVars) {
+        state.mapVars = JSON.parse(JSON.stringify(save.mapVars))
+    } else {
+        state.mapVars = {}
+    }
 
     state.gParty.deserialize(save.party)
 

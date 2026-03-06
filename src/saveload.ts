@@ -155,6 +155,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // faction states, and world-event flags survive across save/load cycles.
     save.scriptGlobalVars = { ...Scripting.getGlobalVars() }
 
+    // Snapshot per-map script variables (MVAR_*) so that map state
+    // (e.g. "water pump repaired", "enemies cleared") survives reloads.
+    save.mapVars = Scripting.getMapVars()
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -202,6 +206,11 @@ export function load(id: number): void {
                 if (save.scriptGlobalVars) {
                     Scripting.setGlobalVars(save.scriptGlobalVars)
                 }
+                // Restore per-map script variables (MVAR_*) so map state
+                // (e.g. "water pump repaired") is preserved across reloads.
+                if (save.mapVars) {
+                    Scripting.setMapVars(save.mapVars)
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -234,6 +243,10 @@ export function load(id: number): void {
                     // Restore script global variables (GVAR_*).
                     if (save.scriptGlobalVars) {
                         Scripting.setGlobalVars(save.scriptGlobalVars)
+                    }
+                    // Restore per-map script variables (MVAR_*).
+                    if (save.mapVars) {
+                        Scripting.setMapVars(save.mapVars)
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

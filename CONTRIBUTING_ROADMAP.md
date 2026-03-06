@@ -539,6 +539,27 @@ These projects provide invaluable cross-reference for understanding engine behav
 
 ## 10. Future Work (Phase 4+)
 
+### Phase 18 Completions (Save Reliability & Scripting Coverage)
+
+Phase 18 landed the following improvements for reliable start-to-finish Fallout 2 play:
+
+| Area | Change | Impact |
+|------|--------|--------|
+| **Save schema v7** | `mapVars` persisted across save/load (`getMapVars` / `setMapVars`) | High — map state (enemy kill flags, quest vars) no longer resets on reload |
+| **`has_trait` TRAIT_PERK** | Type 0 now checks `Critter.perkRanks[perkId]` | High — perk-gated dialogue and combat branches work correctly |
+| **`critter_add_trait` TRAIT_PERK** | Type 0 now writes `Critter.perkRanks[perkId]` | High — NPCs can have perks assigned by scripts |
+| **`inven_cmds` 11/12** | `INVEN_CMD_LEFT_HAND` and `INVEN_CMD_RIGHT_HAND` return equipped hand items | Medium — item-use scripts can query weapon slots |
+| **`obj_item_subtype` fallback** | Falls back to string→integer map when no `.pro` | Medium — item type scripts work for weaponless items |
+| **`game_time_hour` dynamic** | Computed from `gameTickTime` instead of hardcoded `1200` | Medium — schedule and time-based NPC scripts now see the correct hour |
+| **`metarule(21, …)`** | Returns large vendor cap budget (99999) | Low — barter scripts no longer stub-error |
+| **`metarule(24, …)`** | Returns party NPC count via `gParty.getPartyMembers().length` | Medium — party-count checks in scripts work |
+| **`proto_data` data_member 7** | Returns `flags2` / extended flags word | Low — script flag checks no longer stub |
+| **`proto_data` data_members 23/24** | `WEAPON_MAX_RANGE_1/2` | Low — range checks in weapon scripts work |
+| **`proto_data` data_members 28–31** | Ammo AC/DR/dmgMult/dmgDiv | Low — ammo formula scripts work |
+| **sfall `string_compare` (0x8175)** | Case-sensitive and case-insensitive string equality | Low |
+| **sfall `substr` (0x8176)** | Substring extraction with negative-length support | Low |
+| **sfall `get_uptime` (0x8177)** | Session millisecond timer | Low |
+
 ### Near-Term Priorities
 
 | Priority | Area | Description | Key Files |

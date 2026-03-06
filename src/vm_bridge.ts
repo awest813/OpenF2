@@ -285,6 +285,11 @@ export module ScriptVMBridge {
        ,0x8172: bridged("get_critter_body_type", 1)    // get_critter_body_type(obj) → body type index
        ,0x8173: bridged("floor2", 1)                   // floor2(x) → math floor of x
        ,0x8174: bridged("obj_count_by_pid", 1)         // obj_count_by_pid(pid) → count of live objects with matching PID
+
+       // sfall extended opcodes 0x8175–0x8177 — string/array utilities
+       ,0x8175: bridged("string_compare", 3)           // string_compare(str1, str2, case_sensitive) → 0 if equal
+       ,0x8176: bridged("substr", 3)                   // substr(str, start, len) → substring
+       ,0x8177: bridged("get_uptime", 0)               // get_uptime() → session time in milliseconds
     }
     Object.assign(opMap, bridgeOpMap)
 

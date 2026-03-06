@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 export interface SaveGame {
     id?: number
@@ -50,6 +50,16 @@ export interface SaveGame {
      * by karma/perk calculations that depend on lifetime kill counts.
      */
     critterKillCounts?: Record<number, number>
+
+    /**
+     * Per-map script variable store (added in v7).
+     *
+     * Keyed as `{ scriptName: { varIndex: value } }`.
+     * Map variables (MVAR_*) are set and read by map scripts to track
+     * per-map state (e.g. "all enemies killed", "water pump repaired").
+     * Persisting these ensures that maps remember their state after save/load.
+     */
+    mapVars?: Record<string, Record<number, number>>
 
     player: {
         position: Point
@@ -123,6 +133,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.gameTickTime === undefined) save.gameTickTime = 0
             if (save.critterKillCounts === undefined) save.critterKillCounts = {}
             save.version = 6
+            // falls through
+        case 6:
+            // v6 → v7: add mapVars snapshot.
+            // Old saves have no map-variable state — initialize to empty so
+            // map scripts start fresh (default values) rather than throwing.
+            if (save.mapVars === undefined) save.mapVars = {}
+            save.version = 7
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
