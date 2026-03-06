@@ -52,10 +52,10 @@ Gate: **PASS** when repeated interaction loops maintain consistent state.
 
 ## Phase 4 — World-map reliability
 
-- [ ] Travel state updates remain deterministic
-- [ ] Encounter transitions are atomic
-- [ ] Return-to-origin position/state verified
-- [ ] Repeated travel/encounter cycles remain stable
+- [x] Travel state updates remain deterministic
+- [x] Encounter transitions are atomic
+- [x] Return-to-origin position/state verified
+- [x] Repeated travel/encounter cycles remain stable
 
 Gate: **PASS** when no world-map travel/encounter corruption remains on tested path.
 

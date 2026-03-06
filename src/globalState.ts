@@ -89,6 +89,7 @@ export default {
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
     playerCharTraits: [], // player character-creation trait IDs (TRAIT_* constants 0–15)
     playerPerkRanks: {}, // player perk ranks granted by scripts (perkID → rank)
+    worldPosition: undefined, // world-map position snapshot ({x,y}) when travelling on world map
 
     uiManager: null,
     playerEntityId: 0,
@@ -183,6 +184,9 @@ export default {
      * Persisted in save v10+.  Used so perk-based stat bonuses survive save/load.
      */
     playerPerkRanks: Record<number, number>
+
+    /** World-map position snapshot used for save/load continuity on the overworld. */
+    worldPosition?: Point
 
     mapAreas: AreaMap | null
 
