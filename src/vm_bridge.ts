@@ -317,6 +317,10 @@ export module ScriptVMBridge {
        ,0x8186: bridged("list_begin", 1)                // list_begin(type) → first object in iteration (LIST_ALL=0, LIST_CRITTERS=1, LIST_GROUNDITEMS=2)
        ,0x8187: bridged("list_next", 0)                 // list_next() → next object in current iteration (null/0 when exhausted)
        ,0x8188: bridged("list_end", 0, false)           // list_end() — dispose the current object-list iterator
+
+       // sfall extended opcodes 0x8189–0x818A — tile navigation and object elevation
+       ,0x8189: bridged("tile_num_in_direction", 3)     // tile_num_in_direction(tile, dir, count) → tile N steps in direction dir
+       ,0x818A: bridged("get_obj_elevation", 1)         // get_obj_elevation(obj) → elevation index of the given object
     }
     Object.assign(opMap, bridgeOpMap)
 

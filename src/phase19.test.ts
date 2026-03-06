@@ -113,10 +113,11 @@ describe('Phase 19-A — anim() de-stub for ANIM_* codes', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('unknown anim code (e.g. 500) still emits a stub', () => {
+    it('unknown anim code (e.g. 500) logs silently — no stub hit (Phase 24 de-stub)', () => {
         const obj = makeObj()
+        // Phase 24: codes 100–999 now log silently instead of stubbing.
         script.anim(obj, 500, 0)
-        expect(stubHitCount()).toBe(1)
+        expect(stubHitCount()).toBe(0)
     })
 })
 

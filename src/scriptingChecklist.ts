@@ -860,6 +860,140 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'high',
         impact: 'high',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 24 — browser-runtime blockers, critter_state, anim, proto_data 13,
+    //            metarule3 108–115, sfall opcodes 0x8189–0x818A
+    // -----------------------------------------------------------------------
+    {
+        id: 'metarule_49_damage_types',
+        kind: 'metarule',
+        description:
+            'METARULE_W_DAMAGE_TYPE(49): map weapon damage-type string to FO2 DMG_* integer ' +
+            '(0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP, 6=Explosion). ' +
+            'Previously only "explosion" was handled; all types now covered.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'objectGetDamageType_safe_fallback',
+        kind: 'procedure',
+        description:
+            'objectGetDamageType(): returns "Normal" as a safe fallback when the object has ' +
+            'no dmgType property, instead of throwing a runtime exception. Prevents crashes ' +
+            'when metarule(49) is called on non-weapon objects or untyped objects.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'spatial_no_throw',
+        kind: 'procedure',
+        description:
+            'spatial(): no longer throws when the spatial object has no script or no ' +
+            'spatial_p_proc.  Returns silently so map entry is not aborted by spatial ' +
+            'objects that lack a scripted trigger.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'combatEvent_no_throw',
+        kind: 'procedure',
+        description:
+            'combatEvent(): no longer throws when the target object has no script. ' +
+            'Returns false (no override) gracefully so combat proceeds normally.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'useSkillOn_no_throw',
+        kind: 'procedure',
+        description:
+            'useSkillOn(): no longer throws when the target object has no script. ' +
+            'Returns false (no override) so skill-use falls through to default handling.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'pickup_no_throw',
+        kind: 'procedure',
+        description:
+            'pickup(): no longer throws when the target object has no script. ' +
+            'Returns false (no override) so pickup falls through to default item behaviour.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_state_prone',
+        kind: 'procedure',
+        description:
+            'critter_state(): now sets bit 1 (value 2) when the critter has knockedDown===true, ' +
+            'indicating a prone / knocked-down critter. Required for combat AI scripts that ' +
+            'check prone state before applying standing-up animations.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'proto_data_13_material',
+        kind: 'procedure',
+        description:
+            'proto_data data_member 13 (ITEM_DATA_MATERIAL): returns the material type of an ' +
+            'item (0=glass, 1=metal, 2=plastic, etc.). Reads pro.extra.material; returns 0 ' +
+            'when not set. Eliminates stub hits for material-reading scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'metarule3_108_115',
+        kind: 'metarule',
+        description:
+            'metarule3 IDs 108–115: de-stubbed with meaningful or safe-default implementations. ' +
+            '108=critter distance, 109=tile distance, 110=critter tile number, ' +
+            '111=critter is dead, 112=inventory slot lookup, 113–115=safe 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'anim_extended_codes',
+        kind: 'procedure',
+        description:
+            'anim(): codes 100–999 and > 1010 now log silently instead of emitting a stub hit ' +
+            'and a console warning. Eliminates noise from scripts using extended or engine-internal ' +
+            'animation constants that the browser build does not yet drive.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'tile_num_in_direction',
+        kind: 'opcode',
+        description:
+            'sfall 0x8189: tile_num_in_direction(tile, dir, count) → tile number that is ' +
+            'count steps in direction dir (0–5) from tile. Uses hexInDirectionDistance. ' +
+            'Required by AI patrol-path and movement scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'get_obj_elevation',
+        kind: 'opcode',
+        description:
+            'sfall 0x818A: get_obj_elevation(obj) → elevation index (0-based floor) of the ' +
+            'given object. Returns globalState.currentElevation; all visible objects share ' +
+            'the current elevation in this implementation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
