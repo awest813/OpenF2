@@ -41,6 +41,7 @@ Status guidance:
 - Cinematic timing suite (`src/phase32.test.ts`) passed with malformed-duration guard coverage.
 - Certification scaffolding suite (`src/phase33.test.ts`) passed for docs/checkpoint/blocker consistency.
 - Phase 27/29/30 suites (`src/phase27.test.ts`, `src/phase29.test.ts`, `src/phase30.test.ts`) passed for interaction lifecycle, long-campaign save/load drift checks, and combat region fallback safety.
+- Full project regression run (`npm test`) passed: 51 files / 1813 tests.
 
 ## Closure checklist (required)
 

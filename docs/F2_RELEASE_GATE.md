@@ -32,10 +32,10 @@ This gate is the final stop before declaring OpenF2 campaign completion ready.
 ## Release gate checklist
 
 - [ ] All regions certified
-- [ ] No open HIGH/CRITICAL blockers
+- [x] No open HIGH/CRITICAL blockers
 - [ ] Full playthrough to ending completed
-- [ ] Regression suites green
-- [ ] Type-check green
+- [x] Regression suites green
+- [x] Type-check green
 
 ## Current gate status
 
@@ -44,3 +44,8 @@ This gate is the final stop before declaring OpenF2 campaign completion ready.
 Reason:
 - Region checklist is still in-progress for most mid/late-game towns and final route.
 - Full campaign playthrough certification run has not yet been recorded in this artifact.
+
+## Latest validation evidence
+
+- Full regression run: `npm test` → **51 files, 1813 tests passed**.
+- Type-check run: `npx tsc --noEmit` → **pass**.
