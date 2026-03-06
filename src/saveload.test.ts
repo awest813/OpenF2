@@ -131,6 +131,59 @@ describe('migrateSave', () => {
         const raw = { version: 999, player: {}, party: [], savedMaps: {} }
         expect(() => migrateSave(raw)).toThrow()
     })
+
+    it('sanitizes malformed numeric/boolean records in migrated saves', () => {
+        const raw = {
+            version: SAVE_VERSION,
+            name: 'CorruptFields',
+            timestamp: 123,
+            currentMap: 'artemple',
+            currentElevation: 0,
+            scriptGlobalVars: { 1: 10, bad: 20, 2: 'oops', 3: Infinity },
+            gameTickTime: -45.8,
+            critterKillCounts: { 0: 4, 1: 'x', two: 9 },
+            mapVars: {
+                artemple: { 0: 1, 2: 'bad', 5: 8 },
+                broken: 'invalid',
+            },
+            mapAreaStates: { 0: true, 1: 'no', x: false, 2: false },
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            party: [],
+            savedMaps: {},
+        }
+
+        const save = migrateSave(raw)
+        expect(save.scriptGlobalVars).toEqual({ 1: 10 })
+        expect(save.gameTickTime).toBe(0)
+        expect(save.critterKillCounts).toEqual({ 0: 4 })
+        expect(save.mapVars).toEqual({ artemple: { 0: 1, 5: 8 }, broken: {} })
+        expect(save.mapAreaStates).toEqual({ 0: true, 2: false })
+    })
+
+    it('defaults non-record save extension fields to empty records and tick=0', () => {
+        const raw = {
+            version: SAVE_VERSION,
+            name: 'CorruptShapes',
+            timestamp: 123,
+            currentMap: 'artemple',
+            currentElevation: 0,
+            scriptGlobalVars: null,
+            gameTickTime: NaN,
+            critterKillCounts: 7,
+            mapVars: null,
+            mapAreaStates: 'bad',
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            party: [],
+            savedMaps: {},
+        }
+
+        const save = migrateSave(raw)
+        expect(save.scriptGlobalVars).toEqual({})
+        expect(save.gameTickTime).toBe(0)
+        expect(save.critterKillCounts).toEqual({})
+        expect(save.mapVars).toEqual({})
+        expect(save.mapAreaStates).toEqual({})
+    })
 })
 
 describe('save/load fidelity', () => {
