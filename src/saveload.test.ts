@@ -7,8 +7,9 @@
 import { beforeEach, afterEach, describe, it, expect } from 'vitest'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData, validateSaveForHydration } from './saveStateFidelity.js'
-import { resetSaveBackendForTests, save, saveList, saveLoadInit } from './saveload.js'
+import { resetSaveBackendForTests, save, saveList, saveLoadInit, load } from './saveload.js'
 import globalState from './globalState.js'
+import { Scripting } from './scripting.js'
 
 describe('migrateSave', () => {
     it('returns a v3 save unchanged', () => {
@@ -416,9 +417,19 @@ describe('save storage runtime resilience', () => {
         const state: any = globalState
         state.currentElevation = 0
         state.worldPosition = undefined
+        state.mapVars = {}
+        state.mapAreaStates = {}
+        state.gameTickTime = 0
+        state.critterKillCounts = {}
         state.gMap = {
             name: 'artemple',
             serialize: () => ({ name: 'artemple', marker: 'current-map' }),
+            deserialize: (map: any) => {
+                state.gMap.name = map.name
+            },
+            changeElevation: (elevation: number) => {
+                state.currentElevation = elevation
+            },
         }
         state.player = {
             position: { x: 1, y: 2 },
@@ -430,13 +441,17 @@ describe('save storage runtime resilience', () => {
         }
         state.gParty = {
             serialize: () => [],
+            deserialize: () => {},
         }
         state.dirtyMapCache = {}
         state.questLog = {
             serialize: () => ({ entries: [] }),
+            entries: [],
         }
         state.reputation = {
             serialize: () => ({ karma: 0, reputations: {} }),
+            karma: 0,
+            reputations: {},
         }
     }
 
@@ -474,5 +489,46 @@ describe('save storage runtime resilience', () => {
         })
 
         expect(list.map((s) => s.name)).toEqual(['Queued slot'])
+    })
+
+    it('persists worldPosition in saved snapshots through save()', () => {
+        ;(globalState as any).worldPosition = { x: 42, y: 77 }
+
+        saveLoadInit()
+        save('WorldPos slot')
+
+        let list: any[] = []
+        saveList((saves) => {
+            list = saves
+        })
+
+        expect(list).toHaveLength(1)
+        expect(list[0].worldPosition).toEqual({ x: 42, y: 77 })
+    })
+
+    it('load() restores worldPosition and script globals from in-memory backend', () => {
+        const gvarKey = 99999
+        Scripting.setGlobalVars({ [gvarKey]: 123 })
+        ;(globalState as any).worldPosition = { x: 11, y: 22 }
+        ;(globalState as any).player.inventory = []
+
+        saveLoadInit()
+        save('RoundTrip slot')
+
+        let list: any[] = []
+        saveList((saves) => {
+            list = saves
+        })
+        expect(list).toHaveLength(1)
+        const savedId = list[0].id as number
+
+        // Mutate runtime state so load must restore from save.
+        ;(globalState as any).worldPosition = { x: 999, y: 999 }
+        Scripting.setGlobalVars({ [gvarKey]: 0 })
+
+        load(savedId)
+
+        expect((globalState as any).worldPosition).toEqual({ x: 11, y: 22 })
+        expect(Scripting.getGlobalVar(gvarKey)).toBe(123)
     })
 })

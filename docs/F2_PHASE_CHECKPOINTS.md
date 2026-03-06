@@ -63,11 +63,11 @@ Gate: **PASS** when no world-map travel/encounter corruption remains on tested p
 
 ## Phase 5 — Save/load hardening
 
-- [ ] Quest globals persist correctly
-- [ ] Map vars/area states persist correctly
-- [ ] Timers and world position persist correctly
-- [ ] Party/inventory continuity persists correctly
-- [ ] Long-session roundtrip tests pass
+- [x] Quest globals persist correctly
+- [x] Map vars/area states persist correctly
+- [x] Timers and world position persist correctly
+- [x] Party/inventory continuity persists correctly
+- [x] Long-session roundtrip tests pass
 
 Gate: **PASS** when campaign-critical state survives save/load across phases.
 
