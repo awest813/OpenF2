@@ -1140,10 +1140,31 @@ export module Scripting {
             obj.visible = !visibility
         }
         use_obj_on_obj(obj: Obj, who: Obj) {
-            stub('use_obj_on_obj', arguments)
+            if (!isGameObject(obj)) {
+                warn('use_obj_on_obj: source is not a game object: ' + obj, undefined, this)
+                return
+            }
+            if (!isGameObject(who)) {
+                warn('use_obj_on_obj: target is not a game object: ' + who, undefined, this)
+                return
+            }
+
+            // Mirrors common Fallout engine behavior used by key/lock and
+            // item-on-critter scripts: invoke the target object's use_p_proc
+            // with the source object as source_obj.
+            use(who, obj)
         }
         use_obj(obj: Obj) {
-            stub('use_obj', arguments)
+            if (!isGameObject(obj)) {
+                warn('use_obj: not a game object: ' + obj, undefined, this)
+                return
+            }
+
+            const source =
+                isGameObject(this.source_obj) && this.source_obj.type === 'critter'
+                    ? (this.source_obj as Critter)
+                    : globalState.player
+            obj.use(source)
         }
         anim(obj: Obj, anim: number, param: number) {
             if (!isGameObject(obj)) {
