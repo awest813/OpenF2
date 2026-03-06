@@ -965,6 +965,7 @@ function makeDraggable($el: HTMLElement, data: string, endCallback?: () => void)
 }
 
 function uiInventoryScreen() {
+    assertNoLegacyGameplayPanelFallback('inventory', 'uiInventoryScreen')
     globalState.uiMode = UIMode.inventory
 
     showv($id('inventoryBox'))

@@ -63,6 +63,11 @@ export class ScriptDebuggerPanel extends UIPanel {
         if (this._log.length > MAX_LOG_LINES) {
             this._log = this._log.slice(-MAX_LOG_LINES)
         }
+
+        // Surface runtime faults immediately while testing gameplay UI flows.
+        if (msg.startsWith('[unknown opcode]') || msg.startsWith('[missing bridge]')) {
+            this.show()
+        }
     }
 
     /** Remove all buffered log messages. */
