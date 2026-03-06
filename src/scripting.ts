@@ -832,8 +832,7 @@ export module Scripting {
         }
         critter_inven_obj(obj: Critter, where: number) {
             if (!isGameObject(obj)) throw 'critter_inven_obj: not game object'
-            if (where === 0) {
-            } // INVEN_TYPE_WORN
+            if (where === 0) return obj.equippedArmor ?? null // INVEN_TYPE_WORN
             else if (where === 1) return obj.rightHand // INVEN_TYPE_RIGHT_HAND
             else if (where === 2) return obj.leftHand // INVEN_TYPE_LEFT_HAND
             else if (where === -2) {
@@ -1674,7 +1673,35 @@ export module Scripting {
             return player.level
         }
 
-        // game
+        // sfall extended opcodes — any-critter stat helpers
+        get_critter_base_stat(obj: Obj, stat: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_base_stat: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('get_critter_base_stat: unknown stat number: ' + stat, undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats.getBase(statName)
+        }
+        set_critter_base_stat(obj: Obj, stat: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_stat: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('set_critter_base_stat: unknown stat number: ' + stat, undefined, this)
+                return
+            }
+            ;(obj as Critter).stats.setBase(statName, value)
+        }
+        in_combat(): number {
+            return globalState.inCombat ? 1 : 0
+        }
+
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
             info('load_map: ' + map)
