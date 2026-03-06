@@ -28,6 +28,7 @@ export interface UnsupportedVmOperation {
     opcode: number
     scriptName: string
     procedureName: string | null
+    topLevelCallerProcedureName: string | null
     pc: number
     bridgedProcedureName?: string
 }
@@ -57,6 +58,8 @@ export class ScriptVM {
     lastSlowCallTimeMs: number = 0
     /** Deterministic FIFO log of unsupported VM operations encountered during execution. */
     unsupportedOperations: UnsupportedVmOperation[] = []
+    /** Name of the active top-level caller procedure for the current VM execution chain. */
+    topLevelCallerProcedureName: string | null = null
 
     constructor(script: BinaryReader, intfile: IntFile) {
         this.script = script
@@ -92,6 +95,7 @@ export class ScriptVM {
 
         const isTopLevel = this.currentProcedureName === null
         const previousProcedure = this.currentProcedureName
+        const previousTopLevelCaller = this.topLevelCallerProcedureName
         const previousPc = this.pc
         const previousHalted = this.halted
         const previousRetDepth = this.retStack.length
@@ -103,6 +107,7 @@ export class ScriptVM {
         const shouldPushTopLevelReturnSentinel = previousProcedure !== null || previousRetDepth === 0
 
         this.currentProcedureName = procName
+        if (isTopLevel) this.topLevelCallerProcedureName = procName
         this.lastProcedureName = procName
 
         // Args are passed in reverse order (stack-based calling convention).
@@ -131,6 +136,7 @@ export class ScriptVM {
 
             // Keep debugger state consistent even when a procedure throws.
             this.currentProcedureName = previousProcedure
+            this.topLevelCallerProcedureName = previousTopLevelCaller
             if (isTopLevel) {
                 const elapsed = performance.now() - t0
                 this.lastCallTimeMs = elapsed
@@ -193,6 +199,7 @@ export class ScriptVM {
             pc,
             scriptName: this.intfile.name,
             procedureName: this.currentProcedureName,
+            topLevelCallerProcedureName: this.topLevelCallerProcedureName,
         })
     }
 
@@ -202,6 +209,7 @@ export class ScriptVM {
             pc: this.pc,
             scriptName: this.intfile.name,
             procedureName: this.currentProcedureName,
+            topLevelCallerProcedureName: this.topLevelCallerProcedureName,
             bridgedProcedureName: procName,
         })
     }

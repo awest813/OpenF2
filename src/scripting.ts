@@ -95,15 +95,17 @@ export module Scripting {
         updateScriptDebuggerVMInfo(vm)
         const unsupportedOperations = vm.drainUnsupportedOperations()
         for (const op of unsupportedOperations) {
+            const callerContext = op.topLevelCallerProcedureName ?? 'none'
+            const currentProc = op.procedureName ?? 'none'
             if (op.bridgedProcedureName) {
                 pushScriptDebuggerMessage(
-                    `[missing bridge] ${op.scriptName}: ${op.bridgedProcedureName} (opcode=0x${op.opcode.toString(16)})`
+                    `[missing bridge] ${op.scriptName}: ${op.bridgedProcedureName} (opcode=0x${op.opcode.toString(16)}, pc=0x${op.pc.toString(16)}, proc=${currentProc}, caller=${callerContext})`
                 )
                 continue
             }
 
             pushScriptDebuggerMessage(
-                `[unknown opcode] ${op.scriptName}: 0x${op.opcode.toString(16)} @ 0x${op.pc.toString(16)}`
+                `[unknown opcode] ${op.scriptName}: 0x${op.opcode.toString(16)} @ 0x${op.pc.toString(16)} (proc=${currentProc}, caller=${callerContext})`
             )
         }
     }
