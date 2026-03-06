@@ -4,6 +4,8 @@ import { SaveGame } from './saveSchema.js'
 
 export interface SaveDataState {
     currentElevation: number
+    /** World-map position of the player (undefined when inside a local map). */
+    worldPosition?: { x: number; y: number }
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -33,6 +35,8 @@ export interface LoadDataState {
         deserialize: (map: SaveGame['savedMaps'][string]) => void
         changeElevation: (elevation: number, updatePlayer: boolean) => void
     }
+    /** World-map position of the player (written on load when present in save). */
+    worldPosition?: { x: number; y: number }
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -57,6 +61,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         name,
         timestamp,
         currentElevation: state.currentElevation,
+        worldPosition: state.worldPosition !== undefined ? { ...state.worldPosition } : undefined,
         currentMap: curMap.name,
         player: {
             position: state.player.position,
@@ -90,6 +95,14 @@ export function hydrateStateFromSave(
     state.player.xp = save.player.xp ?? 0
     state.player.level = save.player.level ?? 1
     state.player.karma = save.player.karma ?? 0
+
+    if (save.worldPosition !== undefined) {
+        state.worldPosition = { ...save.worldPosition }
+    } else {
+        // Explicitly clear worldPosition so stale data from a previous session
+        // cannot persist when loading a save from inside a local map.
+        state.worldPosition = undefined
+    }
 
     state.gParty.deserialize(save.party)
 

@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 export interface SaveGame {
     id?: number
@@ -21,6 +21,9 @@ export interface SaveGame {
     timestamp: number
     currentMap: string
     currentElevation: number
+
+    /** World-map position of the player when saved (added in v4). */
+    worldPosition?: Point
 
     player: {
         position: Point
@@ -72,6 +75,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.questLog === undefined) save.questLog = { entries: [] }
             if (save.reputation === undefined) save.reputation = { karma: 0, reputations: {} }
             save.version = 3
+            // falls through
+        case 3:
+            // v3 → v4: add worldPosition when present; leave undefined when absent
+            // (undefined means the player was inside a local map, not on the world map)
+            // No forced default — callers should treat missing worldPosition as unknown.
+            save.version = 4
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
