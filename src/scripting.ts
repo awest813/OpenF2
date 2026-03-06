@@ -35,7 +35,7 @@ import { makePID } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
 import { fromTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
-import { assert, BinaryReader, getFileBinarySync, getFileText, getRandomInt } from './util.js'
+import { BinaryReader, getFileBinarySync, getFileText, getRandomInt } from './util.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
@@ -619,10 +619,15 @@ export module Scripting {
             if (traitType === 1) {
                 // TRAIT_OBJECT
                 switch (trait) {
+                    case 0:
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).equippedArmor ? 1 : 0 // INVEN_TYPE_WORN
                     case 5:
-                        break // OBJECT_AI_PACKET (TODO)
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).aiNum // OBJECT_AI_PACKET
                     case 6:
-                        break // OBJECT_TEAM_NUM (TODO)
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).teamNum // OBJECT_TEAM_NUM
                     case 10:
                         return obj.orientation // OBJECT_CUR_ROT
                     case 666: // OBJECT_VISIBILITY
@@ -795,7 +800,11 @@ export module Scripting {
             return +objCanSeeObj(a, b)
         }
         obj_can_hear_obj(a: Obj, b: Obj) {
-            /*stub("obj_can_hear_obj", arguments);*/ return 0
+            if (!isGameObject(a) || !isGameObject(b)) {
+                warn(`obj_can_hear_obj: not game object: a=${a} b=${b}`, undefined, this)
+                return 0
+            }
+            return hexDistance(a.position, b.position) <= 12 ? 1 : 0
         }
         critter_mod_skill(obj: Obj, skill: number, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -863,9 +872,18 @@ export module Scripting {
             return null
         }
         inven_cmds(obj: Critter, invenCmd: number, itemIndex: number): Obj | null {
-            stub('inven_cmds', arguments, 'inventory')
-            assert(invenCmd === 13 /* INVEN_CMD_INDEX_PTR */, 'Invalid invenCmd')
-            return null
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('inven_cmds: not a critter: ' + obj, 'inventory', this)
+                return null
+            }
+
+            if (invenCmd !== 13 /* INVEN_CMD_INDEX_PTR */) {
+                stub('inven_cmds', arguments, 'inventory')
+                return null
+            }
+
+            if (itemIndex < 0 || itemIndex >= obj.inventory.length) return null
+            return obj.inventory[itemIndex]
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
             // Place the critter at tileNum; move_to handles finding a nearby tile if
