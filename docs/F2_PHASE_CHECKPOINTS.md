@@ -29,11 +29,11 @@ Gate: **PASS** when scripted progression no longer hits known unresolved VM bloc
 
 ## Phase 2 — Early campaign validation (Temple → Den)
 
-- [ ] Temple progression validated
-- [ ] Arroyo progression validated
-- [ ] Klamath progression validated
-- [ ] Den arrival/progression validated
-- [ ] Save/load continuity validated across this route
+- [x] Temple progression validated
+- [x] Arroyo progression validated
+- [x] Klamath progression validated
+- [x] Den arrival/progression validated
+- [x] Save/load continuity validated across this route
 
 Gate: **PASS** when early-game path is repeatable without softlock/state corruption.
 

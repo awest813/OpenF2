@@ -22,6 +22,10 @@ Status guidance:
 
 ---
 
+## Latest phase runs
+
+- Phase 26 early-campaign route suite (`src/phase26.test.ts`) passed with no new critical blockers opened.
+
 ## Closure checklist (required)
 
 Before moving a blocker to `CLOSED`, confirm:

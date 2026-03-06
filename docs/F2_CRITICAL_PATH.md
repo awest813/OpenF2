@@ -39,9 +39,9 @@ Legend:
 
 | Region | scripts | dialogue | barter | combat | world_map | cinematics | reputation_karma_globals | Status | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| Arroyo | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Temple + starting quest vars |
-| Klamath | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Early town gating + travel continuation |
-| Den | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Slavers/quest branch stability |
+| Arroyo | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates temple gating + quest global/map vars |
+| Klamath | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Klamath arrival, encounter return, Vic lead gating |
+| Den | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Den route unlock and post-load continuation |
 | Modoc | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Multi-step town quest progression |
 | Vault City | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Reputation + gate checks |
 | Gecko | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Cross-town dependency with Vault City |
