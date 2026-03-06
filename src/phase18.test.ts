@@ -2,7 +2,7 @@
  * Phase 18 regression tests.
  *
  * Covers:
- *   A. Save schema v7 — mapVars migration and round-trip
+ *   A. Save schema v8 — mapVars/mapAreaStates migration and round-trip
  *   B. Scripting — has_trait / critter_add_trait TRAIT_PERK (type 0)
  *   C. Scripting — inven_cmds LEFT_HAND (11) and RIGHT_HAND (12)
  *   D. Scripting — obj_item_subtype fallback using string subtype
@@ -20,12 +20,12 @@ import { Scripting } from './scripting.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
 // ---------------------------------------------------------------------------
-// A. Save schema v7 — mapVars migration
+// A. Save schema v8 — mapVars/mapAreaStates migration
 // ---------------------------------------------------------------------------
 
-describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () => {
-    it('SAVE_VERSION is now 7', () => {
-        expect(SAVE_VERSION).toBe(7)
+describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and round-trip', () => {
+    it('SAVE_VERSION is now 8', () => {
+        expect(SAVE_VERSION).toBe(8)
     })
 
     it('migrating a v6 save adds empty mapVars', () => {
@@ -42,14 +42,15 @@ describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () =
             critterKillCounts: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.mapVars).toEqual({})
+        expect(migrated.mapAreaStates).toEqual({})
         // Prior fields are preserved
         expect(migrated.gameTickTime).toBe(3600)
         expect(migrated.critterKillCounts).toEqual({})
     })
 
-    it('migrating a v1 save migrates all the way to v7 with mapVars={}', () => {
+    it('migrating a v1 save migrates all the way to v8 with mapVars/mapAreaStates defaults', () => {
         const raw = {
             version: 1,
             name: 'Old',
@@ -61,13 +62,14 @@ describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () =
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.mapVars).toEqual({})
+        expect(migrated.mapAreaStates).toEqual({})
     })
 
-    it('a v7 save preserves existing mapVars through no-op migration', () => {
+    it('a v8 save preserves existing mapVars/mapAreaStates through no-op migration', () => {
         const raw = {
-            version: 7,
+            version: 8,
             name: 'Current',
             timestamp: 9999,
             currentMap: 'artemple',
@@ -80,7 +82,7 @@ describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () =
             mapVars: { 'artemple': { 0: 1, 5: 42 } },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.mapVars).toEqual({ 'artemple': { 0: 1, 5: 42 } })
     })
 
@@ -103,6 +105,66 @@ describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () =
         }
         const save = snapshotSaveData('test', 0, SAVE_VERSION, state)
         expect(save.mapVars).toEqual({ 'klamath': { 3: 7, 10: 0 } })
+    })
+
+
+    it('snapshotSaveData includes mapAreaStates from state', () => {
+        const state: any = {
+            currentElevation: 0,
+            gameTickTime: 5000,
+            critterKillCounts: {},
+            mapVars: {},
+            mapAreaStates: { 0: true, 7: false },
+            worldPosition: undefined,
+            gMap: {
+                name: 'klamath',
+                serialize: () => ({ name: 'klamath' } as any),
+            },
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            gParty: { serialize: () => [] as any },
+            dirtyMapCache: {},
+            questLog: { serialize: () => ({ entries: [] } as any) },
+            reputation: { serialize: () => ({ karma: 0, reputations: {} } as any) },
+        }
+        const save = snapshotSaveData('test', 0, SAVE_VERSION, state)
+        expect(save.mapAreaStates).toEqual({ 0: true, 7: false })
+    })
+
+    it('hydrateStateFromSave restores mapAreaStates', () => {
+        const save = migrateSave({
+            version: 8,
+            name: 'test',
+            timestamp: 0,
+            currentMap: 'artemple',
+            currentElevation: 0,
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            party: [],
+            savedMaps: { artemple: { name: 'artemple' } as any },
+            gameTickTime: 0,
+            critterKillCounts: {},
+            mapVars: {},
+            mapAreaStates: { 2: true, 9: false },
+        })
+
+        const state: any = {
+            currentElevation: 0,
+            gameTickTime: 0,
+            critterKillCounts: {},
+            mapVars: {},
+            mapAreaStates: { 99: true },
+            gMap: {
+                name: 'artemple',
+                deserialize: (_m: any) => {},
+                changeElevation: (_e: any, _u: any) => {},
+            },
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            gParty: { deserialize: (_p: any) => {} },
+            dirtyMapCache: {},
+            questLog: { entries: [] } as any,
+            reputation: { karma: 0, reputations: {} } as any,
+        }
+        hydrateStateFromSave(save, state, (o: any) => o)
+        expect(state.mapAreaStates).toEqual({ 2: true, 9: false })
     })
 
     it('snapshotSaveData with empty mapVars stores empty object', () => {
@@ -128,7 +190,7 @@ describe('Phase 18-A — save schema v7: mapVars migration and round-trip', () =
 
     it('hydrateStateFromSave restores mapVars', () => {
         const save = migrateSave({
-            version: 7,
+            version: 8,
             name: 'test',
             timestamp: 0,
             currentMap: 'artemple',

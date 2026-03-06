@@ -12,6 +12,8 @@ export interface SaveDataState {
     critterKillCounts: Record<number, number> | null
     /** Per-map script variable store (scriptName → varIndex → value). */
     mapVars: Record<string, Record<number, number>>
+    /** World-map discovery state keyed by area ID. */
+    mapAreaStates: Record<number, boolean>
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -49,6 +51,8 @@ export interface LoadDataState {
     critterKillCounts: Record<number, number> | null
     /** Per-map script variable store. Restored from save so map state is preserved. */
     mapVars: Record<string, Record<number, number>>
+    /** World-map discovery state keyed by area ID. */
+    mapAreaStates: Record<number, boolean>
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -78,6 +82,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         gameTickTime: state.gameTickTime,
         critterKillCounts: state.critterKillCounts ? { ...state.critterKillCounts } : {},
         mapVars: state.mapVars ? JSON.parse(JSON.stringify(state.mapVars)) : {},
+        mapAreaStates: state.mapAreaStates ? { ...state.mapAreaStates } : {},
         player: {
             position: state.player.position,
             orientation: state.player.orientation,
@@ -131,6 +136,10 @@ export function hydrateStateFromSave(
     } else {
         state.mapVars = {}
     }
+
+    // Restore world-map area discovery state so travel/dialogue progression
+    // linked to area-known checks survives save/load cycles.
+    state.mapAreaStates = save.mapAreaStates ? { ...save.mapAreaStates } : {}
 
     state.gParty.deserialize(save.party)
 

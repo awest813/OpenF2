@@ -23,8 +23,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', () => {
-    it('SAVE_VERSION is now 7 (v7 adds mapVars)', () => {
-        expect(SAVE_VERSION).toBe(7)
+    it('SAVE_VERSION is now 8 (v8 adds mapAreaStates)', () => {
+        expect(SAVE_VERSION).toBe(8)
     })
 
     it('migrating a v5 save adds gameTickTime=0, empty critterKillCounts, and empty mapVars', () => {
@@ -42,7 +42,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             scriptGlobalVars: { 0: 50 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
         expect(migrated.mapVars).toEqual({})
@@ -62,7 +62,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.scriptGlobalVars).toEqual({})
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
@@ -81,7 +81,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
         expect(migrated.mapVars).toEqual({})
@@ -104,7 +104,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             critterKillCounts: { 0: 7, 3: 15 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(7)
+        expect(migrated.version).toBe(8)
         expect(migrated.gameTickTime).toBe(123456)
         expect(migrated.critterKillCounts).toEqual({ 0: 7, 3: 15 })
         expect(migrated.mapVars).toEqual({})
