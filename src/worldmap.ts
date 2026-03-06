@@ -503,8 +503,11 @@ export module Worldmap {
 
     export function doEncounter(): void {
         const squarePos = positionToSquare(worldmapPlayer)
-        const square = worldmap.squares[squarePos.x][squarePos.y]
+        if (!squarePos) return
+        const square = worldmap.squares[squarePos.x]?.[squarePos.y]
+        if (!square) return
         const encTable = worldmap.encounterTables[square.encounterType]
+        if (!encTable) return
 
         console.log('enc table: %s -> %o', square.encounterType, encTable)
         execEncounter(encTable)
@@ -523,8 +526,8 @@ export module Worldmap {
 
         //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
 
-        if (encRate === 0)
-            // 0% encounter rate (none)
+        if (encRate <= 0)
+            // 0% or negative encounter rate (none)
             return false
         else if (encRate === 100)
             // 100% encounter rate (forced)
@@ -791,11 +794,14 @@ export module Worldmap {
                     setWorldmapInteractionLocked(true)
 
                     setTimeout(function () {
-                        doEncounter()
-                        uiCloseWorldMap()
-                        $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmaploc.png')"
-                        isEncounterTransitionPending = false
-                        setWorldmapInteractionLocked(false)
+                        try {
+                            doEncounter()
+                            uiCloseWorldMap()
+                            $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmaploc.png')"
+                        } finally {
+                            isEncounterTransitionPending = false
+                            setWorldmapInteractionLocked(false)
+                        }
                     }, 1000)
 
                     clearTimeout(worldmapTimer)
