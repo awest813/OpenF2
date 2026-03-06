@@ -1081,6 +1081,76 @@ describe('in_combat (sfall 0x8168) — inline replica', () => {
 })
 
 // ---------------------------------------------------------------------------
+// use_obj / use_obj_on_obj procedure parity — inline replicas
+// ---------------------------------------------------------------------------
+
+function useObjReplica(obj: any, sourceObj: any, player: any): any {
+    if (!obj || typeof obj.use !== 'function') return null
+    const source = sourceObj && sourceObj.type === 'critter' ? sourceObj : player
+    obj.use(source)
+    return source
+}
+
+function useObjOnObjReplica(source: any, target: any, triggerUse: (target: any, source: any) => void): boolean {
+    if (!source || !target) return false
+    if (typeof source.type !== 'string' || typeof target.type !== 'string') return false
+    triggerUse(target, source)
+    return true
+}
+
+describe('use_obj procedure behavior — inline replica', () => {
+    it('uses source_obj when it is a critter', () => {
+        const usedWith: any[] = []
+        const obj = { type: 'scenery', use: (source: any) => usedWith.push(source) }
+        const sourceObj = { type: 'critter', name: 'npc' }
+        const player = { type: 'critter', name: 'player' }
+
+        const chosen = useObjReplica(obj, sourceObj, player)
+
+        expect(chosen).toBe(sourceObj)
+        expect(usedWith).toEqual([sourceObj])
+    })
+
+    it('falls back to player when source_obj is not a critter', () => {
+        const usedWith: any[] = []
+        const obj = { type: 'scenery', use: (source: any) => usedWith.push(source) }
+        const sourceObj = { type: 'item', name: 'stimpak' }
+        const player = { type: 'critter', name: 'player' }
+
+        const chosen = useObjReplica(obj, sourceObj, player)
+
+        expect(chosen).toBe(player)
+        expect(usedWith).toEqual([player])
+    })
+
+    it('does nothing for non-usable objects', () => {
+        const player = { type: 'critter', name: 'player' }
+        expect(useObjReplica(null, player, player)).toBeNull()
+    })
+})
+
+describe('use_obj_on_obj procedure behavior — inline replica', () => {
+    it('triggers use_p_proc flow with target as self and source object as source_obj', () => {
+        const trigger = vi.fn()
+        const sourceObj = { type: 'item', pid: 42 }
+        const targetObj = { type: 'scenery', pid: 88 }
+
+        const handled = useObjOnObjReplica(sourceObj, targetObj, trigger)
+
+        expect(handled).toBe(true)
+        expect(trigger).toHaveBeenCalledWith(targetObj, sourceObj)
+    })
+
+    it('does not trigger when either operand is invalid', () => {
+        const trigger = vi.fn()
+        expect(useObjOnObjReplica(null, { type: 'scenery' }, trigger)).toBe(false)
+        expect(useObjOnObjReplica({ type: 'item' }, null, trigger)).toBe(false)
+        expect(useObjOnObjReplica({ type: 1 }, { type: 'scenery' }, trigger)).toBe(false)
+        expect(trigger).not.toHaveBeenCalled()
+    })
+})
+
+// ---------------------------------------------------------------------------
 // critter_inven_obj INVEN_TYPE_WORN (0) — inline replica
 // ---------------------------------------------------------------------------
 
