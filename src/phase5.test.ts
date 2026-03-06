@@ -276,7 +276,7 @@ describe('MapViewerPanel — lifecycle', () => {
     it('is positioned in the lower-left of the screen', () => {
         const p = new MapViewerPanel(800, 600)
         expect(p.bounds.x).toBeLessThan(100)          // left side
-        expect(p.bounds.y).toBeGreaterThan(400)        // lower portion
+        expect(p.bounds.y).toBe(600 - p.bounds.height - 4) // anchored to bottom edge with 4px margin
     })
 })
 
