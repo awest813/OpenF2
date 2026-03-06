@@ -684,6 +684,26 @@ export module Scripting {
                     if (objs[i].type === 'critter' && !(<Critter>objs[i]).isPlayer) return objs[i]
                 }
                 return 0 // no critter found at that position (TODO: test)
+            } else if (id === 102) {
+                // METARULE3_CHECK_WALKING_ALLOWED: 1 if movement is permitted at the given tile.
+                // No path-blocking registry in the script VM context; always return 1 (partial).
+                return 1
+            } else if (id === 103) {
+                // METARULE3_CRITTER_IN_COMBAT: 1 if the given critter is currently in combat.
+                // Uses the engine-wide combat flag; individual critter combat state is not yet
+                // tracked separately, so we return the global inCombat flag.
+                return globalState.inCombat ? 1 : 0
+            } else if (id === 104) {
+                // METARULE3_TILE_LINE_OF_SIGHT: 1 if there is line-of-sight between two tiles.
+                // No LOS system is implemented in the scripting VM yet; always return 1 (partial).
+                return 1
+            } else if (id === 105) {
+                // METARULE3_OBJ_CAN_HEAR_OBJ: alias for obj_can_hear_obj; 1 if obj can hear target.
+                // obj = source object (first arg), userdata = target object.
+                const src = obj
+                const tgt = userdata
+                if (!isGameObject(src) || !isGameObject(tgt)) return 0
+                return hexDistance(src.position, tgt.position) <= 12 ? 1 : 0
             } else if (id === 107) {
                 // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
                 // No fog-of-war system implemented yet; always return 1 (partial).
@@ -1395,6 +1415,42 @@ export module Scripting {
                 case 39:
                     // ARMOR_DATA_DR_EXPLOSIVE — Damage Resistance vs Explosive damage
                     return pro.extra?.stats?.['DR Explosive'] ?? 0
+
+                // --- Armor DT (Damage Threshold) fields ---
+                case 40:
+                    // ARMOR_DATA_DT_NORMAL — Damage Threshold vs Normal damage
+                    return pro.extra?.stats?.['DT Normal'] ?? 0
+                case 41:
+                    // ARMOR_DATA_DT_LASER — Damage Threshold vs Laser damage
+                    return pro.extra?.stats?.['DT Laser'] ?? 0
+                case 42:
+                    // ARMOR_DATA_DT_FIRE — Damage Threshold vs Fire damage
+                    return pro.extra?.stats?.['DT Fire'] ?? 0
+                case 43:
+                    // ARMOR_DATA_DT_PLASMA — Damage Threshold vs Plasma damage
+                    return pro.extra?.stats?.['DT Plasma'] ?? 0
+                case 44:
+                    // ARMOR_DATA_DT_ELECTRICAL — Damage Threshold vs Electrical damage
+                    return pro.extra?.stats?.['DT Electrical'] ?? 0
+                case 45:
+                    // ARMOR_DATA_DT_EMP — Damage Threshold vs EMP damage
+                    return pro.extra?.stats?.['DT EMP'] ?? 0
+                case 46:
+                    // ARMOR_DATA_DT_EXPLOSIVE — Damage Threshold vs Explosive damage
+                    return pro.extra?.stats?.['DT Explosive'] ?? 0
+
+                // --- Armor / weapon extended fields ---
+                case 47:
+                    // ARMOR_DATA_PERK / WEAPON_DATA_PERK — perk granted by wearing/wielding this item
+                    return pro.extra?.perk ?? -1
+
+                // --- Critter kill/XP data (accessed via critter PIDs) ---
+                case 48:
+                    // CRITTER_DATA_EXPERIENCE — base XP awarded for killing this critter
+                    return pro.extra?.XPValue ?? 0
+                case 49:
+                    // CRITTER_DATA_KILL_TYPE — kill-type category for kill-count tracking
+                    return pro.extra?.killType ?? 0
 
                 // --- Common extended flags ---
                 case 7:
@@ -2327,6 +2383,36 @@ export module Scripting {
         // (0 = fully dark, 65536 = fully lit.)
         get_light_level(): number {
             return globalState.ambientLightLevel ?? 65536
+        }
+
+        // sfall extended opcode — get current HP of a critter (0x8183).
+        // Convenience wrapper equivalent to get_critter_stat(obj, STAT_HP/35).
+        get_critter_hp(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_hp: not a critter: ' + obj)
+                return 0
+            }
+            return (obj as Critter).getStat('HP')
+        }
+
+        // sfall extended opcode — set current HP of a critter (0x8184).
+        // Directly writes the critter's current HP stat via stats.setBase('HP', …).
+        set_critter_hp(obj: Obj, hp: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_hp: not a critter: ' + obj)
+                return
+            }
+            ;(obj as Critter).stats.setBase('HP', Math.max(0, hp))
+        }
+
+        // sfall extended opcode — get max action points for a critter (0x8185).
+        // Returns the critter's maximum AP derived stat.
+        get_critter_max_ap(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_max_ap: not a critter: ' + obj)
+                return 0
+            }
+            return (obj as Critter).getStat('AP')
         }
 
         load_map(map: number | string, startLocation: number) {
