@@ -1033,6 +1033,15 @@ export class Critter extends Obj {
     onFire = false // Takes damage each turn
     isFleeing = false // Currently fleeing combat
 
+    /**
+     * Perk ranks for this critter, keyed by Fallout 2 perk ID.
+     *
+     * `has_trait(TRAIT_PERK, obj, perkId)` reads this map.
+     * `critter_add_trait(TRAIT_OBJECT=1, TRAIT_PERK=0, …)` writes it.
+     * Defaults to an empty object (no perks) when the critter has no proto-assigned perks.
+     */
+    perkRanks: Record<number, number> = {}
+
     static fromPID(pid: number, sid?: number): Critter {
         return Obj.fromPID_(new Critter(), pid, sid)
     }

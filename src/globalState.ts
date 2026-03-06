@@ -85,6 +85,7 @@ export default {
     ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
     gameUIDisabled: false, // True when scripts have disabled UI interaction
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
+    mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
 
     uiManager: null,
     playerEntityId: 0,
@@ -157,6 +158,14 @@ export default {
      * persisted across save/load via `scriptGlobalVars` in the save schema.
      */
     critterKillCounts: Record<number, number> | null
+
+    /**
+     * Per-map script variable store.
+     * Keyed as `{ scriptName: { varIndex: value } }`.
+     * Written by `set_map_var`, read by `map_var` in scripts.
+     * Persisted in save v7+ so map state survives save/load.
+     */
+    mapVars: Record<string, Record<number, number>>
 
     mapAreas: AreaMap | null
 

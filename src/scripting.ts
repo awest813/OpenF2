@@ -258,6 +258,40 @@ export module Scripting {
         }
     }
 
+    /**
+     * Return a deep copy of the current map-variable store.
+     *
+     * Keyed as `{ scriptName: { varIndex: value } }`.  Used by the save
+     * system (v7+) to persist per-map script variables across sessions so that
+     * things like "have all enemies been killed on this map" survive reloads.
+     */
+    export function getMapVars(): Record<string, Record<number, number>> {
+        const out: Record<string, Record<number, number>> = {}
+        if (mapVars) {
+            for (const name of Object.keys(mapVars)) {
+                out[name] = { ...mapVars[name] }
+            }
+        }
+        return out
+    }
+
+    /**
+     * Bulk-restore map variables from a saved snapshot.
+     *
+     * Called during save-game load.  The incoming map is *merged* into the
+     * current mapVars so script-level defaults set during map entry are
+     * not overwritten by missing keys from an old save.
+     */
+    export function setMapVars(vars: Record<string, Record<number, number>>): void {
+        if (!mapVars) mapVars = {}
+        for (const scriptName of Object.keys(vars)) {
+            if (!mapVars[scriptName]) mapVars[scriptName] = {}
+            for (const key of Object.keys(vars[scriptName])) {
+                mapVars[scriptName][parseInt(key, 10)] = vars[scriptName][key as any]
+            }
+        }
+    }
+
     function isGameObject(obj: any) {
         // TODO: just use isinstance Obj?
         if (obj === undefined || obj === null) return false
@@ -563,8 +597,22 @@ export module Scripting {
                     return 0 // unknown area ID — treat as undiscovered
                 case 18:
                     return 0 // is the critter under the influence of drugs? (TODO)
+                case 21:
+                    // METARULE_VENDOR_CAPS: return vendor's current available caps.
+                    // Used by barter scripts to cap the amount the vendor will trade.
+                    // Without a vendor inventory system, return a large default budget.
+                    return 99999
                 case 22:
                     return 0 // is_game_loading
+                case 23:
+                    // METARULE_RAND_RANGE: random integer in range.
+                    // The full 2-arg metarule form doesn't carry both bounds; callers
+                    // that need a bounded random should use the metarule3 variant.
+                    // Return 0 as a safe placeholder so existing scripts don't throw.
+                    return 0
+                case 24:
+                    // METARULE_PARTY_COUNT: return number of NPCs currently in the party
+                    return globalState.gParty ? globalState.gParty.getPartyMembers().length : 0
                 case 46:
                     // METARULE_CURRENT_TOWN: return the current map/area ID as the town identifier
                     return currentMapID !== null ? currentMapID : 0
@@ -662,6 +710,12 @@ export module Scripting {
                 return 0
             }
 
+            if (traitType === 0) {
+                // TRAIT_PERK — return the critter's perk rank for this perk ID
+                if (obj.type !== 'critter') return 0
+                return (obj as Critter).perkRanks[trait] ?? 0
+            }
+
             if (traitType === 1) {
                 // TRAIT_OBJECT
                 switch (trait) {
@@ -695,6 +749,12 @@ export module Scripting {
 
             if (obj.type !== 'critter') {
                 warn('critter_add_trait: not a critter: ' + obj, undefined, this)
+                return
+            }
+
+            if (traitType === 0) {
+                // TRAIT_PERK — set the perk rank for this perk ID
+                ;(obj as Critter).perkRanks[trait] = Math.max(0, amount)
                 return
             }
 
@@ -922,6 +982,14 @@ export module Scripting {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('inven_cmds: not a critter: ' + obj, 'inventory', this)
                 return null
+            }
+
+            if (invenCmd === 11 /* INVEN_CMD_LEFT_HAND */) {
+                return (obj as Critter).leftHand ?? null
+            }
+
+            if (invenCmd === 12 /* INVEN_CMD_RIGHT_HAND */) {
+                return (obj as Critter).rightHand ?? null
             }
 
             if (invenCmd !== 13 /* INVEN_CMD_INDEX_PTR */) {
@@ -1224,10 +1292,38 @@ export module Scripting {
                     // WEAPON_DATA_MAX_AMMO — magazine capacity
                     return pro.extra?.maxAmmo ?? 0
 
+                // --- Common extended flags ---
+                case 7:
+                    // PROTO_DATA_FLAGS2 — extended object flags bitfield (second flags word).
+                    // Encodes things like "can use on floor", "two-handed", "big gun", etc.
+                    return pro.extra?.flags2 ?? pro.flags2 ?? 0
+
                 // --- Critter fields ---
                 case 6:
                     // CRITTER_DATA_ACTION_FLAGS — critter action flags
                     return pro.extra?.actionFlags ?? 0
+
+                // --- Weapon range fields ---
+                case 23:
+                    // WEAPON_DATA_MAX_RANGE_1 — maximum range for primary attack
+                    return pro.extra?.maxRange1 ?? 0
+                case 24:
+                    // WEAPON_DATA_MAX_RANGE_2 — maximum range for secondary attack
+                    return pro.extra?.maxRange2 ?? 0
+
+                // --- Ammo / drug specific fields ---
+                case 28:
+                    // AMMO_DATA_AC_ADJUST — AC modifier applied per bullet in burst
+                    return pro.extra?.acAdjust ?? 0
+                case 29:
+                    // AMMO_DATA_DR_ADJUST — DR modifier (as percentage of final DR)
+                    return pro.extra?.drAdjust ?? 0
+                case 30:
+                    // AMMO_DATA_DMG_MULT — damage multiplier numerator
+                    return pro.extra?.dmgMult ?? 1
+                case 31:
+                    // AMMO_DATA_DMG_DIV — damage multiplier denominator
+                    return pro.extra?.dmgDiv ?? 1
 
                 default:
                     stub('proto_data', arguments)
@@ -1269,7 +1365,17 @@ export module Scripting {
                 return null
             }
 
-            if (obj.type === 'item' && obj.pro !== undefined) return obj.pro.extra.subtype
+            if (obj.type === 'item' && (obj as any).pro !== undefined) return (obj as any).pro.extra.subtype
+
+            // Fallback: map the string subtype to its Fallout 2 integer constant.
+            // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key
+            const subtypeIntMap: { [name: string]: number } = {
+                armor: 0, container: 1, drug: 2, weapon: 3, ammo: 4, misc: 5, key: 6,
+            }
+            if (obj.subtype !== undefined && subtypeIntMap[obj.subtype] !== undefined) {
+                return subtypeIntMap[obj.subtype]
+            }
+
             stub('obj_item_subtype', arguments)
             return null
         }
@@ -1971,6 +2077,33 @@ export module Scripting {
             return count
         }
 
+        // sfall extended opcodes — string comparison (0x8175)
+        string_compare(str1: string, str2: string, caseSensitive: number): number {
+            // Returns 0 if the strings are equal, non-zero otherwise.
+            // caseSensitive: 0 = case-insensitive, 1 = case-sensitive.
+            const a = typeof str1 === 'string' ? str1 : String(str1)
+            const b = typeof str2 === 'string' ? str2 : String(str2)
+            if (caseSensitive) return a === b ? 0 : 1
+            return a.toLowerCase() === b.toLowerCase() ? 0 : 1
+        }
+
+        // sfall extended opcodes — substring extraction (0x8176)
+        substr(str: string, start: number, len: number): string {
+            // Returns a substring of `str` starting at `start` with length `len`.
+            // Negative `len` means "to end of string".  Mirrors sfall substr().
+            if (typeof str !== 'string') return ''
+            const s = start < 0 ? Math.max(0, str.length + start) : start
+            if (len < 0) return str.slice(s)
+            return str.slice(s, s + len)
+        }
+
+        // sfall extended opcodes — session uptime (0x8177)
+        get_uptime(): number {
+            // Returns milliseconds since the page was loaded.  Used by scripts
+            // that want to measure real-world elapsed time (e.g. anti-exploit timers).
+            return typeof performance !== 'undefined' ? Math.floor(performance.now()) : 0
+        }
+
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
             info('load_map: ' + map)
@@ -2369,6 +2502,9 @@ export module Scripting {
             }
         }
 
+        const secs = Math.floor(globalState.gameTickTime / 10) % 86400
+        const currentHour = Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60)
+
         var updated = 0
         for (var i = 0; i < gameObjects.length; i++) {
             var script = gameObjects[i]._script
@@ -2376,7 +2512,7 @@ export module Scripting {
                 script.combat_is_initialized = globalState.inCombat ? 1 : 0
                 script.self_obj = gameObjects[i] as ScriptableObj
                 script.game_time = Math.max(1, globalState.gameTickTime)
-                script.game_time_hour = 1200 // hour of the day
+                script.game_time_hour = currentHour
                 script.cur_map_index = currentMapID
                 trackScriptTrigger(script, 'map_update_p_proc')
                 script.map_update_p_proc()
@@ -2449,10 +2585,11 @@ export module Scripting {
     export function objectEnterMap(obj: Obj, elevation: number, mapID: number) {
         var script = obj._script
         if (script !== undefined && script.map_enter_p_proc !== undefined) {
+            const secs = Math.floor(globalState.gameTickTime / 10) % 86400
             script.combat_is_initialized = 0
             script.self_obj = obj as ScriptableObj
             script.game_time = Math.max(1, globalState.gameTickTime)
-            script.game_time_hour = 1200 // hour of the day
+            script.game_time_hour = Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60)
             script.cur_map_index = currentMapID
             trackScriptTrigger(script, 'map_enter_p_proc')
             script.map_enter_p_proc()
