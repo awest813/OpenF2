@@ -23,8 +23,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', () => {
-    it('SAVE_VERSION is now 8 (v8 adds mapAreaStates)', () => {
-        expect(SAVE_VERSION).toBe(8)
+    it('SAVE_VERSION is now 9 (v9 adds playerCharTraits)', () => {
+        expect(SAVE_VERSION).toBe(9)
     })
 
     it('migrating a v5 save adds gameTickTime=0, empty critterKillCounts, and empty mapVars', () => {
@@ -42,7 +42,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             scriptGlobalVars: { 0: 50 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
         expect(migrated.mapVars).toEqual({})
@@ -62,14 +62,14 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.scriptGlobalVars).toEqual({})
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
         expect(migrated.mapVars).toEqual({})
     })
 
-    it('migrating a v1 save migrates all the way to v7', () => {
+    it('migrating a v1 save migrates all the way to current SAVE_VERSION', () => {
         const raw = {
             version: 1,
             name: 'Old',
@@ -81,13 +81,13 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.gameTickTime).toBe(0)
         expect(migrated.critterKillCounts).toEqual({})
         expect(migrated.mapVars).toEqual({})
     })
 
-    it('a v6 save with gameTickTime and critterKillCounts migrates to v7 with mapVars={}', () => {
+    it('a v6 save with gameTickTime and critterKillCounts migrates to current version with mapVars={}', () => {
         const raw = {
             version: 6,
             name: 'V6 Save',
@@ -104,7 +104,7 @@ describe('Phase 17-A — save schema v6: gameTickTime and critterKillCounts', ()
             critterKillCounts: { 0: 7, 3: 15 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.gameTickTime).toBe(123456)
         expect(migrated.critterKillCounts).toEqual({ 0: 7, 3: 15 })
         expect(migrated.mapVars).toEqual({})

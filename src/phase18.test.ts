@@ -24,8 +24,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and round-trip', () => {
-    it('SAVE_VERSION is now 8', () => {
-        expect(SAVE_VERSION).toBe(8)
+    it('SAVE_VERSION is now 9 (v9 adds playerCharTraits)', () => {
+        expect(SAVE_VERSION).toBe(9)
     })
 
     it('migrating a v6 save adds empty mapVars', () => {
@@ -42,7 +42,7 @@ describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and rou
             critterKillCounts: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.mapVars).toEqual({})
         expect(migrated.mapAreaStates).toEqual({})
         // Prior fields are preserved
@@ -50,7 +50,7 @@ describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and rou
         expect(migrated.critterKillCounts).toEqual({})
     })
 
-    it('migrating a v1 save migrates all the way to v8 with mapVars/mapAreaStates defaults', () => {
+    it('migrating a v1 save migrates all the way to current version with mapVars/mapAreaStates defaults', () => {
         const raw = {
             version: 1,
             name: 'Old',
@@ -62,12 +62,12 @@ describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and rou
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.mapVars).toEqual({})
         expect(migrated.mapAreaStates).toEqual({})
     })
 
-    it('a v8 save preserves existing mapVars/mapAreaStates through no-op migration', () => {
+    it('a v8 save migrates to v9 and preserves existing mapVars/mapAreaStates', () => {
         const raw = {
             version: 8,
             name: 'Current',
@@ -82,7 +82,7 @@ describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and rou
             mapVars: { 'artemple': { 0: 1, 5: 42 } },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(8)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.mapVars).toEqual({ 'artemple': { 0: 1, 5: 42 } })
     })
 

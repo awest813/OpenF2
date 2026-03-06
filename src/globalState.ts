@@ -87,6 +87,7 @@ export default {
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
     mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
+    playerCharTraits: [], // player character-creation trait IDs (TRAIT_* constants 0–15)
 
     uiManager: null,
     playerEntityId: 0,
@@ -169,6 +170,12 @@ export default {
     mapVars: Record<string, Record<number, number>>
     /** Per-area world-map discovery overrides keyed by area ID. */
     mapAreaStates: Record<number, boolean>
+
+    /**
+     * Player character-creation trait IDs (sorted number array, values 0–15).
+     * Persisted in save v9+.  Used by `has_trait(TRAIT_CHAR=2, …)` checks.
+     */
+    playerCharTraits: number[]
 
     mapAreas: AreaMap | null
 
