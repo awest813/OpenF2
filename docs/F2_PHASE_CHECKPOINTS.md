@@ -86,10 +86,10 @@ Gate: **PASS** when combat no longer causes critical-path divergence.
 
 ## Phase 7 — Quest consequences
 
-- [ ] Reputation updates propagate correctly
-- [ ] Karma updates propagate correctly
-- [ ] Global/town vars gate dialogue/quests as expected
-- [ ] Cross-region consequence checks validated
+- [x] Reputation updates propagate correctly
+- [x] Karma updates propagate correctly
+- [x] Global/town vars gate dialogue/quests as expected
+- [x] Cross-region consequence checks validated
 
 Gate: **PASS** when player consequences consistently alter campaign state as expected.
 

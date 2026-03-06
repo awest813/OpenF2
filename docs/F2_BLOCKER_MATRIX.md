@@ -23,6 +23,7 @@ Status guidance:
 | BLK-004 | HIGH | World Map | world-map session restore | `Worldmap.init` starting position | World-map session always initialized at Arroyo hotspot, ignoring saved world travel position and risking travel-state discontinuity after load. | Provide saved world position, initialize world map, observe cursor starts at default area instead of saved point. | World-map initialization restores saved position (clamped to bounds) and keeps global worldPosition synchronized during movement. | `src/phase28.test.ts`, `src/worldmapEncounter.test.ts` | @engine | CLOSED | Added normalization helper + runtime sync to global worldPosition for save continuity. |
 | BLK-005 | HIGH | Save/Load | runtime persistence integration | `saveload` world-position/script globals path | Runtime save/load resilience suite had no integration assertion proving `save()` persisted worldPosition and `load()` restored worldPosition + script globals together. | Save slot with non-default world position and marker GVAR; mutate runtime values; load slot. | Loaded state restores saved worldPosition and scripted global variable markers. | `src/saveload.test.ts` | @engine | CLOSED | Added in-memory backend integration regressions for worldPosition persistence + load restoration. |
 | BLK-006 | HIGH | Combat | AP accounting | `ActionPoints.subtractCombatAP/subtractMoveAP` | Negative AP spend inputs could increase AP due subtraction of negative values, allowing AP-gain exploit in malformed call paths. | Call `subtractCombatAP(-n)` or `subtractMoveAP(-n)` on live ActionPoints object. | Non-positive AP spend values are treated as no-op and cannot increase AP. | `src/combat.integration.test.ts` | @engine | CLOSED | Added guards for `value <= 0` in AP subtraction methods and regression test coverage. |
+| BLK-007 | HIGH | Quest Consequences | reputation/global-var branch continuity | consequence gate evaluation + persistence | No dedicated regression suite verified that cross-town consequence gates (karma/reputation + GVAR conditions) stay consistent after save/load. | Apply consequence actions (quest globals + reputation changes), save, load, re-evaluate branch gates. | Consequence-driven branch gates remain stable and deterministic across save/load. | `src/phase31.test.ts` | @engine | CLOSED | Added consequence harness covering NCR/Vault City/Broken Hills gate unlock/revoke + persistence. |
 
 ---
 
@@ -33,6 +34,7 @@ Status guidance:
 - World-map reliability suites (`src/phase28.test.ts`, `src/worldmapEncounter.test.ts`) passed with saved-position normalization coverage.
 - Save/load hardening suite (`src/saveload.test.ts`) passed with worldPosition + script-global roundtrip coverage.
 - Combat fidelity suite (`src/combat.integration.test.ts`) passed after AP subtraction guard hardening.
+- Quest consequence suite (`src/phase31.test.ts`) passed for karma/reputation/global-var gate persistence.
 
 ## Closure checklist (required)
 
