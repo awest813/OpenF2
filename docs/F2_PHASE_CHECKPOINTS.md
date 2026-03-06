@@ -21,7 +21,7 @@ Gate: **PASS** only when scope and tracking artifacts are in place.
 - [x] Critical-path relevant partial/stub procedures prioritized
 - [x] Implementations added for selected blockers
 - [x] Regression test added for every de-stubbed behavior
-- [ ] No known unresolved critical-path stub hit in targeted runs
+- [x] No known unresolved critical-path stub hit in targeted runs
 
 Gate: **PASS** when scripted progression no longer hits known unresolved VM blockers on covered path.
 
