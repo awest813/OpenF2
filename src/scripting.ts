@@ -391,6 +391,7 @@ export module Scripting {
         start!: () => void
 
         map_enter_p_proc!: () => void
+        map_exit_p_proc!: () => void
         map_update_p_proc!: () => void
 
         timed_event_p_proc!: () => void
@@ -401,6 +402,8 @@ export module Scripting {
         use_p_proc!: () => void
         talk_p_proc!: () => void
         pickup_p_proc!: () => void
+        look_at_p_proc!: () => void
+        description_p_proc!: () => void
 
         combat_p_proc!: () => void
         damage_p_proc!: () => void
@@ -1915,6 +1918,34 @@ export module Scripting {
         return obj._script._didOverride
     }
 
+    export function lookAt(obj: Obj, source: Obj): boolean | null {
+        if (!obj._script || obj._script.look_at_p_proc === undefined) return null
+
+        obj._script.source_obj = source
+        obj._script.self_obj = obj as ScriptableObj
+        obj._script.game_time = Math.max(1, globalState.gameTickTime)
+        obj._script.cur_map_index = currentMapID
+        obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'look_at_p_proc')
+        obj._script.look_at_p_proc()
+        flushUnsupportedVMOperations(obj._script)
+        return obj._script._didOverride
+    }
+
+    export function description(obj: Obj, source: Obj): boolean | null {
+        if (!obj._script || obj._script.description_p_proc === undefined) return null
+
+        obj._script.source_obj = source
+        obj._script.self_obj = obj as ScriptableObj
+        obj._script.game_time = Math.max(1, globalState.gameTickTime)
+        obj._script.cur_map_index = currentMapID
+        obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'description_p_proc')
+        obj._script.description_p_proc()
+        flushUnsupportedVMOperations(obj._script)
+        return obj._script._didOverride
+    }
+
     export function talk(script: Script, obj: Obj): boolean {
         script.self_obj = obj as ScriptableObj
         script.game_time = Math.max(1, globalState.gameTickTime)
@@ -2084,6 +2115,32 @@ export module Scripting {
         }
 
         // info("updated " + updated + " objects")
+    }
+
+    export function exitMap(mapScript: Script, objects: Obj[], elevation: number, mapID: number): void {
+        gameObjects = objects
+
+        if (mapScript && mapScript.map_exit_p_proc !== undefined) {
+            mapScript.self_obj = { _script: mapScript }
+            mapScript.game_time = Math.max(1, globalState.gameTickTime)
+            mapScript.cur_map_index = mapID
+            trackScriptTrigger(mapScript, 'map_exit_p_proc')
+            mapScript.map_exit_p_proc()
+            flushUnsupportedVMOperations(mapScript)
+        }
+
+        for (let i = 0; i < gameObjects.length; i++) {
+            const script = gameObjects[i]._script
+            if (script !== undefined && script.map_exit_p_proc !== undefined) {
+                script.self_obj = gameObjects[i] as ScriptableObj
+                script.game_time = Math.max(1, globalState.gameTickTime)
+                script.game_time_hour = 1200
+                script.cur_map_index = mapID
+                trackScriptTrigger(script, 'map_exit_p_proc')
+                script.map_exit_p_proc()
+                flushUnsupportedVMOperations(script)
+            }
+        }
     }
 
     export function enterMap(
