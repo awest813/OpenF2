@@ -4,6 +4,11 @@ import { UIManagerImpl } from './uiPanel.js'
 import { DialoguePanel } from './dialoguePanel.js'
 import { BarterPanel } from './barterPanel.js'
 import { WorldMapPanel } from './worldMapPanel.js'
+import { InventoryPanel } from './inventoryPanel.js'
+import { LootPanel } from './lootPanel.js'
+import { ElevatorPanel } from './elevatorPanel.js'
+import { CalledShotPanel } from './calledShotPanel.js'
+import { ScriptDebuggerPanel } from './scriptDebuggerPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 import { registerDefaultPanels, PRIMARY_GAMEPLAY_PANEL_NAMES } from './registerPanels.js'
 import { Config } from '../config.js'
@@ -93,6 +98,123 @@ describe('WorldMapPanel interaction parity', () => {
     })
 })
 
+
+
+
+describe('InventoryPanel interaction parity', () => {
+    let emitSpy: ReturnType<typeof vi.spyOn>
+    beforeEach(() => {
+        emitSpy = vi.spyOn(EventBus, 'emit')
+    })
+    afterEach(() => {
+        emitSpy.mockRestore()
+    })
+
+    it('emits use/drop events for selected items and mutates list on drop', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [
+            { name: 'Stimpak', amount: 1, canUse: true },
+            { name: 'Rope', amount: 1, canUse: false },
+        ]
+        panel.show()
+
+        panel.onMouseDown(20, 90, 'l')
+        panel.onMouseDown(285, 90, 'l')
+        expect(emitSpy).toHaveBeenCalledWith('inventory:useItem', { index: 0 })
+
+        panel.onMouseDown(20, 112, 'l')
+        panel.onMouseDown(285, 118, 'l')
+        expect(emitSpy).toHaveBeenCalledWith('inventory:dropItem', { index: 1 })
+        expect(panel.items).toHaveLength(1)
+    })
+})
+
+describe('LootPanel interaction parity', () => {
+    let emitSpy: ReturnType<typeof vi.spyOn>
+    beforeEach(() => {
+        emitSpy = vi.spyOn(EventBus, 'emit')
+    })
+    afterEach(() => {
+        emitSpy.mockRestore()
+    })
+
+    it('TAKE ALL transfers container inventory and emits snapshot on close', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith(
+            [{ name: 'Knife', amount: 1 }],
+            [{ name: 'Ammo', amount: 5 }, { name: 'Rope', amount: 1 }],
+        )
+
+        const takeAllX = panel.bounds.width / 2 - 80 - 4
+        const btnY = panel.bounds.height - 36
+        panel.onMouseDown(takeAllX + 1, btnY + 1, 'l')
+
+        expect(panel.containerInventory).toHaveLength(0)
+        expect(panel.playerInventory).toEqual([
+            { name: 'Knife', amount: 1 },
+            { name: 'Ammo', amount: 5 },
+            { name: 'Rope', amount: 1 },
+        ])
+
+        const closeX = panel.bounds.width / 2 + 4
+        panel.onMouseDown(closeX + 1, btnY + 1, 'l')
+        expect(emitSpy).toHaveBeenCalledWith('loot:closed', {
+            playerInventory: panel.playerInventory.slice(),
+            containerInventory: [],
+        })
+    })
+})
+
+describe('ElevatorPanel interaction parity', () => {
+    let emitSpy: ReturnType<typeof vi.spyOn>
+    beforeEach(() => {
+        emitSpy = vi.spyOn(EventBus, 'emit')
+    })
+    afterEach(() => {
+        emitSpy.mockRestore()
+    })
+
+    it('supports numeric floor selection via keyboard', () => {
+        const panel = new ElevatorPanel(800, 600)
+        panel.openWith([
+            { label: 'L1', mapID: 1, level: 0, tileNum: 123 },
+            { label: 'L2', mapID: 1, level: 1, tileNum: 456 },
+        ])
+
+        panel.onKeyDown('2')
+        expect(emitSpy).toHaveBeenCalledWith('elevator:buttonPressed', { mapID: 1, level: 1, tileNum: 456 })
+        expect(panel.visible).toBe(false)
+    })
+})
+
+describe('CalledShotPanel interaction parity', () => {
+    let emitSpy: ReturnType<typeof vi.spyOn>
+    beforeEach(() => {
+        emitSpy = vi.spyOn(EventBus, 'emit')
+    })
+    afterEach(() => {
+        emitSpy.mockRestore()
+    })
+
+    it('emits selected region and closes', () => {
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ torso: 70 })
+
+        panel.onMouseDown(20, 50, 'l')
+        expect(emitSpy).toHaveBeenCalledWith('calledShot:regionSelected', { region: 'torso' })
+        expect(panel.visible).toBe(false)
+    })
+})
+
+describe('ScriptDebuggerPanel gameplay debugging flow', () => {
+    it('surfaces automatically when runtime issues are pushed', () => {
+        const panel = new ScriptDebuggerPanel(800, 600)
+        expect(panel.visible).toBe(false)
+
+        panel.pushMessage('[unknown opcode] test.int: 0xfe @ 0x10')
+        expect(panel.visible).toBe(true)
+    })
+})
 
 describe('UI2-only gameplay mode fallback guard', () => {
     const originalFlag = Config.ui.forceUI2OnlyGameplayPanels

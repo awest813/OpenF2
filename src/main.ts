@@ -357,6 +357,13 @@ heart.keydown = (k: string) => {
     if (globalState.isLoading === true) {
         return
     }
+
+    // Global gameplay-debugger toggle (works even while panel is hidden).
+    if (k === 'F6') {
+        globalState.uiManager?.get<ScriptDebuggerPanel>('scriptDebugger').toggle()
+        return
+    }
+
     // Route to ui2 UIManager first; if a panel consumes the key, skip game handling.
     if (globalState.uiManager?.handleKeyDown(k)) {
         return
