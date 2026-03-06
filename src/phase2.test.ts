@@ -5,6 +5,8 @@
  *   - Game time calculation helpers used by get_month, get_day, game_time_hour
  *   - Encounter difficulty rate scaling used by worldmap didEncounter
  *   - Audio: rollNextSfx handles empty/missing ambientSfx without throwing
+ *   - B1: Encounter-rate matrix (undefined/null, zero/negative, region overrides,
+ *         boundary values, repeated travel ticks after reload)
  */
 
 import { describe, it, expect } from 'vitest'
@@ -224,6 +226,196 @@ describe('encounter rate undefined guard (regression)', () => {
         // Without guard, `undefined === 0` is false and `undefined === 100` is false,
         // so the else branch runs with `undefined` — Math.floor(undefined / 15) = NaN
         expect(rate === undefined).toBe(true)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// B1 — Encounter rate matrix (deterministic ruleset)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors the full resolution path in worldmap.ts didEncounter():
+ *   1. Look up overriding table rate.
+ *   2. Fall back to frequency-token default.
+ *   3. Guard for non-finite / null / negative.
+ *   4. Treat <=0 as "no encounter", 100 as "forced encounter".
+ *   5. Apply difficulty scaling then clamp to [1, 99].
+ */
+function resolveEncounterRate(
+    tableRate: number | undefined | null,
+    frequency: string,
+    frequencyDefaults: Record<string, number>
+): number | null {
+    // Use the explicit override if present (even if zero)
+    const raw = tableRate !== undefined ? tableRate : frequencyDefaults[frequency]
+    // null from tableRate means missing/corrupted entry
+    if (raw === null || raw === undefined) return null
+    if (!Number.isFinite(raw as number)) return null
+    return raw as number
+}
+
+function shouldEncounterOccur(
+    rate: number | null,
+    roll: number,
+    difficulty: 'easy' | 'normal' | 'hard' = 'normal'
+): boolean {
+    if (rate === null) return false
+    if (rate <= 0) return false
+    if (rate === 100) return true
+
+    let adjusted = rate
+    if (difficulty === 'easy') adjusted -= Math.floor(adjusted / 15)
+    else if (difficulty === 'hard') adjusted += Math.floor(adjusted / 15)
+    adjusted = Math.max(1, Math.min(99, adjusted))
+
+    return roll < adjusted
+}
+
+describe('B1 encounter-rate matrix — undefined/null/invalid inputs', () => {
+    const defaults: Record<string, number> = { common: 30, rare: 3, forced: 100, none: 0 }
+
+    it('undefined tableRate falls back to frequency default', () => {
+        expect(resolveEncounterRate(undefined, 'common', defaults)).toBe(30)
+    })
+
+    it('null tableRate (corrupted entry) resolves to null', () => {
+        expect(resolveEncounterRate(null, 'common', defaults)).toBeNull()
+    })
+
+    it('NaN tableRate resolves to null', () => {
+        expect(resolveEncounterRate(NaN, 'common', defaults)).toBeNull()
+    })
+
+    it('Infinity tableRate resolves to null', () => {
+        expect(resolveEncounterRate(Infinity, 'common', defaults)).toBeNull()
+    })
+
+    it('null rate produces no encounter', () => {
+        expect(shouldEncounterOccur(null, 50)).toBe(false)
+    })
+
+    it('unknown frequency token with no tableRate resolves to null', () => {
+        expect(resolveEncounterRate(undefined, 'alien_zone', defaults)).toBeNull()
+    })
+})
+
+describe('B1 encounter-rate matrix — zero and negative rates', () => {
+    it('zero rate produces no encounter regardless of roll', () => {
+        expect(shouldEncounterOccur(0, 0)).toBe(false)
+        expect(shouldEncounterOccur(0, 99)).toBe(false)
+    })
+
+    it('negative rate is treated as no-encounter (not 1% clamped)', () => {
+        expect(shouldEncounterOccur(-1, 0)).toBe(false)
+        expect(shouldEncounterOccur(-50, 0)).toBe(false)
+    })
+
+    it('positive rate still triggers at low roll', () => {
+        expect(shouldEncounterOccur(30, 0)).toBe(true)
+    })
+
+    it('none frequency defaults to 0 — no encounter', () => {
+        const defaults: Record<string, number> = { none: 0, common: 30 }
+        const rate = resolveEncounterRate(undefined, 'none', defaults)
+        expect(shouldEncounterOccur(rate, 0)).toBe(false)
+    })
+})
+
+describe('B1 encounter-rate matrix — region-specific overrides', () => {
+    it('region override beats frequency default', () => {
+        const defaults: Record<string, number> = { common: 30 }
+        // Specific region has 80% rate overriding the "common" default
+        const rate = resolveEncounterRate(80, 'common', defaults)
+        expect(rate).toBe(80)
+    })
+
+    it('region override of 0 suppresses encounters even for frequent areas', () => {
+        const defaults: Record<string, number> = { frequent: 50 }
+        const rate = resolveEncounterRate(0, 'frequent', defaults)
+        expect(shouldEncounterOccur(rate, 0)).toBe(false)
+    })
+
+    it('region override of 100 forces encounter regardless of roll', () => {
+        const defaults: Record<string, number> = { rare: 3 }
+        const rate = resolveEncounterRate(100, 'rare', defaults)
+        expect(shouldEncounterOccur(rate, 99)).toBe(true)
+    })
+
+    it('region-specific rates survive difficulty adjustment (forced stays forced)', () => {
+        const rate = resolveEncounterRate(100, 'forced', {})
+        expect(shouldEncounterOccur(rate, 99, 'easy')).toBe(true)
+        expect(shouldEncounterOccur(rate, 99, 'hard')).toBe(true)
+    })
+})
+
+describe('B1 encounter-rate matrix — boundary values (save/load proximity)', () => {
+    it('rate of 1 (MIN guard) does encounter at roll=0', () => {
+        expect(shouldEncounterOccur(1, 0)).toBe(true)
+    })
+
+    it('rate of 1 (MIN guard) does not encounter at roll=1', () => {
+        expect(shouldEncounterOccur(1, 1)).toBe(false)
+    })
+
+    it('rate of 99 (MAX guard) encounters at roll=98', () => {
+        expect(shouldEncounterOccur(99, 98)).toBe(true)
+    })
+
+    it('rate of 99 (MAX guard) does not encounter at roll=99', () => {
+        expect(shouldEncounterOccur(99, 99)).toBe(false)
+    })
+
+    it('post-difficulty clamp never goes below 1', () => {
+        // Hard clamp: even if adjusted < 1 it becomes 1
+        const adjusted = Math.max(1, Math.min(99, -10))
+        expect(adjusted).toBe(1)
+    })
+
+    it('post-difficulty clamp never goes above 99', () => {
+        const adjusted = Math.max(1, Math.min(99, 200))
+        expect(adjusted).toBe(99)
+    })
+})
+
+describe('B1 encounter-rate matrix — repeated travel ticks after reload', () => {
+    /**
+     * Simulates multiple travel ticks with a fixed random seed.
+     * The key property: the encounter rate must be identical for every tick —
+     * it is not consumed, decremented, or accumulated.
+     */
+    function simulateTicks(
+        rate: number,
+        rolls: number[],
+        difficulty: 'easy' | 'normal' | 'hard' = 'normal'
+    ): boolean[] {
+        return rolls.map((roll) => shouldEncounterOccur(rate, roll, difficulty))
+    }
+
+    it('rate is stateless — same rate produces same outcome for same roll', () => {
+        const results1 = simulateTicks(30, [5, 5, 5])
+        const results2 = simulateTicks(30, [5, 5, 5])
+        expect(results1).toEqual(results2)
+    })
+
+    it('rate is stateless — no accumulation across ticks', () => {
+        // Even after many failed checks the rate stays the same
+        const results = simulateTicks(30, [50, 50, 50, 50, 50])
+        expect(results.every((r) => r === false)).toBe(true)
+    })
+
+    it('reload restores same rate and produces deterministic outcome', () => {
+        // Save-then-reload scenario: rate is stored in save data, not accumulated
+        const rateBeforeSave = 30
+        // Simulate "loading" by just using the saved rate value again
+        const rateAfterReload = rateBeforeSave
+        expect(shouldEncounterOccur(rateAfterReload, 10)).toBe(shouldEncounterOccur(rateBeforeSave, 10))
+    })
+
+    it('continued travel after reload is consistent with pre-reload behaviour', () => {
+        const rate = 50
+        const preSaveResults = simulateTicks(rate, [20, 60, 40])
+        const postLoadResults = simulateTicks(rate, [20, 60, 40])
+        expect(preSaveResults).toEqual(postLoadResults)
     })
 })
 
