@@ -103,11 +103,31 @@ export function load(id: number): void {
     // Load stored savegame with id
 
     withTransaction((trans) => {
-        trans.objectStore('saves').get(id).onsuccess = function (e) {
-            const save: SaveGame = migrateSave((<any>e.target).result)
+        const request = trans.objectStore('saves').get(id)
 
-            console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
-            hydrateStateFromSave(save, globalState, deserializeObj)
+        request.onerror = function () {
+            console.error(`[SaveLoad] Failed to read save #${id} from storage`)
+        }
+
+        request.onsuccess = function (e) {
+            const rawSave = (<any>e.target).result
+            if (!rawSave) {
+                console.error(`[SaveLoad] Save #${id} was not found`)
+                return
+            }
+
+            try {
+                const save: SaveGame = migrateSave(rawSave)
+
+                console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
+                hydrateStateFromSave(save, globalState, deserializeObj)
+            } catch (error) {
+                console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
+                    error,
+                    saveVersion: rawSave.version,
+                    saveName: rawSave.name,
+                })
+            }
         }
     })
 }

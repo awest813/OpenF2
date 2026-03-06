@@ -78,6 +78,8 @@ export function hydrateStateFromSave(
     state: LoadDataState,
     inventoryDeserializer: (obj: SaveGame['player']['inventory'][number]) => any
 ): void {
+    validateSaveForHydration(save)
+
     const savedMap = save.savedMaps[save.currentMap]
 
     state.gMap.deserialize(savedMap)
@@ -98,4 +100,27 @@ export function hydrateStateFromSave(
 
     state.dirtyMapCache = { ...save.savedMaps }
     delete state.dirtyMapCache[savedMap.name]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
+}
+
+export function validateSaveForHydration(save: SaveGame): void {
+    if (!isRecord(save.savedMaps)) {
+        throw new Error('[SaveLoad] Save is missing map data (savedMaps)')
+    }
+
+    const savedMap = save.savedMaps[save.currentMap]
+    if (!savedMap) {
+        throw new Error(`[SaveLoad] Save references missing current map '${save.currentMap}'`)
+    }
+
+    if (!save.player || !Array.isArray(save.player.inventory)) {
+        throw new Error('[SaveLoad] Save player inventory is missing or invalid')
+    }
+
+    if (!Array.isArray(save.party)) {
+        throw new Error('[SaveLoad] Save party data is missing or invalid')
+    }
 }
