@@ -17,7 +17,8 @@ Status guidance:
 
 | ID | Severity | Region | Map/Script | Procedure/Opcode | Symptom | Repro Steps | Expected Behavior | Automated Test Coverage | Owner | Status | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| BLK-001 | CRITICAL | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | OPEN | Seed entry for first critical-path blocker |
+| BLK-001 | HIGH | Global/VM | `src/scripting.ts` | `tile_num_in_direction` + scripting type paths | TypeScript compile failed due duplicate function implementation and invalid type usages in scripting bridge methods. | `npx tsc --noEmit` produced TS2393/TS2345/TS2339 errors. | VM scripting module compiles cleanly with one canonical `tile_num_in_direction` implementation and type-safe logging/object narrowing. | `npx tsc --noEmit`, `src/phase24.test.ts` | @engine | CLOSED | Fixed by removing duplicate method, correcting log/warn argument typing, and narrowing `source_obj` union. |
+| BLK-002 | HIGH | Global/VM | `metarule3` runtime | `metarule3_103` | `METARULE3_CRITTER_IN_COMBAT` answered from global flag only, not per-critter participation. | Call `metarule3(103, critter, ...)` during combat with critter absent from combat roster. | Return 1 only for critters in active combatant list (fallback to global flag only when roster unavailable). | `src/phase22.test.ts` (new roster and fallback assertions) | @engine | CLOSED | Checklist entry promoted to implemented after regression coverage. |
 
 ---
 

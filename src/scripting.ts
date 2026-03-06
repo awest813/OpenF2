@@ -869,9 +869,15 @@ export module Scripting {
                 return 1
             } else if (id === 103) {
                 // METARULE3_CRITTER_IN_COMBAT: 1 if the given critter is currently in combat.
-                // Uses the engine-wide combat flag; individual critter combat state is not yet
-                // tracked separately, so we return the global inCombat flag.
-                return globalState.inCombat ? 1 : 0
+                if (!isGameObject(obj) || obj.type !== 'critter') return 0
+                if (!globalState.inCombat) return 0
+
+                // Prefer explicit membership in the active combat roster when available.
+                // Fall back to the global combat flag for compatibility with contexts that
+                // do not expose globalState.combat (legacy scripted checks).
+                const active = globalState.combat?.combatants
+                if (!active) return 1
+                return active.includes(obj as Critter) ? 1 : 0
             } else if (id === 104) {
                 // METARULE3_TILE_LINE_OF_SIGHT: 1 if there is line-of-sight between two tiles.
                 // No LOS system is implemented in the scripting VM yet; always return 1 (partial).
@@ -959,7 +965,7 @@ export module Scripting {
             if (namedStat !== undefined) return obj.getStat(namedStat)
             // Unknown stat number — return 0 gracefully rather than emitting a stub
             // hit that floods the console when scripts probe optional stat IDs.
-            warn('get_critter_stat: unknown stat ' + stat + ' — returning 0', 'critter', this)
+            warn('get_critter_stat: unknown stat ' + stat + ' — returning 0', undefined, this)
             return 0
         }
         set_critter_stat(obj: Obj, stat: number, amount: number) {
@@ -1826,7 +1832,7 @@ export module Scripting {
             // Last-resort fallback: return 0 (armor/misc) without emitting a stub.
             // Scripts that call obj_item_subtype on an object with no type information
             // are handled gracefully rather than producing console noise.
-            log('obj_item_subtype: unknown subtype for pid=' + (obj.pid ?? '?'), 'inventory')
+            log('obj_item_subtype: unknown subtype for pid=' + (obj.pid ?? '?'), arguments, 'inventory')
             return 0
         }
         anim_busy(obj: Obj) {
@@ -1882,9 +1888,10 @@ export module Scripting {
                 return
             }
 
+            const sourceObj = this.source_obj
             const source =
-                isGameObject(this.source_obj) && this.source_obj.type === 'critter'
-                    ? (this.source_obj as Critter)
+                sourceObj !== 0 && isGameObject(sourceObj) && (sourceObj as Obj).type === 'critter'
+                    ? (sourceObj as Critter)
                     : globalState.player
             obj.use(source)
         }
@@ -2038,20 +2045,6 @@ export module Scripting {
         tile_is_visible(tile: number) {
             log('tile_is_visible', arguments, 'tiles')
             return 1
-        }
-        tile_num_in_direction(tile: number, direction: number, distance: number) {
-            if (distance === 0) {
-                //warn("tile_num_in_direction: distance=" + distance)
-                return -1
-            }
-            let newTile = hexInDirection(fromTileNum(tile), direction)
-            for (
-                var i = 0;
-                i < distance - 1;
-                i++ // repeat for each further distance
-            )
-                newTile = hexInDirection(newTile, direction)
-            return toTileNum(newTile)
         }
         tile_in_tile_rect(ul: number, ur: number, ll: number, lr: number, t: number) {
             //stub("tile_in_tile_rect", arguments, "tiles")

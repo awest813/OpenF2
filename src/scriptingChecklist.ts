@@ -728,8 +728,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_103',
         kind: 'metarule',
-        description: 'METARULE3_CRITTER_IN_COMBAT(103): 1 if the given critter is in combat. Uses global inCombat flag — individual critter combat state not yet tracked.',
-        status: 'partial',
+        description: 'METARULE3_CRITTER_IN_COMBAT(103): 1 if the given critter is in combat. Uses active combat roster membership when available; falls back to global inCombat in legacy contexts.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },

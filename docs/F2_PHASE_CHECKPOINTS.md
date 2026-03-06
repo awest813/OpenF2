@@ -6,10 +6,10 @@ This document defines pass/fail gates for each phase in the campaign-first compl
 
 ## Phase 0 — Scope lock
 
-- [ ] Critical path regions listed and frozen
-- [ ] Required systems tags defined for each region
-- [ ] Non-goals explicitly frozen
-- [ ] Blocker matrix template active
+- [x] Critical path regions listed and frozen
+- [x] Required systems tags defined for each region
+- [x] Non-goals explicitly frozen
+- [x] Blocker matrix template active
 
 Gate: **PASS** only when scope and tracking artifacts are in place.
 
@@ -17,10 +17,10 @@ Gate: **PASS** only when scope and tracking artifacts are in place.
 
 ## Phase 1 — Script VM de-stubbing
 
-- [ ] Procedure/opcode audit matrix created
-- [ ] Critical-path relevant partial/stub procedures prioritized
-- [ ] Implementations added for selected blockers
-- [ ] Regression test added for every de-stubbed behavior
+- [x] Procedure/opcode audit matrix created
+- [x] Critical-path relevant partial/stub procedures prioritized
+- [x] Implementations added for selected blockers
+- [x] Regression test added for every de-stubbed behavior
 - [ ] No known unresolved critical-path stub hit in targeted runs
 
 Gate: **PASS** when scripted progression no longer hits known unresolved VM blockers on covered path.
