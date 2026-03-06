@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 export interface SaveGame {
     id?: number
@@ -24,6 +24,15 @@ export interface SaveGame {
 
     /** World-map position of the player when saved (added in v4). */
     worldPosition?: Point
+
+    /**
+     * Snapshot of all Fallout 2 script global variables (added in v5).
+     *
+     * These correspond to the GVAR_* constants in Fallout 2 scripts and
+     * carry quest flags, faction states, and world-event flags.
+     * Without this, every save/load wipes quest-critical state set by scripts.
+     */
+    scriptGlobalVars?: Record<number, number>
 
     player: {
         position: Point
@@ -81,6 +90,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // (undefined means the player was inside a local map, not on the world map)
             // No forced default — callers should treat missing worldPosition as unknown.
             save.version = 4
+            // falls through
+        case 4:
+            // v4 → v5: add scriptGlobalVars snapshot.
+            // Old saves have no script state — initialize to empty so scripts see a
+            // clean slate (default values) rather than throwing on missing gvars.
+            if (save.scriptGlobalVars === undefined) save.scriptGlobalVars = {}
+            save.version = 5
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.

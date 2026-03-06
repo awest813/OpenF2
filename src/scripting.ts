@@ -31,7 +31,7 @@ import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
 import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
-import { makePID } from './pro.js'
+import { makePID, loadPRO } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
 import { fromTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
@@ -210,6 +210,20 @@ export module Scripting {
 
     export function getGlobalVars(): any {
         return globalVars
+    }
+
+    /**
+     * Bulk-restore global script variables from a saved snapshot.
+     *
+     * Called during save-game load so that quest flags, faction state, and
+     * world-event variables survive across sessions.  The incoming `vars`
+     * map is *merged* (not replaced) so that any engine-default values
+     * already present are preserved when the save was made before v5.
+     */
+    export function setGlobalVars(vars: Record<number, number>): void {
+        for (const key of Object.keys(vars)) {
+            globalVars[parseInt(key, 10)] = (vars as any)[key]
+        }
     }
 
     function isGameObject(obj: any) {
@@ -1107,8 +1121,85 @@ export module Scripting {
             //stub("obj_open", arguments)
         }
         proto_data(pid: number, data_member: number): any {
-            stub('proto_data', arguments)
-            return null
+            // data_member 0 (PROTO_DATA_PID) can be returned directly without
+            // loading the proto — the PID is the argument itself.
+            if (data_member === 0) return pid
+
+            // Load the prototype for this PID.  The PID encodes both the object
+            // type (bits 31-24) and the 1-based prototype index (bits 15-0).
+            const pro = loadPRO(pid, pid & 0xffff)
+            if (!pro) {
+                warn('proto_data: could not load PRO for pid=0x' + pid.toString(16))
+                return 0
+            }
+
+            switch (data_member) {
+                // --- Common header fields (all proto types) ---
+                case 1:
+                    // PROTO_DATA_TEXT_ID — message table ID used for the object name
+                    return pro.textID ?? 0
+                case 2:
+                    // PROTO_DATA_FID — combined FRM id (frmType << 24 | frmPID)
+                    return ((pro.frmType ?? 0) << 24) | (pro.frmPID ?? 0)
+                case 3:
+                    // PROTO_DATA_LIGHT_DIST — light emission radius
+                    return pro.lightRadius ?? 0
+                case 4:
+                    // PROTO_DATA_LIGHT_INTENS — light emission intensity
+                    return pro.lightIntensity ?? 0
+                case 5:
+                    // PROTO_DATA_FLAGS — general object flags bitfield
+                    return pro.flags ?? 0
+
+                // --- Item header fields (type == 0: items) ---
+                case 8:
+                    // ITEM_DATA_SUBTYPE — item sub-type (armor=0, weapon=3, ammo=4, …)
+                    return pro.extra?.subType ?? 0
+                case 9:
+                    // ITEM_DATA_WEIGHT — item weight in tenths of a pound
+                    return pro.extra?.weight ?? 0
+                case 10:
+                    // ITEM_DATA_COST — base barter value in caps
+                    return pro.extra?.cost ?? 0
+                case 11:
+                    // ITEM_DATA_SIZE — inventory size slots occupied
+                    return pro.extra?.size ?? 0
+
+                // --- Weapon-specific item fields ---
+                case 14:
+                    // WEAPON_DATA_MIN_DMG — minimum damage roll
+                    return pro.extra?.minDmg ?? 0
+                case 15:
+                    // WEAPON_DATA_MAX_DMG — maximum damage roll
+                    return pro.extra?.maxDmg ?? 0
+                case 16:
+                    // WEAPON_DATA_DMG_TYPE — damage type index
+                    return pro.extra?.dmgType ?? 0
+                case 21:
+                    // WEAPON_DATA_AP_COST_1 — AP cost for primary attack
+                    return pro.extra?.APCost1 ?? 0
+                case 22:
+                    // WEAPON_DATA_AP_COST_2 — AP cost for secondary attack
+                    return pro.extra?.APCost2 ?? 0
+                case 25:
+                    // WEAPON_DATA_CALIBER — ammo caliber index
+                    return pro.extra?.caliber ?? 0
+                case 26:
+                    // WEAPON_DATA_AMMO_PID — required ammo proto PID
+                    return pro.extra?.ammoPID ?? 0
+                case 27:
+                    // WEAPON_DATA_MAX_AMMO — magazine capacity
+                    return pro.extra?.maxAmmo ?? 0
+
+                // --- Critter fields ---
+                case 6:
+                    // CRITTER_DATA_ACTION_FLAGS — critter action flags
+                    return pro.extra?.actionFlags ?? 0
+
+                default:
+                    stub('proto_data', arguments)
+                    return 0
+            }
         }
         create_object_sid(pid: number, tile: number, elev: number, sid: number) {
             // Create object of pid and possibly script
@@ -1614,10 +1705,15 @@ export module Scripting {
         }
 
         gfade_out(time: number) {
-            stub('gfade_out', arguments)
+            // Screen fade-out over `time` game ticks.  In the browser build we
+            // don't implement an actual fading effect yet, but we must not stub
+            // this procedure — it is called frequently during map transitions
+            // and cut-scenes, and the stub warning floods the console.
+            log('gfade_out', arguments)
         }
         gfade_in(time: number) {
-            stub('gfade_in', arguments)
+            // Screen fade-in over `time` game ticks.  Same note as gfade_out.
+            log('gfade_in', arguments)
         }
 
         // timing
@@ -1782,6 +1878,63 @@ export module Scripting {
             return currentDialogueObject !== null ? 1 : 0
         }
 
+        // sfall extended opcodes — kill count helpers (0x8170–0x8171)
+        get_critter_kills(killType: number): number {
+            // Return the number of kills of the given kill-type recorded on the
+            // player.  Kill types are the KILL_TYPE_* constants (0 = men,
+            // 3 = super mutants, 4 = ghouls, …).  The counts are stored on
+            // globalState so they survive map transitions within a session.
+            const counts = globalState.critterKillCounts
+            if (!counts) return 0
+            return counts[killType] ?? 0
+        }
+        set_critter_kills(killType: number, amount: number): void {
+            // Overwrite the kill count for the given kill type.
+            if (!globalState.critterKillCounts) {
+                ;(globalState as any).critterKillCounts = {}
+            }
+            globalState.critterKillCounts[killType] = Math.max(0, amount)
+        }
+
+        // sfall extended opcodes — critter body type (0x8172)
+        get_critter_body_type(obj: Obj): number {
+            // Return the body-type index from the critter's prototype.
+            // 0 = biped, 1 = quadruped, 2 = robotic, 3 = bat, …
+            // Used by combat AI and animation scripts to gate attack modes.
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_body_type: not a critter: ' + obj)
+                return 0
+            }
+            const critter = obj as Critter
+            // bodyType is stored in the critter prototype extra data.
+            if (critter.pro?.extra?.bodyType !== undefined) return critter.pro.extra.bodyType
+            return 0
+        }
+
+        // sfall extended opcodes — math floor (0x8173)
+        floor2(x: number): number {
+            // Integer floor — mirrors the sfall floor2() opcode used by drug
+            // duration and formula scripts (distinct from the integer division
+            // already available via the division opcode).
+            return Math.floor(x)
+        }
+
+        // sfall extended opcodes — count objects on map by PID (0x8174)
+        obj_count_by_pid(mapPID: number): number {
+            // Return the number of live objects on the current map whose PID
+            // matches `mapPID`.  Used by scripted encounter clean-up and loot
+            // scripts to check whether all enemies are dead.
+            if (!globalState.gMap) return 0
+            let count = 0
+            for (const level of globalState.gMap.objects) {
+                if (!level) continue
+                for (const obj of level) {
+                    if (obj.pid === mapPID) count++
+                }
+            }
+            return count
+        }
+
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
             info('load_map: ' + map)
@@ -1789,7 +1942,10 @@ export module Scripting {
             else globalState.gMap.loadMapByID(map)
         }
         play_gmovie(movieID: number) {
-            stub('play_gmovie', arguments)
+            // Play a full-motion video clip by ID.  The browser build does not
+            // currently have an FMV pipeline, so we skip playback silently rather
+            // than emitting a stub warning on every intro/cut-scene trigger.
+            log('play_gmovie', arguments)
         }
         mark_area_known(areaType: number, area: number, markState: number) {
             if (areaType === 0) {

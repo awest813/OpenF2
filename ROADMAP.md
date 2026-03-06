@@ -58,6 +58,10 @@ Fallout 1 compatibility is maintained as a secondary goal, so the engine can ser
 - **Performance safeguards (Safe Impact Roadmap — step 2):** `ScriptVM.call()` now tracks slow-call telemetry (`slowCallCount`, `lastSlowCallTimeMs`) and emits warn-level logs when top-level procedure runtime exceeds `Config.engine.vmSlowCallWarnThresholdMs`
 - **sfall opcodes — any-critter stat helpers:** `get_critter_base_stat` (0x8166), `set_critter_base_stat` (0x8167), `in_combat` (0x8168) added to `vm_bridge.ts` + `scripting.ts`; regression tests added in `vm.test.ts`
 - **critter_inven_obj WORN fix:** `critter_inven_obj` with `INVEN_TYPE_WORN` (0) now returns `equippedArmor` instead of falling through to stub
+- **Save schema v5 — scriptGlobalVars persistence:** `SAVE_VERSION` bumped to 5; `scriptGlobalVars: Record<number,number>` added to save schema; Fallout 2 script global variables (GVAR_*) now snapshot on save and are restored on load so quest flags, faction states, and world-event flags survive across sessions; v4→v5 migration adds empty dict for old saves; `Scripting.setGlobalVars()` export added
+- **proto_data de-stubbed (partial):** `proto_data(pid, data_member)` now handles data_member 0 (PID), 1 (textID), 2 (FID), 3 (lightRadius), 4 (lightIntensity), 5 (flags), 8 (item subtype), 9 (item weight), 10 (item cost), 11 (item size), 14–16 (weapon min/max/dmgType), 21–22 (weapon AP costs), 25–27 (caliber/ammoPID/maxAmmo), 6 (critter actionFlags); gracefully returns 0 when proMap is unavailable; checklist updated to 'partial'
+- **De-stubbed procedures:** `gfade_in`, `gfade_out`, and `play_gmovie` now log silently instead of emitting console stub warnings (no FMV pipeline in browser build); checklist entries added as 'partial'
+- **sfall opcodes 0x8170–0x8174:** `get_critter_kills` (0x8170), `set_critter_kills` (0x8171), `get_critter_body_type` (0x8172), `floor2` (0x8173), `obj_count_by_pid` (0x8174) added to `vm_bridge.ts` + `scripting.ts`; `globalState.critterKillCounts` added for session-scoped kill tracking
 
 ### Remaining gaps (critical path to 1.0)
 
@@ -144,6 +148,10 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 - [x] **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed (delegates to `move_to` without spurious warning)
 - [x] **VM debug fields:** `stepCount` (incremented each `step()`) and `currentProcedureName` (set/restored in `call()`) added to `ScriptVM`; `ScriptDebuggerPanel` now surfaces step count and active procedure name
 - [x] **Performance instrumentation:** `AssetCache` extended with `recordDecodeLatency`/`avgDecodeLatencyMs` and `lastEvictionReason`; `SpriteBatch.BatchStats` gains `frameTimeMs`; `ScriptVM.call()` tracks `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` exposes `pathfindingTelemetry` (`PathfindingTelemetry`) updated on every `recalcPath` call
+- [x] **Save schema v5 — scriptGlobalVars persistence:** `SAVE_VERSION` bumped to 5; `scriptGlobalVars` field added to `SaveGame`; all Fallout 2 script global variables (GVAR_*) now survive save/load; v4→v5 migration adds empty dict for legacy saves; `Scripting.setGlobalVars()` export added
+- [x] **proto_data partial implementation:** `proto_data(pid, data_member)` now handles data_member constants 0–11, 14–16, 21–22, 25–27, 6 (PID, textID, FID, lightRadius/Intensity, flags, item subtype/weight/cost/size, weapon stats, critter action flags); gracefully returns 0 when proMap is unavailable; checklist updated to 'partial'
+- [x] **De-stubbed — gfade/movie:** `gfade_in`, `gfade_out`, and `play_gmovie` now log silently (no FMV pipeline yet) instead of emitting console stub warnings; checklist entries added as 'partial'
+- [x] **sfall opcodes 0x8170–0x8174:** `get_critter_kills` (0x8170), `set_critter_kills` (0x8171), `get_critter_body_type` (0x8172), `floor2` (0x8173), `obj_count_by_pid` (0x8174) added; `globalState.critterKillCounts` added for session-scoped kill tracking
 - [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
 - [ ] Dialogue + barter edge-case fidelity *(critical path)*
 - [ ] Save/load reliability hardening and long-campaign round-trip fixtures
@@ -178,6 +186,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 9. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
 10. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
 11. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
+12. **Save reliability + proto_data + sfall 0x8170–0x8174** — ✅ Save schema v5: GVAR_* script globals now persist across save/load (`scriptGlobalVars`); `proto_data` de-stubbed for common data members (item weight/cost/size, weapon stats, critter flags); `gfade_in/out` and `play_gmovie` no longer flood console; `get_critter_kills`, `set_critter_kills`, `get_critter_body_type`, `floor2`, `obj_count_by_pid` (0x8170–0x8174) added
 
 ---
 
@@ -221,6 +230,7 @@ This backlog focuses on changes that are **safe to ship incrementally**: low beh
    - **Exit criteria:** lower VM-related frame variance and no behavior regressions in script tests.
 
 5. **Save/load reliability hardening** *(P1, high)*  
+   - ✅ Save schema v5: `scriptGlobalVars` field persists all Fallout 2 GVAR_* script globals across sessions; v4→v5 migration added; `Scripting.setGlobalVars()` export added; save and load paths in `saveload.ts` updated.  
    - Add corruption-tolerant guards and clearer migration diagnostics in save schema handling.  
    - Add round-trip fixtures for long-campaign state (quests, reputations, inventories, world map).  
    - **Exit criteria:** deterministic round-trip test pass and migration confidence across versions.
