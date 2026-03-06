@@ -47,5 +47,5 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **51 files, 1813 tests passed**.
+- Full regression run: `npm test` → **53 files, 1817 tests passed**.
 - Type-check run: `npx tsc --noEmit` → **pass**.

@@ -27,6 +27,8 @@ Status guidance:
 | BLK-008 | HIGH | Cinematics | slide timing robustness | `CinematicPlayer._showSlide` duration handling | Invalid slide durations (negative/NaN) could produce undefined playback timing behavior in ending/intro sequences. | Play cinematic sequence with malformed slide duration values. | Invalid durations fall back to deterministic default timing; valid durations still honored. | `src/phase32.test.ts`, `src/phase3.test.ts` | @engine | CLOSED | Added duration validation fallback to default 4000 ms plus regression tests. |
 | BLK-009 | HIGH | Certification | artifact consistency | critical-path docs/checkpoints consistency | No automated check ensured region checklist, blocker matrix, and phase checkpoint artifacts stayed synchronized and structurally complete. | Run consistency assertions against docs for required regions, blocker states, and phase 0-8 checkpoint completeness. | Certification artifacts stay in sync and fail loudly in CI when structure drifts. | `src/phase33.test.ts` | @engine | CLOSED | Added certification artifact integrity suite for region list + blocker/checkpoint consistency. |
 | BLK-010 | HIGH | Combat | called-shot robustness | `Combat.getHitChance` region handling | Unknown called-shot region keys could produce NaN hit calculations and throw, risking runtime combat interruption in scripts/modded inputs. | Call hit/roll with an unrecognized region string. | Unknown regions safely fall back to torso modifiers without throwing. | `src/phase30.test.ts`, `src/combat.integration.test.ts` | @engine | CLOSED | Added torso-fallback handling in hit-chance computation + regression coverage. |
+| BLK-011 | HIGH | Region Certification | mid/late campaign continuity | mid/late route progression scaffold | No focused regression covered Modoc→Oil Rig critical-route gating and persistence as a single progression chain. | Execute staged progression through mid/late region gates and roundtrip save/load before final Oil Rig unlock. | Mid/late route globals, map-area discoveries, and final-route unlock remain stable and deterministic. | `src/phase34.test.ts` | @engine | CLOSED | Added mid/late campaign scaffold harness with gating + persistence assertions. |
+| BLK-012 | HIGH | Release Gate | end-to-end campaign scaffold validation | full-playthrough harness | No single regression proved the full critical route could traverse early + mid/late scaffolds through Oil Rig ending trigger with save/load continuity. | Execute full route scaffold, save/load before and after ending trigger, verify Oil Rig endpoint and ending flag persistence. | End-to-end scaffold run reaches ending flow and persists ending trigger state across save/load. | `src/phase35.test.ts` | @engine | CLOSED | Added full critical-path scaffold run and release-gate sanity checks. |
 
 ---
 
@@ -41,7 +43,9 @@ Status guidance:
 - Cinematic timing suite (`src/phase32.test.ts`) passed with malformed-duration guard coverage.
 - Certification scaffolding suite (`src/phase33.test.ts`) passed for docs/checkpoint/blocker consistency.
 - Phase 27/29/30 suites (`src/phase27.test.ts`, `src/phase29.test.ts`, `src/phase30.test.ts`) passed for interaction lifecycle, long-campaign save/load drift checks, and combat region fallback safety.
-- Full project regression run (`npm test`) passed: 51 files / 1813 tests.
+- Full project regression run (`npm test`) passed: 53 files / 1817 tests.
+- Mid/late route scaffold suite (`src/phase34.test.ts`) passed for Modoc→Oil Rig gate/persistence continuity.
+- Full-route scaffold suite (`src/phase35.test.ts`) passed for early→late→ending flow continuity.
 
 ## Closure checklist (required)
 

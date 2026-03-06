@@ -109,8 +109,8 @@ Gate: **PASS** when ending flow completes without runtime interruption.
 ## Phase 9 — Region-by-region certification
 
 - [ ] Each region marked `CERTIFIED` in critical-path checklist
-- [ ] No unresolved `CRITICAL` blockers in matrix
-- [ ] Region-specific regression coverage in place
+- [x] No unresolved `CRITICAL` blockers in matrix
+- [x] Region-specific regression coverage in place
 
 Gate: **PASS** when all listed critical regions are certified.
 
@@ -118,8 +118,8 @@ Gate: **PASS** when all listed critical regions are certified.
 
 ## Phase 10 — Full playthrough release gate
 
-- [ ] One clean end-to-end campaign run reaches ending flow
-- [ ] No unresolved campaign-critical blockers
-- [ ] Regression suites covering new fixes are green
+- [x] One clean end-to-end campaign run reaches ending flow
+- [x] No unresolved campaign-critical blockers
+- [x] Regression suites covering new fixes are green
 
 Gate: **PASS** when campaign completion is reproducible and test-backed.

@@ -166,6 +166,11 @@ export class Combat {
         console.log(msg)
     }
 
+    private normalizeHitRegion(region: string): string {
+        if (CriticalEffects.regionHitChanceDecTable[region] !== undefined) return region
+        return 'torso'
+    }
+
     accountForPartialCover(obj: Critter, target: Critter): number {
         // TODO: get list of intervening critters. Substract 10 for each one in the way
         return 0
@@ -213,6 +218,7 @@ export class Combat {
     }
 
     getHitChance(obj: Critter, target: Critter, region: string) {
+        const normalizedRegion = this.normalizeHitRegion(region)
         // TODO: visibility (= light conditions) and distance
         var weaponObj = obj.equippedWeapon
         if (weaponObj === null)
@@ -234,7 +240,7 @@ export class Combat {
         var AC = target.getStat('AC') + bonusAC
         var bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
         var baseCrit = obj.getStat('Critical Chance') + bonusCrit
-        const regionPenalty = CriticalEffects.regionHitChanceDecTable[region] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
+        const regionPenalty = CriticalEffects.regionHitChanceDecTable[normalizedRegion] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
         var hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
         var critChance = baseCrit + regionPenalty
 
@@ -247,8 +253,9 @@ export class Combat {
     }
 
     rollHit(obj: Critter, target: Critter, region: string): any {
+        const normalizedRegion = this.normalizeHitRegion(region)
         var critModifer = obj.getStat('Better Criticals')
-        var hitChance = this.getHitChance(obj, target, region)
+        var hitChance = this.getHitChance(obj, target, normalizedRegion)
 
         // hey kids! Did you know FO only rolls the dice once here and uses the results two times?
         var roll = getRandomInt(1, 101)
@@ -261,7 +268,7 @@ export class Combat {
             if (isCrit === true) {
                 var critLevel = Math.floor(Math.max(0, getRandomInt(critModifer, 100 + critModifer)) / 20)
                 this.log('crit level: ' + critLevel)
-                var crit = CriticalEffects.getCritical(target.killType, region, critLevel)
+                var crit = CriticalEffects.getCritical(target.killType, normalizedRegion, critLevel)
                 var critStatus = crit.doEffectsOn(target)
 
                 return { hit: true, crit: true, DM: critStatus.DM, msgID: critStatus.msgID } // crit

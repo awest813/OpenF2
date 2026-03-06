@@ -57,7 +57,9 @@ describe('Phase 30-B — unknown called-shot region safety', () => {
         const combat = Object.create(Combat.prototype) as Combat
         vi.spyOn(combat, 'getHitDistanceModifier').mockReturnValue(0)
         const { shooter, target } = makeShooterAndTarget()
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
         expect(() => combat.rollHit(shooter, target, 'eye_socket_noncanonical')).not.toThrow()
+        expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('error: could not find critical'))
     })
 })

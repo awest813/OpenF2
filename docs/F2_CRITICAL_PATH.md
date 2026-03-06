@@ -42,16 +42,16 @@ Legend:
 | Arroyo | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates temple gating + quest global/map vars |
 | Klamath | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Klamath arrival, encounter return, Vic lead gating |
 | Den | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 26 harness validates Den route unlock and post-load continuation |
-| Modoc | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Multi-step town quest progression |
-| Vault City | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Reputation + gate checks |
-| Gecko | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Cross-town dependency with Vault City |
-| Broken Hills | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Race/reputation state interactions |
-| New Reno | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Family questline branching |
-| NCR | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Mid/late-state faction outcomes |
-| Redding | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Reputation + economy side effects |
-| San Francisco | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Endgame prerequisite routes |
-| Navarro | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Endgame setup gating |
-| Enclave / Oil Rig | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Final quest chain + ending trigger |
+| Modoc | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Modoc gate start and persistence path |
+| Vault City | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Vault City unlock prerequisites |
+| Gecko | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Gecko ↔ Vault City dependency globals |
+| Broken Hills | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates mid-route progression continuity |
+| New Reno | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates region transition continuity |
+| NCR | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates NCR branch step sequencing |
+| Redding | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates NCR→Redding continuation |
+| San Francisco | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates endgame prerequisite route |
+| Navarro | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates Navarro access gating |
+| Enclave / Oil Rig | ☑ | ☑ | ☐ | ☐ | ☑ | ☐ | ☑ | IN_PROGRESS | Phase 34 scaffold validates final route unlock and Oil Rig entry |
 
 ---
 
