@@ -1,17 +1,20 @@
 # OpenF2 Roadmap
 
-A staged plan for moving OpenF2 from a playable reimplementation to a high-fidelity, moddable Fallout runtime.
+The plan for delivering the **complete Fallout 2 experience in the browser** — and, once that is solid, an optional layer of quality-of-life improvements.
 
 ---
 
 ## Vision
 
-OpenF2 aims to deliver:
+**Play all of Fallout 2 in a modern browser, faithful to the original, with no native install.**
 
-- **Gameplay-faithful behavior** for classic Fallout 1 and Fallout 2
-- **Browser-native portability** (with optional native wrappers)
-- **Strong modding and tooling support** for the community
-- **Maintainable architecture** that can evolve over the long term
+OpenF2 is structured around three ordered goals:
+
+1. **Complete Fallout 2 fidelity** — every location, quest, NPC, scripted event, and ending should work exactly as they do in the original game. This is the non-negotiable north star.
+2. **Browser-native portability** — the engine runs on WebGL + HTML5 Audio. You bring a legal copy of the game data; the engine does the rest. Optional native wrappers are a stretch goal.
+3. **Optional QoL upgrades** — higher resolutions, UI improvements, extended sfall-style scripting hooks, and other modern conveniences are welcome *after* vanilla fidelity is complete, and always as toggleable additions that never alter core gameplay.
+
+Fallout 1 compatibility is maintained as a secondary goal, so the engine can serve both classic titles.
 
 ---
 
@@ -21,7 +24,7 @@ OpenF2 aims to deliver:
 |------|--------|
 | **Active phase** | Phase 4 — Fidelity, Modding, and Tooling |
 | **Completed phases** | 0 · 1 · 2 · 3 |
-| **Next milestone** | Scripting VM (Fallout 2 procedure stubs, sfall extended opcodes) |
+| **Critical path** | Scripting VM completeness (Fallout 2 procedure stubs, sfall extended opcodes) |
 
 ### What works today
 
@@ -54,12 +57,13 @@ OpenF2 aims to deliver:
 - **Performance instrumentation (Safe Impact Roadmap — step 1):** `AssetCache` extended with decode-latency telemetry (`recordDecodeLatency`, `avgDecodeLatencyMs`) and eviction-reason tracking (`lastEvictionReason`); `SpriteBatch` extended with frame-time telemetry (`frameTimeMs` in `BatchStats`); `ScriptVM.call()` instruments top-level call duration (`lastCallTimeMs`, `totalCallTimeMs`); `GameMap.recalcPath()` wrapped with `PathfindingTelemetry` counters (`totalCalls`, `totalTimeMs`, `worstCaseTimeMs`, `lastSolveTimeMs`)
 - **Performance safeguards (Safe Impact Roadmap — step 2):** `ScriptVM.call()` now tracks slow-call telemetry (`slowCallCount`, `lastSlowCallTimeMs`) and emits warn-level logs when top-level procedure runtime exceeds `Config.engine.vmSlowCallWarnThresholdMs`
 - **sfall opcodes — any-critter stat helpers:** `get_critter_base_stat` (0x8166), `set_critter_base_stat` (0x8167), `in_combat` (0x8168) added to `vm_bridge.ts` + `scripting.ts`; regression tests added in `vm.test.ts`
-- **critter_inven_obj WORN fix:** `critter_inven_obj` with `INVEN_TYPE_WORN` (0) now returns `equippedArmor` instead of falling through to stub; checklist entry updated from `stub` → `implemented`
+- **critter_inven_obj WORN fix:** `critter_inven_obj` with `INVEN_TYPE_WORN` (0) now returns `equippedArmor` instead of falling through to stub
 
-### Remaining gaps
+### Remaining gaps (critical path to 1.0)
 
-- **Scripting VM:** some Fallout 2 procedures remain stubs; broader sfall opcode coverage is ongoing
-- **Authoring tools:** full map editor, script step-debugger are future work
+- **Scripting VM:** many Fallout 2 procedures remain stubs — closing these is the single biggest unlock for game completability
+- **Dialogue + barter edge cases:** some conversation flows and barter interactions need further fidelity work
+- **Authoring tools:** full map editor and script step-debugger are future work
 
 ---
 
@@ -90,9 +94,9 @@ OpenF2 aims to deliver:
 
 ---
 
-### ✅ Phase 2 — Full Fallout 2 Completion
+### ✅ Phase 2 — Full Fallout 2 Completion (Foundation)
 
-*Goal: Make Fallout 2 completable end-to-end.*
+*Goal: Lay the foundation for a completable Fallout 2 playthrough.*
 
 - [x] World map correctness and travel balancing
 - [x] Broader opcode/procedure coverage in scripting runtime
@@ -117,7 +121,9 @@ OpenF2 aims to deliver:
 
 ### 🔄 Phase 4 — Fidelity, Modding, and Tooling *(active)*
 
-*Goal: Improve correctness, performance, and the contributor ecosystem.*
+*Goal: Improve correctness, performance, and the contributor ecosystem until Fallout 2 is completable end-to-end.*
+
+The scripting VM is the critical path here. Every stubbed procedure that gets de-stubbed is a step closer to a fully playable game.
 
 - [x] DAT override stacking + structured mod manifests (`src/mods.ts`, `ModRegistry`)
 - [x] Pathfinding and line-of-sight correctness (`hexLine` cube-lerp, `hexesInRadius` ring algorithm)
@@ -138,25 +144,42 @@ OpenF2 aims to deliver:
 - [x] **sfall opcodes — critter/PC helpers:** `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed (delegates to `move_to` without spurious warning)
 - [x] **VM debug fields:** `stepCount` (incremented each `step()`) and `currentProcedureName` (set/restored in `call()`) added to `ScriptVM`; `ScriptDebuggerPanel` now surfaces step count and active procedure name
 - [x] **Performance instrumentation:** `AssetCache` extended with `recordDecodeLatency`/`avgDecodeLatencyMs` and `lastEvictionReason`; `SpriteBatch.BatchStats` gains `frameTimeMs`; `ScriptVM.call()` tracks `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` exposes `pathfindingTelemetry` (`PathfindingTelemetry`) updated on every `recalcPath` call
+- [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
+- [ ] Dialogue + barter edge-case fidelity *(critical path)*
+- [ ] Save/load reliability hardening and long-campaign round-trip fixtures
 - [ ] Full in-browser map/script authoring tools *(long-term)*
+
+---
+
+### 🗺️ Phase 5 — Optional QoL Upgrades *(planned, post-1.0)*
+
+*Goal: Layer optional modern conveniences on top of the complete, faithful vanilla experience. All features in this phase are toggleable and never alter base gameplay.*
+
+- [ ] Widescreen and arbitrary-resolution rendering
+- [ ] Scalable / high-DPI UI option
+- [ ] Extended sfall-style scripting hooks for mod authors
+- [ ] Optional UI improvements (e.g. better font legibility, larger inventory grid)
+- [ ] In-browser mod manager with conflict detection
+- [ ] Community-contributed QoL patches (e.g. Restoration Project compatibility)
+- [ ] Full in-browser map and script authoring suite
 
 ---
 
 ## Near-Term Priorities
 
-1. **Rendering polish** — ✅ Fixed animation first-frame timing (`singleAnimation`/`staticAnimation`)
-2. **Scripting coverage** — ✅ Added `reg_anim_obj_move_to_tile`, `get_year`, `obj_get_rot`, `set_obj_rot` to `vm_bridge.ts`
-3. **Performance** — ✅ `SpriteBatch` batching (`src/renderBatch.ts`), `AssetCache` LRU cache (`src/assetStore.ts`)
-4. **Debug/authoring tools** — ✅ MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
-5. **Scripting VM milestone** — ✅ `obj_art_fid`, `art_anim`, sfall globals, `metarule(56, 0)` version, sfall opcodes 0x8157–0x8158, `critter_add_trait` trait side-effects
-6. **Scripting VM continued** — ✅ `get_poison`/`get_radiation` critter status getters, integer-indexed sfall globals (0x815A–0x815B), `get_day_of_week` opcode (0x815C)
-7. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
-8. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
-9. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
-10. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
+1. **Scripting VM — close procedure stubs** — this is the single highest-leverage item for game completability
+2. **Rendering polish** — ✅ Fixed animation first-frame timing (`singleAnimation`/`staticAnimation`)
+3. **Scripting coverage** — ✅ Added `reg_anim_obj_move_to_tile`, `get_year`, `obj_get_rot`, `set_obj_rot` to `vm_bridge.ts`
+4. **Performance** — ✅ `SpriteBatch` batching (`src/renderBatch.ts`), `AssetCache` LRU cache (`src/assetStore.ts`)
+5. **Debug/authoring tools** — ✅ MapViewerPanel (F5), ScriptDebuggerPanel (F6), PrototypeInspectorPanel (F7)
+6. **Scripting VM milestone** — ✅ `obj_art_fid`, `art_anim`, sfall globals, `metarule(56, 0)` version, sfall opcodes 0x8157–0x8158, `critter_add_trait` trait side-effects
+7. **Scripting VM continued** — ✅ `get_poison`/`get_radiation` critter status getters, integer-indexed sfall globals (0x815A–0x815B), `get_day_of_week` opcode (0x815C)
+8. **VM opcode completeness** — ✅ `op_bwxor` (0x8042) / `op_bwnot` (0x8043) added; `play_sfx`, `reg_anim_obj_move_to_tile`, `animate_stand_obj` de-stubbed; sfall opcodes 0x815D–0x815E added
+9. **Procedure de-stubbing & sfall expansion** — ✅ `set_light_level`, `obj_set_light_level`, `game_ui_disable`/`game_ui_enable` de-stubbed; sfall opcodes 0x815F–0x8162 (`get_pc_base_stat`, `set_pc_base_stat`, `set_critter_current_ap`, `get_npc_level`) added
+10. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
+11. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
 
 ---
-
 
 ## Safe Impact Roadmap (Performance + High/Medium ROI Fixes)
 
@@ -245,7 +268,10 @@ This backlog focuses on changes that are **safe to ship incrementally**: low beh
 OpenF2 will be considered **1.0 ready** when:
 
 - [ ] Fallout 2 is completable start-to-finish without major blockers
+- [ ] Every major location, quest, and NPC in Fallout 2 functions correctly in-browser
 - [ ] Save/load is reliable across long campaigns
 - [ ] Core combat, skills, and progression match expected Fallout 2 behavior
 - [x] All primary UI panels render through the `ui2` WebGL path (no DOM fallback for gameplay panels)
 - [ ] UI and tooling are stable enough for community mod work
+
+After 1.0, Phase 5 optional QoL improvements begin.

@@ -4,7 +4,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
 [![Phase](https://img.shields.io/badge/phase-4%20Fidelity%20%26%20Modding-orange.svg)](ROADMAP.md)
 
-OpenF2 is a **browser-first reimplementation** of the classic Fallout 1/2 engine runtime, built on TypeScript and Python tooling. It reads original game data files and runs entirely in the browser via WebGL.
+**OpenF2's mission is to deliver the complete Fallout 2 experience — every quest, every area, every line of dialogue — running entirely in your browser, no install required.**
+
+OpenF2 is a browser-first reimplementation of the classic Fallout 2 engine runtime, built on TypeScript and Python tooling. It reads your own copy of the original game data and runs entirely in the browser via WebGL. Once the full vanilla experience is solid, optional quality-of-life upgrades (widescreen support, extended resolution, UI improvements, and more) will be available as an opt-in layer on top.
 
 > **Note:** older docs may still reference the former project name **Harold**.
 
@@ -18,19 +20,36 @@ Origins: forked from [darkfo](https://github.com/darkf/darkfo) and extensively m
 
 ## Table of Contents
 
-1. [Status](#status)
-2. [Requirements](#requirements)
-3. [Quick Start](#quick-start)
-4. [Development Notes](#development-notes)
-5. [Testing](#testing)
-6. [Contributing](#contributing)
+1. [Goal](#goal)
+2. [Status](#status)
+3. [Requirements](#requirements)
+4. [Quick Start](#quick-start)
+5. [Development Notes](#development-notes)
+6. [Testing](#testing)
+7. [Contributing](#contributing)
+
+---
+
+## Goal
+
+> **Play all of Fallout 2 in a modern browser, faithful to the original, with no native install.**
+
+The project is built around a single, clear north star:
+
+1. **Complete Fallout 2 fidelity** — every location, quest, NPC, scripted event, and ending should work exactly as they do in the original game.
+2. **Browser-native** — the engine runs on WebGL + HTML5 Audio. No plugins, no native binaries. You bring a legal copy of the game data; the engine does the rest.
+3. **Optional QoL layer** — once the vanilla experience is complete and stable, a curated set of quality-of-life improvements (higher resolutions, UI tweaks, optional sfall-style extensions) will be available as toggles that never alter core gameplay.
+
+Fallout 1 compatibility is maintained as a secondary goal so the engine can serve both classic titles.
+
+See [ROADMAP.md](./ROADMAP.md) for the full milestone plan and the path to 1.0.
 
 ---
 
 ## Status
 
 **Active phase:** Phase 4 — Fidelity, Modding, and Tooling  
-Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone plan.
+Phases 0–3 are complete. The engine can load and run Fallout 2 maps with working combat, stats, scripting, and UI. The remaining work is closing scripting gaps and raising fidelity until the full game is completable end-to-end.
 
 ### Working today
 
@@ -51,9 +70,10 @@ Phases 0–3 are complete. See [ROADMAP.md](./ROADMAP.md) for the full milestone
 
 ### Known gaps
 
-- **UI fidelity/polish:** gameplay panels now render through `ui2`; edge-case visual and interaction parity work continues.
+- **Scripting coverage:** many Fallout 2 procedures and sfall opcodes are still stubs; completing these is the critical path to a fully-playable game.
+- **UI fidelity/polish:** gameplay panels render through `ui2`; edge-case visual and interaction parity work continues.
 - **Animation and rendering fidelity:** edge-case timing and correctness still need polish.
-- **In-browser tooling:** contributor cockpit panels are available now: DebugOverlayPanel (F3/backtick), MapViewerPanel (F5), ScriptDebuggerPanel (F6), and PrototypeInspectorPanel (F7). They expose live HP/AP/entity/map/script data plus mod priority/override visibility for regression debugging.
+- **In-browser tooling:** contributor cockpit panels are available: DebugOverlayPanel (F3/backtick), MapViewerPanel (F5), ScriptDebuggerPanel (F6), and PrototypeInspectorPanel (F7). They expose live HP/AP/entity/map/script data plus mod priority/override visibility for regression debugging.
 
 ---
 
@@ -162,12 +182,12 @@ Key test files and what they cover:
 
 ## Contributing
 
-Contributions are especially welcome in:
+Everything that gets the game closer to fully playable is a priority. Contributions are especially welcome in:
 
-- **UI migration** — moving remaining panels from DOM to `ui2` WebGL rendering
-- **Rendering and animation** — edge-case fidelity and timing polish
-- **Scripting VM** — opcode/procedure coverage expansion
-- **Modding ergonomics** — tooling and debug workflows
+- **Scripting VM** — opcode/procedure coverage is the critical path to a completable game; every de-stubbed procedure unblocks more of the world
+- **Rendering and animation** — edge-case fidelity and timing polish so the game looks right
+- **UI migration** — moving any remaining panels from DOM to `ui2` WebGL rendering
+- **QoL features** — once vanilla fidelity is solid, optional improvements (widescreen, UI tweaks, extended sfall opcodes) are welcome as toggleable additions that never break the base experience
 
 For major features, open an issue first so the work stays aligned with the [roadmap](./ROADMAP.md).  
 For in-depth contributor guidance, architecture notes, and debugging tips, see [CONTRIBUTING_ROADMAP.md](./CONTRIBUTING_ROADMAP.md).
