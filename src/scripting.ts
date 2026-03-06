@@ -410,6 +410,9 @@ export module Scripting {
         destroy_p_proc!: () => void
 
         use_skill_on_p_proc!: () => void
+        use_obj_on_p_proc!: () => void
+        push_p_proc!: () => void
+        is_dropping_p_proc!: () => void
 
         // Actual scripting engine API implementations
 
@@ -1166,10 +1169,14 @@ export module Scripting {
                 return
             }
 
-            // Mirrors common Fallout engine behavior used by key/lock and
-            // item-on-critter scripts: invoke the target object's use_p_proc
-            // with the source object as source_obj.
-            use(who, obj)
+            // Prefer use_obj_on_p_proc (Fallout 2 standard for item-on-target
+            // interactions). Fall back to use_p_proc for scripts that implement
+            // key/lock and item-on-critter logic there.
+            if (who._script && who._script.use_obj_on_p_proc !== undefined) {
+                useObjOn(who, obj)
+            } else {
+                use(who, obj)
+            }
         }
         use_obj(obj: Obj) {
             if (!isGameObject(obj)) {
@@ -1306,7 +1313,7 @@ export module Scripting {
             return 0 // it's not there
         }
         tile_is_visible(tile: number) {
-            stub('tile_is_visible', arguments, 'tiles')
+            log('tile_is_visible', arguments, 'tiles')
             return 1
         }
         tile_num_in_direction(tile: number, direction: number, distance: number) {
@@ -1491,10 +1498,10 @@ export module Scripting {
 
         // animation
         reg_anim_func(_1: any, _2: any) {
-            stub('reg_anim_func', arguments, 'animation')
+            log('reg_anim_func', arguments, 'animation')
         }
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
-            stub('reg_anim_animate', arguments, 'animation')
+            log('reg_anim_animate', arguments, 'animation')
         }
         reg_anim_animate_forever(obj: Obj, anim: number) {
             log('reg_anim_animate_forever', arguments, 'animation')
@@ -2050,6 +2057,45 @@ export module Scripting {
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'pickup_p_proc')
         obj._script.pickup_p_proc()
+        flushUnsupportedVMOperations(obj._script)
+        return obj._script._didOverride
+    }
+
+    export function useObjOn(obj: Obj, item: Obj): boolean | null {
+        if (!obj._script || obj._script.use_obj_on_p_proc === undefined) return null
+
+        obj._script.source_obj = item as Obj
+        obj._script.self_obj = obj as ScriptableObj
+        obj._script.cur_map_index = currentMapID
+        obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'use_obj_on_p_proc')
+        obj._script.use_obj_on_p_proc()
+        flushUnsupportedVMOperations(obj._script)
+        return obj._script._didOverride
+    }
+
+    export function push(obj: Obj, source: Critter): boolean | null {
+        if (!obj._script || obj._script.push_p_proc === undefined) return null
+
+        obj._script.source_obj = source
+        obj._script.self_obj = obj as ScriptableObj
+        obj._script.cur_map_index = currentMapID
+        obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'push_p_proc')
+        obj._script.push_p_proc()
+        flushUnsupportedVMOperations(obj._script)
+        return obj._script._didOverride
+    }
+
+    export function isDropping(obj: Obj, source: Critter): boolean | null {
+        if (!obj._script || obj._script.is_dropping_p_proc === undefined) return null
+
+        obj._script.source_obj = source
+        obj._script.self_obj = obj as ScriptableObj
+        obj._script.cur_map_index = currentMapID
+        obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'is_dropping_p_proc')
+        obj._script.is_dropping_p_proc()
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
