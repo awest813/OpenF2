@@ -398,12 +398,17 @@ export module Worldmap {
 
         if (markState === 0) {
             area.state = false
+            globalState.mapAreaStates[areaID] = false
             return
         }
 
-        if (area.state === true) return // already visible
+        if (area.state === true) {
+            globalState.mapAreaStates[areaID] = true
+            return // already visible
+        }
 
         area.state = true
+        globalState.mapAreaStates[areaID] = true
 
         // Render the area on the world map DOM (mirrors the init() rendering logic)
         if ($worldmap === null) return
@@ -591,6 +596,13 @@ export module Worldmap {
         setWorldmapInteractionLocked(false)
 
         if (!globalState.mapAreas) globalState.mapAreas = loadAreas()
+
+        // Apply save-loaded discovery overrides (if any) so map visibility is
+        // stable across save/load and consistent with METARULE_IS_AREA_KNOWN.
+        for (const areaID in globalState.mapAreaStates) {
+            if (!globalState.mapAreas[areaID]) continue
+            globalState.mapAreas[areaID].state = globalState.mapAreaStates[areaID] === true
+        }
 
         // Register the markAreaKnown callback so scripting.ts can call it without a
         // direct (circular) import of this module.

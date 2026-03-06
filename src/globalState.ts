@@ -86,6 +86,7 @@ export default {
     gameUIDisabled: false, // True when scripts have disabled UI interaction
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
     mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
+    mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
 
     uiManager: null,
     playerEntityId: 0,
@@ -166,6 +167,8 @@ export default {
      * Persisted in save v7+ so map state survives save/load.
      */
     mapVars: Record<string, Record<number, number>>
+    /** Per-area world-map discovery overrides keyed by area ID. */
+    mapAreaStates: Record<number, boolean>
 
     mapAreas: AreaMap | null
 

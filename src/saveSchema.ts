@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 export interface SaveGame {
     id?: number
@@ -60,6 +60,15 @@ export interface SaveGame {
      * Persisting these ensures that maps remember their state after save/load.
      */
     mapVars?: Record<string, Record<number, number>>
+
+    /**
+     * World-map discovery state keyed by area ID (added in v8).
+     *
+     * Keeps discovered/hidden locations stable across save/load so scripts
+     * using METARULE_IS_AREA_KNOWN and world-map travel progression remain
+     * consistent within long campaigns.
+     */
+    mapAreaStates?: Record<number, boolean>
 
     player: {
         position: Point
@@ -140,6 +149,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // map scripts start fresh (default values) rather than throwing.
             if (save.mapVars === undefined) save.mapVars = {}
             save.version = 7
+            // falls through
+        case 7:
+            // v7 → v8: add world-map discovery snapshot.
+            // Old saves default to no explicit overrides, preserving runtime
+            // defaults from city.txt until the user discovers new areas.
+            if (save.mapAreaStates === undefined) save.mapAreaStates = {}
+            save.version = 8
             // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.

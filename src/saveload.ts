@@ -22,6 +22,16 @@ import { Scripting } from './scripting.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
+function applyLoadedMapAreaStates(mapAreaStates: Record<number, boolean> | undefined): void {
+    if (!mapAreaStates || !globalState.mapAreas) return
+
+    for (const areaID in mapAreaStates) {
+        const area = globalState.mapAreas[areaID]
+        if (!area) continue
+        area.state = mapAreaStates[areaID] === true
+    }
+}
+
 // Saving and loading support
 
 let db: IDBDatabase | null = null
@@ -211,6 +221,7 @@ export function load(id: number): void {
                 if (save.mapVars) {
                     Scripting.setMapVars(save.mapVars)
                 }
+                applyLoadedMapAreaStates(save.mapAreaStates)
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -248,6 +259,7 @@ export function load(id: number): void {
                     if (save.mapVars) {
                         Scripting.setMapVars(save.mapVars)
                     }
+                    applyLoadedMapAreaStates(save.mapAreaStates)
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                         error,
