@@ -23,6 +23,7 @@ import {
     hexDirectionTo,
     hexDistance,
     hexInDirection,
+    hexInDirectionDistance,
     hexNearestNeighbor,
     Point,
     tile_in_tile_rect,
@@ -637,13 +638,25 @@ export module Scripting {
                     return 0
                 case 48:
                     return 2 // METARULE_VIOLENCE_FILTER (2 = VLNCLVL_NORMAL)
-                case 49: // METARULE_W_DAMAGE_TYPE
-                    switch (objectGetDamageType(target)) {
-                        case 'explosion':
-                            return 6 // DMG_explosion
-                        default:
-                            throw 'unknown damage type'
+                case 49: { // METARULE_W_DAMAGE_TYPE
+                    // Map the damage-type string to the Fallout 2 DMG_* constants:
+                    //   0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP, 6=Explosion
+                    const _dmgTypeMap: Record<string, number> = {
+                        'Normal': 0,
+                        'Laser': 1,
+                        'Fire': 2,
+                        'Plasma': 3,
+                        'Electrical': 4,
+                        'EMP': 5,
+                        'Explosive': 6,
+                        'explosion': 6,
                     }
+                    const _dtype = objectGetDamageType(target)
+                    const _mapped = _dmgTypeMap[_dtype]
+                    if (_mapped !== undefined) return _mapped
+                    warn('metarule(49): unrecognised damage type: ' + _dtype)
+                    return 0 // fall back to Normal
+                }
                 case 55:
                     // METARULE_GAME_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
                     return 1
@@ -875,6 +888,37 @@ export module Scripting {
                 // No fog-of-war system implemented yet; always return 1 (partial).
                 log('metarule3 107 (tile_visible)', arguments, 'tiles')
                 return 1
+            } else if (id === 108) {
+                // METARULE3_CRITTER_DIST: distance in hexes between two critters (obj, userdata).
+                // Returns 0 if either argument is not a valid game object.
+                if (!isGameObject(obj) || !isGameObject(userdata)) return 0
+                return hexDistance(obj.position, userdata.position)
+            } else if (id === 109) {
+                // METARULE3_TILE_DIST: distance in hexes between two tile numbers.
+                const tileA = typeof obj === 'number' ? fromTileNum(obj) : null
+                const tileB = typeof userdata === 'number' ? fromTileNum(userdata) : null
+                if (!tileA || !tileB) return 0
+                return hexDistance(tileA, tileB)
+            } else if (id === 110) {
+                // METARULE3_CRITTER_TILE: tile number of the given critter.
+                if (!isGameObject(obj)) return -1
+                return toTileNum(obj.position)
+            } else if (id === 111) {
+                // METARULE3_OBJ_IS_CRITTER_DEAD: 1 if the given critter is dead.
+                if (!isGameObject(obj) || obj.type !== 'critter') return 0
+                return (obj as Critter).dead ? 1 : 0
+            } else if (id === 112) {
+                // METARULE3_CRITTER_INVEN_OBJ2: return the item at the given inventory slot
+                // of the given critter (obj=critter, userdata=slot index).
+                if (!isGameObject(obj) || obj.type !== 'critter') return null
+                const slotIdx = typeof userdata === 'number' ? userdata : 0
+                const inv = (obj as Critter).inventory
+                if (!inv || slotIdx < 0 || slotIdx >= inv.length) return null
+                return inv[slotIdx]
+            } else if (id >= 113 && id <= 115) {
+                // METARULE3 IDs 113–115 — unspecified; return 0 as a safe default.
+                log('metarule3 ' + id + ' (safe default 0)', arguments)
+                return 0
             }
 
             stub('metarule3', arguments)
@@ -1280,7 +1324,7 @@ export module Scripting {
 
             var state = 0
             if (obj.dead === true) state |= 1
-            // TODO: if obj is prone, state |= 2
+            if ((obj as any).knockedDown === true) state |= 2 // prone / knocked down
 
             return state
         }
@@ -1536,6 +1580,10 @@ export module Scripting {
                     // WEAPON_DATA_ANIMATION_CODE — animation code (lookup key into
                     // art/critters weapon suffix tables, e.g. 0=fists, 1=knife, 2=club…)
                     return pro.extra?.animCode ?? 0
+                case 13:
+                    // ITEM_DATA_MATERIAL — material type of the item (0=glass, 1=metal, 2=plastic…).
+                    // Used by some scripts for breakage/damage calculations.
+                    return pro.extra?.material ?? 0
                 case 14:
                     // WEAPON_DATA_MIN_DMG — minimum damage roll
                     return pro.extra?.minDmg ?? 0
@@ -1807,6 +1855,14 @@ export module Scripting {
                 // machine from scripted anim() calls, so these are silently logged instead
                 // of emitting stub warnings that flood the console during map entry.
                 log('anim', arguments, 'animation')
+            } else if (anim >= 100 && anim <= 999) {
+                // Extended ANIM_* constants (100+ are engine-internal or sfall-specific).
+                // Log silently rather than stubbing so the console stays clean.
+                log('anim (extended)', arguments, 'animation')
+            } else if (anim > 1010) {
+                // Unknown high-valued anim codes beyond the frame-set marker.
+                // Log silently — these appear in some modded scripts and are not blockers.
+                log('anim (unknown high code)', arguments, 'animation')
             } else {
                 stub('anim', arguments)
                 warn('anim: unknown anim request: ' + anim)
@@ -2650,6 +2706,34 @@ export module Scripting {
         _listIterObjects: Obj[] = []
         _listIterIndex: number = 0
 
+        // sfall extended opcode — tile number N steps in a direction (0x8189).
+        // tile_num_in_direction(tile, dir, count):
+        //   tile  — starting tile number
+        //   dir   — direction (0-5, same hex-grid directions as obj.orientation)
+        //   count — number of steps to take in that direction
+        // Returns the tile number of the destination, or the original tile when
+        // the input is out of range (count <= 0 or bad tile).
+        tile_num_in_direction(tile: number, dir: number, count: number): number {
+            if (typeof tile !== 'number' || typeof dir !== 'number' || typeof count !== 'number') return tile ?? 0
+            if (count <= 0) return tile
+            const start = fromTileNum(tile)
+            if (!start) return tile
+            const dest = hexInDirectionDistance(start, ((dir % 6) + 6) % 6, count)
+            return toTileNum(dest)
+        }
+
+        // sfall extended opcode — get elevation of an object (0x818A).
+        // Returns the current elevation (0-based floor index) that the given
+        // object belongs to.  In the browser build, all visible objects share
+        // the current elevation so we return globalState.currentElevation.
+        get_obj_elevation(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_obj_elevation: not a game object: ' + obj)
+                return 0
+            }
+            return globalState.currentElevation ?? 0
+        }
+
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
             info('load_map: ' + map)
@@ -2886,8 +2970,8 @@ export module Scripting {
     export function spatial(spatialObj: Obj, source: Obj) {
         // TODO: Spatial type
         const script = spatialObj._script
-        if (!script) throw Error('spatial without a script being triggered')
-        if (!script.spatial_p_proc) throw Error('spatial script without a spatial_p_proc triggered')
+        if (!script) return // no script attached — silently ignore
+        if (!script.spatial_p_proc) return // no spatial_p_proc defined — silently ignore
 
         script.game_time = globalState.gameTickTime
         script.cur_map_index = currentMapID
@@ -2928,7 +3012,7 @@ export module Scripting {
     }
 
     export function useSkillOn(who: Critter, skillId: number, obj: Obj): boolean {
-        if (!obj._script) throw Error('useSkillOn: Object has no script')
+        if (!obj._script) return false // no script on this object — treat as no-override
         obj._script.self_obj = obj as ScriptableObj
         obj._script.source_obj = who
         obj._script.cur_map_index = currentMapID
@@ -2941,7 +3025,7 @@ export module Scripting {
     }
 
     export function pickup(obj: Obj, source: Critter): boolean {
-        if (!obj._script) throw Error('pickup: Object has no script')
+        if (!obj._script) return false // no script — default pickup behaviour applies
         obj._script.self_obj = obj as ScriptableObj
         obj._script.source_obj = source
         obj._script.cur_map_index = currentMapID
@@ -2992,7 +3076,7 @@ export module Scripting {
     }
 
     export function combatEvent(obj: Obj, event: 'turnBegin'): boolean {
-        if (!obj._script) throw Error('combatEvent: Object has no script')
+        if (!obj._script) return false // no script — not a bug; many map objects lack one
 
         let fixed_param: number | null = null
         switch (event) {

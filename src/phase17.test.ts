@@ -404,8 +404,10 @@ describe('Phase 17-E — anim does not stub for handled cases', () => {
             visible: true,
             orientation: 0,
         }
+        // Phase 24: codes > 1010 (and 100–999) now log silently instead of stubbing to
+        // reduce console noise during gameplay.  Code 9999 is no longer a stub hit.
         script.anim(obj, 9999, 0)
-        expect(stubHitCount()).toBe(1)
+        expect(stubHitCount()).toBe(0)
     })
 })
 

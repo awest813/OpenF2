@@ -82,7 +82,9 @@ export function objectGetDamageType(obj: any): string {
     if (obj.dmgType !== undefined) {
         return obj.dmgType
     }
-    throw 'no damage type for obj: ' + obj
+    // Safe fallback: normal damage when no dmgType is set (avoids crash on
+    // scripted weapons/objects that lack an explicit damage-type field).
+    return 'Normal'
 }
 
 function useExplosive(obj: Obj, source: Critter): void {
