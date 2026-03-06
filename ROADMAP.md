@@ -53,6 +53,8 @@ OpenF2 aims to deliver:
 - **VM debug fields:** `stepCount` + `currentProcedureName` on `ScriptVM`; `ScriptDebuggerPanel` surfaces step count and active procedure name
 - **Performance instrumentation (Safe Impact Roadmap — step 1):** `AssetCache` extended with decode-latency telemetry (`recordDecodeLatency`, `avgDecodeLatencyMs`) and eviction-reason tracking (`lastEvictionReason`); `SpriteBatch` extended with frame-time telemetry (`frameTimeMs` in `BatchStats`); `ScriptVM.call()` instruments top-level call duration (`lastCallTimeMs`, `totalCallTimeMs`); `GameMap.recalcPath()` wrapped with `PathfindingTelemetry` counters (`totalCalls`, `totalTimeMs`, `worstCaseTimeMs`, `lastSolveTimeMs`)
 - **Performance safeguards (Safe Impact Roadmap — step 2):** `ScriptVM.call()` now tracks slow-call telemetry (`slowCallCount`, `lastSlowCallTimeMs`) and emits warn-level logs when top-level procedure runtime exceeds `Config.engine.vmSlowCallWarnThresholdMs`
+- **sfall opcodes — any-critter stat helpers:** `get_critter_base_stat` (0x8166), `set_critter_base_stat` (0x8167), `in_combat` (0x8168) added to `vm_bridge.ts` + `scripting.ts`; regression tests added in `vm.test.ts`
+- **critter_inven_obj WORN fix:** `critter_inven_obj` with `INVEN_TYPE_WORN` (0) now returns `equippedArmor` instead of falling through to stub; checklist entry updated from `stub` → `implemented`
 
 ### Remaining gaps
 

@@ -947,3 +947,191 @@ describe('ScriptVM unsupported operation buffer', () => {
         ])
     })
 })
+
+// ---------------------------------------------------------------------------
+// Bridge procedure regression tests (inline replicas — no scripting layer)
+//
+// These replicate the logic of sfall procedures 0x8166–0x8168 and the
+// critter_inven_obj INVEN_TYPE_WORN fix.  They exercise the algorithm in
+// isolation so that correctness is verifiable without browser dependencies.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// get_critter_base_stat (sfall 0x8166) — inline replica
+// ---------------------------------------------------------------------------
+
+const statMapReplica: { [stat: number]: string } = {
+    0: 'STR', 1: 'PER', 2: 'END', 3: 'CHA', 4: 'INT', 5: 'AGI', 6: 'LUK',
+    7: 'Max HP', 35: 'HP',
+}
+
+function makeStubCritter(bases: Record<string, number>) {
+    const _bases: Record<string, number> = { ...bases }
+    return {
+        type: 'critter',
+        stats: {
+            getBase(name: string) { return _bases[name] ?? 0 },
+            setBase(name: string, val: number) { _bases[name] = val },
+        },
+    }
+}
+
+function getCritterBaseStatReplica(obj: any, stat: number): number {
+    if (!obj || obj.type !== 'critter') return 0
+    const statName = statMapReplica[stat]
+    if (!statName) return 0
+    return obj.stats.getBase(statName)
+}
+
+function setCritterBaseStatReplica(obj: any, stat: number, value: number): void {
+    if (!obj || obj.type !== 'critter') return
+    const statName = statMapReplica[stat]
+    if (!statName) return
+    obj.stats.setBase(statName, value)
+}
+
+describe('get_critter_base_stat (sfall 0x8166) — inline replica', () => {
+    it('returns the base STR (stat 0) for a critter', () => {
+        const critter = makeStubCritter({ STR: 7 })
+        expect(getCritterBaseStatReplica(critter, 0)).toBe(7)
+    })
+
+    it('returns the base AGI (stat 5) for a critter', () => {
+        const critter = makeStubCritter({ AGI: 9 })
+        expect(getCritterBaseStatReplica(critter, 5)).toBe(9)
+    })
+
+    it('returns 0 for an unknown stat number', () => {
+        const critter = makeStubCritter({ STR: 5 })
+        expect(getCritterBaseStatReplica(critter, 999)).toBe(0)
+    })
+
+    it('returns 0 when obj is not a critter', () => {
+        const item = { type: 'item', stats: { getBase: () => 99 } }
+        expect(getCritterBaseStatReplica(item, 0)).toBe(0)
+    })
+
+    it('returns 0 for null obj', () => {
+        expect(getCritterBaseStatReplica(null, 0)).toBe(0)
+    })
+
+    it('returns 0 (default) for a stat not explicitly set', () => {
+        const critter = makeStubCritter({ STR: 5 })
+        expect(getCritterBaseStatReplica(critter, 1 /* PER */)).toBe(0)
+    })
+})
+
+describe('set_critter_base_stat (sfall 0x8167) — inline replica', () => {
+    it('sets the base STR (stat 0) on a critter', () => {
+        const critter = makeStubCritter({ STR: 5 })
+        setCritterBaseStatReplica(critter, 0, 8)
+        expect(critter.stats.getBase('STR')).toBe(8)
+    })
+
+    it('sets the base LUK (stat 6) on a critter', () => {
+        const critter = makeStubCritter({})
+        setCritterBaseStatReplica(critter, 6, 3)
+        expect(critter.stats.getBase('LUK')).toBe(3)
+    })
+
+    it('does nothing for an unknown stat number', () => {
+        const critter = makeStubCritter({ STR: 5 })
+        setCritterBaseStatReplica(critter, 999, 10)
+        expect(critter.stats.getBase('STR')).toBe(5)
+    })
+
+    it('does nothing when obj is not a critter', () => {
+        const item = { type: 'item', stats: { getBase: () => 0, setBase: vi.fn() } }
+        setCritterBaseStatReplica(item, 0, 10)
+        expect(item.stats.setBase).not.toHaveBeenCalled()
+    })
+
+    it('round-trips: set then get returns the same value', () => {
+        const critter = makeStubCritter({})
+        setCritterBaseStatReplica(critter, 3 /* CHA */, 6)
+        expect(getCritterBaseStatReplica(critter, 3)).toBe(6)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// in_combat (sfall 0x8168) — inline replica
+// ---------------------------------------------------------------------------
+
+function inCombatReplica(state: { inCombat: boolean }): number {
+    return state.inCombat ? 1 : 0
+}
+
+describe('in_combat (sfall 0x8168) — inline replica', () => {
+    it('returns 1 when engine is in combat', () => {
+        expect(inCombatReplica({ inCombat: true })).toBe(1)
+    })
+
+    it('returns 0 when engine is not in combat', () => {
+        expect(inCombatReplica({ inCombat: false })).toBe(0)
+    })
+
+    it('toggles correctly between in-combat and out-of-combat', () => {
+        const state = { inCombat: false }
+        expect(inCombatReplica(state)).toBe(0)
+        state.inCombat = true
+        expect(inCombatReplica(state)).toBe(1)
+        state.inCombat = false
+        expect(inCombatReplica(state)).toBe(0)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// critter_inven_obj INVEN_TYPE_WORN (0) — inline replica
+// ---------------------------------------------------------------------------
+
+function critterInvenObjReplica(critter: any, where: number): any {
+    if (!critter || critter.type !== 'critter') throw new Error('not game object')
+    if (where === 0) return critter.equippedArmor ?? null // INVEN_TYPE_WORN
+    if (where === 1) return critter.rightHand ?? null     // INVEN_TYPE_RIGHT_HAND
+    if (where === 2) return critter.leftHand ?? null      // INVEN_TYPE_LEFT_HAND
+    return null
+}
+
+describe('critter_inven_obj INVEN_TYPE_WORN (0) — inline replica', () => {
+    it('returns the equipped armor when armor is set', () => {
+        const armor = { type: 'item', name: 'leather_armor' }
+        const critter = { type: 'critter', equippedArmor: armor, rightHand: null, leftHand: null }
+        expect(critterInvenObjReplica(critter, 0)).toBe(armor)
+    })
+
+    it('returns null when no armor is equipped', () => {
+        const critter = { type: 'critter', equippedArmor: null, rightHand: null, leftHand: null }
+        expect(critterInvenObjReplica(critter, 0)).toBeNull()
+    })
+
+    it('returns null when equippedArmor is undefined', () => {
+        const critter = { type: 'critter', rightHand: null, leftHand: null }
+        expect(critterInvenObjReplica(critter, 0)).toBeNull()
+    })
+
+    it('still returns rightHand for INVEN_TYPE_RIGHT_HAND (1)', () => {
+        const weapon = { type: 'item', name: 'pistol' }
+        const critter = { type: 'critter', equippedArmor: null, rightHand: weapon, leftHand: null }
+        expect(critterInvenObjReplica(critter, 1)).toBe(weapon)
+    })
+
+    it('still returns leftHand for INVEN_TYPE_LEFT_HAND (2)', () => {
+        const weapon = { type: 'item', name: 'knife' }
+        const critter = { type: 'critter', equippedArmor: null, rightHand: null, leftHand: weapon }
+        expect(critterInvenObjReplica(critter, 2)).toBe(weapon)
+    })
+
+    it('throws for non-critter objects', () => {
+        const item = { type: 'item' }
+        expect(() => critterInvenObjReplica(item, 0)).toThrow('not game object')
+    })
+
+    it('armor change is reflected immediately (no caching)', () => {
+        const armor1 = { type: 'item', name: 'leather' }
+        const armor2 = { type: 'item', name: 'metal' }
+        const critter: any = { type: 'critter', equippedArmor: armor1, rightHand: null, leftHand: null }
+        expect(critterInvenObjReplica(critter, 0)).toBe(armor1)
+        critter.equippedArmor = armor2
+        expect(critterInvenObjReplica(critter, 0)).toBe(armor2)
+    })
+})

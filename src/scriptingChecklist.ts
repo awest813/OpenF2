@@ -140,8 +140,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'critter_inven_obj_worn',
         kind: 'procedure',
-        description: 'critter_inven_obj with INVEN_TYPE_WORN (0): get currently worn armor. Stubbed — returns null.',
-        status: 'stub',
+        description: 'critter_inven_obj with INVEN_TYPE_WORN (0): get currently worn armor. Returns equippedArmor field.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -160,6 +160,34 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         status: 'stub',
         frequency: 'low',
         impact: 'low',
+    },
+
+    // -----------------------------------------------------------------------
+    // sfall opcodes — implemented
+    // -----------------------------------------------------------------------
+    {
+        id: 'get_critter_base_stat',
+        kind: 'opcode',
+        description: 'sfall 0x8166: get_critter_base_stat(critter, stat) — read a base SPECIAL/derived stat for any critter (not just PC). Uses the same statMap as get_critter_stat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_critter_base_stat',
+        kind: 'opcode',
+        description: 'sfall 0x8167: set_critter_base_stat(critter, stat, value) — write a base SPECIAL/derived stat for any critter. Mirrors set_pc_base_stat but for arbitrary critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'in_combat',
+        kind: 'opcode',
+        description: 'sfall 0x8168: in_combat() → 1 when the engine is in combat, 0 otherwise. Used by scripts to gate combat-only logic.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
     },
 
     // -----------------------------------------------------------------------

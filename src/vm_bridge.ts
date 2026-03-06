@@ -268,6 +268,9 @@ export module ScriptVMBridge {
        ,0x8163: bridged("get_critter_current_ap", 1)   // get_critter_current_ap(obj) → current combat AP
        ,0x8164: bridged("get_critter_max_hp", 1)       // get_critter_max_hp(obj) → max HP
        ,0x8165: bridged("get_pc_level", 0)             // get_pc_level() → PC level
+       ,0x8166: bridged("get_critter_base_stat", 2)    // get_critter_base_stat(critter, stat) → base stat value
+       ,0x8167: bridged("set_critter_base_stat", 3, false) // set_critter_base_stat(critter, stat, value)
+       ,0x8168: bridged("in_combat", 0)                // in_combat() → 1 if engine is in combat, 0 otherwise
     }
     Object.assign(opMap, bridgeOpMap)
 
