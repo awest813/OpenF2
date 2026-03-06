@@ -62,6 +62,15 @@ Fallout 1 compatibility is maintained as a secondary goal, so the engine can ser
 - **proto_data de-stubbed (partial):** `proto_data(pid, data_member)` now handles data_member 0 (PID), 1 (textID), 2 (FID), 3 (lightRadius), 4 (lightIntensity), 5 (flags), 8 (item subtype), 9 (item weight), 10 (item cost), 11 (item size), 14–16 (weapon min/max/dmgType), 21–22 (weapon AP costs), 25–27 (caliber/ammoPID/maxAmmo), 6 (critter actionFlags); gracefully returns 0 when proMap is unavailable; checklist updated to 'partial'
 - **De-stubbed procedures:** `gfade_in`, `gfade_out`, and `play_gmovie` now log silently instead of emitting console stub warnings (no FMV pipeline in browser build); checklist entries added as 'partial'
 - **sfall opcodes 0x8170–0x8174:** `get_critter_kills` (0x8170), `set_critter_kills` (0x8171), `get_critter_body_type` (0x8172), `floor2` (0x8173), `obj_count_by_pid` (0x8174) added to `vm_bridge.ts` + `scripting.ts`; `globalState.critterKillCounts` added for session-scoped kill tracking
+- **Phase 17 — Scripting completeness & save reliability:**
+  - **Extended `statMap`:** `get_critter_stat` / `set_critter_stat` now cover all 34 stat constants (0–33, 35) including AC (9), Max AP (8), carry weight (12), sequence (13), healing rate (14), critical chance (15), better criticals (16), all DT/DR types (17–32), and age (33); no more stub emissions for standard stat reads
+  - **`gsay_end` de-stubbed:** the Script method no longer emits a stub warning; the VM-level opcode handler (0x811D) already halts the VM correctly and was unaffected
+  - **`end_dialogue` implemented:** now calls `dialogueExit()` to properly close dialogue and resume the VM; previously stubbed and left the dialogue UI hanging
+  - **`anim` stub noise eliminated:** rotation (1000) and frame-set (1010) cases now execute silently; only genuinely unknown animation codes record a stub hit
+  - **`set_exit_grids`, `tile_contains_pid_obj` de-stubbed:** implementation was already complete; stub call removed so console is no longer flooded during map entry
+  - **`wm_area_set_pos`, `mark_area_known` (MARK_TYPE_MAP):** changed from stub to log; neither has browser-side state to update and the stub warning was noise
+  - **`has_trait` / `critter_add_trait` OBJECT_CUR_WEIGHT (669):** now reads/writes the critter's `Carry` base stat; checklist entry promoted from `stub` to `implemented`
+  - **Save schema v6:** `gameTickTime` (game clock in ticks) and `critterKillCounts` (per-type kill counts) added to `SaveGame`; both now survive save/load so the calendar, quest timers, and lifetime kill-count checks are correct after loading; v5→v6 migration initialises both to safe defaults; `snapshotSaveData` and `hydrateStateFromSave` updated accordingly
 
 ### Remaining gaps (critical path to 1.0)
 
@@ -152,6 +161,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 - [x] **proto_data partial implementation:** `proto_data(pid, data_member)` now handles data_member constants 0–11, 14–16, 21–22, 25–27, 6 (PID, textID, FID, lightRadius/Intensity, flags, item subtype/weight/cost/size, weapon stats, critter action flags); gracefully returns 0 when proMap is unavailable; checklist updated to 'partial'
 - [x] **De-stubbed — gfade/movie:** `gfade_in`, `gfade_out`, and `play_gmovie` now log silently (no FMV pipeline yet) instead of emitting console stub warnings; checklist entries added as 'partial'
 - [x] **sfall opcodes 0x8170–0x8174:** `get_critter_kills` (0x8170), `set_critter_kills` (0x8171), `get_critter_body_type` (0x8172), `floor2` (0x8173), `obj_count_by_pid` (0x8174) added; `globalState.critterKillCounts` added for session-scoped kill tracking
+- [x] **Phase 17 — Scripting completeness & save reliability:** extended `statMap` (stats 8–33 including AC/AP/carry/DT/DR); `gsay_end` and `end_dialogue` de-stubbed; `anim` stub noise eliminated for handled cases; `set_exit_grids`/`tile_contains_pid_obj`/`wm_area_set_pos`/`mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6 adds `gameTickTime` and `critterKillCounts` persistence
 - [ ] Scripting VM — complete remaining Fallout 2 procedure stubs *(critical path)*
 - [ ] Dialogue + barter edge-case fidelity *(critical path)*
 - [ ] Save/load reliability hardening and long-campaign round-trip fixtures
@@ -187,6 +197,7 @@ The scripting VM is the critical path here. Every stubbed procedure that gets de
 10. **sfall critter/PC helpers & VM debug** — ✅ `get_critter_current_ap` (0x8163), `get_critter_max_hp` (0x8164), `get_pc_level` (0x8165) added; `critter_attempt_placement` de-stubbed; `ScriptVM.stepCount`/`currentProcedureName` debug fields added; `ScriptDebuggerPanel` shows step count and active procedure
 11. **Performance instrumentation (Safe Impact Roadmap step 1)** — ✅ Decode-latency + eviction-reason telemetry added to `AssetCache`; `SpriteBatch` gains `frameTimeMs`; `ScriptVM` gains `lastCallTimeMs`/`totalCallTimeMs`; `GameMap` gains `PathfindingTelemetry` on `recalcPath`
 12. **Save reliability + proto_data + sfall 0x8170–0x8174** — ✅ Save schema v5: GVAR_* script globals now persist across save/load (`scriptGlobalVars`); `proto_data` de-stubbed for common data members (item weight/cost/size, weapon stats, critter flags); `gfade_in/out` and `play_gmovie` no longer flood console; `get_critter_kills`, `set_critter_kills`, `get_critter_body_type`, `floor2`, `obj_count_by_pid` (0x8170–0x8174) added
+13. **Phase 17 — Scripting completeness & save reliability** — ✅ `statMap` extended to all 34 stat constants; `gsay_end`/`end_dialogue` de-stubbed; `anim` stub noise eliminated; `set_exit_grids`, `tile_contains_pid_obj`, `wm_area_set_pos`, `mark_area_known(MARK_TYPE_MAP)` de-stubbed; `has_trait`/`critter_add_trait` OBJECT_CUR_WEIGHT (669) implemented; save schema v6: `gameTickTime` and `critterKillCounts` now persist across save/load
 
 ---
 

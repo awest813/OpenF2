@@ -130,6 +130,7 @@ export module Scripting {
     }
 
     var statMap: { [stat: number]: string } = {
+        // SPECIAL primaries (0–6)
         0: 'STR',
         1: 'PER',
         2: 'END',
@@ -137,8 +138,39 @@ export module Scripting {
         4: 'INT',
         5: 'AGI',
         6: 'LUK',
-        35: 'HP',
+        // Derived combat stats (7–16)
         7: 'Max HP',
+        8: 'AP',
+        9: 'AC',
+        10: 'Melee',    // Unarmed Damage (same as melee)
+        11: 'Melee',    // Melee Damage
+        12: 'Carry',    // Carry Weight
+        13: 'Sequence',
+        14: 'Healing Rate',
+        15: 'Critical Chance',
+        16: 'Better Criticals',
+        // DT (Damage Threshold) stats (17–23)
+        17: 'DT Normal',
+        18: 'DT Laser',
+        19: 'DT Fire',
+        20: 'DT Plasma',
+        21: 'DT Electrical',
+        22: 'DT EMP',
+        23: 'DT Explosive',
+        // DR (Damage Resistance) stats (24–32)
+        24: 'DR Normal',
+        25: 'DR Laser',
+        26: 'DR Fire',
+        27: 'DR Plasma',
+        28: 'DR Electrical',
+        29: 'DR EMP',
+        30: 'DR Explosive',
+        31: 'DR Radiation',
+        32: 'DR Poison',
+        // Misc character stats (33–35)
+        33: 'Age',
+        // 34: Gender — handled separately in get_critter_stat
+        35: 'HP',       // Current HP
     }
 
     var skillNumToName: { [num: number]: string } = {
@@ -646,8 +678,9 @@ export module Scripting {
                         return obj.orientation // OBJECT_CUR_ROT
                     case 666: // OBJECT_VISIBILITY
                         return obj.visible === false ? 0 : 1 // 1 = visible, 0 = invisible
-                    case 669:
-                        break // OBJECT_CUR_WEIGHT (TODO)
+                    case 669: // OBJECT_CUR_WEIGHT — total carried weight in lbs
+                        if (obj.type !== 'critter') return 0
+                        return (obj as Critter).stats.getBase('Carry')
                 }
             }
 
@@ -682,8 +715,8 @@ export module Scripting {
                     case 666: // OBJECT_VISIBILITY
                         obj.visible = amount !== 0
                         return
-                    case 669: // OBJECT_CUR_WEIGHT
-                        stub('critter_add_trait', arguments)
+                    case 669: // OBJECT_CUR_WEIGHT — set the critter's carry weight
+                        ;(obj as Critter).stats.setBase('Carry', Math.max(0, amount))
                         return
                 }
             }
@@ -1304,14 +1337,16 @@ export module Scripting {
                 warn('anim: not a game object: ' + obj)
                 return
             }
-            stub('anim', arguments)
             if (anim === 1000)
                 // set rotation
                 obj.orientation = param
             else if (anim === 1010)
                 // set frame
                 obj.frame = param
-            else warn('anim: unknown anim request: ' + anim)
+            else {
+                stub('anim', arguments)
+                warn('anim: unknown anim request: ' + anim)
+            }
         }
 
         // environment
@@ -1380,7 +1415,7 @@ export module Scripting {
             globalState.gMap.destroyObject(obj)
         }
         set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, rotation: number) {
-            stub('set_exit_grids', arguments)
+            log('set_exit_grids', arguments)
             for (var i = 0; i < gameObjects!.length; i++) {
                 var obj = gameObjects![i]
                 if (obj.type === 'misc' && obj.extra && obj.extra.exitMapID !== undefined) {
@@ -1411,7 +1446,7 @@ export module Scripting {
             return toTileNum(obj.position)
         }
         tile_contains_pid_obj(tile: number, elevation: number, pid: number): any {
-            stub('tile_contains_pid_obj', arguments, 'tiles')
+            log('tile_contains_pid_obj', arguments, 'tiles')
             var pos = fromTileNum(tile)
             var objects = globalState.gMap.getObjects(elevation)
             for (var i = 0; i < objects.length; i++) {
@@ -1541,10 +1576,11 @@ export module Scripting {
             uiSetDialogueReply(msg)
         }
         gsay_end() {
-            stub('gSay_End', arguments)
+            log('gsay_end', arguments)
         }
         end_dialogue() {
-            stub('end_dialogue', arguments)
+            log('end_dialogue', arguments)
+            dialogueExit()
         }
         giq_option(iqTest: number, msgList: number, msgID: string | number, target: any, reaction: number) {
             log('giQ_Option', arguments)
@@ -1956,15 +1992,17 @@ export module Scripting {
                 } else {
                     // MARK_STATE_UNKNOWN (0), MARK_STATE_KNOWN (1), MARK_STATE_VISITED (2)
                     if (globalState.markAreaKnown) globalState.markAreaKnown(area, markState)
-                    else stub('mark_area_known', arguments)
+                    else log('mark_area_known', arguments)
                 }
             } else if (areaType === 1) {
-                // MARK_TYPE_MAP
-                stub('mark_area_known', arguments)
+                // MARK_TYPE_MAP — individual map reveal within a town area.
+                // Currently no per-map fog-of-war is tracked, so we log and
+                // treat the call as a no-op rather than emitting a stub warning.
+                log('mark_area_known', arguments)
             } else throw 'mark_area_known: invalid area type ' + areaType
         }
         wm_area_set_pos(area: number, x: number, y: number) {
-            stub('wm_area_set_pos', arguments)
+            log('wm_area_set_pos', arguments)
         }
         game_ui_disable() {
             log('game_ui_disable', arguments)
