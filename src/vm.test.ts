@@ -949,6 +949,112 @@ describe('ScriptVM unsupported operation buffer', () => {
 })
 
 // ---------------------------------------------------------------------------
+// ScriptVM — vmMaxStepsPerCall step limit
+// ---------------------------------------------------------------------------
+
+describe('ScriptVM — vmMaxStepsPerCall step limit', () => {
+    /**
+     * A VM whose run() loop feeds a tight infinite loop: push 0, jmp 0.
+     * Each step() call advances by one opcode. We use a real ScriptVM with
+     * a crafted bytecode buffer so we exercise the actual run() loop.
+     */
+    function makeLoopingVM(maxSteps: number): ScriptVM {
+        // Bytecode: jmp to offset 0 (opcode 0x8004 reads a 32-bit address from
+        // the data stack, so we seed the stack with address 0).
+        // Simpler: use op_dup (0x801b) in a tight loop — the stack grows but
+        // we only need to exercise the step counter.
+        // We craft a ScriptVM subclass whose step() always returns true until
+        // halted, to isolate the step-limit logic from real bytecode parsing.
+        class InfiniteScriptVM extends ScriptVM {
+            private stepsExecuted = 0
+
+            step(): boolean {
+                if (this.halted) return false
+                this.stepsExecuted++
+                this.stepCount++
+                // Advance PC so ScriptVM.run() doesn't re-read the same offset
+                this.pc++
+                return true
+            }
+        }
+
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { name: 'loop.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new InfiniteScriptVM(script, intfile)
+        return vm
+    }
+
+    it('throws when step limit is exceeded', () => {
+        const oldMax = Config.engine.vmMaxStepsPerCall
+        Config.engine.vmMaxStepsPerCall = 10
+        const vm = makeLoopingVM(10)
+        try {
+            expect(() => vm.run()).toThrow(/step limit exceeded/i)
+        } finally {
+            Config.engine.vmMaxStepsPerCall = oldMax
+        }
+    })
+
+    it('includes step count and script name in the error message', () => {
+        const oldMax = Config.engine.vmMaxStepsPerCall
+        Config.engine.vmMaxStepsPerCall = 5
+        const vm = makeLoopingVM(5)
+        try {
+            expect(() => vm.run()).toThrow(/5.*loop\.int|loop\.int.*5/)
+        } finally {
+            Config.engine.vmMaxStepsPerCall = oldMax
+        }
+    })
+
+    it('does not throw when step limit is 0 (unlimited) and VM halts normally', () => {
+        class HaltingScriptVM extends ScriptVM {
+            step(): boolean {
+                this.halted = true
+                return false
+            }
+        }
+
+        const oldMax = Config.engine.vmMaxStepsPerCall
+        Config.engine.vmMaxStepsPerCall = 0
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { name: 'halt.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new HaltingScriptVM(script, intfile)
+        try {
+            expect(() => vm.run()).not.toThrow()
+        } finally {
+            Config.engine.vmMaxStepsPerCall = oldMax
+        }
+    })
+
+    it('does not throw when step limit is set but VM halts within the limit', () => {
+        class LimitedScriptVM extends ScriptVM {
+            private count = 0
+
+            step(): boolean {
+                if (this.halted) return false
+                if (++this.count >= 3) {
+                    this.halted = true
+                    return false
+                }
+                this.stepCount++
+                return true
+            }
+        }
+
+        const oldMax = Config.engine.vmMaxStepsPerCall
+        Config.engine.vmMaxStepsPerCall = 100
+        const script = { seek() {}, read16() { return 0 }, offset: 0 } as any
+        const intfile = { name: 'short.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new LimitedScriptVM(script, intfile)
+        try {
+            expect(() => vm.run()).not.toThrow()
+        } finally {
+            Config.engine.vmMaxStepsPerCall = oldMax
+        }
+    })
+})
+
+// ---------------------------------------------------------------------------
 // Bridge procedure regression tests (inline replicas — no scripting layer)
 //
 // These replicate the logic of sfall procedures 0x8166–0x8168 and the

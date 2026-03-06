@@ -47,6 +47,7 @@ export const Config = {
         doDisasmOnUnimplOp: true, // Disassemble script upon reaching unimplemented opcode?
         failOnUnknownVmOpcode: false, // Throw immediately when script VM hits an unknown opcode?
         vmSlowCallWarnThresholdMs: 8, // Warn when a top-level script call exceeds this frame-budget threshold
+        vmMaxStepsPerCall: 0, // Maximum opcode steps per run() cycle (0 = unlimited); throws when exceeded
     },
 
     combat: {

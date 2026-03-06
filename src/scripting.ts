@@ -469,6 +469,19 @@ export module Scripting {
             log('random', arguments)
             return getRandomInt(min, max)
         }
+        abs_value(x: number): number {
+            return Math.abs(x)
+        }
+        string_length(str: string): number {
+            if (typeof str !== 'string') return 0
+            return str.length
+        }
+        pow(base: number, exp: number): number {
+            return Math.pow(base, exp)
+        }
+        obj_is_valid(obj: any): number {
+            return isGameObject(obj) ? 1 : 0
+        }
         debug_msg(msg: string) {
             log('debug_msg', arguments)
             info('DEBUG MSG: [' + this.scriptName + ']: ' + msg, 'debugMessage')

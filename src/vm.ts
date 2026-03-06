@@ -194,7 +194,15 @@ export class ScriptVM {
 
     run(): void {
         this.halted = false
-        while (this.step()) {}
+        const maxSteps = Config.engine.vmMaxStepsPerCall
+        let runSteps = 0
+        while (this.step()) {
+            if (maxSteps > 0 && ++runSteps >= maxSteps) {
+                throw new Error(
+                    `ScriptVM step limit exceeded (${maxSteps} steps) in ${this.intfile.name}`
+                )
+            }
+        }
     }
 
     recordUnsupportedOpcode(opcode: number, pc: number): void {
