@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
-import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
+import { hydrateStateFromSave, snapshotSaveData, validateSaveForHydration } from './saveStateFidelity.js'
 
 describe('migrateSave', () => {
     it('returns a v3 save unchanged', () => {
@@ -298,5 +298,57 @@ describe('save/load fidelity', () => {
             random_1: { name: 'random_1', marker: 'encounter-map-old' },
         })
 
+    })
+})
+
+
+describe('save validation and failure clarity', () => {
+    it('provides checklist coverage for key long-campaign fields captured in save snapshots', () => {
+        const source = {
+            currentElevation: 0,
+            gMap: { name: 'checklist_map', serialize: () => ({ name: 'checklist_map', encounter: 'active' }) },
+            player: {
+                position: { x: 1, y: 2 },
+                orientation: 5,
+                inventory: [{ serialize: () => ({ pid: 9, amount: 3, equipped: true }) }],
+                xp: 99,
+                level: 2,
+                karma: 12,
+            },
+            gParty: { serialize: () => [{ pid: 50, amount: 1, role: 'npc' }] },
+            dirtyMapCache: { worldmap: { name: 'worldmap', transition: 'in-progress' } },
+            questLog: { serialize: () => ({ entries: [{ id: 'q-main', state: 'active', stateChangedAt: 77 }] }) },
+            reputation: { serialize: () => ({ karma: -5, reputations: { Hero: 1 } }) },
+        }
+
+        const save = snapshotSaveData('Checklist', 100, SAVE_VERSION, source as any)
+
+        expect(save.currentMap).toBe('checklist_map')
+        expect(save.currentElevation).toBe(0)
+        expect(save.party).toEqual([{ pid: 50, amount: 1, role: 'npc' }])
+        expect(save.player.inventory).toEqual([{ pid: 9, amount: 3, equipped: true }])
+        expect(save.questLog).toEqual({ entries: [{ id: 'q-main', state: 'active', stateChangedAt: 77 }] })
+        expect(save.reputation).toEqual({ karma: -5, reputations: { Hero: 1 } })
+        expect(save.savedMaps).toEqual({
+            checklist_map: { name: 'checklist_map', encounter: 'active' },
+            worldmap: { name: 'worldmap', transition: 'in-progress' },
+        })
+    })
+
+    it('throws actionable errors for incomplete/corrupt saves before mutating runtime state', () => {
+        const missingMapSave = {
+            version: SAVE_VERSION,
+            name: 'Corrupt',
+            timestamp: 1,
+            currentMap: 'missing_map',
+            currentElevation: 0,
+            player: { position: { x: 0, y: 0 }, orientation: 0, inventory: [], xp: 0, level: 1, karma: 0 },
+            party: [],
+            savedMaps: {},
+        }
+
+        expect(() => validateSaveForHydration(missingMapSave as any)).toThrow(
+            "[SaveLoad] Save references missing current map 'missing_map'"
+        )
     })
 })
