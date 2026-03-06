@@ -4,9 +4,11 @@
  * questLog/reputation fields added in version 3.
  */
 
-import { describe, it, expect } from 'vitest'
+import { beforeEach, afterEach, describe, it, expect } from 'vitest'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData, validateSaveForHydration } from './saveStateFidelity.js'
+import { resetSaveBackendForTests, save, saveList, saveLoadInit } from './saveload.js'
+import globalState from './globalState.js'
 
 describe('migrateSave', () => {
     it('returns a v3 save unchanged', () => {
@@ -350,5 +352,74 @@ describe('save validation and failure clarity', () => {
         expect(() => validateSaveForHydration(missingMapSave as any)).toThrow(
             "[SaveLoad] Save references missing current map 'missing_map'"
         )
+    })
+})
+
+
+describe('save storage runtime resilience', () => {
+    const originalIndexedDB = (globalThis as any).indexedDB
+
+    function installMinimalSaveState(): void {
+        const state: any = globalState
+        state.currentElevation = 0
+        state.worldPosition = undefined
+        state.gMap = {
+            name: 'artemple',
+            serialize: () => ({ name: 'artemple', marker: 'current-map' }),
+        }
+        state.player = {
+            position: { x: 1, y: 2 },
+            orientation: 3,
+            inventory: [{ serialize: () => ({ pid: 1, amount: 1 }) }],
+            xp: 0,
+            level: 1,
+            karma: 0,
+        }
+        state.gParty = {
+            serialize: () => [],
+        }
+        state.dirtyMapCache = {}
+        state.questLog = {
+            serialize: () => ({ entries: [] }),
+        }
+        state.reputation = {
+            serialize: () => ({ karma: 0, reputations: {} }),
+        }
+    }
+
+    beforeEach(() => {
+        resetSaveBackendForTests()
+        ;(globalThis as any).indexedDB = undefined
+        installMinimalSaveState()
+    })
+
+    afterEach(() => {
+        ;(globalThis as any).indexedDB = originalIndexedDB
+        resetSaveBackendForTests()
+    })
+
+    it('falls back to in-memory saves when IndexedDB is unavailable', () => {
+        saveLoadInit()
+        save('Slot 1')
+
+        let list: any[] = []
+        saveList((saves) => {
+            list = saves
+        })
+
+        expect(list).toHaveLength(1)
+        expect(list[0].name).toBe('Slot 1')
+    })
+
+    it('queues save requests made before storage initialization and flushes after fallback activation', () => {
+        save('Queued slot')
+        saveLoadInit()
+
+        let list: any[] = []
+        saveList((saves) => {
+            list = saves
+        })
+
+        expect(list.map((s) => s.name)).toEqual(['Queued slot'])
     })
 })

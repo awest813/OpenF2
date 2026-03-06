@@ -23,7 +23,41 @@ export { SAVE_VERSION, SaveGame, migrateSave }
 
 // Saving and loading support
 
-let db: IDBDatabase
+let db: IDBDatabase | null = null
+let dbReady = false
+let usingMemoryStore = false
+let pendingOps: Array<() => void> = []
+const memorySaves = new Map<number, SaveGame>()
+let nextMemorySaveId = 1
+
+function flushPendingOps(): void {
+    const ops = pendingOps
+    pendingOps = []
+    for (const op of ops) {
+        op()
+    }
+}
+
+function runWhenStorageReady(op: () => void): void {
+    if (dbReady || usingMemoryStore) {
+        op()
+        return
+    }
+
+    pendingOps.push(op)
+}
+
+function switchToMemoryStore(reason: string): void {
+    if (usingMemoryStore) {
+        return
+    }
+
+    usingMemoryStore = true
+    dbReady = false
+    db = null
+    console.warn(`[SaveLoad] ${reason}. Falling back to in-memory save storage for this session.`)
+    flushPendingOps()
+}
 
 export function formatSaveDate(save: SaveGame): string {
     const date = new Date(save.timestamp)
@@ -33,6 +67,11 @@ export function formatSaveDate(save: SaveGame): string {
 }
 
 function withTransaction(f: (trans: IDBTransaction) => void, finished?: () => void) {
+    if (!dbReady || db === null) {
+        console.error('[SaveLoad] IndexedDB transaction attempted before DB was ready')
+        return
+    }
+
     const trans = db.transaction('saves', 'readwrite')
     if (finished) {
         trans.oncomplete = finished
@@ -41,6 +80,29 @@ function withTransaction(f: (trans: IDBTransaction) => void, finished?: () => vo
         console.error('Database error: ' + (<any>e.target).errorCode)
     }
     f(trans)
+}
+
+function nextAvailableMemorySlot(): number {
+    while (memorySaves.has(nextMemorySaveId)) {
+        nextMemorySaveId += 1
+    }
+
+    return nextMemorySaveId
+}
+
+function memorySaveList(callback: (saves: SaveGame[]) => void): void {
+    const saves = Array.from(memorySaves.values()).sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+    callback(saves)
+}
+
+function memorySave(save: SaveGame, slot = -1, callback?: () => void): void {
+    const id = slot !== -1 ? slot : nextAvailableMemorySlot()
+    save.id = id
+    memorySaves.set(id, save)
+    if (id >= nextMemorySaveId) {
+        nextMemorySaveId = id + 1
+    }
+    callback?.()
 }
 
 function getAll<T>(store: IDBObjectStore, callback?: (result: T[]) => void) {
@@ -58,8 +120,15 @@ function getAll<T>(store: IDBObjectStore, callback?: (result: T[]) => void) {
 }
 
 export function saveList(callback: (saves: SaveGame[]) => void): void {
-    withTransaction((trans) => {
-        getAll(trans.objectStore('saves'), callback)
+    runWhenStorageReady(() => {
+        if (usingMemoryStore) {
+            memorySaveList(callback)
+            return
+        }
+
+        withTransaction((trans) => {
+            getAll(trans.objectStore('saves'), callback)
+        })
     })
 }
 
@@ -92,25 +161,27 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         save.id = slot
     }
 
-    withTransaction((trans) => {
-        trans.objectStore('saves').put(save)
+    runWhenStorageReady(() => {
+        if (usingMemoryStore) {
+            memorySave(save, slot, callback)
+            console.log("[SaveLoad] Saving game data in memory as '%s'", name)
+            return
+        }
 
-        console.log("[SaveLoad] Saving game data as '%s'", name)
-    }, callback)
+        withTransaction((trans) => {
+            trans.objectStore('saves').put(save)
+
+            console.log("[SaveLoad] Saving game data as '%s'", name)
+        }, callback)
+    })
 }
 
 export function load(id: number): void {
     // Load stored savegame with id
 
-    withTransaction((trans) => {
-        const request = trans.objectStore('saves').get(id)
-
-        request.onerror = function () {
-            console.error(`[SaveLoad] Failed to read save #${id} from storage`)
-        }
-
-        request.onsuccess = function (e) {
-            const rawSave = (<any>e.target).result
+    runWhenStorageReady(() => {
+        if (usingMemoryStore) {
+            const rawSave = memorySaves.get(id)
             if (!rawSave) {
                 console.error(`[SaveLoad] Save #${id} was not found`)
                 return
@@ -128,25 +199,79 @@ export function load(id: number): void {
                     saveName: rawSave.name,
                 })
             }
+            return
         }
+
+        withTransaction((trans) => {
+            const request = trans.objectStore('saves').get(id)
+
+            request.onerror = function () {
+                console.error(`[SaveLoad] Failed to read save #${id} from storage`)
+            }
+
+            request.onsuccess = function (e) {
+                const rawSave = (<any>e.target).result
+                if (!rawSave) {
+                    console.error(`[SaveLoad] Save #${id} was not found`)
+                    return
+                }
+
+                try {
+                    const save: SaveGame = migrateSave(rawSave)
+
+                    console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
+                    hydrateStateFromSave(save, globalState, deserializeObj)
+                } catch (error) {
+                    console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
+                        error,
+                        saveVersion: rawSave.version,
+                        saveName: rawSave.name,
+                    })
+                }
+            }
+        })
     })
 }
 
 export function saveLoadInit(): void {
+    if (dbReady || usingMemoryStore) {
+        return
+    }
+
+    if (typeof indexedDB === 'undefined') {
+        switchToMemoryStore('IndexedDB is unavailable in this browser environment')
+        return
+    }
+
     const request = indexedDB.open('darkfo', 1)
 
     request.onupgradeneeded = function () {
         const db = request.result
-        const store = db.createObjectStore('saves', { keyPath: 'id', autoIncrement: true })
+        db.createObjectStore('saves', { keyPath: 'id', autoIncrement: true })
     }
 
     request.onsuccess = function () {
         db = request.result
+        dbReady = true
 
         db.onerror = function (e) {
             console.error('Database error: ' + (<any>e.target).errorCode)
         }
 
         console.log('Established DB connection')
+        flushPendingOps()
     }
+
+    request.onerror = function () {
+        switchToMemoryStore('IndexedDB failed to initialize')
+    }
+}
+
+export function resetSaveBackendForTests(): void {
+    db = null
+    dbReady = false
+    usingMemoryStore = false
+    pendingOps = []
+    memorySaves.clear()
+    nextMemorySaveId = 1
 }
