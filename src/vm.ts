@@ -45,6 +45,8 @@ export class ScriptVM {
     stepCount: number = 0
     /** Name of the procedure currently being executed, or null when idle. */
     currentProcedureName: string | null = null
+    /** Name of the most recently entered procedure (including when currently idle). */
+    lastProcedureName: string | null = null
     /** Wall-clock time spent in the most recent top-level call(), in milliseconds. */
     lastCallTimeMs: number = 0
     /** Cumulative wall-clock time spent in all top-level call() invocations, in milliseconds. */
@@ -101,6 +103,7 @@ export class ScriptVM {
         const shouldPushTopLevelReturnSentinel = previousProcedure !== null || previousRetDepth === 0
 
         this.currentProcedureName = procName
+        this.lastProcedureName = procName
 
         // Args are passed in reverse order (stack-based calling convention).
         const reversedArgs = [...args].reverse()

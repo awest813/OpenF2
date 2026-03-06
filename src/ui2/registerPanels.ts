@@ -11,6 +11,7 @@ import { InventoryPanel } from './inventoryPanel.js'
 import { WorldMapPanel } from './worldMapPanel.js'
 import { ElevatorPanel } from './elevatorPanel.js'
 import { CalledShotPanel } from './calledShotPanel.js'
+import { ScriptDebuggerPanel } from './scriptDebuggerPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 
 export const PRIMARY_GAMEPLAY_PANEL_NAMES = [
@@ -43,4 +44,5 @@ export function registerDefaultPanels(
     manager.register(new WorldMapPanel(screenWidth, screenHeight))
     manager.register(new ElevatorPanel(screenWidth, screenHeight))
     manager.register(new CalledShotPanel(screenWidth, screenHeight))
+    manager.register(new ScriptDebuggerPanel(screenWidth, screenHeight))
 }
