@@ -97,10 +97,10 @@ Gate: **PASS** when player consequences consistently alter campaign state as exp
 
 ## Phase 8 — Cinematics/audio/endings
 
-- [ ] Pre-ending trigger chain validated
-- [ ] Ending sequence execution validated
-- [ ] Slide ordering and fallback behavior validated
-- [ ] Audio transitions validated
+- [x] Pre-ending trigger chain validated
+- [x] Ending sequence execution validated
+- [x] Slide ordering and fallback behavior validated
+- [x] Audio transitions validated
 
 Gate: **PASS** when ending flow completes without runtime interruption.
 

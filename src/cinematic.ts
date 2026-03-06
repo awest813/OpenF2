@@ -122,7 +122,11 @@ export class CinematicPlayer {
 
         this._renderSlide(slide)
 
-        const duration = slide.duration ?? 4000
+        const rawDuration = slide.duration ?? 4000
+        const duration =
+            Number.isFinite(rawDuration) && rawDuration > 0
+                ? rawDuration
+                : 4000
         this.timerId = setTimeout(() => {
             this.slideIndex++
             if (this.slideIndex >= total) {

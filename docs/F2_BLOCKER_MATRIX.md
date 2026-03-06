@@ -24,6 +24,7 @@ Status guidance:
 | BLK-005 | HIGH | Save/Load | runtime persistence integration | `saveload` world-position/script globals path | Runtime save/load resilience suite had no integration assertion proving `save()` persisted worldPosition and `load()` restored worldPosition + script globals together. | Save slot with non-default world position and marker GVAR; mutate runtime values; load slot. | Loaded state restores saved worldPosition and scripted global variable markers. | `src/saveload.test.ts` | @engine | CLOSED | Added in-memory backend integration regressions for worldPosition persistence + load restoration. |
 | BLK-006 | HIGH | Combat | AP accounting | `ActionPoints.subtractCombatAP/subtractMoveAP` | Negative AP spend inputs could increase AP due subtraction of negative values, allowing AP-gain exploit in malformed call paths. | Call `subtractCombatAP(-n)` or `subtractMoveAP(-n)` on live ActionPoints object. | Non-positive AP spend values are treated as no-op and cannot increase AP. | `src/combat.integration.test.ts` | @engine | CLOSED | Added guards for `value <= 0` in AP subtraction methods and regression test coverage. |
 | BLK-007 | HIGH | Quest Consequences | reputation/global-var branch continuity | consequence gate evaluation + persistence | No dedicated regression suite verified that cross-town consequence gates (karma/reputation + GVAR conditions) stay consistent after save/load. | Apply consequence actions (quest globals + reputation changes), save, load, re-evaluate branch gates. | Consequence-driven branch gates remain stable and deterministic across save/load. | `src/phase31.test.ts` | @engine | CLOSED | Added consequence harness covering NCR/Vault City/Broken Hills gate unlock/revoke + persistence. |
+| BLK-008 | HIGH | Cinematics | slide timing robustness | `CinematicPlayer._showSlide` duration handling | Invalid slide durations (negative/NaN) could produce undefined playback timing behavior in ending/intro sequences. | Play cinematic sequence with malformed slide duration values. | Invalid durations fall back to deterministic default timing; valid durations still honored. | `src/phase32.test.ts`, `src/phase3.test.ts` | @engine | CLOSED | Added duration validation fallback to default 4000 ms plus regression tests. |
 
 ---
 
@@ -35,6 +36,7 @@ Status guidance:
 - Save/load hardening suite (`src/saveload.test.ts`) passed with worldPosition + script-global roundtrip coverage.
 - Combat fidelity suite (`src/combat.integration.test.ts`) passed after AP subtraction guard hardening.
 - Quest consequence suite (`src/phase31.test.ts`) passed for karma/reputation/global-var gate persistence.
+- Cinematic timing suite (`src/phase32.test.ts`) passed with malformed-duration guard coverage.
 
 ## Closure checklist (required)
 
