@@ -31,6 +31,7 @@ import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
 import { Point } from './geometry.js'
 import { lazyLoadImage } from './images.js'
+import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
 
 // UI system
 
@@ -1141,6 +1142,7 @@ function uiAnimateBox($el: HTMLElement, origin: number | null, target: number, c
 }
 
 export function uiStartDialogue(force: boolean, target?: Critter) {
+    assertNoLegacyGameplayPanelFallback('dialogue', 'uiStartDialogue')
     if (globalState.uiMode === UIMode.barter && force !== true) {
         return
     }
@@ -1269,6 +1271,7 @@ function uiEndBarterMode() {
 }
 
 export function uiBarterMode(merchant: Critter) {
+    assertNoLegacyGameplayPanelFallback('barter', 'uiBarterMode')
     globalState.uiMode = UIMode.barter
 
     // Hide dialogue screen for now (animate down)
@@ -1453,6 +1456,7 @@ function uiEndLoot() {
 }
 
 export function uiLoot(object: Obj) {
+    assertNoLegacyGameplayPanelFallback('loot', 'uiLoot')
     globalState.uiMode = UIMode.loot
 
     function uiLootMove(data: string /* "l"|"r" */, where: 'left' | 'right') {
@@ -1548,6 +1552,7 @@ export function uiCloseWorldMap() {
 }
 
 export function uiWorldMap(onAreaMap = false) {
+    assertNoLegacyGameplayPanelFallback('worldMap', 'uiWorldMap')
     globalState.uiMode = UIMode.worldMap
     show($id('worldMapContainer'))
 
@@ -1646,6 +1651,7 @@ function uiElevatorDone() {
 }
 
 export function uiElevator(elevator: Elevator) {
+    assertNoLegacyGameplayPanelFallback('elevator', 'uiElevator')
     globalState.uiMode = UIMode.elevator
     const art = lookupInterfaceArt(elevator.type)
     console.log('elevator art: ' + art)
@@ -1699,6 +1705,7 @@ export function uiCloseCalledShot() {
 }
 
 export function uiCalledShot(art: string, target: Critter, callback?: (regionHit: string) => void) {
+    assertNoLegacyGameplayPanelFallback('calledShot', 'uiCalledShot')
     globalState.uiMode = UIMode.calledShot
     show($id('calledShotBox'))
 

@@ -6,6 +6,8 @@ import { BarterPanel } from './barterPanel.js'
 import { WorldMapPanel } from './worldMapPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 import { registerDefaultPanels, PRIMARY_GAMEPLAY_PANEL_NAMES } from './registerPanels.js'
+import { Config } from '../config.js'
+import { assertNoLegacyGameplayPanelFallback } from './index.js'
 
 describe('ui2 primary gameplay panel registration parity', () => {
     it('registerDefaultPanels registers every primary gameplay panel into UIManagerImpl', () => {
@@ -78,5 +80,31 @@ describe('WorldMapPanel interaction parity', () => {
         // Select first entrance from area list.
         panel.onMouseDown(31, 62, 'l')
         expect(emitSpy).toHaveBeenCalledWith('worldMap:travelTo', { mapLookupName: 'arroyo_main' })
+    })
+})
+
+
+describe('UI2-only gameplay mode fallback guard', () => {
+    const originalFlag = Config.ui.forceUI2OnlyGameplayPanels
+
+    afterEach(() => {
+        Config.ui.forceUI2OnlyGameplayPanels = originalFlag
+    })
+
+    it('logs clearly and throws when legacy gameplay panel paths are used', () => {
+        Config.ui.forceUI2OnlyGameplayPanels = true
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        expect(() => assertNoLegacyGameplayPanelFallback('loot', 'panel-smoke')).toThrowError(
+            /UI2_ONLY_GAMEPLAY_PANELS/,
+        )
+        expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('panel=loot'))
+
+        consoleError.mockRestore()
+    })
+
+    it('does not throw for gameplay panels when the mode is disabled', () => {
+        Config.ui.forceUI2OnlyGameplayPanels = false
+        expect(() => assertNoLegacyGameplayPanelFallback('dialogue', 'panel-smoke')).not.toThrow()
     })
 })
