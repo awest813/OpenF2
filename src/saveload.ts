@@ -165,6 +165,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         globalState.playerCharTraits = traits
             ? Array.from(traits).sort((a, b) => a - b)
             : []
+        // Sync player's perkRanks → globalState.playerPerkRanks before snapshot.
+        globalState.playerPerkRanks = globalState.player.perkRanks
+            ? { ...globalState.player.perkRanks }
+            : {}
     }
 
     const save = snapshotSaveData(name, Date.now(), SAVE_VERSION, globalState)
@@ -235,6 +239,10 @@ export function load(id: number): void {
                 if (globalState.player && Array.isArray(save.playerCharTraits)) {
                     globalState.player.charTraits = new Set(save.playerCharTraits)
                 }
+                // Restore player perk ranks so perk-based stat bonuses survive reload.
+                if (globalState.player && save.playerPerkRanks) {
+                    globalState.player.perkRanks = { ...save.playerPerkRanks }
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -276,6 +284,10 @@ export function load(id: number): void {
                     // Restore player character-creation traits.
                     if (globalState.player && Array.isArray(save.playerCharTraits)) {
                         globalState.player.charTraits = new Set(save.playerCharTraits)
+                    }
+                    // Restore player perk ranks so perk-based stat bonuses survive reload.
+                    if (globalState.player && save.playerPerkRanks) {
+                        globalState.player.perkRanks = { ...save.playerPerkRanks }
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

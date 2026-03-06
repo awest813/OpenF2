@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 9
+export const SAVE_VERSION = 10
 
 export interface SaveGame {
     id?: number
@@ -82,6 +82,20 @@ export interface SaveGame {
      * (no traits) when absent in older saves.
      */
     playerCharTraits?: number[]
+
+    /**
+     * Player perk ranks granted by scripts during play (added in v10).
+     *
+     * When Fallout 2 scripts call `critter_add_trait(dude_obj, TRAIT_PERK, perkId, rank)`
+     * the perk is stored in the player's `perkRanks` record.  Without persisting
+     * this, any perk-gated skill or stat bonus (e.g. Action Boy +AP, Toughness
+     * +DT) would silently vanish every time the player loaded a save, causing
+     * incorrect derived-stat calculations throughout the campaign.
+     *
+     * Keyed by numeric perk ID, values are the granted rank (typically 1).
+     * Defaults to {} (no scripted perks) when absent in older saves.
+     */
+    playerPerkRanks?: Record<number, number>
 
     player: {
         position: Point
@@ -177,6 +191,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerCharTraits === undefined) save.playerCharTraits = []
             save.version = 9
             // falls through
+        case 9:
+            // v9 → v10: add player perk-ranks snapshot.
+            // Old saves have no persisted perk data — initialize to empty record so
+            // perk-based stat bonuses start from a clean slate on legacy saves.
+            if (save.playerPerkRanks === undefined) save.playerPerkRanks = {}
+            save.version = 10
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -195,6 +216,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     save.mapVars = sanitizeNestedNumericRecord(save.mapVars)
     save.mapAreaStates = sanitizeBooleanRecord(save.mapAreaStates)
     save.playerCharTraits = sanitizeTraitArray(save.playerCharTraits)
+    save.playerPerkRanks = sanitizeNumericRecord(save.playerPerkRanks)
 
     return save as SaveGame
 }

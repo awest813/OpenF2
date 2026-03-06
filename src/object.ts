@@ -1081,6 +1081,13 @@ export class Critter extends Obj {
             if (Array.isArray(mobj.charTraits)) {
                 obj.charTraits = new Set(mobj.charTraits.filter((t: unknown) => typeof t === 'number'))
             }
+            // Restore perkRanks from the serialized record (or default to empty {}).
+            // Older saves that predate perkRanks persistence will have undefined here.
+            if (mobj.perkRanks !== null && typeof mobj.perkRanks === 'object') {
+                obj.perkRanks = { ...mobj.perkRanks }
+            } else {
+                obj.perkRanks = {}
+            }
         }
 
         return obj
@@ -1534,9 +1541,12 @@ interface SerializedCritter extends SerializedObj {
     dead: boolean
 
     charTraits?: number[]
+
+    /** Perk ranks granted to this critter by scripts (e.g. critter_add_trait TRAIT_PERK). */
+    perkRanks?: Record<number, number>
 }
 
-const SERIALIZED_CRITTER_PROPS = ['stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead']
+const SERIALIZED_CRITTER_PROPS = ['stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead', 'perkRanks']
 
 // Collection of functions for dealing with critters
 

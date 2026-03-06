@@ -481,8 +481,8 @@ describe('Phase 23-D — metarule IDs de-stubbed (no stub hits)', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 23-E — save schema v9 migration', () => {
-    it('SAVE_VERSION is 9', () => {
-        expect(SAVE_VERSION).toBe(9)
+    it('SAVE_VERSION is 10 (v10 adds playerPerkRanks)', () => {
+        expect(SAVE_VERSION).toBe(10)
     })
 
     it('migrating from v8 adds playerCharTraits as empty array', () => {
@@ -497,7 +497,7 @@ describe('Phase 23-E — save schema v9 migration', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(9)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(Array.isArray(migrated.playerCharTraits)).toBe(true)
         expect(migrated.playerCharTraits!.length).toBe(0)
     })
@@ -514,7 +514,7 @@ describe('Phase 23-E — save schema v9 migration', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(9)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(Array.isArray(migrated.playerCharTraits)).toBe(true)
         expect(migrated.playerCharTraits!.length).toBe(0)
     })
@@ -533,7 +533,7 @@ describe('Phase 23-E — save schema v9 migration', () => {
             playerCharTraits: [4, 14],
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(9)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerCharTraits).toEqual([4, 14])
     })
 
