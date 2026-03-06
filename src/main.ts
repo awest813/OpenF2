@@ -41,6 +41,7 @@ import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
 import { UIManagerImpl, BitmapFontRenderer } from './ui2/uiPanel.js'
+import { ScriptDebuggerPanel } from './ui2/scriptDebuggerPanel.js'
 import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 
@@ -247,6 +248,9 @@ function initUIManager(): void {
     }
 
     registerDefaultPanels(mgr, SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog)
+
+    const scriptDebuggerPanel = mgr.get<ScriptDebuggerPanel>('scriptDebugger')
+    Scripting.setScriptDebuggerSink(scriptDebuggerPanel)
 
     mgr.connectEventBus()
 

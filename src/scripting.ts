@@ -44,6 +44,11 @@ import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER } from './sfallGlobals.js'
 
 export module Scripting {
+    export interface ScriptDebuggerSink {
+        setVMInfo(stepCount: number, currentProcedure: string | null): void
+        pushMessage(msg: string): void
+    }
+
     var gameObjects: Obj[] | null = null
     var mapVars: any = null
     var globalVars: any = {
@@ -65,6 +70,43 @@ export module Scripting {
     var currentDialogueObject: Obj | null = null
     export var timeEventList: TimedEvent[] = []
     let overrideStartPos: StartPos | null = null
+    let scriptDebuggerSink: ScriptDebuggerSink | null = null
+
+    export function setScriptDebuggerSink(sink: ScriptDebuggerSink | null): void {
+        scriptDebuggerSink = sink
+    }
+
+    function pushScriptDebuggerMessage(msg: string): void {
+        scriptDebuggerSink?.pushMessage(msg)
+    }
+
+    function updateScriptDebuggerVMInfo(vm: ScriptVM): void {
+        scriptDebuggerSink?.setVMInfo(vm.stepCount, vm.currentProcedureName ?? vm.lastProcedureName)
+    }
+
+    function trackScriptTrigger(script: Script, procName: string): void {
+        pushScriptDebuggerMessage(`${script.scriptName}: ${procName}`)
+    }
+
+    function flushUnsupportedVMOperations(script: Script): void {
+        const vm = script._vm
+        if (!vm) return
+
+        updateScriptDebuggerVMInfo(vm)
+        const unsupportedOperations = vm.drainUnsupportedOperations()
+        for (const op of unsupportedOperations) {
+            if (op.bridgedProcedureName) {
+                pushScriptDebuggerMessage(
+                    `[missing bridge] ${op.scriptName}: ${op.bridgedProcedureName} (opcode=0x${op.opcode.toString(16)})`
+                )
+                continue
+            }
+
+            pushScriptDebuggerMessage(
+                `[unknown opcode] ${op.scriptName}: 0x${op.opcode.toString(16)} @ 0x${op.pc.toString(16)}`
+            )
+        }
+    }
 
     export interface StartPos {
         position: Point
@@ -417,10 +459,14 @@ export module Scripting {
         debug_msg(msg: string) {
             log('debug_msg', arguments)
             info('DEBUG MSG: [' + this.scriptName + ']: ' + msg, 'debugMessage')
+            pushScriptDebuggerMessage(`[debug] ${this.scriptName}: ${msg}`)
+            if (this._vm) updateScriptDebuggerVMInfo(this._vm)
         }
         display_msg(msg: string) {
             log('display_msg', arguments)
             info('DISPLAY MSG: ' + msg, 'displayMessage')
+            pushScriptDebuggerMessage(`[display] ${this.scriptName}: ${msg}`)
+            if (this._vm) updateScriptDebuggerVMInfo(this._vm)
             uiLog(msg)
         }
         message_str(msgList: number, msgNum: number) {
@@ -1755,7 +1801,11 @@ export module Scripting {
     export function initScript(script: Script, obj: Obj) {
         script.self_obj = obj as ScriptableObj
         script.cur_map_index = currentMapID!
-        if (script.start !== undefined) script.start()
+        if (script.start !== undefined) {
+            trackScriptTrigger(script, 'start')
+            script.start()
+            flushUnsupportedVMOperations(script)
+        }
     }
 
     export function timedEvent(script: Script, userdata: any): boolean {
@@ -1769,7 +1819,9 @@ export module Scripting {
 
         script.fixed_param = userdata
         script._didOverride = false
+        trackScriptTrigger(script, 'timed_event_p_proc')
         script.timed_event_p_proc()
+        flushUnsupportedVMOperations(script)
         return script._didOverride
     }
 
@@ -1779,7 +1831,9 @@ export module Scripting {
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
         obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'use_p_proc')
         obj._script.use_p_proc()
+        flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
 
@@ -1788,7 +1842,9 @@ export module Scripting {
         script.game_time = Math.max(1, globalState.gameTickTime)
         script.cur_map_index = currentMapID
         script._didOverride = false
+        trackScriptTrigger(script, 'talk_p_proc')
         script.talk_p_proc()
+        flushUnsupportedVMOperations(script)
         return script._didOverride
     }
 
@@ -1801,7 +1857,9 @@ export module Scripting {
         script._didOverride = false
         script.self_obj = obj as ScriptableObj
         script.self_tile = toTileNum(obj.position)
+        trackScriptTrigger(script, 'critter_p_proc')
         script.critter_p_proc()
+        flushUnsupportedVMOperations(script)
         return script._didOverride
     }
 
@@ -1815,7 +1873,9 @@ export module Scripting {
         script.cur_map_index = currentMapID
         script.source_obj = source
         script.self_obj = spatialObj as ScriptableObj
+        trackScriptTrigger(script, 'spatial_p_proc')
         script.spatial_p_proc()
+        flushUnsupportedVMOperations(script)
     }
 
     export function destroy(obj: Obj, source?: Obj) {
@@ -1826,7 +1886,9 @@ export module Scripting {
         obj._script.game_time = Math.max(1, globalState.gameTickTime)
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'destroy_p_proc')
         obj._script.destroy_p_proc()
+        flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
 
@@ -1839,7 +1901,9 @@ export module Scripting {
         obj._script.game_time = Math.max(1, globalState.gameTickTime)
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'damage_p_proc')
         obj._script.damage_p_proc()
+        flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
 
@@ -1850,7 +1914,9 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         obj._script.action_being_used = skillId
+        trackScriptTrigger(obj._script, 'use_skill_on_p_proc')
         obj._script.use_skill_on_p_proc()
+        flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
 
@@ -1860,7 +1926,9 @@ export module Scripting {
         obj._script.source_obj = source
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
+        trackScriptTrigger(obj._script, 'pickup_p_proc')
         obj._script.pickup_p_proc()
+        flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
 
@@ -1895,7 +1963,9 @@ export module Scripting {
         obj._script.terminate_combat = function () {
             doTerminate = true
         }
+        trackScriptTrigger(obj._script, 'combat_p_proc')
         obj._script.combat_p_proc()
+        flushUnsupportedVMOperations(obj._script)
 
         if (doTerminate) {
             console.log('DUH DUH TERMINATE!')
@@ -1913,7 +1983,9 @@ export module Scripting {
             mapScript.combat_is_initialized = globalState.inCombat ? 1 : 0
             if (mapScript.map_update_p_proc !== undefined) {
                 mapScript.self_obj = { _script: mapScript }
+                trackScriptTrigger(mapScript, 'map_update_p_proc')
                 mapScript.map_update_p_proc()
+                flushUnsupportedVMOperations(mapScript)
             }
         }
 
@@ -1926,7 +1998,9 @@ export module Scripting {
                 script.game_time = Math.max(1, globalState.gameTickTime)
                 script.game_time_hour = 1200 // hour of the day
                 script.cur_map_index = currentMapID
+                trackScriptTrigger(script, 'map_update_p_proc')
                 script.map_update_p_proc()
+                flushUnsupportedVMOperations(script)
                 updated++
             }
         }
@@ -1948,7 +2022,9 @@ export module Scripting {
         if (mapScript && mapScript.map_enter_p_proc !== undefined) {
             info('calling map enter')
             mapScript.self_obj = { _script: mapScript }
+            trackScriptTrigger(mapScript, 'map_enter_p_proc')
             mapScript.map_enter_p_proc()
+            flushUnsupportedVMOperations(mapScript)
         }
 
         if (overrideStartPos) {
@@ -1973,7 +2049,9 @@ export module Scripting {
             script.game_time = Math.max(1, globalState.gameTickTime)
             script.game_time_hour = 1200 // hour of the day
             script.cur_map_index = currentMapID
+            trackScriptTrigger(script, 'map_enter_p_proc')
             script.map_enter_p_proc()
+            flushUnsupportedVMOperations(script)
         }
     }
 
