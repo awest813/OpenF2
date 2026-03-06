@@ -168,6 +168,9 @@ export class ScriptVM {
         if (opMap[opcode] !== undefined) opMap[opcode].call(this)
         else {
             this.recordUnsupportedOpcode(opcode, this.pc)
+            const unsupportedOpcodeError = new Error(
+                `unknown opcode 0x${opcode.toString(16)} (pc=0x${this.pc.toString(16)}) in ${this.intfile.name}`
+            )
             console.warn(
                 'unimplemented opcode %s (pc=%s) in %s',
                 opcode.toString(16),
@@ -178,6 +181,7 @@ export class ScriptVM {
                 console.log('disassembly:')
                 console.log(transpile(this.intfile, this.script))
             }
+            if (Config.engine.failOnUnknownVmOpcode) throw unsupportedOpcodeError
             return false
         }
 

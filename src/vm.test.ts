@@ -840,6 +840,28 @@ describe('ScriptVM unsupported operation buffer', () => {
         ])
     })
 
+    it('throws on unknown opcode when strict mode is enabled', () => {
+        const script = {
+            offset: 0,
+            seek(pos: number) { this.offset = pos },
+            read16() { return 0xDEAD },
+        } as any
+        const intfile = { name: 'stub.int', procedures: {}, proceduresTable: [], strings: {}, identifiers: {} } as any
+        const vm = new ScriptVM(script, intfile)
+
+        const oldDisasmOnUnimpl = Config.engine.doDisasmOnUnimplOp
+        const oldFailOnUnknown = Config.engine.failOnUnknownVmOpcode
+        Config.engine.doDisasmOnUnimplOp = false
+        Config.engine.failOnUnknownVmOpcode = true
+        try {
+            expect(() => vm.step()).toThrow(/unknown opcode/i)
+            expect(vm.unsupportedOperations).toHaveLength(1)
+        } finally {
+            Config.engine.doDisasmOnUnimplOp = oldDisasmOnUnimpl
+            Config.engine.failOnUnknownVmOpcode = oldFailOnUnknown
+        }
+    })
+
     it('drainUnsupportedOperations returns and clears the buffer', () => {
         const script = {
             offset: 0,
