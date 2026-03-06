@@ -16,41 +16,14 @@ limitations under the License.
 
 import globalState from './globalState.js'
 import { deserializeObj } from './object.js'
-import { QuestLog } from './quest/questLog.js'
-import { Reputation } from './quest/reputation.js'
 import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
+import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
 // Saving and loading support
 
 let db: IDBDatabase
-
-function gatherSaveData(name: string): SaveGame {
-    // Saves the game and returns the savegame
-
-    const curMap = globalState.gMap.serialize()
-
-    return {
-        version: SAVE_VERSION,
-        name,
-        timestamp: Date.now(),
-        currentElevation: globalState.currentElevation,
-        currentMap: curMap.name,
-        player: {
-            position: globalState.player.position,
-            orientation: globalState.player.orientation,
-            inventory: globalState.player.inventory.map((obj) => obj.serialize()),
-            xp: globalState.player.xp,
-            level: globalState.player.level,
-            karma: globalState.player.karma,
-        },
-        party: globalState.gParty.serialize(),
-        savedMaps: { [curMap.name]: curMap, ...globalState.dirtyMapCache },
-        questLog: globalState.questLog.serialize(),
-        reputation: globalState.reputation.serialize(),
-    }
-}
 
 export function formatSaveDate(save: SaveGame): string {
     const date = new Date(save.timestamp)
@@ -106,7 +79,7 @@ export function debugSave(): void {
 }
 
 export function save(name: string, slot = -1, callback?: () => void): void {
-    const save = gatherSaveData(name)
+    const save = snapshotSaveData(name, Date.now(), SAVE_VERSION, globalState)
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
@@ -132,37 +105,9 @@ export function load(id: number): void {
     withTransaction((trans) => {
         trans.objectStore('saves').get(id).onsuccess = function (e) {
             const save: SaveGame = migrateSave((<any>e.target).result)
-            const savedMap = save.savedMaps[save.currentMap]
 
             console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
-
-            globalState.gMap.deserialize(savedMap)
-            console.log('[SaveLoad] Finished map deserialization')
-
-            // TODO: Properly (de)serialize the player!
-            globalState.player.position = save.player.position
-            globalState.player.orientation = save.player.orientation
-            globalState.player.inventory = save.player.inventory.map((obj) => deserializeObj(obj))
-            // xp/level/karma are guaranteed by migrateSave(); fallbacks guard against
-            // stale in-memory objects that bypassed migration.
-            globalState.player.xp = save.player.xp ?? 0
-            globalState.player.level = save.player.level ?? 1
-            globalState.player.karma = save.player.karma ?? 0
-
-            globalState.gParty.deserialize(save.party)
-
-            // Restore quest log and reputation (guaranteed present by migrateSave v2→v3;
-            // fallbacks guard against stale in-memory objects that bypassed migration).
-            globalState.questLog = QuestLog.deserialize(save.questLog ?? { entries: [] })
-            globalState.reputation = Reputation.deserialize(save.reputation ?? { karma: 0, reputations: {} })
-
-            globalState.gMap.changeElevation(save.currentElevation, false)
-
-            // populate dirty map cache out of non-current saved maps
-            globalState.dirtyMapCache = { ...save.savedMaps }
-            delete globalState.dirtyMapCache[savedMap.name]
-
-            console.log('[SaveLoad] Finished loading map %s', savedMap.name)
+            hydrateStateFromSave(save, globalState, deserializeObj)
         }
     })
 }
