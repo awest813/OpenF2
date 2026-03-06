@@ -14,6 +14,11 @@ export interface SaveDataState {
     mapVars: Record<string, Record<number, number>>
     /** World-map discovery state keyed by area ID. */
     mapAreaStates: Record<number, boolean>
+    /**
+     * Character-creation trait IDs chosen for the player (sorted number array,
+     * values 0–15 corresponding to Fallout 2 TRAIT_* constants).
+     */
+    playerCharTraits: number[]
     gMap: {
         name: string
         serialize: () => SaveGame['savedMaps'][string]
@@ -53,6 +58,11 @@ export interface LoadDataState {
     mapVars: Record<string, Record<number, number>>
     /** World-map discovery state keyed by area ID. */
     mapAreaStates: Record<number, boolean>
+    /**
+     * Character-creation trait IDs for the player (sorted number array, values 0–15).
+     * Restored from save so trait-based script checks are correct after load.
+     */
+    playerCharTraits: number[]
     player: {
         position: SaveGame['player']['position']
         orientation: number
@@ -83,6 +93,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
         critterKillCounts: state.critterKillCounts ? { ...state.critterKillCounts } : {},
         mapVars: state.mapVars ? JSON.parse(JSON.stringify(state.mapVars)) : {},
         mapAreaStates: state.mapAreaStates ? { ...state.mapAreaStates } : {},
+        playerCharTraits: state.playerCharTraits ? [...state.playerCharTraits] : [],
         player: {
             position: state.player.position,
             orientation: state.player.orientation,
@@ -140,6 +151,10 @@ export function hydrateStateFromSave(
     // Restore world-map area discovery state so travel/dialogue progression
     // linked to area-known checks survives save/load cycles.
     state.mapAreaStates = save.mapAreaStates ? { ...save.mapAreaStates } : {}
+
+    // Restore player character-creation traits so trait-based script checks
+    // (has_trait TRAIT_CHAR) return correct results after loading a save.
+    state.playerCharTraits = save.playerCharTraits ? [...save.playerCharTraits] : []
 
     state.gParty.deserialize(save.party)
 

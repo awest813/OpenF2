@@ -312,6 +312,11 @@ export module ScriptVMBridge {
        ,0x8183: bridged("get_critter_hp", 1)            // get_critter_hp(obj) → current HP of critter
        ,0x8184: bridged("set_critter_hp", 2, false)     // set_critter_hp(obj, hp) — set current HP of critter
        ,0x8185: bridged("get_critter_max_ap", 1)        // get_critter_max_ap(obj) → max action points for critter
+
+       // sfall extended opcodes 0x8186–0x8188 — object list iteration
+       ,0x8186: bridged("list_begin", 1)                // list_begin(type) → first object in iteration (LIST_ALL=0, LIST_CRITTERS=1, LIST_GROUNDITEMS=2)
+       ,0x8187: bridged("list_next", 0)                 // list_next() → next object in current iteration (null/0 when exhausted)
+       ,0x8188: bridged("list_end", 0, false)           // list_end() — dispose the current object-list iterator
     }
     Object.assign(opMap, bridgeOpMap)
 

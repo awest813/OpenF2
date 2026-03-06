@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 export interface SaveGame {
     id?: number
@@ -69,6 +69,19 @@ export interface SaveGame {
      * consistent within long campaigns.
      */
     mapAreaStates?: Record<number, boolean>
+
+    /**
+     * Character-creation trait IDs chosen for the player character (added in v9).
+     *
+     * Each element is a Fallout 2 TRAIT_* constant (0–15) corresponding to one
+     * of the 16 character-creation mutations (Fast Metabolism, Bruiser, etc.).
+     * Persisting this ensures that trait-based script checks (`has_trait(2, …)`)
+     * and trait-modulated derived-stats survive across save/load cycles.
+     *
+     * Stored as a sorted number array for stable JSON output.  Defaults to []
+     * (no traits) when absent in older saves.
+     */
+    playerCharTraits?: number[]
 
     player: {
         position: Point
@@ -157,6 +170,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.mapAreaStates === undefined) save.mapAreaStates = {}
             save.version = 8
             // falls through
+        case 8:
+            // v8 → v9: add player character-creation traits snapshot.
+            // Old saves have no trait data — initialize to empty array so
+            // trait-based script checks start from a clean slate (no traits).
+            if (save.playerCharTraits === undefined) save.playerCharTraits = []
+            save.version = 9
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -174,6 +194,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     save.critterKillCounts = sanitizeNumericRecord(save.critterKillCounts)
     save.mapVars = sanitizeNestedNumericRecord(save.mapVars)
     save.mapAreaStates = sanitizeBooleanRecord(save.mapAreaStates)
+    save.playerCharTraits = sanitizeTraitArray(save.playerCharTraits)
 
     return save as SaveGame
 }
@@ -230,4 +251,14 @@ function sanitizeBooleanRecord(value: unknown): Record<number, boolean> {
     }
 
     return out
+}
+
+function sanitizeTraitArray(value: unknown): number[] {
+    if (!Array.isArray(value)) return []
+    const out: number[] = []
+    for (const entry of value) {
+        if (typeof entry !== 'number' || !Number.isInteger(entry) || entry < 0 || entry > 15) continue
+        if (!out.includes(entry)) out.push(entry)
+    }
+    return out.sort((a, b) => a - b)
 }

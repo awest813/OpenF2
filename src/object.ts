@@ -1042,6 +1042,15 @@ export class Critter extends Obj {
      */
     perkRanks: Record<number, number> = {}
 
+    /**
+     * Character-creation trait IDs for this critter, keyed by Fallout 2 trait ID (0–15).
+     *
+     * `has_trait(TRAIT_CHAR=2, obj, traitId)` reads this set.
+     * `critter_add_trait(obj, 2, traitId, amount)` writes it.
+     * Defaults to empty (no character traits chosen) for NPCs.
+     */
+    charTraits: Set<number> = new Set()
+
     static fromPID(pid: number, sid?: number): Critter {
         return Obj.fromPID_(new Critter(), pid, sid)
     }
@@ -1065,6 +1074,10 @@ export class Critter extends Obj {
             if (mobj.skills) {
                 obj.skills = new SkillSet(mobj.skills.baseSkills, mobj.skills.tagged, mobj.skills.skillPoints)
                 console.warn('Deserializing skill set: %o to: %o', mobj.skills, obj.skills)
+            }
+            // Restore charTraits from the serialized array (or default to empty set)
+            if (Array.isArray(mobj.charTraits)) {
+                obj.charTraits = new Set(mobj.charTraits.filter((t: unknown) => typeof t === 'number'))
             }
         }
 
@@ -1495,6 +1508,9 @@ export class Critter extends Obj {
             ;(obj as any)[prop] = (this as any)[prop]
         }
 
+        // Serialize charTraits as a sorted number array for stable JSON output
+        obj.charTraits = Array.from(this.charTraits).sort((a, b) => a - b)
+
         return obj
     }
 }
@@ -1514,6 +1530,8 @@ interface SerializedCritter extends SerializedObj {
 
     isPlayer: boolean
     dead: boolean
+
+    charTraits?: number[]
 }
 
 const SERIALIZED_CRITTER_PROPS = ['stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead']

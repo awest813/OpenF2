@@ -159,6 +159,14 @@ export function debugSave(): void {
 }
 
 export function save(name: string, slot = -1, callback?: () => void): void {
+    // Sync player's charTraits Set → globalState.playerCharTraits array before snapshot.
+    if (globalState.player) {
+        const traits = globalState.player.charTraits
+        globalState.playerCharTraits = traits
+            ? Array.from(traits).sort((a, b) => a - b)
+            : []
+    }
+
     const save = snapshotSaveData(name, Date.now(), SAVE_VERSION, globalState)
 
     // Snapshot Fallout 2 script global variables (GVAR_*) so that quest flags,
@@ -222,6 +230,11 @@ export function load(id: number): void {
                     Scripting.setMapVars(save.mapVars)
                 }
                 applyLoadedMapAreaStates(save.mapAreaStates)
+                // Restore player character-creation traits so trait-based
+                // script checks return correct values after loading.
+                if (globalState.player && Array.isArray(save.playerCharTraits)) {
+                    globalState.player.charTraits = new Set(save.playerCharTraits)
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -260,6 +273,10 @@ export function load(id: number): void {
                         Scripting.setMapVars(save.mapVars)
                     }
                     applyLoadedMapAreaStates(save.mapAreaStates)
+                    // Restore player character-creation traits.
+                    if (globalState.player && Array.isArray(save.playerCharTraits)) {
+                        globalState.player.charTraits = new Set(save.playerCharTraits)
+                    }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                         error,

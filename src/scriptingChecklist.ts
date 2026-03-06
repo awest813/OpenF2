@@ -773,6 +773,93 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+    // -----------------------------------------------------------------------
+    // Phase 23 — TRAIT_CHAR, list opcodes, metarule expansion
+    // -----------------------------------------------------------------------
+    {
+        id: 'has_trait_char',
+        kind: 'procedure',
+        description:
+            'has_trait(TRAIT_CHAR=2, obj, traitId): check if the critter has the given character-creation trait (0–15). ' +
+            'Reads critter.charTraits (Set<number>). Required for scripts that branch on player mutation choices.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'critter_add_trait_char',
+        kind: 'procedure',
+        description:
+            'critter_add_trait(obj, TRAIT_CHAR=2, traitId, amount): grant (amount>0) or revoke (amount<=0) a ' +
+            'character-creation trait on a critter.  Writes critter.charTraits (Set<number>).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'list_begin',
+        kind: 'opcode',
+        description:
+            'sfall 0x8186: list_begin(type) → first object in a new iteration over game objects. ' +
+            'type: 0=LIST_ALL, 1=LIST_CRITTERS, 2=LIST_GROUNDITEMS. Iterates the current elevation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'list_next',
+        kind: 'opcode',
+        description:
+            'sfall 0x8187: list_next() → advance the object-list iterator and return the next object ' +
+            '(null/0 when exhausted). Must be called after list_begin().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'list_end',
+        kind: 'opcode',
+        description:
+            'sfall 0x8188: list_end() — dispose the current object-list iterator. ' +
+            'Should always be paired with list_begin() to avoid iterator leaks.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'metarule_1_to_13',
+        kind: 'metarule',
+        description:
+            'metarule IDs 1–13: signal_end_game, timer_fired, first_time, radiation_gauge, movie, ' +
+            'armor_worn, critter_in_party, critter_on_team, cur_town, tile_locked, map_info, ' +
+            'critter_reaction, critter_reaction_to_pc. All implemented with safe defaults or real values.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'metarule_16_20_25_32',
+        kind: 'metarule',
+        description:
+            'metarule IDs 16 (is_big_gun), 19 (party_follow), 20 (is_big_gun_equipped), ' +
+            '25 (party_member_state), 26 (critical_hit_adjust), 27 (hostile_to_pc), ' +
+            '28 (critter_state), 29 (area_reachable), 31–43 (various critter conditions), ' +
+            '45 (blinded), 50–54 (misc). All implemented with safe defaults.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'save_schema_v9_char_traits',
+        kind: 'procedure',
+        description:
+            'Save schema v9: playerCharTraits (number[]) added to SaveGame. Persists player ' +
+            'character-creation trait choices across save/load cycles so has_trait(TRAIT_CHAR) ' +
+            'returns correct results after loading a save.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
 ])
 
 // ---------------------------------------------------------------------------
