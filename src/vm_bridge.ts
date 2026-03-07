@@ -595,6 +595,48 @@ export module ScriptVMBridge {
        // 0x81C5 — set_critter_team(critter, team): set the team number of a critter.
        // Used by faction-switch and story-beat scripts.
        ,0x81C5: bridged("set_critter_team", 2, false) // set_critter_team(critter, team) — set
+
+       // Phase 53 — sfall extended opcodes 0x81C6–0x81CF
+
+       // 0x81C6 — get_critter_base_stat(critter, stat): return the unmodified base
+       // value of a critter stat (before perk/equipment bonuses).
+       ,0x81C6: bridged("get_critter_base_stat", 2) // get_critter_base_stat(critter, stat) → base val
+
+       // 0x81C7 — set_critter_base_stat(critter, stat, value): set the base value
+       // of a critter stat. Delegates to existing set_critter_stat implementation.
+       ,0x81C7: bridged("set_critter_base_stat", 3, false) // set_critter_base_stat(critter, stat, val)
+
+       // 0x81C8 — critter_mod_skill_points(critter, delta): add/subtract raw skill
+       // points from a critter. No-op for NPCs; adjusts player SkillSet.skillPoints.
+       ,0x81C8: bridged("critter_mod_skill_points", 2, false) // critter_mod_skill_points(critter, delta)
+
+       // 0x81C9 — get_critter_current_ap(critter): return available combat AP for
+       // the critter on its current turn. Returns 0 outside combat.
+       ,0x81C9: bridged("get_critter_current_ap", 1) // get_critter_current_ap(critter) → ap
+
+       // 0x81CA — set_critter_current_ap(critter, ap): override a critter's current
+       // AP on its turn. Used by scripts that grant bonus AP mid-turn.
+       ,0x81CA: bridged("set_critter_current_ap", 2, false) // set_critter_current_ap(critter, ap)
+
+       // 0x81CB — get_combat_target(critter): return the current combat target of
+       // a critter. Browser build: returns 0 (no target tracking per-critter).
+       ,0x81CB: bridged("get_combat_target", 1) // get_combat_target(critter) → target | 0
+
+       // 0x81CC — set_combat_target(critter, target): set a critter's combat target.
+       // No-op in the browser build (AI targeting handled differently).
+       ,0x81CC: bridged("set_combat_target", 2, false) // set_combat_target(critter, target) — no-op
+
+       // 0x81CD — get_game_time_in_seconds: return game time in real seconds.
+       // Equivalent to game_time() / 10.
+       ,0x81CD: bridged("get_game_time_in_seconds", 0) // get_game_time_in_seconds() → seconds
+
+       // 0x81CE — get_light_level: return the current global ambient light level
+       // (0–65536). Same as globalState.ambientLightLevel or 65536 when unknown.
+       ,0x81CE: bridged("get_light_level", 0) // get_light_level() → 0-65536
+
+       // 0x81CF — set_light_level(level, update): set the global ambient light level.
+       // Browser build accepts the call but defers actual rendering update.
+       ,0x81CF: bridged("set_light_level_sfall", 2, false) // set_light_level(level, update) — partial
     }
     Object.assign(opMap, bridgeOpMap)
 

@@ -3166,6 +3166,148 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // Phase 53 entries
+    {
+        id: 'blk039_weapon_slot_save',
+        kind: 'procedure',
+        description:
+            'BLK-039: Weapon slot restoration on save/load. leftHandPID and rightHandPID are ' +
+            'persisted in SerializedCritter and restored on deserialization so equipped weapons ' +
+            'survive save/load cycles without being reset to bare-handed punch.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk040_dead_target_guard',
+        kind: 'procedure',
+        description:
+            'BLK-040: doAITurn dead-target guard. Before attacking, the AI now checks whether ' +
+            'the target died during the move phase. If so it re-targets by recursing into ' +
+            'doAITurn, preventing attacks on already-dead critters and potential null-dereferences.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk040_no_ap_guard',
+        kind: 'procedure',
+        description:
+            'BLK-040: nextTurn AP guard. Critters that were added to combat mid-round without ' +
+            'their AP object initialised now have their turn skipped with a warning rather than ' +
+            'crashing on the non-null assertion critter.AP!.resetAP().',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_critter_base_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C6: get_critter_base_stat(critter, stat) → unmodified base stat value. ' +
+            'Returns the raw base value before perk/equipment bonuses. Prevents unknown-opcode ' +
+            'crashes in scripts that probe SPECIAL stats before modifiers are applied.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_base_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C7: set_critter_base_stat(critter, stat, value) — set base stat. ' +
+            'Delegates to set_critter_stat/setBase. Used by training and attribute-override scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_critter_mod_skill_points',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C8: critter_mod_skill_points(critter, delta) — add/subtract skill points. ' +
+            'Only applies to the player critter; NPCs are silently ignored. ' +
+            'Prevents unknown-opcode crashes in level-up and reward scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_current_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C9: get_critter_current_ap(critter) → current combat AP. ' +
+            'Returns critter.AP.combat. Returns 0 outside combat or for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_current_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CA: set_critter_current_ap(critter, ap) — override combat AP. ' +
+            'Sets critter.AP.combat to the given value. Used by bonus-AP scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_combat_target',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CB: get_combat_target(critter) → current combat target or 0. ' +
+            'Browser build: returns 0 (no per-critter target tracking). ' +
+            'Prevents unknown-opcode crashes in combat AI scripts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_combat_target',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CC: set_combat_target(critter, target) — no-op. ' +
+            'Browser build does not maintain per-critter target state. ' +
+            'Prevents unknown-opcode crashes in combat scripts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_game_time_in_seconds',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CD: get_game_time_in_seconds() → game time in seconds. ' +
+            'Returns Math.floor(gameTickTime / 10). Equivalent to game_time() / 10. ' +
+            'Prevents unknown-opcode crashes in time-sensitive scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_light_level_81ce',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CE: get_light_level() → ambient light level (0–65536). ' +
+            'Returns globalState.ambientLightLevel or 65536. ' +
+            'Prevents unknown-opcode crashes in lighting-aware scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_light_level_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81CF: set_light_level(level, update) — set ambient light level. ' +
+            'Stores the value in globalState.ambientLightLevel (0–65536 clamped). ' +
+            'Actual rendering update is deferred in the browser build.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
