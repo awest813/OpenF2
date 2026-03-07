@@ -742,8 +742,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_104',
         kind: 'metarule',
-        description: 'METARULE3_TILE_LINE_OF_SIGHT(104): 1 if there is line-of-sight between two tiles. No LOS system in script VM yet; always returns 1 (partial).',
-        status: 'partial',
+        description: 'METARULE3_TILE_LINE_OF_SIGHT(104): 1 if there is line-of-sight between two tiles. Approximated via hex distance: tiles within 14 hexes return 1 (visible), farther tiles return 0.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1845,6 +1845,79 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'varying damage values produce correctly-scaled blast effects.',
         status: 'implemented',
         frequency: 'low',
+        impact: 'medium',
+    },
+
+    // -----------------------------------------------------------------------
+    // Phase 43 — Combat perk fidelity, VM resilience, tile visibility
+    // -----------------------------------------------------------------------
+    {
+        id: 'vm_step_limit_no_throw',
+        kind: 'opcode',
+        description:
+            'ScriptVM.run(): when vmMaxStepsPerCall is exceeded the engine previously threw ' +
+            'an Error that crashed the entire game session. Now logs a console.warn, sets ' +
+            'halted=true and returns so the script is cut short rather than crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'sharpshooter_perk_distance',
+        kind: 'procedure',
+        description:
+            'combat.ts getHitDistanceModifier(): Sharpshooter perk (ID 5) now applies its ' +
+            'range bonus. Each rank subtracts 2 from the un-scaled distance before the ' +
+            'x4 penalty multiplier is applied, matching the Fallout 2 formula ' +
+            '(+2 effective PER for ranged weapon range per rank).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sniper_perk_called_shot',
+        kind: 'procedure',
+        description:
+            'combat.ts rollHit(): Sniper perk (ID 9) now performs a second d100 roll on ' +
+            'a hit; if the second roll independently qualifies as a critical the attack ' +
+            'becomes a critical hit, giving snipers a meaningful bonus over one roll alone.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'jinxed_trait_crit_miss',
+        kind: 'procedure',
+        description:
+            'combat.ts rollHit(): Jinxed trait (ID 9 in charTraits) now adds a 50% ' +
+            'chance that any miss becomes a critical miss. The check is non-stacking and ' +
+            'applies when either the attacker or the nearby player has the Jinxed trait.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'tile_is_visible_range',
+        kind: 'procedure',
+        description:
+            'scripting.ts tile_is_visible(tile): instead of unconditionally returning 1, ' +
+            'now checks hex distance from the player position. Tiles within 14 hexes ' +
+            'return 1 (visible); farther tiles return 0. Falls back to 1 when the player ' +
+            'object is unavailable so startup scripts are unaffected.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'metarule3_tile_los_distance',
+        kind: 'metarule',
+        description:
+            'scripting.ts metarule3(104) METARULE3_TILE_LINE_OF_SIGHT: previously always ' +
+            'returned 1. Now approximates LOS by hex distance: if the two tile arguments ' +
+            'are within 14 hexes the function returns 1, otherwise 0, matching the ' +
+            'Fallout 2 view radius and preventing distant triggers from firing falsely.',
+        status: 'implemented',
+        frequency: 'medium',
         impact: 'medium',
     },
 ])

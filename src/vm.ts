@@ -213,9 +213,11 @@ export class ScriptVM {
         let runSteps = 0
         while (this.step()) {
             if (maxSteps > 0 && ++runSteps >= maxSteps) {
-                throw new Error(
-                    `ScriptVM step limit exceeded (${maxSteps} steps) in ${this.intfile.name}`
+                console.warn(
+                    `ScriptVM step limit exceeded (${maxSteps} steps) in ${this.intfile.name} — halting script`
                 )
+                this.halted = true
+                return
             }
         }
     }
