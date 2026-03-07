@@ -984,25 +984,33 @@ describe('ScriptVM — vmMaxStepsPerCall step limit', () => {
         return vm
     }
 
-    it('throws when step limit is exceeded', () => {
+    it('warns and halts (does not throw) when step limit is exceeded', () => {
         const oldMax = Config.engine.vmMaxStepsPerCall
         Config.engine.vmMaxStepsPerCall = 10
         const vm = makeLoopingVM(10)
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         try {
-            expect(() => vm.run()).toThrow(/step limit exceeded/i)
+            expect(() => vm.run()).not.toThrow()
+            expect(vm.halted).toBe(true)
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/step limit exceeded/i))
         } finally {
             Config.engine.vmMaxStepsPerCall = oldMax
+            warnSpy.mockRestore()
         }
     })
 
-    it('includes step count and script name in the error message', () => {
+    it('includes step count and script name in the warning message', () => {
         const oldMax = Config.engine.vmMaxStepsPerCall
         Config.engine.vmMaxStepsPerCall = 5
         const vm = makeLoopingVM(5)
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         try {
-            expect(() => vm.run()).toThrow(/5.*loop\.int|loop\.int.*5/)
+            vm.run()
+            expect(vm.halted).toBe(true)
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/5.*loop\.int|loop\.int.*5/))
         } finally {
             Config.engine.vmMaxStepsPerCall = oldMax
+            warnSpy.mockRestore()
         }
     })
 

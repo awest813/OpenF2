@@ -130,6 +130,13 @@ export class AI {
 }
 
 // A combat encounter
+
+/** Upper bound (exclusive) for a d100 roll: getRandomInt(1, D100_MAX) gives 1-100. */
+const D100_MAX = 101
+
+/** Jinxed trait (charTraits ID 9): percent chance of forcing a critical miss on any miss. */
+const JINXED_CRIT_MISS_CHANCE = 50
+
 export class Combat {
     combatants: Critter[]
     playerIdx: number
@@ -225,8 +232,10 @@ export class Combat {
         // If anyone can tell me why it exists or what it's for I'd be grateful.
         if (-2 * perception > distance) distance = -2 * perception
 
-        // TODO: needs to add sharpshooter perk bonuses on top
-        // distance -= 2*sharpshooterRank
+        // Sharpshooter perk (ID 5): each rank grants +2 effective PER for range penalty.
+        // Implemented as reducing the un-multiplied distance by 2*rank before the x4 scale.
+        const sharpshooterRank = (obj.perkRanks ?? {})[5] ?? 0
+        if (sharpshooterRank > 0) distance -= 2 * sharpshooterRank
 
         // then we multiply a magic number on top. More if there is eye damage involved by the attacker
         // this means for each field distance after PER modification we lose 4 points of hitchance
@@ -289,13 +298,24 @@ export class Combat {
         var hitChance = this.getHitChance(obj, target, normalizedRegion)
 
         // hey kids! Did you know FO only rolls the dice once here and uses the results two times?
-        var roll = getRandomInt(1, 101)
+        var roll = getRandomInt(1, D100_MAX)
 
         if (hitChance.hit - roll > 0) {
             var isCrit = false
             if (rollSkillCheck(Math.floor(hitChance.hit - roll) / 10, hitChance.crit, false) === true) isCrit = true
 
-            // TODO: if Slayer/Sniper perk -> second chance to crit
+            // Sniper perk (ID 9): make a second d100 roll; use the better outcome
+            // for the called-shot location. If the second roll also qualifies as a
+            // critical, the attack becomes a critical hit.
+            const sniperRank = (obj.perkRanks ?? {})[9] ?? 0
+            if (sniperRank > 0 && !isCrit) {
+                const secondRoll = getRandomInt(1, D100_MAX)
+                if (hitChance.hit - secondRoll > 0) {
+                    if (rollSkillCheck(Math.floor(hitChance.hit - secondRoll) / 10, hitChance.crit, false))
+                        isCrit = true
+                }
+            }
+
             if (isCrit === true) {
                 var critLevel = Math.floor(Math.max(0, getRandomInt(critModifer, 100 + critModifer)) / 20)
                 this.log('crit level: ' + critLevel)
@@ -311,7 +331,13 @@ export class Combat {
         // in reverse because miss -> roll > hitchance.hit
         var isCrit = false
         if (rollSkillCheck(Math.floor(roll - hitChance.hit) / 10, 0, false)) isCrit = true
-        // TODO: jinxed/pariah dog give (nonstacking) 50% chance for critical miss upon miss
+        // Jinxed trait (ID 9): 50% added chance for a critical miss on any miss.
+        // Pariah Dog companion provides the same non-stacking bonus; check both.
+        const attackerJinxed = obj.charTraits?.has(9) ?? false
+        const playerJinxed = this.player && !obj.isPlayer ? (this.player.charTraits?.has(9) ?? false) : false
+        if ((attackerJinxed || playerJinxed) && !isCrit) {
+            if (getRandomInt(1, D100_MAX) <= JINXED_CRIT_MISS_CHANCE) isCrit = true
+        }
 
         return { hit: false, crit: isCrit } // miss
     }

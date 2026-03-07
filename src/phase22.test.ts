@@ -245,8 +245,15 @@ describe('Phase 22-C — metarule3 IDs 102-105 de-stub', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(104, ...) returns 1 (LOS partial)', () => {
-        expect(script.metarule3(104, 0, 99999, 0)).toBe(1)
+    it('metarule3(104, tile, tile, ...) returns 1 when tiles are the same (distance 0)', () => {
+        // Both tile args equal 0 → same position → distance 0 ≤ 14 → visible (1)
+        expect(script.metarule3(104, 0, 0, 0)).toBe(1)
+        expect(stubHitCount()).toBe(0)
+    })
+
+    it('metarule3(104, tile, farTile, ...) returns 0 when tiles are far apart', () => {
+        // tile 0 is (0,0); tile 99999 is far away → distance > 14 → not visible (0)
+        expect(script.metarule3(104, 0, 99999, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 

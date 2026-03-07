@@ -908,8 +908,15 @@ export module Scripting {
                 return active.includes(obj as Critter) ? 1 : 0
             } else if (id === 104) {
                 // METARULE3_TILE_LINE_OF_SIGHT: 1 if there is line-of-sight between two tiles.
-                // No LOS system is implemented in the scripting VM yet; always return 1 (partial).
-                return 1
+                // A full LOS raycasting system is not yet implemented; approximate by distance:
+                // tiles within 14 hexes of each other are considered in line-of-sight.
+                const tileA = typeof obj === 'number' ? fromTileNum(obj) : null
+                const tileB = typeof userdata === 'number' ? fromTileNum(userdata) : null
+                if (!tileA || !tileB) {
+                    warn('metarule3(104): invalid tile argument — defaulting to visible (1)')
+                    return 1
+                }
+                return hexDistance(tileA, tileB) <= 14 ? 1 : 0
             } else if (id === 105) {
                 // METARULE3_OBJ_CAN_HEAR_OBJ: alias for obj_can_hear_obj; 1 if obj can hear target.
                 // obj = source object (first arg), userdata = target object.
@@ -2088,7 +2095,15 @@ export module Scripting {
             return 0 // it's not there
         }
         tile_is_visible(tile: number) {
-            log('tile_is_visible', arguments, 'tiles')
+            // A tile is considered visible if the player exists and the tile is within
+            // the Fallout 2 standard view radius of 14 hexes.  When the player is not
+            // available (e.g. scripts run at startup), fall back to returning 1 so that
+            // scripts that use this as a guard condition can still run.
+            if (globalState.player) {
+                const tilePos = fromTileNum(tile)
+                const dist = hexDistance(globalState.player.position, tilePos)
+                return dist <= 14 ? 1 : 0
+            }
             return 1
         }
         tile_in_tile_rect(ul: number, ur: number, ll: number, lr: number, t: number) {
