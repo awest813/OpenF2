@@ -343,7 +343,7 @@ npx vitest --watch
 
 | File(s) | Coverage |
 |---------|----------|
-| `src/phase1.test.ts` – `src/phase25.test.ts` | Roadmap milestone regressions and scripting fidelity |
+| `src/phase1.test.ts` – `src/phase35.test.ts` | Roadmap milestone regressions and scripting fidelity |
 | `src/vm.test.ts` | Script VM bytecode execution and opcode correctness |
 | `src/ui2/ui2.test.ts`, `src/ui2/panelParity.test.ts` | WebGL UI rendering and panel parity |
 | `src/combat.integration.test.ts`, `src/combat/damageFormula.test.ts` | Combat integration and damage math |
@@ -397,11 +397,10 @@ See [ROADMAP.md](./ROADMAP.md) for the full milestone plan and phase history.
 |------|--------|
 | Phase 0 — Stabilize core architecture | ✅ Complete |
 | Phase 1 — Playable core RPG loop | ✅ Complete |
-| Phase 2 — Full Fallout 2 system coverage | ✅ Complete |
+| Phase 2 — Full Fallout 2 completion (foundation) | ✅ Complete |
 | Phase 3 — Fallout 1 compatibility | ✅ Complete |
 | Phase 4 — Fidelity, modding, and tooling | 🔶 Active |
-| Phase 5 — End-to-end completability (1.0) | ⬜ Upcoming |
-| Post-1.0 — Optional QoL layer | ⬜ Future |
+| Phase 5 — Optional QoL upgrades (post-1.0) | ⬜ Future |
 
 **Critical path to 1.0:** scripting VM completeness — every de-stubbed procedure and sfall opcode unblocks more of the game world.
 
