@@ -160,8 +160,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'inven_cmds',
         kind: 'procedure',
-        description: 'Execute inventory command on a critter. INVEN_CMD_INDEX_PTR (13) returns inventory entry by index; other commands remain stubbed.',
-        status: 'partial',
+        description:
+            'Execute inventory command on a critter. Commands 0-3 (FIRST/LAST/PREV/NEXT), ' +
+            '11-12 (LEFT/RIGHT_HAND), and 13 (INDEX_PTR) are fully implemented. ' +
+            'Unknown command codes now log a warn and return null instead of calling stub().',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -1792,6 +1795,57 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         status: 'implemented',
         frequency: 'high',
         impact: 'high',
+    },
+    // -----------------------------------------------------------------------
+    // Phase 42 — VM resilience: throw→warn for missing bridges/procedures/stacks
+    // -----------------------------------------------------------------------
+    {
+        id: 'vm_bridge_missing_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'ScriptVMBridge.bridged(): when the target procedure is not implemented on ' +
+            'scriptObj, the engine previously threw an Error that crashed the entire game ' +
+            'session. Now logs a console.warn, pushes 0 if the opcode returns a value, and ' +
+            'returns — script execution continues gracefully.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'vm_call_unknown_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'ScriptVM.call(): when a named procedure does not exist in the compiled intfile ' +
+            'procedures table, the engine previously threw a string that crashed the game. ' +
+            'Now logs a console.warn and returns undefined — the calling context receives a ' +
+            'safe fallback and execution continues.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'vm_stack_underflow_no_throw',
+        kind: 'opcode',
+        description:
+            'ScriptVM.pop(): data-stack underflow previously threw crashing the game. ' +
+            'Now logs a console.warn and returns 0. ScriptVM.popAddr(): return-stack underflow ' +
+            'previously threw; now logs a warn and returns -1 (the halt sentinel), causing the ' +
+            'VM to halt gracefully instead of crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'explosion_uses_script_damage',
+        kind: 'procedure',
+        description:
+            'scripting.ts explosion(tile, elevation, damage): previously used hardcoded ' +
+            'min=0 / max=100 regardless of the script-supplied damage parameter. Now uses ' +
+            'floor(damage/2) as minDmg and damage as maxDmg, so explosion() calls with ' +
+            'varying damage values produce correctly-scaled blast effects.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
     },
 ])
 

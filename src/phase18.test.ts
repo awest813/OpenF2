@@ -419,11 +419,12 @@ describe('Phase 18-C — inven_cmds LEFT_HAND (11) and RIGHT_HAND (12)', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('inven_cmds with unknown command still stubs', () => {
+    it('inven_cmds with unknown command returns null without stub hit (Phase 42: warn-only)', () => {
         const script = new Scripting.Script()
         const critter = makeCritter(null, null)
-        script.inven_cmds(critter as any, 99, 0)
-        expect(stubHitCount()).toBe(1)
+        // Unknown commands emit warn() instead of stub() — no stub hit recorded
+        expect(script.inven_cmds(critter as any, 99, 0)).toBeNull()
+        expect(stubHitCount()).toBe(0)
     })
 })
 
