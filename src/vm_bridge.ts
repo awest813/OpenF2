@@ -749,6 +749,174 @@ export module ScriptVMBridge {
        // 0x81E7 — get_critter_skill_points(obj, skill): return base skill-point
        // allocation for the given skill number on a critter.
        ,0x81E7: bridged("get_critter_skill_points", 2) // get_critter_skill_points(obj, skill) → points
+
+       // -----------------------------------------------------------------------
+       // Phase 57 — sfall extended opcodes 0x81E8–0x81EF
+       // -----------------------------------------------------------------------
+
+       // 0x81E8 — get_object_cost_sfall(obj): return base barter/store cost from
+       // proto data.  Equivalent to proto_data(obj, ITEM_DATA_COST).
+       ,0x81E8: bridged("get_object_cost_sfall", 1) // get_object_cost_sfall(obj) → cost
+
+       // 0x81E9 — set_object_cost_sfall(obj, cost): override barter cost.
+       // Browser build: no-op (proto data is read-only at runtime).
+       ,0x81E9: bridged("set_object_cost_sfall", 2, false) // set_object_cost — no-op
+
+       // 0x81EA — get_sfall_global_int_sfall(index): alias of get_sfall_global_int.
+       // Alternate calling convention used by some script authors.
+       ,0x81EA: bridged("get_sfall_global_int_sfall", 1) // get_sfall_global_int(idx) → value
+
+       // 0x81EB — set_sfall_global_int_sfall(index, value): alias of set_sfall_global_int.
+       ,0x81EB: bridged("set_sfall_global_int_sfall", 2, false) // set_sfall_global_int(idx, val)
+
+       // 0x81EC — get_combat_difficulty_sfall(): return current difficulty (0=Easy,
+       // 1=Normal, 2=Hard).  Browser build: always 1 (Normal).
+       ,0x81EC: bridged("get_combat_difficulty_sfall", 0) // get_combat_difficulty() → 1
+
+       // 0x81ED — game_in_combat_sfall(): return 1 if in turn-based combat, 0 otherwise.
+       // Faster than checking GVAR_IN_COMBAT via global_var() in tight-loop AI scripts.
+       ,0x81ED: bridged("game_in_combat_sfall", 0) // game_in_combat() → 0|1
+
+       // 0x81EE — get_tile_fid_sfall(tile, elev): return the floor-tile FID at the
+       // given tile number and elevation.  Browser build: returns 0 (no tile FID registry).
+       ,0x81EE: bridged("get_tile_fid_sfall", 2) // get_tile_fid(tile, elev) → fid | 0
+
+       // 0x81EF — set_tile_fid_sfall(tile, elev, fid): override floor-tile FID.
+       // Browser build: no-op (no tile-override system).
+       ,0x81EF: bridged("set_tile_fid_sfall", 3, false) // set_tile_fid — no-op
+
+       // -----------------------------------------------------------------------
+       // Phase 58 — sfall extended opcodes 0x81F0–0x81F7
+       // -----------------------------------------------------------------------
+
+       // 0x81F0 — get_critter_xp_sfall(obj): return critter's XP value from proto.
+       // Used by loot/reward scripts; returns 0 for non-critters.
+       ,0x81F0: bridged("get_critter_xp_sfall", 1) // get_critter_xp(obj) → xp
+
+       // 0x81F1 — get_object_sid_sfall(obj): return the script SID for an object.
+       // Returns 0 if the object has no script.
+       ,0x81F1: bridged("get_object_sid_sfall", 1) // get_object_sid(obj) → sid | 0
+
+       // 0x81F2 — get_game_mode_ex_sfall(): extended game mode bitfield; alias of
+       // get_game_mode_sfall in the browser build (returns 0 = field mode).
+       ,0x81F2: bridged("get_game_mode_ex_sfall", 0) // get_game_mode_ex() → 0
+
+       // 0x81F3 — get_object_pid_sfall(obj): return the prototype ID of an object.
+       // Equivalent to obj_pid (0x80D0) but exposed as a dedicated sfall opcode.
+       ,0x81F3: bridged("get_object_pid_sfall", 1) // get_object_pid(obj) → pid
+
+       // 0x81F4 — get_critter_kill_type_sfall(obj): return kill-type index for a
+       // critter.  Used to attribute kill-counts per species.
+       ,0x81F4: bridged("get_critter_kill_type_sfall", 1) // get_critter_kill_type(obj) → type
+
+       // 0x81F5 — get_tile_at_sfall(x, y): convert hex-grid coordinates to a
+       // Fallout 2 tile number.  Inverse of fromTileNum.
+       ,0x81F5: bridged("get_tile_at_sfall", 2) // get_tile_at(x, y) → tile
+
+       // 0x81F6 — get_object_type_sfall(obj): return the object type as an integer
+       // (0=item, 1=critter, 2=scenery, 3=wall, 4=tile, 5=misc).
+       ,0x81F6: bridged("get_object_type_sfall", 1) // get_object_type(obj) → type int
+
+       // 0x81F7 — critter_at_sfall(tile, elev): return the first non-player critter
+       // at the given tile/elevation, or 0 if none.
+       ,0x81F7: bridged("critter_at_sfall", 2) // critter_at(tile, elev) → obj | 0
+
+       // -----------------------------------------------------------------------
+       // Phase 59 — sfall extended opcodes 0x81F8–0x81FF
+       // -----------------------------------------------------------------------
+
+       // 0x81F8 — get_critter_max_hp_sfall(obj): return critter's Max HP stat.
+       ,0x81F8: bridged("get_critter_max_hp_sfall", 1) // get_critter_max_hp(obj) → hp
+
+       // 0x81F9 — set_critter_max_hp_sfall(obj, hp): set critter's base Max HP.
+       ,0x81F9: bridged("set_critter_max_hp_sfall", 2, false) // set_critter_max_hp(obj, hp)
+
+       // 0x81FA — get_total_kills_sfall(): return total kills across all kill types.
+       ,0x81FA: bridged("get_total_kills_sfall", 0) // get_total_kills() → count
+
+       // 0x81FB — get_critter_extra_data_sfall(obj, field): return a proto extra field
+       // by numeric index (0=age, 1=gender, 2=killType, 3=XPValue, 4=AI).
+       ,0x81FB: bridged("get_critter_extra_data_sfall", 2) // get_critter_extra_data(obj, field) → val
+
+       // 0x81FC — get_script_return_val_sfall(): return the stored sfall return value.
+       ,0x81FC: bridged("get_script_return_val_sfall", 0) // get_script_return_val() → val
+
+       // 0x81FD — set_script_return_val_sfall(val): store a script return value.
+       ,0x81FD: bridged("set_script_return_val_sfall", 1, false) // set_script_return_val(val)
+
+       // 0x81FE — get_active_map_id_sfall(): alias of get_current_map_id.
+       ,0x81FE: bridged("get_active_map_id_sfall", 0) // get_active_map_id() → map id
+
+       // 0x81FF — get_critter_range_sfall(obj): return max attack range of equipped weapon.
+       ,0x81FF: bridged("get_critter_range_sfall", 1) // get_critter_range(obj) → range
+
+       // -----------------------------------------------------------------------
+       // Phase 60 — sfall extended opcodes 0x8200–0x8207
+       // -----------------------------------------------------------------------
+
+       // 0x8200 — get_critter_current_hp_sfall(obj): return critter's current HP.
+       // Alias of critter_hp(obj) (opcode 0x8107) exposed as sfall convention.
+       ,0x8200: bridged("get_critter_current_hp_sfall", 1) // get_critter_current_hp(obj) → hp
+
+       // 0x8201 — get_critter_level_sfall(obj): return critter's current level.
+       // Used by level-scaling and encounter scripts.
+       ,0x8201: bridged("get_critter_level_sfall2", 1) // get_critter_level(obj) → level
+
+       // 0x8202 — get_num_nearby_critters_sfall(obj, radius, team):
+       // Return the number of living critters within radius hexes of obj that belong
+       // to team.  Pass -1 for team to count all critters regardless of team.
+       ,0x8202: bridged("get_num_nearby_critters_sfall", 3) // get_num_nearby_critters(obj, radius, team) → count
+
+       // 0x8203 — is_critter_hostile_sfall(obj):
+       // Return 1 if the critter is currently hostile to the player, else 0.
+       ,0x8203: bridged("is_critter_hostile_sfall", 1) // is_critter_hostile(obj) → 0|1
+
+       // 0x8204 — set_critter_hostile_sfall(obj, hostile):
+       // Set the hostile flag on a critter.
+       ,0x8204: bridged("set_critter_hostile_sfall", 2, false) // set_critter_hostile(obj, hostile)
+
+       // 0x8205 — get_inven_slot_sfall(critter, slot):
+       // Return the item in the given inventory slot (0=left, 1=right, 2=armor).
+       // Returns 0 if the slot is empty or the object is not a critter.
+       ,0x8205: bridged("get_inven_slot_sfall", 2) // get_inven_slot(critter, slot) → obj | 0
+
+       // 0x8206 — get_critter_body_type_sfall(obj):
+       // Return the critter body type (0=biped, 1=quadruped, 2=robotic).
+       ,0x8206: bridged("get_critter_body_type_sfall", 1) // get_critter_body_type(obj) → int
+
+       // 0x8207 — get_flags_sfall(obj):
+       // Return the raw flags bitmask stored on a game object.
+       ,0x8207: bridged("get_flags_sfall", 1) // get_flags(obj) → flags
+
+       // -----------------------------------------------------------------------
+       // Phase 61 — sfall extended opcodes 0x8208–0x820F
+       // -----------------------------------------------------------------------
+
+       // 0x8208 — get_critter_trait_sfall(obj, traitId):
+       // Return 1 if the critter has the given character trait, 0 otherwise.
+       ,0x8208: bridged("get_critter_trait_sfall", 2) // get_critter_trait(obj, id) → 0|1
+
+       // 0x8209 — set_critter_trait_sfall(obj, traitId, value):
+       // Add (value≠0) or remove (value=0) a trait from a critter.
+       ,0x8209: bridged("set_critter_trait_sfall", 3, false) // set_critter_trait(obj, id, val)
+
+       // 0x820A — get_critter_race_sfall(obj): return critter race index.
+       ,0x820A: bridged("get_critter_race_sfall", 1) // get_critter_race(obj) → race
+
+       // 0x820B — obj_has_trait_sfall(obj, traitId): alias of get_critter_trait_sfall.
+       ,0x820B: bridged("obj_has_trait_sfall", 2) // obj_has_trait(obj, id) → 0|1
+
+       // 0x820C — get_critter_move_ap_sfall(obj): return available move AP.
+       ,0x820C: bridged("get_critter_move_ap_sfall", 1) // get_critter_move_ap(obj) → ap
+
+       // 0x820D — get_critter_combat_ap_sfall(obj): return available combat AP.
+       ,0x820D: bridged("get_critter_combat_ap_sfall", 1) // get_critter_combat_ap(obj) → ap
+
+       // 0x820E — critter_knockout_sfall(obj): return 1 if critter is knocked out.
+       ,0x820E: bridged("critter_knockout_sfall", 1) // critter_knockout(obj) → 0|1
+
+       // 0x820F — get_map_script_id_sfall(): return current map script ID.
+       ,0x820F: bridged("get_map_script_id_sfall", 0) // get_map_script_id() → sid
     }
     Object.assign(opMap, bridgeOpMap)
 

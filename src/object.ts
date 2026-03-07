@@ -1119,6 +1119,14 @@ export class Critter extends Obj {
                 ) as WeaponObj | undefined
                 if (w) obj.rightHand = w
             }
+
+            // BLK-054: Restore the critter's name from the save data.
+            // Critter.init() always sets this.name from proto text data, which would
+            // overwrite any custom name assigned via set_name() during gameplay.
+            // Re-apply mobj.name after init() so script-assigned names survive save/load.
+            if (typeof mobj.name === 'string' && mobj.name !== '') {
+                obj.name = mobj.name
+            }
         }
 
         return obj
