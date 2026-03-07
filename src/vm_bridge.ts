@@ -887,6 +887,36 @@ export module ScriptVMBridge {
        // 0x8207 — get_flags_sfall(obj):
        // Return the raw flags bitmask stored on a game object.
        ,0x8207: bridged("get_flags_sfall", 1) // get_flags(obj) → flags
+
+       // -----------------------------------------------------------------------
+       // Phase 61 — sfall extended opcodes 0x8208–0x820F
+       // -----------------------------------------------------------------------
+
+       // 0x8208 — get_critter_trait_sfall(obj, traitId):
+       // Return 1 if the critter has the given character trait, 0 otherwise.
+       ,0x8208: bridged("get_critter_trait_sfall", 2) // get_critter_trait(obj, id) → 0|1
+
+       // 0x8209 — set_critter_trait_sfall(obj, traitId, value):
+       // Add (value≠0) or remove (value=0) a trait from a critter.
+       ,0x8209: bridged("set_critter_trait_sfall", 3, false) // set_critter_trait(obj, id, val)
+
+       // 0x820A — get_critter_race_sfall(obj): return critter race index.
+       ,0x820A: bridged("get_critter_race_sfall", 1) // get_critter_race(obj) → race
+
+       // 0x820B — obj_has_trait_sfall(obj, traitId): alias of get_critter_trait_sfall.
+       ,0x820B: bridged("obj_has_trait_sfall", 2) // obj_has_trait(obj, id) → 0|1
+
+       // 0x820C — get_critter_move_ap_sfall(obj): return available move AP.
+       ,0x820C: bridged("get_critter_move_ap_sfall", 1) // get_critter_move_ap(obj) → ap
+
+       // 0x820D — get_critter_combat_ap_sfall(obj): return available combat AP.
+       ,0x820D: bridged("get_critter_combat_ap_sfall", 1) // get_critter_combat_ap(obj) → ap
+
+       // 0x820E — critter_knockout_sfall(obj): return 1 if critter is knocked out.
+       ,0x820E: bridged("critter_knockout_sfall", 1) // critter_knockout(obj) → 0|1
+
+       // 0x820F — get_map_script_id_sfall(): return current map script ID.
+       ,0x820F: bridged("get_map_script_id_sfall", 0) // get_map_script_id() → sid
     }
     Object.assign(opMap, bridgeOpMap)
 

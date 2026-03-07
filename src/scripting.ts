@@ -2340,6 +2340,11 @@ export module Scripting {
                 warn('tile_distance_objs: ' + a + ' or ' + b + ' are not game objects')
                 return null
             }
+            // BLK-060: Guard null positions to prevent hexDistance crash.
+            if (!a.position || !b.position) {
+                warn('tile_distance_objs: one or both objects lack a position', undefined, this)
+                return 0
+            }
             return hexDistance(a.position, b.position)
         }
         tile_distance(a: number, b: number) {
@@ -2350,6 +2355,11 @@ export module Scripting {
             if (!isSpatial(obj) && !isGameObject(obj)) {
                 warn('tile_num: not a game object: ' + obj, undefined, this)
                 return null
+            }
+            // BLK-060: Guard null position to prevent toTileNum crash.
+            if (!obj.position) {
+                warn('tile_num: object has no position', undefined, this)
+                return -1
             }
             return toTileNum(obj.position)
         }
@@ -2730,7 +2740,15 @@ export module Scripting {
                 obj: obj,
                 userdata: userdata,
                 fn: function () {
-                    timedEvent(obj._script!, userdata)
+                    // BLK-061: Guard against the object being destroyed between
+                    // add_timer_event and when the timer fires.  If the script
+                    // was cleared (e.g. destroy_object called in the meantime),
+                    // skip the event silently rather than crashing.
+                    if (!obj._script) {
+                        warn('add_timer_event callback: obj._script was null when timer fired — skipping', undefined, undefined)
+                        return
+                    }
+                    timedEvent(obj._script, userdata)
                 }.bind(this),
             })
         }
@@ -4287,6 +4305,95 @@ export module Scripting {
                 return 0
             }
             return (obj as any).flags ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 61 — sfall extended opcodes 0x8208–0x820F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8208 — get_critter_trait_sfall(obj, traitId):
+        // Return the rank of a character trait on a critter.
+        // Traits are stored in critter.charTraits as a Set; this returns 1 if the
+        // trait is present, 0 otherwise.
+        get_critter_trait_sfall(obj: Obj, traitId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_trait_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const traits = (obj as Critter).charTraits
+            return traits && traits.has(traitId) ? 1 : 0
+        }
+
+        // sfall 0x8209 — set_critter_trait_sfall(obj, traitId, value):
+        // Add or remove a trait from a critter's charTraits set.
+        set_critter_trait_sfall(obj: Obj, traitId: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_trait_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (!critter.charTraits) critter.charTraits = new Set()
+            if (value) critter.charTraits.add(traitId)
+            else critter.charTraits.delete(traitId)
+        }
+
+        // sfall 0x820A — get_critter_race_sfall(obj):
+        // Return the critter's race index from proto.extra.race.
+        // 0=human, 1=ghoul, 2=super mutant, 3=ghoul (special), …
+        // Defaults to 0 (human) when no race is set.
+        get_critter_race_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_race_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.race ?? 0
+        }
+
+        // sfall 0x820B — obj_has_trait_sfall(obj, traitId):
+        // Return 1 if a critter has the given trait; 0 otherwise.
+        // Alias of get_critter_trait_sfall() with a more script-friendly name.
+        obj_has_trait_sfall(obj: Obj, traitId: number): number {
+            return this.get_critter_trait_sfall(obj, traitId)
+        }
+
+        // sfall 0x820C — get_critter_move_ap_sfall(obj):
+        // Return the critter's current available move AP.
+        // Returns 0 when not in combat or AP not initialized.
+        get_critter_move_ap_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_move_ap_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).AP?.getAvailableMoveAP() ?? 0
+        }
+
+        // sfall 0x820D — get_critter_combat_ap_sfall(obj):
+        // Return the critter's current available combat AP.
+        // Returns 0 when not in combat or AP not initialized.
+        get_critter_combat_ap_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_combat_ap_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).AP?.getAvailableCombatAP() ?? 0
+        }
+
+        // sfall 0x820E — critter_knockout_sfall(obj):
+        // Return 1 if the critter is currently knocked out (unconscious), else 0.
+        critter_knockout_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_knockout_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).knockedOut ? 1 : 0
+        }
+
+        // sfall 0x820F — get_map_script_id_sfall():
+        // Return the script ID (SID) of the current map's map script.
+        // Browser build: returns the current map's script ID from the map object,
+        // or 0 if no map script is loaded.
+        get_map_script_id_sfall(): number {
+            return (globalState.gMap as any)?.mapObj?.scriptID ?? 0
         }
 
         _serialize(): SerializedScript {

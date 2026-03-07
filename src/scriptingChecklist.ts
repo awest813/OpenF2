@@ -4111,6 +4111,105 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 61 entries
+    {
+        id: 'blk_060_tile_distance_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-060: tile_distance_objs() and tile_num() now guard null positions.  ' +
+            'tile_distance_objs returns 0 instead of crashing; tile_num returns -1.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_061_add_timer_event_null_script',
+        kind: 'procedure',
+        description:
+            'BLK-061: add_timer_event() callback now checks obj._script before calling ' +
+            'timedEvent().  Prevents crash when the owning object is destroyed between ' +
+            'add_timer_event() and when the timer actually fires.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_trait',
+        kind: 'opcode',
+        description:
+            'sfall 0x8208: get_critter_trait_sfall(obj, traitId) — return 1 if a critter ' +
+            'has the given character trait, 0 otherwise.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_trait',
+        kind: 'opcode',
+        description:
+            'sfall 0x8209: set_critter_trait_sfall(obj, traitId, value) — add or remove a ' +
+            'character trait from a critter\'s charTraits set.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_race',
+        kind: 'opcode',
+        description:
+            'sfall 0x820A: get_critter_race_sfall(obj) — return critter race index from ' +
+            'proto.extra.race.  Defaults to 0 (human).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_has_trait',
+        kind: 'opcode',
+        description:
+            'sfall 0x820B: obj_has_trait_sfall(obj, traitId) — alias of get_critter_trait_sfall.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_move_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x820C: get_critter_move_ap_sfall(obj) — return available move AP.  ' +
+            'Returns 0 when not in combat or AP not initialized.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_combat_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x820D: get_critter_combat_ap_sfall(obj) — return available combat AP.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_critter_knockout',
+        kind: 'opcode',
+        description:
+            'sfall 0x820E: critter_knockout_sfall(obj) — return 1 if critter is knocked out.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_map_script_id',
+        kind: 'opcode',
+        description:
+            'sfall 0x820F: get_map_script_id_sfall() — return current map script ID.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
