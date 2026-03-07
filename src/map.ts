@@ -87,6 +87,24 @@ export class GameMap {
         lastSolveTimeMs: 0,
     }
 
+    /** Reused occupancy matrix for pathfinding to avoid per-call allocations. */
+    private pathMatrix: number[][] = []
+    /** Reused A* finder instance. */
+    private readonly pathFinder = new PF.AStarFinder()
+
+    private ensurePathMatrix(): void {
+        if (this.pathMatrix.length === HEX_GRID_SIZE) {
+            return
+        }
+
+        this.pathMatrix = new Array(HEX_GRID_SIZE)
+        for (let y = 0; y < HEX_GRID_SIZE; y++) {
+            const row = new Array<number>(HEX_GRID_SIZE)
+            row.fill(0)
+            this.pathMatrix[y] = row
+        }
+    }
+
     getObjects(level?: number): Obj[] {
         return this.objects[level === undefined ? this.currentElevation : level]
     }
@@ -493,10 +511,10 @@ export class GameMap {
     recalcPath(start: Point, goal: Point, isGoalBlocking?: boolean) {
         const t0 = performance.now()
 
-        const matrix = new Array(HEX_GRID_SIZE)
-
+        this.ensurePathMatrix()
+        const matrix = this.pathMatrix
         for (let y = 0; y < HEX_GRID_SIZE; y++) {
-            matrix[y] = new Array(HEX_GRID_SIZE)
+            matrix[y].fill(0)
         }
 
         for (const obj of this.getObjects()) {
@@ -509,8 +527,7 @@ export class GameMap {
         }
 
         const grid = new PF.Grid(HEX_GRID_SIZE, HEX_GRID_SIZE, matrix)
-        const finder = new PF.AStarFinder()
-        const path = finder.findPath(start.x, start.y, goal.x, goal.y, grid)
+        const path = this.pathFinder.findPath(start.x, start.y, goal.x, goal.y, grid)
 
         const elapsed = performance.now() - t0
         this.pathfindingTelemetry.totalCalls++
