@@ -3340,10 +3340,9 @@ export module Scripting {
 
         // sfall extended opcode — return the player's currently active hand (0x8199).
         // 0 = primary hand (left), 1 = secondary hand (right).
-        // Partial: returns 0 (primary) as a safe default; active-hand state is not
-        // tracked separately in the browser build.
+        // BLK-034: now reads Player.activeHand for a live value instead of always 0.
         active_hand(): number {
-            return 0
+            return (globalState.player as any)?.activeHand ?? 0
         }
 
         // sfall hook-script opcode — set the return value for a hook script (0x819A).

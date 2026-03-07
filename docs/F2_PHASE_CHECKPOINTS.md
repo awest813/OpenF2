@@ -196,3 +196,24 @@ Gate: **PASS** — all 1953 tests green, tsc clean.
 - [x] phase44.test.ts: 34 regression tests, all passing
 
 Gate: **PASS** — all 2075 tests green, tsc clean.
+
+---
+
+## Phase 50 — Critter status flags persistence, active hand, save schema v13, sfall expansion
+
+- [x] Critter critical-injury / status flags (`knockedOut`, `knockedDown`, `stunned`, `crippledLeftLeg`, `crippledRightLeg`, `crippledLeftArm`, `crippledRightArm`, `blinded`, `onFire`, `isFleeing`) added to `SERIALIZED_CRITTER_PROPS` + `SerializedCritter` interface (BLK-033)
+- [x] `Player.activeHand` (0=primary, 1=secondary) added to Player class; `active_hand()` opcode reads live value (BLK-034)
+- [x] Save schema bumped to v13: `playerActiveHand` field added; v12→v13 migration defaults to 0; normalization ensures 0 or 1 only
+- [x] Both IDB and memory load paths restore `playerActiveHand` on load
+- [x] New sfall opcode 0x81AE: `get_perk_owed()` → 0
+- [x] New sfall opcode 0x81AF: `set_perk_owed(n)` → no-op
+- [x] New sfall opcode 0x81B0: `get_last_target(obj)` → 0
+- [x] New sfall opcode 0x81B1: `get_last_attacker(obj)` → 0
+- [x] New sfall opcode 0x81B2: `art_cache_flush()` → no-op
+- [x] New sfall opcode 0x81B3: `game_loaded()` → 0
+- [x] New sfall opcode 0x81B4: `set_weapon_knockback(obj, dist, chance)` → no-op
+- [x] New sfall opcode 0x81B5: `remove_weapon_knockback(obj)` → no-op
+- [x] Checklist status upgrades: `proto_data`, `tile_is_visible`, `metarule_46`, `metarule_21`, `metarule_35`, `metarule_44`, `metarule_55`, `metarule_18`, `anim`, `proto_data_flags2` → all promoted to `implemented`
+- [x] phase50.test.ts: 48 regression tests, all passing
+
+Gate: **PASS** — all 2336 tests green, tsc clean.

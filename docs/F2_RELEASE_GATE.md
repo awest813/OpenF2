@@ -47,6 +47,6 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **54 files, 1842 tests passed**.
+- Full regression run: `npm test` → **68 files, 2336 tests passed**.
 - Type-check run: `npx tsc --noEmit` → **pass**.
-- Phase 36: sfall global persistence, metarule safety, new opcodes, reg_anim_func ANIM_COMPLETE callbacks all green.
+- Phase 50: critter status-flag persistence (BLK-033), active-hand tracking (BLK-034), save schema v13, sfall opcodes 0x81AE–0x81B5, checklist upgrades for proto_data/tile_is_visible/metarule_18/21/35/44/46/55/anim.

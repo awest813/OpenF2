@@ -81,6 +81,13 @@ Status guidance:
 - Phase 46 suite (`src/phase46.test.ts`) passed: BLK-026 lookupScriptName warn+null; BLK-027 loadMessage skip-invalid-line; BLK-028 party.removePartyMember warn+no-op; BLK-029 saveSchema unknown-version warn+best-effort; BLK-030 char.ts SkillSet/StatSet getBase/get warn+0; BLK-031 critter_state full bitmask (knockedOut/crippled/isFleeing); BLK-032 obj_is_locked non-object default 1→0; validateSaveForHydration returns string|null.
 - Full project regression run (`npm test`) passed: 64 files / 2151 tests.
 
+| BLK-033 | HIGH | Save/Load | critter critical-injury flags not persisted | `src/object.ts` `SERIALIZED_CRITTER_PROPS` | Critter critical-injury and status flags (knockedOut, knockedDown, stunned, crippledLeftLeg, crippledRightLeg, crippledLeftArm, crippledRightArm, blinded, onFire, isFleeing) were not included in `SERIALIZED_CRITTER_PROPS`, so any crippled-limb or fleeing state was silently reset every time a save was loaded. | Save during or after combat with a crippled critter; reload; observe that the crippled state is gone. | All ten status-flag properties are now in `SERIALIZED_CRITTER_PROPS` and declared in `SerializedCritter`; the existing loop serializes/deserializes them automatically. | `src/phase50.test.ts` | @engine | CLOSED | Added to SERIALIZED_CRITTER_PROPS in object.ts; SerializedCritter interface updated with optional flag fields. |
+
+| BLK-034 | MEDIUM | Save/Load | active_hand() always returned 0; active hand not persisted | `src/player.ts`, `src/scripting.ts`, `src/saveSchema.ts`, `src/saveload.ts` | The sfall `active_hand()` opcode always returned 0 (primary hand) regardless of which weapon slot the player had selected. The active-hand state was also not persisted in saves, so switching to the secondary weapon and saving/loading would always reset to primary. | Select secondary weapon slot, save, reload. `active_hand()` still returns 0. | `Player.activeHand` (number) added to Player class; `active_hand()` now reads the live value; save schema bumped to v13 with `playerActiveHand` field; both IDB and memory load paths restore the value. | `src/phase50.test.ts` | @engine | CLOSED | Player.activeHand tracks live state; save schema v13 persists it; defaults to 0 (primary) for old saves. |
+
+- Phase 50 suite (`src/phase50.test.ts`) passed: BLK-033 critter status flags serialized; BLK-034 active hand tracked and persisted; save schema v13; sfall opcodes 0x81AE–0x81B5; checklist upgrades (proto_data, tile_is_visible, metarule_18/21/35/44/46/55, anim, proto_data_flags2).
+- Full project regression run (`npm test`) passed: 68 files / 2336 tests.
+
 ## Closure checklist (required)
 
 Before moving a blocker to `CLOSED`, confirm:

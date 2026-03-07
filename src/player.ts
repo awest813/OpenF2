@@ -59,6 +59,19 @@ export class Player extends Critter {
      */
     pcFlags: number = 0
 
+    /**
+     * Currently active weapon hand (BLK-034).
+     *
+     * 0 = primary hand (left UI weapon slot — `leftHand` in engine)
+     * 1 = secondary hand (right UI weapon slot — `rightHand` in engine)
+     *
+     * Read by the sfall active_hand() opcode (0x8199) and by scripts that
+     * need to know which weapon slot the player is currently using.
+     * Updated when inventory-hand commands switch the active slot.
+     * Persisted in save schema v13+.
+     */
+    activeHand: number = 0
+
     inventory = [createObjectWithPID(41).setAmount(1337)]
 
     lightRadius = 4

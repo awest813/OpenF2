@@ -494,6 +494,41 @@ export module ScriptVMBridge {
        // 0x81AD — get_critter_current_hp2 (alias): same as get_critter_hp (0x8183).
        // Some sfall-using mods call this opcode for NPC heal checks.
        ,0x81AD: bridged("get_critter_hp", 1) // get_critter_hp(obj) → current HP
+
+       // Phase 50 — sfall extended opcodes 0x81AE–0x81B5
+       // 0x81AE — get_perk_owed(): return number of pending perk-selection points.
+       // Scripts use this to check whether a level-up perk selection is waiting.
+       // Browser build has no perk-selection UI; return 0 (no perks owed).
+       ,0x81AE: function() { this.push(0) } // get_perk_owed() → 0
+
+       // 0x81AF — set_perk_owed(n): set number of pending perk-selection points.
+       // No-op in browser build (no perk-selection UI).
+       ,0x81AF: function() { this.pop() } // set_perk_owed(n) — no-op
+
+       // 0x81B0 — get_last_target(obj): return the last critter targeted in combat
+       // by obj.  Returns 0 when no combat target is available.
+       ,0x81B0: function() { this.pop(); this.push(0) } // get_last_target(obj) → 0
+
+       // 0x81B1 — get_last_attacker(obj): return the last critter that attacked obj.
+       // Returns 0 when no attacker is recorded.
+       ,0x81B1: function() { this.pop(); this.push(0) } // get_last_attacker(obj) → 0
+
+       // 0x81B2 — art_cache_flush(): flush the internal art/animation cache.
+       // No-op in browser build (no separate art cache to manage).
+       ,0x81B2: function() {} // art_cache_flush() — no-op
+
+       // 0x81B3 — game_loaded(): returns 1 if the game was freshly loaded (i.e.
+       // the current map entry is from a save-load, not a first-time visit).
+       // Browser build returns 0 (treated as first-time visit always).
+       ,0x81B3: function() { this.push(0) } // game_loaded() → 0 (first-time entry)
+
+       // 0x81B4 — set_weapon_knockback(obj, dist, chance): set weapon knockback
+       // parameters for an object.  No-op in browser build (no knockback model).
+       ,0x81B4: function() { this.pop(); this.pop(); this.pop() } // set_weapon_knockback — no-op
+
+       // 0x81B5 — remove_weapon_knockback(obj): clear weapon knockback.
+       // No-op in browser build.
+       ,0x81B5: function() { this.pop() } // remove_weapon_knockback — no-op
     }
     Object.assign(opMap, bridgeOpMap)
 

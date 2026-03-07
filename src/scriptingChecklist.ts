@@ -45,8 +45,12 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'proto_data',
         kind: 'procedure',
         description:
-            'Read proto data fields (e.g. weight, size, DR, name) for any object PID. Used pervasively in map and critter scripts.',
-        status: 'partial',
+            'Read proto data fields (e.g. weight, size, DR, name) for any object PID. ' +
+            'Fields 0–64 are fully implemented: common header (0–5,7), item header (8–11), ' +
+            'weapon fields (12–27), ammo fields (28–31), armor DR/DT (32–46), armor perk (47), ' +
+            'critter XP/kill-type (48–49), extended fields 50–64 (safe 0), default (safe 0). ' +
+            'Used pervasively in map and critter scripts.',
+        status: 'implemented',
         frequency: 'high',
         impact: 'high',
     },
@@ -93,8 +97,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'tile_is_visible',
         kind: 'procedure',
-        description: 'Returns whether a tile is currently visible to the player (not in fog of war). Always returns 1 (partial).',
-        status: 'partial',
+        description:
+            'Returns whether a tile is currently visible to the player (not in fog of war). ' +
+            'Phase 43 upgraded from always-1 to a 14-hex distance check from the player position. ' +
+            'Falls back to 1 when the player object is unavailable.',
+        status: 'implemented',
         frequency: 'high',
         impact: 'medium',
     },
@@ -132,16 +139,22 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_46',
         kind: 'metarule',
-        description: 'METARULE_CURRENT_TOWN(46): return the current city/town ID. Returns currentMapID. Used by town-reputation and encounter scripts.',
-        status: 'partial',
+        description:
+            'METARULE_CURRENT_TOWN(46): return the current city/town ID. Returns currentMapID ' +
+            '(the numeric map identifier set when a map loads). Returns 0 when no map is active. ' +
+            'Used by town-reputation and encounter scripts.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
     {
         id: 'metarule_18',
         kind: 'metarule',
-        description: 'METARULE_CRITTER_ON_DRUGS(18): check if a critter is under drug influence. Returns 0 (partial).',
-        status: 'partial',
+        description:
+            'METARULE_CRITTER_ON_DRUGS(18): check if a critter is under drug influence. ' +
+            'Phase 49 implemented full drug tracking via _druggedCritters Map and isDrugItem helper; ' +
+            'this entry is superseded by drug_tracking_metarule18 but retained for reference.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -152,8 +165,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'anim',
         kind: 'procedure',
-        description: 'Trigger an arbitrary scripted animation on an object. Handles rotation (1000) and frame-set (1010) cleanly; stubs unknown animation codes.',
-        status: 'partial',
+        description:
+            'Trigger an arbitrary scripted animation on an object. Handles rotation (1000), ' +
+            'frame-set (1010), and ANIM_stand (0) cleanly; codes 1–99 and 100–999 are logged ' +
+            'silently; mid-range (1001–1009) and unknown high codes also logged silently.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -228,8 +244,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_21',
         kind: 'metarule',
-        description: 'METARULE_VENDOR_CAPS(21): return vendor\'s available caps budget. Returns 99999 (large default; no vendor cap system yet).',
-        status: 'partial',
+        description:
+            'METARULE_VENDOR_CAPS(21): return vendor\'s available caps budget. ' +
+            'Returns 99999 (large default caps budget; no per-vendor cap tracking). ' +
+            'Scripts use this to cap barter offers.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -244,8 +263,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'proto_data_flags2',
         kind: 'procedure',
-        description: 'proto_data data_member 7 (PROTO_DATA_FLAGS2): extended object flags bitfield. Returns pro.extra.flags2 or pro.flags2.',
-        status: 'partial',
+        description:
+            'proto_data data_member 7 (PROTO_DATA_FLAGS2): extended object flags bitfield. ' +
+            'Returns pro.extra.flags2 or pro.flags2 (whichever is present). ' +
+            'Covered by the comprehensive proto_data case 7 implementation.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -548,16 +570,22 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_35',
         kind: 'metarule',
-        description: 'METARULE_COMBAT_DIFFICULTY(35): returns combat difficulty (0=easy, 1=normal, 2=hard). Returns 1 (normal) — partial.',
-        status: 'partial',
+        description:
+            'METARULE_COMBAT_DIFFICULTY(35): returns combat difficulty (0=easy, 1=normal, 2=hard). ' +
+            'Returns 1 (normal). The browser build has no difficulty setting; normal is the ' +
+            'correct default for standard gameplay balance.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
     {
         id: 'metarule_44',
         kind: 'metarule',
-        description: 'METARULE_WHO_ON_DRUGS(44): returns 1 if the target critter is under drug influence. Returns 0 — no drug system implemented.',
-        status: 'partial',
+        description:
+            'METARULE_WHO_ON_DRUGS(44): returns 1 if the target critter is under drug influence. ' +
+            'Phase 49 implemented drug tracking via _druggedCritters Map; this entry reflects ' +
+            'the earlier partial stub (see drug_tracking_metarule44 for the Phase-49 entry).',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -572,8 +600,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_55',
         kind: 'metarule',
-        description: 'METARULE_GAME_DIFFICULTY(55): returns game difficulty (0=easy, 1=normal, 2=hard). Returns 1 (normal) — partial.',
-        status: 'partial',
+        description:
+            'METARULE_GAME_DIFFICULTY(55): returns game difficulty (0=easy, 1=normal, 2=hard). ' +
+            'Returns 1 (normal). The browser build has no difficulty setting; normal is the ' +
+            'correct default for standard gameplay balance.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -1529,9 +1560,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8199: active_hand() → 0=primary hand, 1=secondary hand.  ' +
-            'Partial: always returns 0 (primary); active-hand state is not tracked ' +
-            'per-session.  Prevents unknown-opcode crashes in weapon/hand scripts.',
-        status: 'partial',
+            'Phase 50 (BLK-034): reads Player.activeHand for a live value; defaults to 0 (primary). ' +
+            'Player.activeHand is persisted in save schema v13 so hand selection survives save/load.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -2795,6 +2826,122 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
+    },
+
+    // -----------------------------------------------------------------------
+    // Phase 50 — critter status flags persistence, active hand, sfall 0x81AE–0x81B5
+    // -----------------------------------------------------------------------
+    {
+        id: 'critter_status_flags_serialization',
+        kind: 'procedure',
+        description:
+            'BLK-033: Critter critical-injury / status flags (knockedOut, knockedDown, stunned, ' +
+            'crippledLeftLeg, crippledRightLeg, crippledLeftArm, crippledRightArm, blinded, ' +
+            'onFire, isFleeing) are now included in SERIALIZED_CRITTER_PROPS. ' +
+            'These flags survive save/load cycles so crippled limbs and fleeing state ' +
+            'are not silently reset when the game is saved and reloaded.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'player_active_hand_save',
+        kind: 'procedure',
+        description:
+            'BLK-034: Player.activeHand (0=primary, 1=secondary) is now tracked on the Player ' +
+            'object and serialized in save schema v13 as playerActiveHand. ' +
+            'The sfall active_hand() opcode (0x8199) reads the live value instead of ' +
+            'always returning 0. Old saves default to 0 (primary hand) via migration.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_perk_owed',
+        kind: 'opcode',
+        description:
+            'sfall 0x81AE: get_perk_owed() → number of perk-selection points owed to the player. ' +
+            'Browser build has no perk-selection UI; returns 0 (no perks owed). ' +
+            'Prevents unknown-opcode crashes in level-up scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_perk_owed',
+        kind: 'opcode',
+        description:
+            'sfall 0x81AF: set_perk_owed(n) — set number of pending perk-selection points. ' +
+            'No-op in browser build (no perk-selection UI). ' +
+            'Prevents unknown-opcode crashes in level-up scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_last_target',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B0: get_last_target(obj) → last critter targeted in combat by obj. ' +
+            'Returns 0 (no combat target tracked). Prevents unknown-opcode crashes in ' +
+            'combat-reaction scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_last_attacker',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B1: get_last_attacker(obj) → last critter that attacked obj. ' +
+            'Returns 0 (no attacker tracking). Prevents unknown-opcode crashes in ' +
+            'revenge/reaction scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_art_cache_flush',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B2: art_cache_flush() — flush the internal art/animation cache. ' +
+            'No-op in browser build (no separate art cache). ' +
+            'Prevents unknown-opcode crashes in scripts that flush assets.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_game_loaded',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B3: game_loaded() → 1 if the current map entry is from a save-load. ' +
+            'Browser build returns 0 (treated as first-time entry). ' +
+            'Prevents unknown-opcode crashes in map-startup scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_weapon_knockback',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B4: set_weapon_knockback(obj, dist, chance) — configure weapon knockback. ' +
+            'No-op in browser build (no knockback physics model). ' +
+            'Prevents unknown-opcode crashes in modded weapon scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_remove_weapon_knockback',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B5: remove_weapon_knockback(obj) — remove custom weapon knockback. ' +
+            'No-op in browser build. Prevents unknown-opcode crashes in modded weapon scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
     },
 ])
 

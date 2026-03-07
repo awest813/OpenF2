@@ -1581,9 +1581,33 @@ interface SerializedCritter extends SerializedObj {
      * so DT/DR/AC bonuses survive save/load cycles.
      */
     equippedArmorPID?: number
+
+    /**
+     * Critical injury / status flags (added in Phase 50 / BLK-033).
+     * Serializing these ensures crippled limbs, unconscious state, and fleeing
+     * behaviour survive save/load without being silently reset.
+     */
+    knockedOut?: boolean
+    knockedDown?: boolean
+    stunned?: boolean
+    crippledLeftLeg?: boolean
+    crippledRightLeg?: boolean
+    crippledLeftArm?: boolean
+    crippledRightArm?: boolean
+    blinded?: boolean
+    onFire?: boolean
+    isFleeing?: boolean
 }
 
-const SERIALIZED_CRITTER_PROPS = ['stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead', 'perkRanks']
+// BLK-033: Include all critical-injury/status flags so that save/load preserves
+// combat state (crippled limbs, unconscious, fleeing, etc.) faithfully.
+const SERIALIZED_CRITTER_PROPS = [
+    'stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead', 'perkRanks',
+    'knockedOut', 'knockedDown', 'stunned',
+    'crippledLeftLeg', 'crippledRightLeg',
+    'crippledLeftArm', 'crippledRightArm',
+    'blinded', 'onFire', 'isFleeing',
+]
 
 // Collection of functions for dealing with critters
 

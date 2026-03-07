@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 12
+export const SAVE_VERSION = 13
 
 export interface SaveGame {
     id?: number
@@ -129,6 +129,17 @@ export interface SaveGame {
      */
     playerPcFlags?: number
 
+    /**
+     * Currently active weapon hand (added in v13 / BLK-034).
+     *
+     * 0 = primary hand (left UI weapon slot / engine `leftHand`)
+     * 1 = secondary hand (right UI weapon slot / engine `rightHand`)
+     *
+     * Read by the sfall active_hand() opcode and by combat scripts that need
+     * to know which weapon the player is wielding.  Defaults to 0 (primary).
+     */
+    playerActiveHand?: number
+
     player: {
         position: Point
         orientation: number
@@ -243,6 +254,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerPcFlags === undefined) save.playerPcFlags = 0
             save.version = 12
             // falls through
+        case 12:
+            // v12 → v13: add player active-hand tracker (BLK-034).
+            // Old saves default to 0 (primary hand active).
+            if (save.playerActiveHand === undefined) save.playerActiveHand = 0
+            save.version = 13
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -273,6 +290,10 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
         save.playerPcFlags = 0
     } else {
         save.playerPcFlags = save.playerPcFlags >>> 0 // coerce to unsigned 32-bit integer
+    }
+    // Normalize playerActiveHand: must be 0 (primary) or 1 (secondary).
+    if (save.playerActiveHand !== 0 && save.playerActiveHand !== 1) {
+        save.playerActiveHand = 0
     }
 
     return save as SaveGame

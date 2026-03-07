@@ -271,10 +271,10 @@ describe('Phase 39-I — get_ini_setting opcode (0x8198)', () => {
 // ===========================================================================
 
 describe('Phase 39-J — active_hand opcode (0x8199)', () => {
-    it('checklist entry active_hand is present and partial', () => {
+    it('checklist entry active_hand is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'active_hand')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
         expect(entry?.kind).toBe('opcode')
         expect(entry?.impact).toBe('medium')
     })

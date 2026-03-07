@@ -357,10 +357,10 @@ describe('Phase 14-E — tile_is_visible de-stubbed', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('checklist entry for tile_is_visible is partial', () => {
+    it('checklist entry for tile_is_visible is implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'tile_is_visible')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(entry!.status).toBe('implemented')
     })
 })
 
@@ -441,10 +441,10 @@ describe('Phase 14-H — metarule_18 upgraded to partial', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('checklist entry for metarule_18 is partial', () => {
+    it('checklist entry for metarule_18 is implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule_18')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(entry!.status).toBe('implemented')
     })
 })
 
