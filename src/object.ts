@@ -815,7 +815,8 @@ export class Obj {
             }
         }
         if (!removed) {
-            throw "dropObject: couldn't find object"
+            console.warn("dropObject: item not found in source inventory — ignoring drop")
+            return
         }
 
         globalState.gMap.addObject(this) // add to objects
@@ -1213,7 +1214,9 @@ export class Critter extends Obj {
                 if (pos) {
                     const dir = directionOfDelta(this.position.x, this.position.y, pos[0], pos[1])
                     if (dir == null) {
-                        throw Error()
+                        console.warn('walk anim: directionOfDelta returned null — stopping animation')
+                        this.clearAnim()
+                        return
                     }
                     this.orientation = dir
                 }
@@ -1223,7 +1226,9 @@ export class Critter extends Obj {
 
                 const info = globalState.imageInfo[this.art]
                 if (info === undefined) {
-                    throw 'No image map info for: ' + this.art
+                    console.warn('walk anim: no image info for art "' + this.art + '" — stopping animation')
+                    this.clearAnim()
+                    return
                 }
 
                 // add the new frame's offset to our shift
@@ -1340,11 +1345,12 @@ export class Critter extends Obj {
         const weaponObj = this.equippedWeapon
         if (weaponObj !== null && Config.engine.doUseWeaponModel === true) {
             if (!weaponObj.weapon) {
-                throw Error()
-            }
-            const wepAnim = weaponObj.weapon.getAnim(anim)
-            if (wepAnim) {
-                return base + wepAnim
+                console.warn('getAnimation: weapon object has no weapon data — using default animation')
+            } else {
+                const wepAnim = weaponObj.weapon.getAnim(anim)
+                if (wepAnim) {
+                    return base + wepAnim
+                }
             }
         }
 
@@ -1388,7 +1394,8 @@ export class Critter extends Obj {
             case 'death-explode':
                 return base + 'bl'
             default:
-                throw 'Unknown animation: ' + anim
+                console.warn('getAnimation: unknown animation "' + anim + '" — falling back to idle')
+                return base + wep + 'a'
         }
     }
 
@@ -1425,7 +1432,8 @@ export class Critter extends Obj {
     get directionalOffset(): Point {
         const info = globalState.imageInfo[this.art]
         if (info === undefined) {
-            throw 'No image map info for: ' + this.art
+            console.warn('directionalOffset: no image map info for art "' + this.art + '" — returning zero offset')
+            return { x: 0, y: 0 }
         }
         return info.directionOffsets[this.orientation]
     }
@@ -1477,7 +1485,9 @@ export class Critter extends Obj {
         this.shift = { x: 0, y: 0 }
         const dir = directionOfDelta(this.position.x, this.position.y, path[1][0], path[1][1])
         if (dir == null) {
-            throw Error()
+            console.warn('walkTo: directionOfDelta returned null — cannot start walk animation')
+            this.path = null
+            return false
         }
         this.orientation = dir
         //console.log("start dir: %o", this.orientation)
@@ -1585,7 +1595,12 @@ function getAnimPartialActions(art: string, anim: string): { movement: number; a
         numPartials = 1
     }
 
-    const delta = Math.floor(globalState.imageInfo[art].numFrames / numPartials)
+    const imageInfo = globalState.imageInfo[art]
+    if (!imageInfo) {
+        console.warn('getAnimPartialActions: no image info for "' + art + '" — returning empty partials')
+        return { movement: 0, actions: [{ startFrame: 0, endFrame: 1, step: 0 }] }
+    }
+    const delta = Math.floor(imageInfo.numFrames / numPartials)
     let startFrame = 0
     let endFrame = delta
     for (let i = 0; i < numPartials; i++) {
@@ -1595,7 +1610,7 @@ function getAnimPartialActions(art: string, anim: string): { movement: number; a
     }
 
     // extend last partial action to the last frame
-    partialActions.actions[partialActions.actions.length - 1].endFrame = globalState.imageInfo[art].numFrames
+    partialActions.actions[partialActions.actions.length - 1].endFrame = imageInfo.numFrames
 
     //console.log("partials: %o", partialActions)
     return partialActions
@@ -1604,7 +1619,8 @@ function getAnimPartialActions(art: string, anim: string): { movement: number; a
 function getAnimDistance(art: string): number {
     const info = globalState.imageInfo[art]
     if (info === undefined) {
-        throw 'no image info for ' + art
+        console.warn('getAnimDistance: no image info for "' + art + '" — returning 0')
+        return 0
     }
 
     const firstShift = info.frameOffsets[0][0].ox

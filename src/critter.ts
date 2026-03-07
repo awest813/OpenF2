@@ -313,7 +313,9 @@ export function critterDamage(
     if (obj.getStat('HP') <= 0) return critterKill(obj, source, useScript)
 
     if (useScript) {
-        // TODO: Call damage_p_proc
+        // Trigger damage_p_proc on the damaged critter's script so scripted effects
+        // (e.g. special damage responses, quest triggers) can fire.
+        Scripting.damage(obj as any, obj as any, source as any, damage)
     }
 
     // TODO: other hit animations
@@ -330,8 +332,7 @@ function critterGetRawStat(obj: Critter, stat: string) {
 }
 
 function critterSetRawStat(obj: Critter, stat: string, amount: number) {
-    // obj.stats[stat] = amount
-    console.warn(`TODO: Change stat ${stat} to ${amount}`)
+    obj.stats.setBase(stat, amount)
 }
 
 function critterGetRawSkill(obj: Critter, skill: string) {
@@ -339,6 +340,5 @@ function critterGetRawSkill(obj: Critter, skill: string) {
 }
 
 function critterSetRawSkill(obj: Critter, skill: string, amount: number) {
-    // obj.skills[skill] = amount
-    console.warn(`TODO: Change skill ${skill} to ${amount}`)
+    obj.skills.setBase(skill, amount)
 }

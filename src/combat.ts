@@ -264,8 +264,8 @@ export class Combat {
         } else weaponSkill = obj.getSkill(weapon.weaponSkillType)
 
         var hitDistanceModifier = this.getHitDistanceModifier(obj, target, weaponObj)
-        var bonusAC = 0 // TODO: AP at end of turn bonus
-        var AC = target.getStat('AC') + bonusAC
+        // AC now includes any temporary end-of-turn AP bonus via StatSet.acBonus
+        var AC = target.getStat('AC')
         var bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
         var baseCrit = obj.getStat('Critical Chance') + bonusCrit
         const regionPenalty = CriticalEffects.regionHitChanceDecTable[normalizedRegion] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
@@ -627,6 +627,16 @@ export class Combat {
     }
 
     nextTurn(): void {
+        // Capture unused AP from the critter whose turn is ending and grant it as a
+        // temporary AC bonus (Fallout 2 mechanic: each unused AP → +1 AC until next turn).
+        const prevTurnCritter = this.combatants[this.whoseTurn]
+        if (prevTurnCritter && prevTurnCritter.AP && prevTurnCritter.stats) {
+            const unusedAP = prevTurnCritter.AP.getAvailableCombatAP()
+            if (unusedAP > 0) {
+                prevTurnCritter.stats.acBonus = unusedAP
+            }
+        }
+
         // update range checks
         var numActive = 0
         for (var i = 0; i < this.combatants.length; i++) {
@@ -649,7 +659,8 @@ export class Combat {
         if (this.whoseTurn >= this.combatants.length) this.whoseTurn = 0
 
         if (this.combatants[this.whoseTurn].isPlayer) {
-            // player turn
+            // Player's turn starts — clear the player's end-of-turn AC bonus.
+            this.player.stats.acBonus = 0
             this.inPlayerTurn = true
             this.player.AP!.resetAP()
         } else {
@@ -657,7 +668,8 @@ export class Combat {
             var critter = this.combatants[this.whoseTurn]
             if (critter.dead === true || critter.hostile !== true) return this.nextTurn()
 
-            // TODO: convert unused AP into AC
+            // Clear the AC bonus from this critter's previous turn before resetting AP.
+            critter.stats.acBonus = 0
             critter.AP!.resetAP()
             this.doAITurn(critter, this.whoseTurn, 1)
         }
