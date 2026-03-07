@@ -130,6 +130,7 @@ export class StatSet {
     baseStats: { [name: string]: number } = {};
     useBonuses: boolean;
     apBonus: number = 0; // Bonus AP from perks/traits
+    acBonus: number = 0; // Temporary AC bonus (e.g. from unused AP at end of combat turn)
 
     constructor(baseStats?: { [name: string]: number }, useBonuses: boolean=true, apBonus: number=0) {
         // Copy construct a StatSet
@@ -195,6 +196,11 @@ export class StatSet {
         // Add AP bonus from perks/traits
         if(stat === 'AP') {
             statValue += this.apBonus;
+        }
+
+        // Add temporary AC bonus (unused AP at end of combat turn)
+        if(stat === 'AC') {
+            statValue += this.acBonus;
         }
 
         return clamp(statDep.min, statDep.max, statValue);

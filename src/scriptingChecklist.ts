@@ -1697,6 +1697,102 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'medium',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 41 — object throw→warn; critter damage_p_proc; AP→AC; raw stat/skill
+    // -----------------------------------------------------------------------
+    {
+        id: 'object_drop_not_found',
+        kind: 'procedure',
+        description:
+            'dropObject: item not found in source inventory — warn and return early ' +
+            'instead of throwing, preventing inventory-drop crashes.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'object_unknown_animation',
+        kind: 'procedure',
+        description:
+            'Critter.getAnimation: unknown animation name — warn and return idle animation ' +
+            'instead of throwing, preventing animation lookup crashes.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'object_walk_null_direction',
+        kind: 'procedure',
+        description:
+            'walkTo / walk-anim loop: directionOfDelta returns null — warn and stop/abort ' +
+            'animation instead of throwing, preventing walk-path crashes.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'object_no_image_info_graceful',
+        kind: 'procedure',
+        description:
+            'directionalOffset / walk-anim loop: no image info for art key — warn and ' +
+            'return zero offset / stop animation instead of throwing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'object_anim_partial_no_image_info',
+        kind: 'procedure',
+        description:
+            'getAnimPartialActions / getAnimDistance: no image info for art key — warn and ' +
+            'return safe empty partials / 0 distance instead of throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_damage_p_proc',
+        kind: 'procedure',
+        description:
+            'critterDamage: call Scripting.damage() to trigger damage_p_proc on the ' +
+            'damaged critter\'s script when useScript=true. Required for scripted damage ' +
+            'reactions (e.g. special effects, quest triggers).',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'critter_set_raw_stat',
+        kind: 'procedure',
+        description:
+            'critterSetRawStat: now calls stats.setBase() instead of logging a TODO warning. ' +
+            'Enables correct stat mutation for any future callers.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_set_raw_skill',
+        kind: 'procedure',
+        description:
+            'critterSetRawSkill: now calls skills.setBase() instead of logging a TODO warning. ' +
+            'Enables correct skill mutation for any future callers.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'combat_ap_to_ac_bonus',
+        kind: 'procedure',
+        description:
+            'nextTurn: unused AP at end of turn is converted to a temporary +1 AC per unused AP ' +
+            '(Fallout 2 end-of-turn AC mechanic). Bonus is stored in StatSet.acBonus and cleared ' +
+            'at the start of the critter\'s next turn. getStat(\'AC\') now includes acBonus.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
 ])
 
 // ---------------------------------------------------------------------------
