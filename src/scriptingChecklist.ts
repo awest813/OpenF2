@@ -3908,6 +3908,116 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+
+    // Phase 59 entries
+    {
+        id: 'blk_056_giq_option_null_player',
+        kind: 'procedure',
+        description:
+            'BLK-056: giq_option() now guards against null globalState.player.  ' +
+            'Previously crashed when called before the player was initialised (e.g. ' +
+            'early map scripts); now shows the option unconditionally in that case.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_057_node998_enter_combat',
+        kind: 'procedure',
+        description:
+            'BLK-057: node998() now exits any active dialogue and initiates combat ' +
+            'against the player when an NPC script triggers the "go hostile" node.  ' +
+            'Previously was a no-op logging stub.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_058_metarule3_108_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-058: metarule3(108) CRITTER_DIST now guards both object positions ' +
+            'before calling hexDistance.  Prevents crash when either critter lacks a ' +
+            'position (e.g. just-created or off-map objects).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_max_hp',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F8: get_critter_max_hp_sfall(obj) — return critter Max HP stat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_max_hp',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F9: set_critter_max_hp_sfall(obj, hp) — set critter base Max HP.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_total_kills',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FA: get_total_kills_sfall() — return total kills across all kill types.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_extra_data',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FB: get_critter_extra_data_sfall(obj, field) — return a field from ' +
+            'critter proto extra data (0=age, 1=gender, 2=killType, 3=XP, 4=AI).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_script_return_val',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FC: get_script_return_val_sfall() — return the last stored sfall ' +
+            'return value.  Companion to set_script_return_val_sfall (0x81FD).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_script_return_val',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FD: set_script_return_val_sfall(val) — store a script return value.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_active_map_id',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FE: get_active_map_id_sfall() — alias of get_current_map_id_sfall.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_range',
+        kind: 'opcode',
+        description:
+            'sfall 0x81FF: get_critter_range_sfall(obj) — return max attack range of the ' +
+            'critter\'s equipped weapon (maxRange1 from proto).  Defaults to 1 (melee).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

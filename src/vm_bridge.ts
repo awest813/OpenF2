@@ -820,6 +820,35 @@ export module ScriptVMBridge {
        // 0x81F7 — critter_at_sfall(tile, elev): return the first non-player critter
        // at the given tile/elevation, or 0 if none.
        ,0x81F7: bridged("critter_at_sfall", 2) // critter_at(tile, elev) → obj | 0
+
+       // -----------------------------------------------------------------------
+       // Phase 59 — sfall extended opcodes 0x81F8–0x81FF
+       // -----------------------------------------------------------------------
+
+       // 0x81F8 — get_critter_max_hp_sfall(obj): return critter's Max HP stat.
+       ,0x81F8: bridged("get_critter_max_hp_sfall", 1) // get_critter_max_hp(obj) → hp
+
+       // 0x81F9 — set_critter_max_hp_sfall(obj, hp): set critter's base Max HP.
+       ,0x81F9: bridged("set_critter_max_hp_sfall", 2, false) // set_critter_max_hp(obj, hp)
+
+       // 0x81FA — get_total_kills_sfall(): return total kills across all kill types.
+       ,0x81FA: bridged("get_total_kills_sfall", 0) // get_total_kills() → count
+
+       // 0x81FB — get_critter_extra_data_sfall(obj, field): return a proto extra field
+       // by numeric index (0=age, 1=gender, 2=killType, 3=XPValue, 4=AI).
+       ,0x81FB: bridged("get_critter_extra_data_sfall", 2) // get_critter_extra_data(obj, field) → val
+
+       // 0x81FC — get_script_return_val_sfall(): return the stored sfall return value.
+       ,0x81FC: bridged("get_script_return_val_sfall", 0) // get_script_return_val() → val
+
+       // 0x81FD — set_script_return_val_sfall(val): store a script return value.
+       ,0x81FD: bridged("set_script_return_val_sfall", 1, false) // set_script_return_val(val)
+
+       // 0x81FE — get_active_map_id_sfall(): alias of get_current_map_id.
+       ,0x81FE: bridged("get_active_map_id_sfall", 0) // get_active_map_id() → map id
+
+       // 0x81FF — get_critter_range_sfall(obj): return max attack range of equipped weapon.
+       ,0x81FF: bridged("get_critter_range_sfall", 1) // get_critter_range(obj) → range
     }
     Object.assign(opMap, bridgeOpMap)
 
