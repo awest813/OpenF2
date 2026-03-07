@@ -66,7 +66,8 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
 
     if (!obj && skillRequiresTarget(skill)) {
-        throw 'trying to use skill that requires a target without providing one'
+        console.warn('playerUseSkill: skill ' + skill + ' requires a target but none was provided — skipping')
+        return
     }
 
     if (skillRequiresTarget(skill)) {
@@ -122,13 +123,14 @@ export function playerUse() {
                 console.log('Cannot walk there')
             } else {
                 if (!globalState.player.AP.subtractMoveAP(globalState.player.path.path.length - 1)) {
-                    throw (
-                        'subtraction issue: has AP: ' +
+                    console.warn(
+                        'subtractMoveAP failed: has AP: ' +
                         globalState.player.AP.getAvailableMoveAP() +
                         ' needs AP:' +
                         globalState.player.path.path.length +
                         ' and maxDist was:' +
-                        maxWalkingDist
+                        maxWalkingDist +
+                        ' — ignoring AP desync'
                     )
                 }
             }
@@ -195,7 +197,8 @@ export function playerUse() {
         globalState.player.clearAnim()
 
         if (!obj) {
-            throw Error()
+            console.warn('playerUse callback: obj is null — skipping use action')
+            return
         }
 
         // if there's an object under the cursor, use it
@@ -721,14 +724,16 @@ export function useElevator(): void {
     }
 
     if (elevatorStub === null) {
-        throw "couldn't find elevator stub near " + center.x + ', ' + center.y
+        console.warn("useElevator: couldn't find elevator stub near " + center.x + ', ' + center.y + ' — aborting')
+        return
     }
 
     console.log('elevator type: ' + elevatorStub.extra.type + ', ' + 'level: ' + elevatorStub.extra.level)
 
     const elevator = getElevator(elevatorStub.extra.type)
     if (!elevator) {
-        throw 'no elevator: ' + elevatorStub.extra.type
+        console.warn('useElevator: no elevator definition for type: ' + elevatorStub.extra.type + ' — aborting')
+        return
     }
 
     uiElevator(elevator)

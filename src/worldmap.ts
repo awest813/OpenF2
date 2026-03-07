@@ -208,7 +208,10 @@ export module Worldmap {
             const party = '(?:\\((\\d+)-(\\d+)\\) ([a-z0-9_]+))'
             const re = party + ' ?(?:(ambush player)|(fighting) ' + party + ')?'
             const m = data.match(new RegExp(re))
-            if (!m) throw Error('Error parsing encounter reference')
+            if (!m) {
+                console.warn("worldmap: error parsing encounter reference '" + data + "' — skipping")
+                return null
+            }
             //console.log("%o %o", re, data)
 
             const firstParty = { start: parseInt(m[1]), end: parseInt(m[2]), name: m[3] }

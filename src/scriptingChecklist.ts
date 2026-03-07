@@ -628,8 +628,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'get_game_mode',
         kind: 'opcode',
-        description: 'sfall 0x817E: get_game_mode() → bitmask of active game modes. Returns 0 — no mode-flags register in engine (partial).',
-        status: 'partial',
+        description: 'sfall 0x817E: get_game_mode() → bitmask of active game modes (combat=1, dialogue=2). Returns correct bitmask based on engine state.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -2040,6 +2040,119 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x81A2: get_object_weight(obj) → object weight in lbs. Reads from ' +
             'pro.extra.weight or pro.weight (stored as g×10 in proto data; divided by ' +
             '10 to get lbs). Returns 0 for non-game-objects.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // -----------------------------------------------------------------------
+    // Phase 45 — Crash-Free Hardening: throw→warn, encounter parsing, pro.ts,
+    //            sfall 0x81A3–0x81A7 (get_ini_string, set_global_script_type,
+    //            get_year, get_month, get_day), get_game_mode implemented
+    // -----------------------------------------------------------------------
+    {
+        id: 'ui_barter_loot_no_throw',
+        kind: 'procedure',
+        description:
+            'ui.ts uiBarterMove/uiLootMove/uiSwapItem: converted throw statements to ' +
+            'console.warn+return. Invalid data, missing object, or unknown location no longer ' +
+            'crash the barter/loot UI — they log a warning and skip the operation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'main_elevator_ap_no_throw',
+        kind: 'procedure',
+        description:
+            'main.ts: useElevator missing-stub and missing-type throws converted to warn+return; ' +
+            'AP subtraction mismatch throw converted to warn; playerUse callback null-obj throw ' +
+            'converted to warn+return; playerUseSkill no-target throw converted to warn+return.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'encounters_parse_no_throw',
+        kind: 'procedure',
+        description:
+            'encounters.ts: all throws in tokenizeCond, parseCond, evalCond, pickEncounter, and ' +
+            'evalEncounter converted to console.warn with safe fallbacks. Added or/ge/le/eq/ne ' +
+            'operator support to evalCond. pickEncounter now falls back to all encounters when ' +
+            'none pass conditions. evalEncounter now handles null from pickEncounter gracefully.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'worldmap_encounter_ref_no_throw',
+        kind: 'procedure',
+        description:
+            'worldmap.ts: parseEncounterReference throw replaced with warn+return null. ' +
+            'pickEncounter now filters out encounters with null enc field.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'pro_critter_art_path_no_throw',
+        kind: 'procedure',
+        description:
+            'pro.ts getCritterArtPath: all throw statements (reindex, id1>=0x0b, 0x26-0x2f range, ' +
+            '0x14 range, 0x0d case) converted to warn+fallback base art path. id2=0x12 case now ' +
+            'correctly maps dm/gm/as suffixes instead of throwing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'get_ini_string_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A3: get_ini_string(key) → string value from INI config. Partial: no INI ' +
+            'file system in browser build; returns empty string. Prevents unimplemented-opcode ' +
+            'crashes in mods that read their own config.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'set_global_script_type_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A4: set_global_script_type(type) — set global script type (0=map-update, ' +
+            '1=combat). No-op in browser build (no global script ticker). Prevents unimplemented- ' +
+            'opcode crash in scripts that register a global ticker.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_year_sfall_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A5: get_year() → in-game calendar year. Game epoch 2241; 360-day years ' +
+            '(12×30-day months). Derived from globalState.gameTickTime.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_month_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A6: get_month() → in-game calendar month (1–12). 30-day months. ' +
+            'Derived from globalState.gameTickTime.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_day_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A7: get_day() → in-game calendar day of month (1–30). 30-day months. ' +
+            'Derived from globalState.gameTickTime.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',

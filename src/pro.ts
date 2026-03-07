@@ -65,35 +65,43 @@ function getCritterArtPath(frmPID: number) {
             id2 == 0x1e || id2 == 0x37 ||
             id2 == 0x39 || id2 == 0x3a ||
             id2 == 0x21 || id2 == 0x40) {
-        throw "reindex(?)"
+        console.warn("getCritterArtPath: unhandled reindex id2=0x" + id2.toString(16) + " for FRM PID 0x" + frmPID.toString(16) + " — using base art")
+        return "art/critters/" + getLstId("art/critters/critters", idx).split(',')[0].toLowerCase() + "aa"
     }
 
     var path = "art/critters/" + getLstId("art/critters/critters", idx).split(',')[0].toLowerCase()
 
-    if(id1 >= 0x0b)
-        throw "?"
+    if(id1 >= 0x0b) {
+        console.warn("getCritterArtPath: id1=0x" + id1.toString(16) + " >= 0x0b for FRM PID 0x" + frmPID.toString(16) + " — using base art")
+        return path + "aa"
+    }
 
-    if(id2 >= 0x26 && id2 <= 0x2f)
-        throw ("0x26 and 0x2f")
+    if(id2 >= 0x26 && id2 <= 0x2f) {
+        console.warn("getCritterArtPath: id2=0x" + id2.toString(16) + " in unhandled range 0x26-0x2f for FRM PID 0x" + frmPID.toString(16) + " — using base art")
+        return path + "aa"
+    }
     else if(id2 === 0x24)
         path += "ch"
     else if(id2 === 0x25)
         path += "cj"
     else if(id2 >= 0x30)
         path += 'r' + String.fromCharCode(id2 + 0x31)
-    else if(id2 >= 0x14)
-        throw "0x14"
+    else if(id2 >= 0x14) {
+        console.warn("getCritterArtPath: id2=0x" + id2.toString(16) + " >= 0x14 unhandled for FRM PID 0x" + frmPID.toString(16) + " — using base art")
+        return path + "aa"
+    }
     else if (id2 === 0x12) {
-        throw "0x12"
-        /*if(id1 === 0x01)
+        if(id1 === 0x01)
             path += "dm"
         else if(id1 === 0x04)
             path += "gm"
         else
-            path += "as"*/
+            path += "as"
     }
-    else if(id2 === 0x0d)
-        throw "0x0d"
+    else if(id2 === 0x0d) {
+        console.warn("getCritterArtPath: id2=0x0d unhandled for FRM PID 0x" + frmPID.toString(16) + " — using base art")
+        return path + "aa"
+    }
     else {
         if(id2 <= 1 && id1 > 0) {
             console.log("ID1: " + id1)

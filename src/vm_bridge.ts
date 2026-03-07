@@ -367,6 +367,13 @@ export module ScriptVMBridge {
        ,0x81A0: bridged("get_critter_level", 1)         // get_critter_level(obj) → character level of critter
        ,0x81A1: bridged("set_critter_level", 2, false)  // set_critter_level(obj, level) — override critter level
        ,0x81A2: bridged("get_object_weight", 1)         // get_object_weight(obj) → weight of object in lbs
+
+       // sfall extended opcodes 0x81A3–0x81A7 — ini strings, global script type, game calendar
+       ,0x81A3: bridged("get_ini_string", 1)            // get_ini_string(key) → INI value as string (partial: "")
+       ,0x81A4: bridged("set_global_script_type", 1, false) // set_global_script_type(type) — set global script type (0=map, 1=combat)
+       ,0x81A5: bridged("get_year", 0)                  // get_year() → in-game calendar year
+       ,0x81A6: bridged("get_month", 0)                 // get_month() → in-game calendar month (1–12)
+       ,0x81A7: bridged("get_day", 0)                   // get_day() → in-game calendar day of month (1–31)
     }
     Object.assign(opMap, bridgeOpMap)
 

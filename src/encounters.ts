@@ -68,8 +68,10 @@ export module Encounters {
         var toks: Token[] = []
         while(acc.length > 0) {
             var m = match(acc)
-            if(m === null)
-                throw "error parsing condition: '" + data + "': choked on '" + acc + "'"
+            if(m === null) {
+                console.warn("encounters: error parsing condition: '" + data + "': choked on '" + acc + "' — skipping token")
+                break
+            }
             toks.push(m[0] === Tok.INT ? [Tok.INT, m[1], parseInt(m[1])] : m)
             acc = acc.slice(m[2])
         }
@@ -83,9 +85,8 @@ export module Encounters {
         var curTok = 0
 
         function expect(t: Tok) {
-            if(tokens[curTok++][0] !== t)
-                throw "expect: expected " + t + ", got " + tokens[curTok-1] +
-                      ", input: " + data
+            if(tokens[curTok] === undefined || tokens[curTok++][0] !== t)
+                console.warn("encounters: expected token " + t + " but got " + tokens[curTok-1] + " in: " + data)
         }
 
         function next() {
@@ -130,7 +131,8 @@ export module Encounters {
                 case Tok.INT:
                     return checkOp({type: 'int', value: t[2]})
                 default:
-                    throw "unhandled/unexpected token: " + t + " in: " + data
+                    console.warn("encounters: unhandled/unexpected token: " + t + " in: " + data)
+                    return {type: 'int', value: 0} as Node
             }
         }
 
@@ -141,7 +143,13 @@ export module Encounters {
         // conditions are formed by conjunctions, so
         // x AND y AND z can just be collapsed to [x, y, z] here
 
-        var cond = parseCond(data)
+        var cond: Node
+        try {
+            cond = parseCond(data)
+        } catch(e) {
+            console.warn('encounters: parseConds failed for "' + data + '": ' + e + ' — treating as always-true')
+            return [{type: 'int', value: 1} as Node]
+        }
         var out: Node[] = []
 
         function visit(node: Node) {
@@ -189,23 +197,28 @@ export module Encounters {
             case "call": // call (more like a property access)
                 switch(node.name) {
                     case "global": // GVAR
-                        if(node.arg.type !== "int") throw "evalCond: GVAR not a number";
+                        if(node.arg.type !== "int") { console.warn("evalCond: GVAR not a number"); return 0 }
                         return Scripting.getGlobalVar(node.arg.value)
                     case "player":
-                        if(node.arg.type !== "var") throw "evalCond: player arg not a var";
-                        if(node.arg.name !== "level")
-                            throw "player( " + node.arg.name + ")"
-                        return 0 // player level
+                        if(node.arg.type !== "var") { console.warn("evalCond: player arg not a var"); return 0 }
+                        if(node.arg.name === "level")
+                            return 0 // player level (TODO: use actual player level)
+                        console.warn("evalCond: unhandled player property: " + node.arg.name)
+                        return 0
                     case "rand": // random percentage
-                        if(node.arg.type !== "int") throw "evalCond: rand arg not a number";
+                        if(node.arg.type !== "int") { console.warn("evalCond: rand arg not a number"); return 0 }
                         return getRandomInt(0, 100) <= node.arg.value
-                    default: throw "unhandled call: " + node.name
+                    default:
+                        console.warn("evalCond: unhandled call: " + node.name + " — returning 0")
+                        return 0
                 }
             case "var":
                 switch(node.name) {
                     case "time_of_day":
                         return 12 // hour of the day
-                    default: throw "unhandled var: " + node.name
+                    default:
+                        console.warn("evalCond: unhandled var: " + node.name + " — returning 0")
+                        return 0
                 }
             case "int": return node.value
             case "op":
@@ -214,13 +227,22 @@ export module Encounters {
                 var op: { [op: string]: (l: boolean|number, r: boolean|number) => boolean|number } =  {
                     "<": (l, r) => l < r,
                     ">": (l, r) => l > r,
-                    "and": (l, r) => l && r
+                    "and": (l, r) => l && r,
+                    "or": (l, r) => l || r,
+                    ">=": (l, r) => l >= r,
+                    "<=": (l, r) => l <= r,
+                    "==": (l, r) => l === r,
+                    "!=": (l, r) => l !== r,
                 }
 
-                if(op[node.op] === undefined)
-                    throw "unhandled op: " + node.op
+                if(op[node.op] === undefined) {
+                    console.warn("evalCond: unhandled op: " + node.op + " — returning true (include encounter)")
+                    return 1
+                }
                 return op[node.op](lhs, rhs)
-            default: throw "unhandled node: " + node
+            default:
+                console.warn("evalCond: unhandled node type: " + (node as any).type + " — returning 0")
+                return 0
         }
     }
 
@@ -283,13 +305,19 @@ export module Encounters {
         // Pick an encounter from an encounter list based on a roll
 
         var succEncounters = encounters.filter(function(enc) {
+            if(enc.enc === null) return false // skip encounters with invalid enc ref
             return (enc.cond !== null) ? evalConds(enc.cond) : true
         })
         var numEncounters = succEncounters.length
         var totalChance = succEncounters.reduce(function(sum, x) { return x.chance + sum }, 0)
 
-        if(numEncounters === 0)
-            throw "pickEncounter: There were no successfully-conditioned encounters"
+        if(numEncounters === 0) {
+            console.warn("pickEncounter: no conditioned encounters passed — using all encounters unconditionally")
+            succEncounters = encounters.slice()
+            numEncounters = succEncounters.length
+            totalChance = succEncounters.reduce(function(sum, x) { return x.chance + sum }, 0)
+            if(numEncounters === 0) return null
+        }
 
         console.log("pickEncounter: num: %d, chance: %d, encounters: %o", numEncounters, totalChance, succEncounters)
 
@@ -387,6 +415,11 @@ export module Encounters {
         var groups: Worldmap.EncounterGroup[] = []
         var encounter = pickEncounter(encTable.encounters)
 
+        if(encounter === null) {
+            console.warn("evalEncounter: pickEncounter returned null — skipping encounter")
+            return null
+        }
+
         if(encounter.special !== null) {
             // special encounter: use specific map
             mapLookupName = encounter.special
@@ -420,7 +453,10 @@ export module Encounters {
             var secondParty = encounter.enc.secondParty
             console.log("two factions: %o vs %o", firstParty, secondParty)
 
-            if(!firstParty) throw Error();
+            if(!firstParty) {
+                console.warn("encounter fighting: firstParty is null — skipping encounter")
+                return null
+            }
 
             var firstGroup = Worldmap.getEncounterGroup(firstParty.name)
             var firstCritterCount = getRandomInt(firstParty.start, firstParty.end)
@@ -436,7 +472,9 @@ export module Encounters {
         else if(encounter.enc.type === "special") {
             //console.log("TODO: special encounter type")
         }
-        else throw "unknown encounter type: " + encounter.enc.type
+        else {
+            console.warn("encounter: unknown encounter type: " + encounter.enc.type + " — treating as empty encounter")
+        }
 
         console.log("groups: %o", groups)
 

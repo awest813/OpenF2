@@ -1249,7 +1249,8 @@ function uiSwapItem(a: Obj[], item: Obj, b: Obj[], amount: number) {
         }
     }
     if (idx === -1) {
-        throw 'item (' + item + ') does not exist in a'
+        console.warn('uiSwapItem: item (' + item + ') does not exist in source list — skipping swap')
+        return
     }
 
     if (amount < item.amount) {
@@ -1384,13 +1385,15 @@ export function uiBarterMode(merchant: Critter) {
         )[data[0]]
 
         if (from === undefined) {
-            throw 'uiBarterMove: wrong data: ' + data
+            console.warn('uiBarterMove: wrong data: ' + data + ' — skipping')
+            return
         }
 
         const idx = parseInt(data.slice(1))
         const obj = from[idx]
         if (obj === undefined) {
-            throw 'uiBarterMove: obj not found in list (' + idx + ')'
+            console.warn('uiBarterMove: obj not found in list (' + idx + ') — skipping')
+            return
         }
 
         // player inventory -> left table or player inventory
@@ -1411,7 +1414,8 @@ export function uiBarterMode(merchant: Critter) {
         }[where]
 
         if (to === undefined) {
-            throw 'uiBarterMove: invalid location: ' + where
+            console.warn('uiBarterMove: invalid location: ' + where + ' — skipping')
+            return
         } else if (to === from) {
             // table -> same table
             return
@@ -1476,19 +1480,22 @@ export function uiLoot(object: Obj) {
         const from = ({ l: globalState.player.inventory, r: object.inventory } as any)[data[0]]
 
         if (from === undefined) {
-            throw 'uiLootMove: wrong data: ' + data
+            console.warn('uiLootMove: wrong data: ' + data + ' — skipping')
+            return
         }
 
         const idx = parseInt(data.slice(1))
         const obj = from[idx]
         if (obj === undefined) {
-            throw 'uiLootMove: obj not found in list (' + idx + ')'
+            console.warn('uiLootMove: obj not found in list (' + idx + ') — skipping')
+            return
         }
 
         const to = { left: globalState.player.inventory, right: object.inventory }[where]
 
         if (to === undefined) {
-            throw 'uiLootMove: invalid location: ' + where
+            console.warn('uiLootMove: invalid location: ' + where + ' — skipping')
+            return
         } else if (to === from) {
             // object -> same location
             return
