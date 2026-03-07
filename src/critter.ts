@@ -265,6 +265,19 @@ export function critterKill(
     obj.dead = true
     obj.outline = null
 
+    // Increment kill-type counter so get_critter_kills() returns accurate counts.
+    // killType is stored on the critter's proto (CRITTER_DATA_KILL_TYPE).
+    // Only count non-player critters; player deaths are not tracked as kills.
+    if (!obj.isPlayer) {
+        const kt = obj.killType
+        if (kt !== null && kt !== undefined) {
+            if (!globalState.critterKillCounts) {
+                globalState.critterKillCounts = {}
+            }
+            globalState.critterKillCounts[kt] = (globalState.critterKillCounts[kt] ?? 0) + 1
+        }
+    }
+
     if (useScript === undefined || useScript === true) {
         Scripting.destroy(obj, source)
     }
