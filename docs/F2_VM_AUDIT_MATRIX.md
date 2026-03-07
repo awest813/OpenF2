@@ -43,3 +43,19 @@ Legend:
 2. `anim`/`reg_anim_*` fidelity in branches that visibly alter progression scripts.
 3. `metarule_46` parity validation across town/map transitions.
 4. Visibility/LOS/walkability (`tile_is_visible`, `metarule3_104`, `metarule3_102`) once map-state APIs are wired into scripting.
+
+## Phase 51 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `player_stats_persistence` (BLK-035) | procedure | implemented | P0 | Player HP, SPECIAL, skills now saved in v14 schema; eliminates HP-reset-on-load bug. |
+| `get_critter_stat_bonus` (0x81B6) | opcode | implemented | P2 | Returns derived minus base stat bonus. |
+| `obj_art_name` (0x81B7) | opcode | implemented | P2 | Returns art path string of an object. |
+| `get_item_type_int` (0x81B8) | opcode | implemented | P2 | Returns item subtype integer. |
+| `set_pc_stat` (0x81B9) | opcode | implemented | P1 | Sets player stat by pcstat index (0–4). |
+| `num_critters_in_radius` (0x81BA) | opcode | implemented | P1 | Count critters within hex radius; used by AI scripts. |
+| `get_object_ai_num` (0x81BB) | opcode | implemented | P2 | Returns critter AI packet number. |
+| `set_object_ai_num` (0x81BC) | opcode | implemented | P2 | Sets critter AI packet number. |
+| `get_critter_hostile_to_dude` (0x81BD) | opcode | implemented | P2 | Returns hostile flag vs player. |
+
+Next available sfall opcode: **0x81BE**

@@ -194,6 +194,18 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // selection survives across save/load cycles.
     save.playerActiveHand = (globalState.player as any).activeHand ?? 0
 
+    // Snapshot player base stats (HP, radiation, etc.) so that the player's
+    // current health and any script-driven SPECIAL changes survive reload (BLK-035).
+    if (globalState.player && globalState.player.stats) {
+        save.playerBaseStats = { ...globalState.player.stats.baseStats }
+    }
+
+    // Snapshot player base skill values so skill-point investments persist (BLK-035).
+    if (globalState.player && globalState.player.skills) {
+        save.playerSkillValues = { ...globalState.player.skills.baseSkills }
+        save.playerSkillPoints = globalState.player.skills.skillPoints
+    }
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -269,6 +281,22 @@ export function load(id: number): void {
                 if (globalState.player && typeof save.playerActiveHand === 'number') {
                     ;(globalState.player as any).activeHand = save.playerActiveHand
                 }
+                // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
+                if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
+                    for (const [statName, statValue] of Object.entries(save.playerBaseStats)) {
+                        globalState.player.stats.setBase(statName, statValue)
+                    }
+                }
+                // Restore player base skill values so skill investments survive reload (BLK-035).
+                if (globalState.player && save.playerSkillValues && Object.keys(save.playerSkillValues).length > 0) {
+                    for (const [skillName, skillValue] of Object.entries(save.playerSkillValues)) {
+                        globalState.player.skills.setBase(skillName, skillValue)
+                    }
+                }
+                // Restore unspent skill points (BLK-035).
+                if (globalState.player && typeof save.playerSkillPoints === 'number') {
+                    globalState.player.skills.skillPoints = save.playerSkillPoints
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -327,6 +355,22 @@ export function load(id: number): void {
                     // Restore active hand selection (BLK-034).
                     if (globalState.player && typeof save.playerActiveHand === 'number') {
                         ;(globalState.player as any).activeHand = save.playerActiveHand
+                    }
+                    // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
+                    if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
+                        for (const [statName, statValue] of Object.entries(save.playerBaseStats)) {
+                            globalState.player.stats.setBase(statName, statValue)
+                        }
+                    }
+                    // Restore player base skill values so skill investments survive reload (BLK-035).
+                    if (globalState.player && save.playerSkillValues && Object.keys(save.playerSkillValues).length > 0) {
+                        for (const [skillName, skillValue] of Object.entries(save.playerSkillValues)) {
+                            globalState.player.skills.setBase(skillName, skillValue)
+                        }
+                    }
+                    // Restore unspent skill points (BLK-035).
+                    if (globalState.player && typeof save.playerSkillPoints === 'number') {
+                        globalState.player.skills.skillPoints = save.playerSkillPoints
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
