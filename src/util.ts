@@ -39,7 +39,10 @@ export function parseIni(text: string) {
                 console.log('warning: parseIni: not a key=value line: ' + line)
                 continue
             }
-            if (category === null) throw 'parseIni: key=value not in category: ' + line
+            if (category === null) {
+                console.warn('parseIni: key=value before first section header — skipping: ' + line)
+                continue
+            }
 
             if (ini[category] === undefined) ini[category] = {}
             ini[category][kv[1]] = kv[2]

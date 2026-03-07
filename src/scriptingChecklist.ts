@@ -2466,6 +2466,53 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'medium',
     },
+    {
+        id: 'util_parseIni_key_before_section_no_throw',
+        kind: 'procedure',
+        description:
+            'util.ts parseIni(): a key=value pair appearing before the first [section] ' +
+            'header previously threw a string crashing any code that loaded such an INI ' +
+            '(e.g. AI.TXT, ddraw.ini). Now logs console.warn and skips the line so the ' +
+            'rest of the file is parsed successfully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'renderer_objectRenderInfo_no_imageInfo_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectRenderInfo(): when globalState.imageInfo[obj.art] is ' +
+            'undefined (image loaded but metadata not yet available), previously threw ' +
+            'a string crashing the renderer. Now logs console.warn and returns null so ' +
+            'the object is simply skipped during this render frame.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'renderer_objectBoundingBox_no_imageInfo_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectBoundingBox(): missing imageInfo previously threw a string ' +
+            'crashing hit-testing. Now logs console.warn and returns null so callers ' +
+            'treat the object as having no bounding box (click-through).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'renderer_objectTransparentAt_no_tempCanvasCtx_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectTransparentAt(): a null tempCanvasCtx (and missing imageInfo) ' +
+            'previously threw an Error crashing click transparency testing. Now guards both ' +
+            'conditions with console.warn + return true (transparent) so the game continues ' +
+            'without a crash if the temp canvas is unavailable.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

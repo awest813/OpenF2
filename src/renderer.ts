@@ -184,7 +184,8 @@ export class Renderer {
 
         const info = globalState.imageInfo[obj.art]
         if (info === undefined) {
-            throw 'No image map info for: ' + obj.art
+            console.warn('[renderer] objectRenderInfo: no imageInfo for art "' + obj.art + '" — returning null')
+            return null
         }
 
         if (!(obj.orientation in info.frameOffsets)) {
@@ -295,10 +296,13 @@ export function objectOnScreen(obj: Obj): boolean {
 
 export function objectTransparentAt(obj: Obj, position: Point) {
     const frame = obj.frame !== undefined ? obj.frame : 0
-    const sx = globalState.imageInfo[obj.art].frameOffsets[obj.orientation][frame].sx
+    const imageInfo = globalState.imageInfo[obj.art]
+    if (!imageInfo) return true // no image info — treat as transparent
+    const sx = imageInfo.frameOffsets[obj.orientation]?.[frame]?.sx ?? 0
 
     if (!globalState.tempCanvasCtx) {
-        throw Error()
+        console.warn('[renderer] objectTransparentAt: tempCanvasCtx is null — assuming transparent')
+        return true
     }
 
     globalState.tempCanvasCtx.clearRect(0, 0, 1, 1) // clear previous color
@@ -319,7 +323,8 @@ export function objectBoundingBox(obj: Obj): BoundingBox | null {
 
     const info = globalState.imageInfo[obj.art]
     if (info === undefined) {
-        throw 'No image map info for: ' + obj.art
+        console.warn('[renderer] objectBoundingBox: no imageInfo for art "' + obj.art + '" — returning null')
+        return null
     }
 
     let frameIdx = 0
