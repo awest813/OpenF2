@@ -248,10 +248,15 @@ describe('hit-chance fidelity regression tests', () => {
         expect(eyes.crit - torso.crit).toBe(regionPenaltyDelta)
     })
 
-    it('returns -1/-1 hit data when no weapon is equipped', () => {
+    it('returns unarmed fallback hit data when no weapon is equipped (BLK-053)', () => {
         const combat = Object.create(Combat.prototype) as Combat
         const { shooter, target } = makeShooterTarget({ shooter: { equippedWeapon: null } })
-        expect(combat.getHitChance(shooter, target, 'torso')).toEqual({ hit: -1, crit: -1 })
+        // BLK-053: getHitChance now falls back to Unarmed skill instead of returning
+        // {hit:-1, crit:-1}, so unarmed critters can actually fight.
+        const result = combat.getHitChance(shooter, target, 'torso')
+        expect(result.hit).not.toBe(-1)
+        expect(typeof result.hit).toBe('number')
+        expect(result.crit).not.toBe(-1)
     })
 
     it('clamps NaN hit chance to 0 (no throw — guard path hardened)', () => {

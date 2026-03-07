@@ -749,6 +749,41 @@ export module ScriptVMBridge {
        // 0x81E7 — get_critter_skill_points(obj, skill): return base skill-point
        // allocation for the given skill number on a critter.
        ,0x81E7: bridged("get_critter_skill_points", 2) // get_critter_skill_points(obj, skill) → points
+
+       // -----------------------------------------------------------------------
+       // Phase 57 — sfall extended opcodes 0x81E8–0x81EF
+       // -----------------------------------------------------------------------
+
+       // 0x81E8 — get_object_cost_sfall(obj): return base barter/store cost from
+       // proto data.  Equivalent to proto_data(obj, ITEM_DATA_COST).
+       ,0x81E8: bridged("get_object_cost_sfall", 1) // get_object_cost_sfall(obj) → cost
+
+       // 0x81E9 — set_object_cost_sfall(obj, cost): override barter cost.
+       // Browser build: no-op (proto data is read-only at runtime).
+       ,0x81E9: bridged("set_object_cost_sfall", 2, false) // set_object_cost — no-op
+
+       // 0x81EA — get_sfall_global_int_sfall(index): alias of get_sfall_global_int.
+       // Alternate calling convention used by some script authors.
+       ,0x81EA: bridged("get_sfall_global_int_sfall", 1) // get_sfall_global_int(idx) → value
+
+       // 0x81EB — set_sfall_global_int_sfall(index, value): alias of set_sfall_global_int.
+       ,0x81EB: bridged("set_sfall_global_int_sfall", 2, false) // set_sfall_global_int(idx, val)
+
+       // 0x81EC — get_combat_difficulty_sfall(): return current difficulty (0=Easy,
+       // 1=Normal, 2=Hard).  Browser build: always 1 (Normal).
+       ,0x81EC: bridged("get_combat_difficulty_sfall", 0) // get_combat_difficulty() → 1
+
+       // 0x81ED — game_in_combat_sfall(): return 1 if in turn-based combat, 0 otherwise.
+       // Faster than checking GVAR_IN_COMBAT via global_var() in tight-loop AI scripts.
+       ,0x81ED: bridged("game_in_combat_sfall", 0) // game_in_combat() → 0|1
+
+       // 0x81EE — get_tile_fid_sfall(tile, elev): return the floor-tile FID at the
+       // given tile number and elevation.  Browser build: returns 0 (no tile FID registry).
+       ,0x81EE: bridged("get_tile_fid_sfall", 2) // get_tile_fid(tile, elev) → fid | 0
+
+       // 0x81EF — set_tile_fid_sfall(tile, elev, fid): override floor-tile FID.
+       // Browser build: no-op (no tile-override system).
+       ,0x81EF: bridged("set_tile_fid_sfall", 3, false) // set_tile_fid — no-op
     }
     Object.assign(opMap, bridgeOpMap)
 

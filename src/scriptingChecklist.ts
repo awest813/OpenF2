@@ -3684,6 +3684,125 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 57 entries
+    {
+        id: 'blk_051_combat_null_ai_guard',
+        kind: 'procedure',
+        description:
+            'BLK-051: nextTurn() and doAITurn() now guard against null this.player and ' +
+            'null obj.ai.  Previously these caused hard crashes when combat was entered ' +
+            'without a player combatant, or after save/load when a critter\'s AI failed ' +
+            'to initialise.  Guards call end() or nextTurn() gracefully instead.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_052_maybetaunt_null_ai_guard',
+        kind: 'procedure',
+        description:
+            'BLK-052: maybeTaunt() now guards against null obj.ai before dereferencing ' +
+            'obj.ai.info.  Prevents crash when an NPC without AI data tries to taunt ' +
+            'during its combat turn.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_053_unarmed_combat_fallback',
+        kind: 'procedure',
+        description:
+            'BLK-053: getHitChance() and getDamageDone() now fall back to unarmed combat ' +
+            'stats (Weapon(null) / Unarmed skill) when equippedWeapon is null or its ' +
+            '.weapon field is missing.  Previously both returned {hit:-1,crit:-1}/0 ' +
+            'causing all weaponless attacks to auto-miss and deal zero damage.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_object_cost_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E8: get_object_cost_sfall(obj) — return the base barter/store cost ' +
+            'of an item from its proto data.  Equivalent to proto_data(obj, ITEM_DATA_COST). ' +
+            'Returns 0 for critters and non-game objects.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_object_cost_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E9: set_object_cost_sfall(obj, cost) — override barter cost at ' +
+            'runtime.  Browser build: no-op (proto data is read-only).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_sfall_global_int_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81EA: get_sfall_global_int_sfall(index) — alias of get_sfall_global_int; ' +
+            'return the integer sfall global at the given index.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_sfall_global_int_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81EB: set_sfall_global_int_sfall(index, value) — alias of ' +
+            'set_sfall_global_int; write to the integer sfall global at the given index.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_combat_difficulty',
+        kind: 'opcode',
+        description:
+            'sfall 0x81EC: get_combat_difficulty_sfall() — return the current combat ' +
+            'difficulty (0=Easy, 1=Normal, 2=Hard).  Browser build: always returns 1.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_game_in_combat',
+        kind: 'opcode',
+        description:
+            'sfall 0x81ED: game_in_combat_sfall() — return 1 if the engine is currently ' +
+            'in turn-based combat, 0 otherwise.  Fully implemented; reads globalState.inCombat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_tile_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x81EE: get_tile_fid_sfall(tile, elev) — return the FID of the floor ' +
+            'tile at the given position.  Browser build: partial — returns 0 (no tile FID ' +
+            'registry).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_tile_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x81EF: set_tile_fid_sfall(tile, elev, fid) — override the floor-tile ' +
+            'FID at the given position.  Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

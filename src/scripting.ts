@@ -3896,6 +3896,76 @@ export module Scripting {
             return critter.skills?.getBase(skillName) ?? 0
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 57 — sfall extended opcodes 0x81E8–0x81EF
+        // -----------------------------------------------------------------------
+
+        // sfall 0x81E8 — get_object_cost_sfall(obj):
+        // Return the base barter/store cost of an item from its proto data.
+        // Equivalent to proto_data(obj, ITEM_DATA_COST) for items.
+        // Returns 0 for critters and non-game objects.
+        get_object_cost_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_cost_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            const pro = (obj as any).pro
+            if (pro?.extra?.cost !== undefined) return pro.extra.cost
+            if (pro?.cost !== undefined) return pro.cost
+            return 0
+        }
+
+        // sfall 0x81E9 — set_object_cost_sfall(obj, cost):
+        // Override the barter cost for an object.  Browser build: no-op (proto data
+        // is read-only at runtime).
+        set_object_cost_sfall(_obj: Obj, _cost: number): void {
+            log('set_object_cost_sfall', arguments)
+        }
+
+        // sfall 0x81EA — get_sfall_global_int_sfall(index):
+        // Alias of get_sfall_global_int — return the integer sfall global at the
+        // given numeric index.  Provided as a dedicated opcode for scripts that use
+        // the alt calling convention.
+        get_sfall_global_int_sfall(index: number): number {
+            return this.get_sfall_global_int(index)
+        }
+
+        // sfall 0x81EB — set_sfall_global_int_sfall(index, value):
+        // Alias of set_sfall_global_int.
+        set_sfall_global_int_sfall(index: number, value: number): void {
+            this.set_sfall_global_int(index, value)
+        }
+
+        // sfall 0x81EC — get_combat_difficulty_sfall():
+        // Return the current combat difficulty as an integer:
+        //   0 = Easy, 1 = Normal (default), 2 = Hard.
+        // Browser build: always returns 1 (Normal) — no per-session difficulty setting.
+        get_combat_difficulty_sfall(): number {
+            log('get_combat_difficulty_sfall', arguments)
+            return 1
+        }
+
+        // sfall 0x81ED — game_in_combat_sfall():
+        // Return 1 if the engine is currently in turn-based combat, 0 otherwise.
+        // Equivalent to checking global_var(GVAR_IN_COMBAT) in vanilla scripts.
+        game_in_combat_sfall(): number {
+            return globalState.inCombat ? 1 : 0
+        }
+
+        // sfall 0x81EE — get_tile_fid_sfall(tile, elev):
+        // Return the FID (Frame ID) of the floor tile at the given tile/elevation.
+        // Browser build: partial — no tile-FID registry; returns 0.
+        get_tile_fid_sfall(_tile: number, _elev: number): number {
+            return 0
+        }
+
+        // sfall 0x81EF — set_tile_fid_sfall(tile, elev, fid):
+        // Override the floor tile FID at the given tile/elevation.
+        // Browser build: no-op (no tile-override system).
+        set_tile_fid_sfall(_tile: number, _elev: number, _fid: number): void {
+            log('set_tile_fid_sfall', arguments)
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

@@ -17,10 +17,10 @@ limitations under the License.
 
 import { Config } from './config.js'
 import { CriticalEffects } from './criticalEffects.js'
-import { critterDamage } from './critter.js'
+import { critterDamage, Weapon } from './critter.js'
 import { hexDistance, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
 import globalState from './globalState.js'
-import { Critter, Obj } from './object.js'
+import { Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat } from './ui.js'
@@ -253,26 +253,38 @@ export class Combat {
     getHitChance(obj: Critter, target: Critter, region: string) {
         const normalizedRegion = this.normalizeHitRegion(region)
         // TODO: visibility (= light conditions) and distance
-        var weaponObj = obj.equippedWeapon
-        if (weaponObj === null)
-            // no weapon equipped (not even melee)
-            return { hit: -1, crit: -1 }
 
-        var weapon = weaponObj.weapon
-        var weaponSkill
+        // BLK-053: Build a resolved weapon and skill, falling back to unarmed when
+        // the critter has no equipped weapon or its weapon data is missing.
+        // This ensures all unarmed critters can fight rather than auto-missing.
+        const unarmedWeapon = new Weapon(null)
+        const unarmedWeaponObj: WeaponObj = { type: 'item', subtype: 'weapon', weapon: unarmedWeapon } as WeaponObj
 
-        if (!weapon) {
-            // Weapon object present but has no weapon data — treat as unarmed.
-            console.warn('getHitChance: weapon object has no weapon data')
-            return { hit: -1, crit: -1 }
+        const rawWeaponObj = obj.equippedWeapon
+        let effectiveWeaponObj: WeaponObj
+        let effectiveWeapon: Weapon
+        let weaponSkill: number
+
+        if (rawWeaponObj !== null && rawWeaponObj.weapon) {
+            effectiveWeaponObj = rawWeaponObj
+            effectiveWeapon = rawWeaponObj.weapon
+            if (effectiveWeapon.weaponSkillType === undefined) {
+                this.log('weaponSkillType is undefined')
+                weaponSkill = 0
+            } else {
+                weaponSkill = obj.getSkill(effectiveWeapon.weaponSkillType)
+            }
+        } else {
+            // No weapon or weapon data missing — use unarmed fallback.
+            if (rawWeaponObj !== null) {
+                console.warn('getHitChance: weapon object has no weapon data — using unarmed fallback')
+            }
+            effectiveWeaponObj = unarmedWeaponObj
+            effectiveWeapon = unarmedWeapon
+            weaponSkill = obj.getSkill('Unarmed')
         }
 
-        if (weapon.weaponSkillType === undefined) {
-            this.log('weaponSkillType is undefined')
-            weaponSkill = 0
-        } else weaponSkill = obj.getSkill(weapon.weaponSkillType)
-
-        var hitDistanceModifier = this.getHitDistanceModifier(obj, target, weaponObj)
+        var hitDistanceModifier = this.getHitDistanceModifier(obj, target, effectiveWeaponObj)
         // AC now includes any temporary end-of-turn AP bonus via StatSet.acBonus
         var AC = target.getStat('AC')
         var bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
@@ -344,11 +356,10 @@ export class Combat {
 
     getDamageDone(obj: Critter, target: Critter, critModifer: number) {
         var weapon = obj.equippedWeapon
-        if (!weapon) {
-            console.warn('getDamageDone: no equipped weapon — returning 0 damage')
-            return 0
-        }
-        var wep = weapon.weapon
+        // BLK-053: No weapon equipped — use a synthetic unarmed weapon (Weapon(null))
+        // so that critters can deal damage in melee even without an equipped item.
+        // Weapon(null) represents a bare-fist punch: 1–2 Normal damage.
+        var wep = weapon?.weapon ?? new Weapon(null)
         if (!wep) {
             console.warn('getDamageDone: weapon has no weapon data — returning 0 damage')
             return 0
@@ -434,7 +445,9 @@ export class Combat {
 
     maybeTaunt(obj: Critter, type: string, roll: boolean) {
         if (roll === false) return
-        var msgID = getRandomInt(parseInt(obj.ai!.info[type + '_start']), parseInt(obj.ai!.info[type + '_end']))
+        // BLK-052: Guard against null ai (AI failed to initialize for this critter).
+        if (!obj.ai?.info) return
+        var msgID = getRandomInt(parseInt(obj.ai.info[type + '_start']), parseInt(obj.ai.info[type + '_end']))
         this.log('[TAUNT ' + obj.name + ': ' + this.getCombatAIMessage(msgID) + ']')
     }
 
@@ -478,6 +491,14 @@ export class Combat {
             return this.nextTurn()
         }
 
+        // BLK-052: Guard against null ai (AI failed to initialize for this critter on
+        // the previous combat constructor run, e.g. after save/load).  Skip the turn
+        // gracefully so the game does not crash.
+        if (!obj.ai) {
+            console.warn('[combat] doAITurn: critter ' + obj.name + ' has no AI — skipping turn')
+            return this.nextTurn()
+        }
+
         var that = this
         var target = this.findTarget(obj)
         if (!target) {
@@ -486,7 +507,7 @@ export class Combat {
         }
         var distance = hexDistance(obj.position, target.position)
         var AP = obj.AP!
-        var messageRoll = rollSkillCheck(obj.ai!.info.chance, 0, false)
+        var messageRoll = rollSkillCheck(obj.ai.info.chance, 0, false)
 
         if (Config.engine.doLoadScripts === true && obj._script !== undefined) {
             // notify the critter script of a combat event
@@ -499,7 +520,7 @@ export class Combat {
 
         // behaviors
 
-        if (obj.getStat('HP') <= obj.ai!.info.min_hp) {
+        if (obj.getStat('HP') <= obj.ai.info.min_hp) {
             // hp <= min fleeing hp, so flee
             this.log('[AI FLEES]')
 
@@ -676,16 +697,29 @@ export class Combat {
             }
         }
 
+        // BLK-051: Guard against a null player reference (can occur when combat was
+        // started without the player among the combatants — rare but otherwise crashes).
+        if (!this.player) {
+            console.warn('[combat] nextTurn: no player — ending combat')
+            return this.end()
+        }
+
         // update range checks
         var numActive = 0
         for (var i = 0; i < this.combatants.length; i++) {
             var obj = this.combatants[i]
             if (obj.dead || obj.isPlayer) continue
-            var inRange = hexDistance(obj.position, this.player.position) <= obj.ai!.info.max_dist
+            // BLK-051: Guard against null ai (AI failed to init for this critter).
+            // Fall back to a safe default max_dist so the loop can still complete.
+            const maxDist: number = obj.ai?.info?.max_dist ?? 20
+            var inRange = hexDistance(obj.position, this.player.position) <= maxDist
 
             if (inRange || obj.hostile) {
                 obj.hostile = true
-                obj.outline = obj.teamNum !== globalState.player.teamNum ? 'red' : 'green'
+                // BLK-051: Guard globalState.player null — fall back to team -1 (never
+                // matches any NPC team) so the outline defaults to hostile red.
+                const playerTeam = globalState.player?.teamNum ?? -1
+                obj.outline = obj.teamNum !== playerTeam ? 'red' : 'green'
                 numActive++
             }
         }
