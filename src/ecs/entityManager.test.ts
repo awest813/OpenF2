@@ -173,3 +173,38 @@ describe('serialize / deserialize', () => {
         expect(snapshot.version).toBe(1)
     })
 })
+
+// ---------------------------------------------------------------------------
+// allIds() snapshot safety
+// ---------------------------------------------------------------------------
+
+describe('allIds snapshot safety', () => {
+    it('returns an Array (snapshot), not the live internal Set', () => {
+        const a = em.create()
+        const result = em.allIds()
+        // Destroying an entity after calling allIds() must not retroactively
+        // remove it from the already-captured snapshot.
+        em.destroy(a)
+        expect(result).toContain(a)
+    })
+
+    it('iterating allIds() while destroying entities is safe (no mutation of snapshot)', () => {
+        const a = em.create()
+        const b = em.create()
+        const c = em.create()
+        const ids = em.allIds()
+        // Simulate concurrent destruction during iteration
+        for (const id of ids) {
+            em.destroy(id)
+        }
+        // All three IDs should have been in the snapshot even though they were
+        // destroyed mid-iteration.
+        expect(ids).toContain(a)
+        expect(ids).toContain(b)
+        expect(ids).toContain(c)
+        // And the manager should now report them all as dead.
+        expect(em.isAlive(a)).toBe(false)
+        expect(em.isAlive(b)).toBe(false)
+        expect(em.isAlive(c)).toBe(false)
+    })
+})

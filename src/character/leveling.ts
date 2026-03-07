@@ -26,8 +26,10 @@ export function awardXP(
     hasTraitSkilled: boolean,
     educatedRanks: number,
 ): number {
+    if (amount <= 0) return 0
+
     stats.xp += amount
-    EventBus.emit('player:xpGain', { amount, total: stats.xp })
+    EventBus.emit('player:xpGain', { entityId: playerId, amount, total: stats.xp })
 
     let levelsGained = 0
 
@@ -71,7 +73,7 @@ function levelUp(
     const perkInterval = hasTraitSkilled ? 4 : PERK_EVERY_N_LEVELS
     const perksAvailable = stats.level % perkInterval === 0 ? 1 : 0
 
-    EventBus.emit('player:levelUp', { newLevel: stats.level, perksAvailable })
+    EventBus.emit('player:levelUp', { entityId: playerId, newLevel: stats.level, perksAvailable })
 }
 
 /**

@@ -48,11 +48,14 @@ export function recomputeDerivedStats(s: StatsComponent): void {
     // Damage Resistance (Normal): 0% base (armor adds to this)
     // (left as-is; armor system adds to dr.normal separately)
 
-    // Poison Resistance: 5×END %
-    s.poisonResistance = 5 * end + (s.poisonResistanceMod ?? 0)
+    // Poison Resistance: 5×END %, clamped to [0, 100]
+    // Traits like Fast Metabolism apply a negative mod (−10), so the value can
+    // dip below zero with low Endurance.  The damage pipeline also clamps to
+    // [0, 100] but it is better to keep the stored stat consistent.
+    s.poisonResistance = Math.max(0, Math.min(100, 5 * end + (s.poisonResistanceMod ?? 0)))
 
-    // Radiation Resistance: 2×END %
-    s.radiationResistance = 2 * end + (s.radiationResistanceMod ?? 0)
+    // Radiation Resistance: 2×END %, clamped to [0, 100]
+    s.radiationResistance = Math.max(0, Math.min(100, 2 * end + (s.radiationResistanceMod ?? 0)))
 
     // Sequence: 2×PER
     s.sequence = 2 * per + (s.sequenceMod ?? 0)
@@ -60,8 +63,10 @@ export function recomputeDerivedStats(s: StatsComponent): void {
     // Healing Rate: max(1, floor(END/3)) + bonus
     s.healingRate = Math.max(1, Math.floor(end / 3)) + (s.healingRateMod ?? 0)
 
-    // Critical Chance: LCK %
-    s.criticalChance = lck + (s.criticalChanceMod ?? 0)
+    // Critical Chance: LCK %, clamped to [0, 100]
+    // Values >100 are meaningless (100% crit is already a guaranteed crit) and
+    // negative values would suppress crits entirely in an unintuitive way.
+    s.criticalChance = Math.max(0, Math.min(100, lck + (s.criticalChanceMod ?? 0)))
 
     // XP to next level: cumulative triangular threshold (Fallout 2 formula)
     s.xpToNextLevel = xpForLevel(s.level + 1)

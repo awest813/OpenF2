@@ -58,8 +58,11 @@ export class EntityManagerImpl {
         return this.alive.has(id)
     }
 
-    allIds(): Iterable<EntityId> {
-        return this.alive
+    allIds(): EntityId[] {
+        // Return a snapshot array rather than the live Set so that callers
+        // iterating the result are not affected by concurrent create/destroy
+        // calls, and cannot accidentally mutate internal state by casting.
+        return Array.from(this.alive)
     }
 
     // ------------------------------------------------------------------
