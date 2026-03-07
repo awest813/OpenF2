@@ -438,8 +438,8 @@ describe('Phase 25-N — Critter perkRanks serialization round-trip', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 25-O — save schema v10: playerPerkRanks', () => {
-    it('SAVE_VERSION is 10', () => {
-        expect(SAVE_VERSION).toBe(10)
+    it('SAVE_VERSION is at least 10 (currently ' + SAVE_VERSION + ')', () => {
+        expect(SAVE_VERSION).toBeGreaterThanOrEqual(10)
     })
 
     it('migrating from v9 adds playerPerkRanks as empty record', () => {
@@ -455,7 +455,7 @@ describe('Phase 25-O — save schema v10: playerPerkRanks', () => {
             playerCharTraits: [],
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(10)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerPerkRanks).toEqual({})
     })
 
@@ -471,7 +471,7 @@ describe('Phase 25-O — save schema v10: playerPerkRanks', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(10)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerPerkRanks).toEqual({})
     })
 
@@ -489,7 +489,7 @@ describe('Phase 25-O — save schema v10: playerPerkRanks', () => {
             playerPerkRanks: { 5: 2, 12: 1 },
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(10)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerPerkRanks).toEqual({ 5: 2, 12: 1 })
     })
 

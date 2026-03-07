@@ -41,7 +41,7 @@ import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResu
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
-import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER } from './sfallGlobals.js'
+import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 
 export module Scripting {
@@ -832,6 +832,10 @@ export module Scripting {
                     stub('metarule', arguments)
                     break
             }
+            // Default return for any case that uses break instead of return
+            // (e.g. elevator case 15, stub default) — ensures VM stack gets a
+            // valid number rather than undefined.
+            return 0
         }
         metarule3(id: number, obj: any, userdata: any, radius: number): any {
             if (id === 100) {
@@ -2214,8 +2218,22 @@ export module Scripting {
         }
 
         // animation
-        reg_anim_func(_1: any, _2: any) {
+        reg_anim_func(signal: any, callback: any) {
             log('reg_anim_func', arguments, 'animation')
+            // ANIM_BEGIN (1): start an animation sequence — no-op since we don't
+            // queue animations, but register the intent.
+            // ANIM_COMPLETE (2): register a callback to be called when the animation
+            // sequence completes.  Since the browser build has no async animation
+            // queue, call the callback immediately so script continuation logic
+            // (like transitioning to the next dialogue step or triggering a follow-up
+            // event) is not permanently blocked.
+            if (signal === 2 /* ANIM_COMPLETE */ && typeof callback === 'function') {
+                try {
+                    callback()
+                } catch (e) {
+                    warn('reg_anim_func: ANIM_COMPLETE callback threw: ' + e, 'animation')
+                }
+            }
         }
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
             log('reg_anim_animate', arguments, 'animation')
@@ -2568,6 +2586,24 @@ export module Scripting {
             // Returns milliseconds since the page was loaded.  Used by scripts
             // that want to measure real-world elapsed time (e.g. anti-exploit timers).
             return typeof performance !== 'undefined' ? Math.floor(performance.now()) : 0
+        }
+
+        // sfall extended opcodes — type conversion (0x8190–0x8191)
+        string_to_int(str: any): number {
+            // Parse a string as a base-10 integer.  Mirrors sfall string_to_int().
+            // Returns 0 for non-string inputs or strings that cannot be parsed.
+            // parseInt already handles leading/trailing whitespace, so no trim needed.
+            if (typeof str !== 'string') return 0
+            const n = parseInt(str, 10)
+            return Number.isFinite(n) ? n : 0
+        }
+        int_to_string(n: any): string {
+            // Convert a number to its decimal string representation.  Mirrors
+            // the sfall sprintf("%d", n) pattern commonly used for display and logging.
+            // Returns '0' for non-number inputs to match sfall's safe-zero default for
+            // invalid arguments (consistent with how string_to_int returns 0 on error).
+            if (typeof n !== 'number') return '0'
+            return Math.trunc(n).toString()
         }
 
         // sfall extended opcodes — weapon ammo PID getter/setter (0x8178–0x8179)

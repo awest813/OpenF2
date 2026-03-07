@@ -47,5 +47,6 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **53 files, 1817 tests passed**.
+- Full regression run: `npm test` → **54 files, 1842 tests passed**.
 - Type-check run: `npx tsc --noEmit` → **pass**.
+- Phase 36: sfall global persistence, metarule safety, new opcodes, reg_anim_func ANIM_COMPLETE callbacks all green.

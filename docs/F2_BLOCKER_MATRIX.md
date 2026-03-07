@@ -30,6 +30,8 @@ Status guidance:
 | BLK-011 | HIGH | Region Certification | mid/late campaign continuity | mid/late route progression scaffold | No focused regression covered Modoc→Oil Rig critical-route gating and persistence as a single progression chain. | Execute staged progression through mid/late region gates and roundtrip save/load before final Oil Rig unlock. | Mid/late route globals, map-area discoveries, and final-route unlock remain stable and deterministic. | `src/phase34.test.ts` | @engine | CLOSED | Added mid/late campaign scaffold harness with gating + persistence assertions. |
 | BLK-012 | HIGH | Release Gate | end-to-end campaign scaffold validation | full-playthrough harness | No single regression proved the full critical route could traverse early + mid/late scaffolds through Oil Rig ending trigger with save/load continuity. | Execute full route scaffold, save/load before and after ending trigger, verify Oil Rig endpoint and ending flag persistence. | End-to-end scaffold run reaches ending flow and persists ending trigger state across save/load. | `src/phase35.test.ts` | @engine | CLOSED | Added full critical-path scaffold run and release-gate sanity checks. |
 
+| BLK-013 | HIGH | Save/Load | sfall global variable persistence | `sfallGlobals.ts` / `saveload.ts` | sfall string-keyed and integer-indexed global variables (`set_sfall_global` / `get_sfall_global` / `set_sfall_global_int` / `get_sfall_global_int`) were not persisted in saves, causing mods and scripts that use sfall globals for cross-map quest state to silently reset to zero on every save/load cycle. | Set sfall globals during gameplay, save, load — globals return to zero. | Save schema v11 adds `sfallGlobals: {stringKeyed, intIndexed}` field; saveload.ts serializes/deserializes both stores on every save/load; sanitization strips non-finite values. | `src/phase36.test.ts` | @engine | CLOSED | Added `serializeSfallGlobals`/`deserializeSfallGlobals`/`resetSfallGlobals` to sfallGlobals.ts; save schema v11 migration; save/load persistence. |
+
 ---
 
 ## Latest phase runs
@@ -46,6 +48,8 @@ Status guidance:
 - Full project regression run (`npm test`) passed: 53 files / 1817 tests.
 - Mid/late route scaffold suite (`src/phase34.test.ts`) passed for Modoc→Oil Rig gate/persistence continuity.
 - Full-route scaffold suite (`src/phase35.test.ts`) passed for early→late→ending flow continuity.
+- Phase 36 suite (`src/phase36.test.ts`) passed: sfall globals persistence (save schema v11), metarule default return safety, string_to_int/int_to_string opcodes, reg_anim_func ANIM_COMPLETE callbacks.
+- Full project regression run (`npm test`) passed: 54 files / 1842 tests.
 
 ## Closure checklist (required)
 

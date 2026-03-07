@@ -481,8 +481,8 @@ describe('Phase 23-D — metarule IDs de-stubbed (no stub hits)', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 23-E — save schema v9 migration', () => {
-    it('SAVE_VERSION is 10 (v10 adds playerPerkRanks)', () => {
-        expect(SAVE_VERSION).toBe(10)
+    it('SAVE_VERSION is at least 10 (v10 adds playerPerkRanks, v11 adds sfallGlobals)', () => {
+        expect(SAVE_VERSION).toBeGreaterThanOrEqual(10)
     })
 
     it('migrating from v8 adds playerCharTraits as empty array', () => {

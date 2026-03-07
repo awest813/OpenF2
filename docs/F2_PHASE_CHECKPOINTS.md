@@ -123,3 +123,17 @@ Gate: **PASS** when all listed critical regions are certified.
 - [x] Regression suites covering new fixes are green
 
 Gate: **PASS** when campaign completion is reproducible and test-backed.
+
+
+---
+
+## Phase 36 — Scripting hardening and save state completeness
+
+- [x] sfall global variables (string-keyed and int-indexed) persisted in save schema v11
+- [x] metarule() default/break path returns 0 instead of undefined (VM stack safety)
+- [x] New sfall opcodes 0x8190 (string_to_int) and 0x8191 (int_to_string) implemented
+- [x] reg_anim_func ANIM_COMPLETE callbacks invoked immediately (browser build has no async anim queue)
+- [x] sfallGlobals serialization/deserialization/reset helpers tested
+- [x] phase36.test.ts: 25 regression tests, all passing
+
+Gate: **PASS** — all 1842 tests green, tsc clean.

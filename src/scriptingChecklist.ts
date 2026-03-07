@@ -109,7 +109,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'reg_anim_func',
         kind: 'procedure',
-        description: 'Register a function callback in the animation queue (ANIM_BEGIN/ANIM_COMPLETE signals). Used to chain animation sequences.',
+        description:
+            'Register a function callback in the animation queue (ANIM_BEGIN/ANIM_COMPLETE signals). ' +
+            'ANIM_COMPLETE (signal=2) callbacks are now called immediately since the browser build ' +
+            'has no async animation queue, preventing script continuation logic from being blocked.',
         status: 'partial',
         frequency: 'high',
         impact: 'medium',
@@ -1170,6 +1173,63 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         status: 'implemented',
         frequency: 'high',
         impact: 'high',
+    },
+    {
+        id: 'save_schema_v11_sfall_globals',
+        kind: 'procedure',
+        description:
+            'Save schema v11: sfallGlobals ({stringKeyed, intIndexed}) added to SaveGame. ' +
+            'Persists sfall string-keyed and integer-indexed global variables across save/load cycles. ' +
+            'Prevents mods and scripts using set_sfall_global/get_sfall_global from losing cross-map ' +
+            'state on every reload. v10→v11 migration sets sfallGlobals={}.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'metarule_default_safe_return',
+        kind: 'metarule',
+        description:
+            'metarule() now returns 0 after the switch instead of undefined for any case that ' +
+            'falls through via break (e.g. default stub case, elevator case 15). ' +
+            'Prevents undefined from being pushed onto the VM stack and causing NaN comparisons.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'string_to_int',
+        kind: 'opcode',
+        description:
+            'sfall 0x8190: string_to_int(str) → parse string as base-10 integer. ' +
+            'Returns 0 for non-numeric or non-string inputs. Commonly used in sfall-enhanced ' +
+            'scripts to convert string arguments or user input to numeric values.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'int_to_string',
+        kind: 'opcode',
+        description:
+            'sfall 0x8191: int_to_string(n) → decimal string representation of integer. ' +
+            'Mirrors the sfall sprintf("%d", n) pattern commonly used for display and logging ' +
+            'in sfall-enhanced scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'reg_anim_func_anim_complete',
+        kind: 'procedure',
+        description:
+            'reg_anim_func ANIM_COMPLETE (signal=2) callbacks are now called immediately. ' +
+            'Since the browser build has no async animation queue, deferring callbacks would ' +
+            'permanently block script continuation logic (next-dialogue-step, follow-up events). ' +
+            'Immediate callback ensures animation-chained script flows complete correctly.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
     },
 ])
 

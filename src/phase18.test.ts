@@ -24,8 +24,8 @@ import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scripti
 // ---------------------------------------------------------------------------
 
 describe('Phase 18-A — save schema v8: mapVars/mapAreaStates migration and round-trip', () => {
-    it('SAVE_VERSION is now 10 (v10 adds playerPerkRanks)', () => {
-        expect(SAVE_VERSION).toBe(10)
+    it('SAVE_VERSION is now at least 10 (v10 adds playerPerkRanks, v11 adds sfallGlobals)', () => {
+        expect(SAVE_VERSION).toBeGreaterThanOrEqual(10)
     })
 
     it('migrating a v6 save adds empty mapVars', () => {
