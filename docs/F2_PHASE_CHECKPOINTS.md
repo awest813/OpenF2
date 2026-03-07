@@ -156,3 +156,23 @@ Gate: **PASS** — all 1842 tests green, tsc clean.
 - [x] phase38.test.ts: 44 regression tests, all passing
 
 Gate: **PASS** — all 1906 tests green, tsc clean.
+
+---
+
+## Phase 39 — Crash hardening (dialogue, inventory, map, elevator) and sfall expansion
+
+- [x] `getScriptMessage` missing-file throw → warn+return null; missing-key throw → warn+return '' (BLK-017)
+- [x] `item_caps_total` non-game-object throw → warn+return 0 (BLK-018)
+- [x] `create_object_sid` invalid elevation throw → warn+clamp to [0,2] (BLK-019)
+- [x] `start_gdialog` / `gdialog_mod_barter` missing self_obj throw → warn+no-op (BLK-020)
+- [x] `gsay_reply` null/empty message throw → warn+no-op (BLK-020)
+- [x] `metarule(15)` explicit type throw → log+proceed (BLK-021)
+- [x] Message file parser invalid-line throw → warn+skip line (BLK-022)
+- [x] `anim()` negative/unclassified code: stub() → silent log (no stub-hit noise)
+- [x] New sfall opcode 0x8198: `get_ini_setting(key)` → partial (returns 0)
+- [x] New sfall opcode 0x8199: `active_hand()` → partial (returns 0, primary)
+- [x] New sfall opcode 0x819A: `set_sfall_return(val)` → no-op partial
+- [x] New sfall opcode 0x819B: `get_sfall_arg()` → partial (returns 0)
+- [x] phase39.test.ts: 47 regression tests, all passing
+
+Gate: **PASS** — all 1953 tests green, tsc clean.

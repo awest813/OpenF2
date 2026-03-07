@@ -36,7 +36,19 @@ Status guidance:
 
 | BLK-015 | MEDIUM | Scripting/VM | metarule3 fallthrough bug and id<100 stub flood | `src/scripting.ts` | `metarule3(100, ...)` (CLR_FIXED_TIMED_EVENTS) fell through to `stub()` when the loop found no matching event, emitting a spurious stub hit and returning `undefined`. Additionally, metarule3 IDs below 100 had no safe fallback, routing to `stub()` and flooding the console. | Call `metarule3(100, obj, userdata, 0)` with a userdata value that matches no registered event; or call `metarule3(50, ...)`. | `metarule3(100, ...)` returns 0 always; metarule3 IDs < 100 return 0 silently. | `src/phase38.test.ts` | @engine | CLOSED | Added explicit `return 0` in id=100 loop; added id<100 silent default before all else-if chains; removed trailing `stub('metarule3', ...)` call. |
 
-| BLK-016 | LOW | Scripting/VM | proto_data default stub emitting stub hit for unknown fields | `src/scripting.ts` | `proto_data` default case called `stub()` for any unmapped field index, generating console noise and incrementing the stub-hit counter on every call from mods that probe non-standard proto fields. | Call `proto_data` with a field index > 64. | Returns 0 silently (log only). | `src/phase38.test.ts` | @engine | CLOSED | Changed default case from `stub(...)` to silent `log(...)` + return 0. |
+| BLK-017 | HIGH | Scripting/Dialogue | `getScriptMessage` throw paths | `src/scripting.ts` | `getScriptMessage` threw on missing message file or missing key, crashing any dialogue/message script that referenced an unloaded message. | Call `message_str(scriptID, msgNum)` where the message file fails to load or the message key is absent. | Missing file → warn + return null; missing key → warn + return empty string. No runtime crash. | `src/phase39.test.ts` | @engine | CLOSED | Converted both throw paths to warn+safe return (null / empty string). |
+
+| BLK-018 | HIGH | Inventory/Economy | `item_caps_total` throw on non-game-object | `src/scripting.ts` | `item_caps_total(obj)` threw when `obj` was not a game object (deleted reference, null, etc.), crashing barter and economy scripts. | Call `item_caps_total(null)` or pass a non-object in barter flow. | Returns 0 with warning. No crash. | `src/phase39.test.ts` | @engine | CLOSED | Changed throw to warn + return 0. |
+
+| BLK-019 | HIGH | Map/Objects | `create_object_sid` invalid elevation throw | `src/scripting.ts` | `create_object_sid(pid, tile, elev, sid)` threw on elevation out of [0,2], crashing map-init scripts that pass data-file elevation constants. | Call with `elev=-1` or `elev=3`. | Clamps elevation to [0,2] with warning, creates object normally. | `src/phase39.test.ts` | @engine | CLOSED | Changed throw to warn + clamp `elev = Math.max(0, Math.min(2, elev))`. |
+
+| BLK-020 | HIGH | Dialogue | `start_gdialog`/`gdialog_mod_barter`/`gsay_reply` throw paths | `src/scripting.ts` | Three dialogue procedures threw when `self_obj` was missing or message was null: `start_gdialog`, `gdialog_mod_barter` (throw on no self_obj); `gsay_reply` (throw Error on null msg). | Trigger dialogue from a context without a self_obj, or call gsay_reply when message file is unavailable. | All three procedures warn and return/no-op instead of throwing. Dialogue simply skips without crashing. | `src/phase39.test.ts` | @engine | CLOSED | All three throw paths converted to warn+safe return/no-op. |
+
+| BLK-021 | MEDIUM | World/Elevator | `metarule(15)` explicit type throw | `src/scripting.ts` | `metarule(15, target)` threw when `target !== -1`, crashing any script that called the elevator with an explicit type constant. | Call `metarule(15, 0)` (type 0 elevator). | Logs the explicit type and still invokes the elevator handler. No crash. | `src/phase39.test.ts` | @engine | CLOSED | Changed throw to log + proceed. |
+
+| BLK-022 | MEDIUM | Scripting/Load | Message file parser throw on invalid line | `src/scripting.ts` | `loadMessageFile` threw on any line that didn't match the `{N}{}{...}` format, preventing any dialogue from loading when a message file had a comment or blank line. | Load a message file with a comment or malformed line. | Invalid lines are skipped with a warning; valid lines still load normally. | `src/phase39.test.ts` | @engine | CLOSED | Changed throw to warn + `continue`. |
+
+
 
 ---
 
@@ -58,6 +70,8 @@ Status guidance:
 - Full project regression run (`npm test`) passed: 54 files / 1842 tests.
 - Phase 38 suite (`src/phase38.test.ts`) passed: crash-causing throws hardened to safe returns (get_pc_stat, mark_area_known, set_map_var, critter_inven_obj); metarule3 id=100 fallthrough fixed; metarule3 id<100 silent default; proto_data default silenced; new sfall opcodes 0x8194–0x8197 (get_tile_fid, set_tile_fid, get_critter_flags, set_critter_flags).
 - Full project regression run (`npm test`) passed: 56 files / 1906 tests.
+- Phase 39 suite (`src/phase39.test.ts`) passed: dialogue/inventory/map/elevator crash-causing throws converted to safe returns (getScriptMessage, item_caps_total, create_object_sid, start_gdialog, gdialog_mod_barter, gsay_reply, metarule(15), message parser); anim negative-code stub silenced; new sfall opcodes 0x8198–0x819B (get_ini_setting, active_hand, set_sfall_return, get_sfall_arg).
+- Full project regression run (`npm test`) passed: 57 files / 1953 tests.
 
 ## Closure checklist (required)
 

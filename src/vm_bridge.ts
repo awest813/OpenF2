@@ -342,6 +342,12 @@ export module ScriptVMBridge {
        ,0x8195: bridged("set_tile_fid", 3, false)       // set_tile_fid(tile, elev, fid) — override floor tile art (no-op)
        ,0x8196: bridged("get_critter_flags", 1)         // get_critter_flags(obj) → critter injury/state flags bitmask
        ,0x8197: bridged("set_critter_flags", 2, false)  // set_critter_flags(obj, flags) — bulk-set critter injury flags
+
+       // sfall extended opcodes 0x8198–0x819B — INI settings, active hand, hook return/arg
+       ,0x8198: bridged("get_ini_setting", 1)           // get_ini_setting(key) → INI value as int (partial: 0)
+       ,0x8199: bridged("active_hand", 0)               // active_hand() → 0=primary/1=secondary (partial: 0)
+       ,0x819A: bridged("set_sfall_return", 1, false)   // set_sfall_return(val) — set hook-script return value (no-op)
+       ,0x819B: bridged("get_sfall_arg", 0)             // get_sfall_arg() → hook-script argument (partial: 0)
     }
     Object.assign(opMap, bridgeOpMap)
 
