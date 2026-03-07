@@ -3443,6 +3443,130 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 55 entries
+    {
+        id: 'blk_045_player_armor_save',
+        kind: 'procedure',
+        description:
+            'BLK-045: Player equipped armor (equippedArmor) persisted in save schema v16. ' +
+            'Armor equipped via drag-and-drop is removed from inventory and stored only in ' +
+            'player.equippedArmor.  Save schema v16 adds playerArmorPID; the save path ' +
+            'serializes the armor into inventory so it survives the load cycle.  The load ' +
+            'path re-equips it by PID lookup.  Prevents players from losing Combat Armor, ' +
+            'Leather Armor, etc. across save/load cycles.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_046_party_migration_safety',
+        kind: 'procedure',
+        description:
+            'BLK-046: Defensive party array normalization added to migrateSave(). ' +
+            'If a save object does not have a valid array in the "party" field, ' +
+            'migrateSave() now initializes it to [] before validation.  Without this, ' +
+            'validateSaveForHydration aborts the load and leaves the game in an ' +
+            'unchanged (pre-load) state, silently losing user progress.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'blk_047_perk_owed_tracking',
+        kind: 'procedure',
+        description:
+            'BLK-047: Perk-owed credit tracking.  give_exp_points() now increments ' +
+            'globalState.playerPerksOwed by 1 every time the player reaches a level ' +
+            'that is a multiple of 3 (levels 3, 6, 9, …), matching Fallout 2 behaviour. ' +
+            'get_perk_owed() (sfall 0x81AE) returns the actual counter instead of ' +
+            'always returning 0; set_perk_owed() (0x81AF) writes the counter instead ' +
+            'of being a no-op.  playerPerksOwed is persisted in save schema v16.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_drop_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D8: get_drop_amount(obj) → count of items that drop when obj ' +
+            'is destroyed.  Browser build: returns 0 (no drop-amount registry).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_drop_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D9: set_drop_amount(obj, amount) — override item drop count. ' +
+            'Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_art_exists',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DA: art_exists(artPath) → 1 if art resource exists, 0 otherwise. ' +
+            'Browser build: returns 0 (no local art index to query at runtime).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_item_subtype_81db',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DB: obj_item_subtype(obj) → item subtype integer. ' +
+            'Alias of core opcode 0x80C9 obj_item_subtype; returns weapon=0, ammo=1, ' +
+            'misc=2, key=3, armor=4, container=5, drug=6.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_level_81dc',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DC: get_critter_level(obj) — return derived level of a critter. ' +
+            'Alias of get_npc_level (0x8162); same XP-based level formula.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_hero_art_id',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DD: hero_art_id(type) → hero art ID for the given player model ' +
+            'type.  Browser build: returns 0 (no hero-art registry).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_current_inven_size',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DE: get_current_inven_size(critter) — return total inventory ' +
+            'size in item-size units.  Alias of critter_inven_size (0x81BF).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_burst_disable',
+        kind: 'opcode',
+        description:
+            'sfall 0x81DF: set_critter_burst_disable(obj, disable) — disable or enable ' +
+            'burst-fire mode for a critter.  Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

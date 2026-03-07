@@ -230,6 +230,21 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         }
     }
 
+    // BLK-045: Snapshot player equipped armor.
+    // Like weapon slots, equipped armor is removed from inventory and stored only
+    // in player.equippedArmor, so it would be lost without an explicit snapshot.
+    const equippedArmor = (globalState.player as any).equippedArmor
+    if (equippedArmor && typeof equippedArmor.pid === 'number' && equippedArmor.pid >= 1) {
+        save.playerArmorPID = equippedArmor.pid
+        const alreadyInArmor = save.player.inventory.some((i: any) => i.pid === equippedArmor.pid)
+        if (!alreadyInArmor && typeof equippedArmor.serialize === 'function') {
+            save.player.inventory.push(equippedArmor.serialize())
+        }
+    }
+
+    // BLK-047: Snapshot pending perk-selection credits.
+    save.playerPerksOwed = globalState.playerPerksOwed ?? 0
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -338,6 +353,18 @@ export function load(id: number): void {
                         globalState.player.inventory.splice(rightIdx, 1)
                     }
                 }
+                // BLK-045: Restore player equipped armor from persisted PID.
+                if (globalState.player && typeof save.playerArmorPID === 'number') {
+                    const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
+                    if (armorIdx !== -1) {
+                        ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
+                        globalState.player.inventory.splice(armorIdx, 1)
+                    }
+                }
+                // BLK-047: Restore pending perk-selection credits.
+                if (typeof save.playerPerksOwed === 'number') {
+                    globalState.playerPerksOwed = save.playerPerksOwed
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -427,6 +454,18 @@ export function load(id: number): void {
                             ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
                             globalState.player.inventory.splice(rightIdx, 1)
                         }
+                    }
+                    // BLK-045: Restore player equipped armor from persisted PID.
+                    if (globalState.player && typeof save.playerArmorPID === 'number') {
+                        const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
+                        if (armorIdx !== -1) {
+                            ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
+                            globalState.player.inventory.splice(armorIdx, 1)
+                        }
+                    }
+                    // BLK-047: Restore pending perk-selection credits.
+                    if (typeof save.playerPerksOwed === 'number') {
+                        globalState.playerPerksOwed = save.playerPerksOwed
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

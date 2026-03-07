@@ -1069,6 +1069,13 @@ export module Scripting {
                 const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
                 player.skills.skillPoints += pointsGained
                 uiLog('You have reached experience level ' + player.level + '.')
+                // BLK-047: Award a perk credit every 3 levels (levels 3, 6, 9, …).
+                // The player earns one perk selection every 3 levels in Fallout 2.
+                // Scripts and sfall mods can read this via get_perk_owed() (0x81AE)
+                // and update it via set_perk_owed() (0x81AF).
+                if (player.level % 3 === 0) {
+                    globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
+                }
             }
         }
 

@@ -497,13 +497,14 @@ export module ScriptVMBridge {
 
        // Phase 50 — sfall extended opcodes 0x81AE–0x81B5
        // 0x81AE — get_perk_owed(): return number of pending perk-selection points.
-       // Scripts use this to check whether a level-up perk selection is waiting.
-       // Browser build has no perk-selection UI; return 0 (no perks owed).
-       ,0x81AE: function() { this.push(0) } // get_perk_owed() → 0
+       // BLK-047: Now returns the actual playerPerksOwed counter (incremented by 1
+       // every 3 levels in give_exp_points).  Previously always returned 0.
+       ,0x81AE: function() { this.push(globalState.playerPerksOwed ?? 0) } // get_perk_owed() → count
 
        // 0x81AF — set_perk_owed(n): set number of pending perk-selection points.
-       // No-op in browser build (no perk-selection UI).
-       ,0x81AF: function() { this.pop() } // set_perk_owed(n) — no-op
+       // BLK-047: Now writes the actual playerPerksOwed counter so scripts and
+       // the perk-selection screen can correctly clear the perk debt.
+       ,0x81AF: function() { globalState.playerPerksOwed = Math.max(0, this.pop() | 0) } // set_perk_owed(n)
 
        // 0x81B0 — get_last_target(obj): return the last critter targeted in combat
        // by obj.  Returns 0 when no combat target is available.
@@ -674,6 +675,43 @@ export module ScriptVMBridge {
        // 0x81D7 — obj_run_proc(obj, proc_name): run a named procedure on an object.
        // Browser build: partial no-op (cannot dynamically invoke named procs).
        ,0x81D7: function() { this.pop(); this.pop() } // obj_run_proc(obj, proc) — no-op
+
+       // -----------------------------------------------------------------------
+       // Phase 55 — sfall extended opcodes 0x81D8–0x81DF
+       // -----------------------------------------------------------------------
+
+       // 0x81D8 — get_drop_amount(obj): return the count of items that drop when
+       // an object is destroyed.  Browser build: returns 0 (no drop-amount registry).
+       ,0x81D8: function() { this.pop(); this.push(0) } // get_drop_amount(obj) → 0
+
+       // 0x81D9 — set_drop_amount(obj, amount): override how many items drop from an
+       // object on destruction.  Browser build: no-op.
+       ,0x81D9: function() { this.pop(); this.pop() } // set_drop_amount(obj, amount) — no-op
+
+       // 0x81DA — art_exists(artPath): check whether an art resource exists.
+       // Browser build: returns 0 (no local art index; cannot check at runtime).
+       ,0x81DA: function() { this.pop(); this.push(0) } // art_exists(artPath) → 0
+
+       // 0x81DB — obj_item_subtype(obj): return the item subtype of an object as an
+       // integer (0=weapon, 1=ammo, 2=misc, 3=key, 4=armor, 5=container, 6=drug).
+       // Falls back to 2 (misc) for unknown subtypes.  Alias of 0x80C9.
+       ,0x81DB: bridged("obj_item_subtype", 1) // obj_item_subtype(obj) → subtype int
+
+       // 0x81DC — get_critter_level(obj): return a critter's derived level based on
+       // its current XP.  Equivalent to the existing get_npc_level (0x8162).
+       ,0x81DC: bridged("get_npc_level", 1) // get_critter_level(obj) → level
+
+       // 0x81DD — hero_art_id(type): return the art ID for the player character model
+       // of the given gender/type.  Browser build: returns 0 (no hero-art registry).
+       ,0x81DD: function() { this.pop(); this.push(0) } // hero_art_id(type) → 0
+
+       // 0x81DE — get_current_inven_size(critter): return the current total size
+       // (in item-size units) of a critter's inventory.  Equivalent to critter_inven_size.
+       ,0x81DE: bridged("critter_inven_size", 1) // get_current_inven_size(critter) → size
+
+       // 0x81DF — set_critter_burst_disable(obj, disable): disable or enable the
+       // burst-fire mode for a critter's weapon.  Browser build: no-op.
+       ,0x81DF: function() { this.pop(); this.pop() } // set_critter_burst_disable — no-op
     }
     Object.assign(opMap, bridgeOpMap)
 

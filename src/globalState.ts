@@ -89,6 +89,7 @@ export default {
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
     playerCharTraits: [], // player character-creation trait IDs (TRAIT_* constants 0–15)
     playerPerkRanks: {}, // player perk ranks granted by scripts (perkID → rank)
+    playerPerksOwed: 0, // pending perk-selection credits (earn 1 every 3 levels; BLK-047)
     worldPosition: undefined, // world-map position snapshot ({x,y}) when travelling on world map
 
     uiManager: null,
@@ -184,6 +185,13 @@ export default {
      * Persisted in save v10+.  Used so perk-based stat bonuses survive save/load.
      */
     playerPerkRanks: Record<number, number>
+
+    /**
+     * Number of perk-selection credits owed to the player (BLK-047).
+     * Increments by 1 every 3 levels (3, 6, 9, …).  Persisted in save v16+.
+     * Read by `get_perk_owed()` (sfall 0x81AE); written by `set_perk_owed()` (0x81AF).
+     */
+    playerPerksOwed: number
 
     /** World-map position snapshot used for save/load continuity on the overworld. */
     worldPosition?: Point
