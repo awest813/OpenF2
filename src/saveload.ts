@@ -190,6 +190,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // sneak mode and other PC flags survive save/load cycles.
     save.playerPcFlags = globalState.player.pcFlags ?? 0
 
+    // Snapshot active hand state (BLK-034) so the player's current weapon slot
+    // selection survives across save/load cycles.
+    save.playerActiveHand = (globalState.player as any).activeHand ?? 0
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -261,6 +265,10 @@ export function load(id: number): void {
                 if (globalState.player && typeof save.playerPcFlags === 'number') {
                     globalState.player.pcFlags = save.playerPcFlags
                 }
+                // Restore active hand selection (BLK-034).
+                if (globalState.player && typeof save.playerActiveHand === 'number') {
+                    ;(globalState.player as any).activeHand = save.playerActiveHand
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -315,6 +323,10 @@ export function load(id: number): void {
                     // Restore player character state flags (sneak mode, etc.).
                     if (globalState.player && typeof save.playerPcFlags === 'number') {
                         globalState.player.pcFlags = save.playerPcFlags
+                    }
+                    // Restore active hand selection (BLK-034).
+                    if (globalState.player && typeof save.playerActiveHand === 'number') {
+                        ;(globalState.player as any).activeHand = save.playerActiveHand
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

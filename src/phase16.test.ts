@@ -296,9 +296,9 @@ describe('Phase 16-E — gfade and play_gmovie do not emit stub hits', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 16-F — checklist reflects de-stubbed procedures', () => {
-    it('proto_data is now partial in the checklist', () => {
+    it('proto_data is now implemented in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'proto_data')
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
     })
 
     it('gfade_out is listed as partial in the checklist', () => {

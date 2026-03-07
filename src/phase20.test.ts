@@ -391,16 +391,16 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
         expect(e!.status).toBe('implemented')
     })
 
-    it('metarule_35 is marked partial', () => {
+    it('metarule_35 is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'metarule_35')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('partial')
+        expect(e!.status).toBe('implemented')
     })
 
-    it('metarule_44 is marked partial', () => {
+    it('metarule_44 is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'metarule_44')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('partial')
+        expect(e!.status).toBe('implemented')
     })
 
     it('metarule_47 is marked implemented', () => {
@@ -409,10 +409,10 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
         expect(e!.status).toBe('implemented')
     })
 
-    it('metarule_55 is marked partial', () => {
+    it('metarule_55 is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'metarule_55')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('partial')
+        expect(e!.status).toBe('implemented')
     })
 
     it('metarule3_101 is marked implemented', () => {

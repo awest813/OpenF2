@@ -57,10 +57,10 @@ describe('Phase 12-A — metarule_46 (METARULE_CURRENT_TOWN) de-stub', () => {
         expect(metarule46CurrentTown(999)).toBe(999)
     })
 
-    it('checklist entry for metarule_46 is now "partial"', () => {
+    it('checklist entry for metarule_46 is now "implemented"', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule_46')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(entry!.status).toBe('implemented')
     })
 })
 
