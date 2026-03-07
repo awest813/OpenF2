@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 11
+export const SAVE_VERSION = 12
 
 export interface SaveGame {
     id?: number
@@ -114,6 +114,20 @@ export interface SaveGame {
         stringKeyed?: Record<string, number>
         intIndexed?: Record<number, number>
     }
+
+    /**
+     * Player character state flags bitfield (added in v12).
+     *
+     * Set and cleared by pc_flag_on(flag) / pc_flag_off(flag) script calls.
+     * Known bits:
+     *   bit 0 (1)  — LEVEL_UP_UNUSED
+     *   bit 1 (2)  — LEVEL_UP2
+     *   bit 2 (4)  — I_AM_EVIL  (karma-alignment flag)
+     *   bit 3 (8)  — SNK_MODE   (sneak mode; halves NPC perception range)
+     *
+     * Defaults to 0 (no flags set) for old saves.
+     */
+    playerPcFlags?: number
 
     player: {
         position: Point
@@ -223,6 +237,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.sfallGlobals === undefined) save.sfallGlobals = {}
             save.version = 11
             // falls through
+        case 11:
+            // v11 → v12: add player character state flags (pc_flag_on/pc_flag_off).
+            // Old saves have no pcFlags — default to 0 (no flags set, e.g. not sneaking).
+            if (save.playerPcFlags === undefined) save.playerPcFlags = 0
+            save.version = 12
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -248,6 +268,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     save.playerCharTraits = sanitizeTraitArray(save.playerCharTraits)
     save.playerPerkRanks = sanitizeNumericRecord(save.playerPerkRanks)
     save.sfallGlobals = sanitizeSfallGlobals(save.sfallGlobals)
+    // Normalize playerPcFlags: must be a non-negative integer (bitfield).
+    if (typeof save.playerPcFlags !== 'number' || !Number.isFinite(save.playerPcFlags)) {
+        save.playerPcFlags = 0
+    } else {
+        save.playerPcFlags = save.playerPcFlags >>> 0 // coerce to unsigned 32-bit integer
+    }
 
     return save as SaveGame
 }

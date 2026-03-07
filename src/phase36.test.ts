@@ -32,11 +32,11 @@ import { SCRIPTING_STUB_CHECKLIST, stubChecklistSummary } from './scriptingCheck
 // ===========================================================================
 
 describe('Phase 36-A — save schema v11 sfall globals', () => {
-    it('SAVE_VERSION is 11', () => {
-        expect(SAVE_VERSION).toBe(11)
+    it('SAVE_VERSION is at least 11 (currently ' + SAVE_VERSION + ')', () => {
+        expect(SAVE_VERSION).toBeGreaterThanOrEqual(11)
     })
 
-    it('migrateSave from v10 adds empty sfallGlobals', () => {
+    it('migrateSave from v10 upgrades to current SAVE_VERSION and adds sfallGlobals', () => {
         const raw = {
             version: 10,
             name: 'test',
@@ -57,12 +57,12 @@ describe('Phase 36-A — save schema v11 sfall globals', () => {
             playerPerkRanks: {},
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(11)
+        expect(save.version).toBe(SAVE_VERSION)
         expect(save.sfallGlobals).toBeDefined()
         expect(typeof save.sfallGlobals).toBe('object')
     })
 
-    it('migrateSave from v9 upgrades through v10 and v11', () => {
+    it('migrateSave from v9 upgrades through all versions and adds sfallGlobals', () => {
         const raw = {
             version: 9,
             name: 'legacy',
@@ -82,7 +82,7 @@ describe('Phase 36-A — save schema v11 sfall globals', () => {
             playerCharTraits: [],
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(11)
+        expect(save.version).toBe(SAVE_VERSION)
         expect(save.playerPerkRanks).toEqual({})
         expect(save.sfallGlobals).toBeDefined()
     })

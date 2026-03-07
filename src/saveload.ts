@@ -186,6 +186,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // set_sfall_global / get_sfall_global survive across save/load cycles.
     save.sfallGlobals = serializeSfallGlobals()
 
+    // Snapshot player character state flags (pc_flag_on/pc_flag_off) so that
+    // sneak mode and other PC flags survive save/load cycles.
+    save.playerPcFlags = globalState.player.pcFlags ?? 0
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -253,6 +257,10 @@ export function load(id: number): void {
                 if (save.sfallGlobals) {
                     deserializeSfallGlobals(save.sfallGlobals)
                 }
+                // Restore player character state flags (sneak mode, etc.).
+                if (globalState.player && typeof save.playerPcFlags === 'number') {
+                    globalState.player.pcFlags = save.playerPcFlags
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -303,6 +311,10 @@ export function load(id: number): void {
                     // state and mod tracking survive save/load cycles.
                     if (save.sfallGlobals) {
                         deserializeSfallGlobals(save.sfallGlobals)
+                    }
+                    // Restore player character state flags (sneak mode, etc.).
+                    if (globalState.player && typeof save.playerPcFlags === 'number') {
+                        globalState.player.pcFlags = save.playerPcFlags
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

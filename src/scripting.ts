@@ -79,6 +79,56 @@ export module Scripting {
     let overrideStartPos: StartPos | null = null
     let scriptDebuggerSink: ScriptDebuggerSink | null = null
 
+    /**
+     * Per-critter drug-effect tracking.
+     *
+     * Maps a critter object reference to the game-tick time at which its active
+     * drug effect(s) expire.  Any drug item whose use_p_proc fires marks the
+     * using/target critter for the default Fallout 2 drug duration (600 ticks =
+     * 60 seconds).  metarule(18) (CRITTER_ON_DRUGS) and metarule(44)
+     * (WHO_ON_DRUGS) query this map to determine whether a critter is currently
+     * under drug influence.
+     *
+     * A WeakRef-like approach is not needed here because the map is cleared on
+     * every map transition (reset()), which is the natural lifetime boundary.
+     */
+    const _druggedCritters = new Map<object, number>()
+
+    /** Default drug effect duration in game ticks (600 ticks = 60 in-game seconds). */
+    const DRUG_EFFECT_TICKS = 600
+
+    /**
+     * Mark a critter as being under drug influence for the given duration.
+     * Extends any existing drug timer to the later of the current and new expiry.
+     */
+    function markOnDrugs(critter: object, durationTicks: number = DRUG_EFFECT_TICKS): void {
+        const newExpiry = globalState.gameTickTime + durationTicks
+        const existing = _druggedCritters.get(critter) ?? 0
+        _druggedCritters.set(critter, Math.max(existing, newExpiry))
+    }
+
+    /**
+     * Return 1 if the given critter object is currently under drug influence, 0 otherwise.
+     * Lazily evicts stale entries to avoid unbounded growth.
+     */
+    function isOnDrugs(obj: object): number {
+        const expiry = _druggedCritters.get(obj)
+        if (expiry === undefined) return 0
+        if (globalState.gameTickTime >= expiry) {
+            _druggedCritters.delete(obj)
+            return 0
+        }
+        return 1
+    }
+
+    /**
+     * Return true if the given game object is a drug item (Fallout 2 item subtype 2).
+     * Centralises the check used by use() and useObjOn() to avoid duplication.
+     */
+    function isDrugItem(obj: any): boolean {
+        return obj?.subtype === 'drug' || obj?.pro?.extra?.subType === 2
+    }
+
     export function setScriptDebuggerSink(sink: ScriptDebuggerSink | null): void {
         scriptDebuggerSink = sink
     }
@@ -245,6 +295,11 @@ export module Scripting {
         return globalVars
     }
 
+    /** Return 1 if the current map has not been entered before in this session (map_first_run). */
+    export function getMapFirstRun(): number {
+        return mapFirstRun ? 1 : 0
+    }
+
     /**
      * Bulk-restore global script variables from a saved snapshot.
      *
@@ -401,14 +456,12 @@ export module Scripting {
                 reqDist /= 2
 
             if (target === globalState.player) {
-                if (false /* is_pc_sneak_working */) {
-                    // @ts-ignore: Unreachable code error (this isn't implemented yet)
+                // SNK_MODE (bit 3) set via pc_flag_on(3) means sneak mode is active.
+                const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
+                if (isSneaking) {
                     reqDist /= 4
-
                     if (sneakSkill > 120) reqDist--
-                } else if (false /* is_sneaking */)
-                    // @ts-ignore: Unreachable code error (this isn't implemented yet)
-                    reqDist = (reqDist * 2) / 3
+                }
             }
 
             if (dist <= reqDist) return true
@@ -417,14 +470,11 @@ export module Scripting {
         reqDist = globalState.inCombat ? perception * 2 : perception
 
         if (target === globalState.player) {
-            if (false /* is_pc_sneak_working */) {
-                // @ts-ignore: Unreachable code error (this isn't implemented yet)
+            const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
+            if (isSneaking) {
                 reqDist /= 4
-
                 if (sneakSkill > 120) reqDist--
-            } else if (false /* is_sneaking */)
-                // @ts-ignore: Unreachable code error (this isn't implemented yet)
-                reqDist = (reqDist * 2) / 3
+            }
         }
 
         return dist <= reqDist
@@ -615,7 +665,9 @@ export module Scripting {
                     }
                     return 0 // unknown area ID — treat as undiscovered
                 case 18:
-                    return 0 // is the critter under the influence of drugs? (TODO)
+                    // METARULE_CRITTER_ON_DRUGS: 1 if the self_obj critter is currently
+                    // under drug influence (e.g. just used a stimpak or buffout).
+                    return isOnDrugs(this.self_obj as object)
                 case 21:
                     // METARULE_VENDOR_CAPS: return vendor's current available caps.
                     // Used by barter scripts to cap the amount the vendor will trade.
@@ -640,10 +692,12 @@ export module Scripting {
                 case 35:
                     // METARULE_COMBAT_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
                     return 1
-                case 44:
-                    // METARULE_WHO_ON_DRUGS: 1 if the critter is currently under drug influence.
-                    // No drug system implemented; always return 0 (partial).
-                    return 0
+                case 44: {
+                    // METARULE_WHO_ON_DRUGS: 1 if the target critter is currently under drug influence.
+                    // Uses the drug-tracking map populated when drug items are used via use/useObjOn.
+                    const drugTarget = isGameObject(target) ? target : this.self_obj
+                    return isOnDrugs(drugTarget as unknown as object)
+                }
                 case 46:
                     // METARULE_CURRENT_TOWN: return the current map/area ID as the town identifier
                     return currentMapID !== null ? currentMapID : 0
@@ -1623,6 +1677,110 @@ export module Scripting {
                 return
             }
             ;(obj as Critter).isFleeing = isFleeing !== 0
+        }
+
+        // ---------------------------------------------------------------------------
+        // PC flags — player character state bitfield
+        //   Bit 0: LEVEL_UP_UNUSED (legacy level-up flag, not used at runtime)
+        //   Bit 1: LEVEL_UP2       (second level-up flag)
+        //   Bit 2: I_AM_EVIL       (character is evil-aligned for karma logic)
+        //   Bit 3: SNK_MODE        (sneak mode active; reduces NPC perception range)
+        // ---------------------------------------------------------------------------
+        pc_flag_on(flag: number) {
+            log('pc_flag_on', arguments)
+            const player = globalState.player
+            if (!player) {
+                warn('pc_flag_on: no player', undefined, this)
+                return
+            }
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) {
+                warn('pc_flag_on: invalid flag ' + flag, undefined, this)
+                return
+            }
+            player.pcFlags |= (1 << flag)
+        }
+        pc_flag_off(flag: number) {
+            log('pc_flag_off', arguments)
+            const player = globalState.player
+            if (!player) {
+                warn('pc_flag_off: no player', undefined, this)
+                return
+            }
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) {
+                warn('pc_flag_off: invalid flag ' + flag, undefined, this)
+                return
+            }
+            player.pcFlags &= ~(1 << flag)
+        }
+
+        // ---------------------------------------------------------------------------
+        // inven_unwield — make a critter put away their current weapon
+        //
+        // In Fallout 2 this causes the critter to holster their weapon so it returns
+        // to their inventory.  The browser build keeps the weapon object in inventory
+        // but clears the rightHand (primary weapon) slot to reflect an unwielded state.
+        // ---------------------------------------------------------------------------
+        inven_unwield(obj: Obj) {
+            log('inven_unwield', arguments)
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('inven_unwield: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            critter.rightHand = undefined
+        }
+
+        // ---------------------------------------------------------------------------
+        // pickup_obj — move an object from the map to the player's inventory
+        //
+        // Fallout 2 scripts call this to force-add items to the player's inventory
+        // (e.g. quest item hand-offs).  The object is removed from the map and pushed
+        // onto the player inventory array.
+        // ---------------------------------------------------------------------------
+        pickup_obj(obj: Obj) {
+            log('pickup_obj', arguments)
+            if (!isGameObject(obj)) {
+                warn('pickup_obj: not a game object: ' + obj, undefined, this)
+                return
+            }
+            const player = globalState.player
+            if (!player) {
+                warn('pickup_obj: no player', undefined, this)
+                return
+            }
+            if (globalState.gMap) globalState.gMap.removeObject(obj)
+            player.inventory.push(obj)
+        }
+
+        // ---------------------------------------------------------------------------
+        // drop_obj — remove an object from a critter's inventory and place on the map
+        //
+        // Used by scripts to force-drop items from a critter (e.g. disarming a
+        // critter in a scripted event).  Places the item at the critter's tile.
+        // ---------------------------------------------------------------------------
+        drop_obj(obj: Obj) {
+            log('drop_obj', arguments)
+            if (!isGameObject(obj)) {
+                warn('drop_obj: not a game object: ' + obj, undefined, this)
+                return
+            }
+            // Determine the source critter: prefer self_obj if it's a critter,
+            // otherwise fall back to the player.
+            const selfObj = this.self_obj
+            const source: Critter | null =
+                isGameObject(selfObj) && (selfObj as any).type === 'critter'
+                    ? (selfObj as Critter)
+                    : (globalState.player ?? null)
+            if (!source) {
+                warn('drop_obj: no source critter', undefined, this)
+                return
+            }
+            const idx = source.inventory.indexOf(obj)
+            if (idx !== -1) source.inventory.splice(idx, 1)
+            if (globalState.gMap && source.position) {
+                obj.position = { ...source.position }
+                globalState.gMap.addObject(obj)
+            }
         }
 
         // objects
@@ -3423,6 +3581,13 @@ export module Scripting {
     export function use(obj: Obj, source: Obj): boolean | null {
         if (!obj._script || obj._script.use_p_proc === undefined) return null
 
+        // If the item being used is a drug, mark the source critter as
+        // "on drugs" so that metarule(18) checks return the correct result
+        // for the duration of the drug effect.
+        if (isDrugItem(obj) && source && (source as any).type === 'critter') {
+            markOnDrugs(source)
+        }
+
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
         obj._script._didOverride = false
@@ -3557,6 +3722,13 @@ export module Scripting {
 
     export function useObjOn(obj: Obj, item: Obj): boolean | null {
         if (!obj._script || obj._script.use_obj_on_p_proc === undefined) return null
+
+        // If the item being used on this target is a drug, mark the target
+        // critter as "on drugs" so that metarule(44)/WHO_ON_DRUGS queries return
+        // the correct result (e.g. NPC healer scripts using stimpaks on companions).
+        if (isDrugItem(item) && (obj as any).type === 'critter') {
+            markOnDrugs(obj)
+        }
 
         obj._script.source_obj = item as Obj
         obj._script.self_obj = obj as ScriptableObj
@@ -3754,6 +3926,7 @@ export module Scripting {
         currentMapObject = null
         currentMapID = mapID !== undefined ? mapID : null
         mapVars = {}
+        _druggedCritters.clear() // clear per-critter drug effects on map transition
     }
 
     export function init(mapName: string, mapID?: number) {
