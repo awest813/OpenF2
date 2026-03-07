@@ -2513,6 +2513,139 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'medium',
     },
+    // -------------------------------------------------------------------------
+    // Phase 48 entries
+    // -------------------------------------------------------------------------
+    {
+        id: 'pcstat_karma_gvar0_sync',
+        kind: 'procedure',
+        description:
+            'get_pc_stat(4) (PCSTAT_karma): now returns globalVars[0] (GVAR_PLAYER_REPUTATION) ' +
+            'instead of globalState.reputation.getKarma(). In Fallout 2 both PCSTAT_reputation ' +
+            'and PCSTAT_karma read GVAR_0; the old code returned a separate reputation object ' +
+            'value that was never updated by scripts, so karma-gated dialogue/quest conditions ' +
+            'always saw 0.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'set_global_var_0_karma_sync',
+        kind: 'procedure',
+        description:
+            'set_global_var(0, value): when scripts update GVAR_PLAYER_REPUTATION (GVAR_0) the ' +
+            'reputation system karma is now synced via reputation.setKarma(). Keeps the UI and ' +
+            'save-file reputation object consistent with the value scripts read and write.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'rm_mult_objs_from_inven_multi_stack',
+        kind: 'procedure',
+        description:
+            'rm_mult_objs_from_inven: now drains from multiple inventory stacks when the ' +
+            'first matching stack has fewer items than the requested count. Returns the total ' +
+            'items actually removed. Prevents item-count mismatches when the same PID appears ' +
+            'in separate stacks (e.g. after repeated add_obj_to_inven calls).',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'item_caps_adjust_caps_creation',
+        kind: 'procedure',
+        description:
+            'item_caps_adjust(obj, amount): when amount > 0 and no caps item (PID 41) is found ' +
+            'in the object\'s inventory, now creates a new caps item with the given amount. ' +
+            'Fallout 2 scripts commonly call item_caps_adjust to hand money to critters that ' +
+            'start with an empty inventory; previously the caps were silently discarded.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'metarule_53_have_drug_implemented',
+        kind: 'metarule',
+        description:
+            'METARULE_HAVE_DRUG (metarule case 53): now returns 1 if the target critter\'s ' +
+            'inventory contains any item with subtype "drug" (subType===2 in PRO extra data). ' +
+            'Previously always returned 0, causing NPC scripts that check for doctor\'s bags, ' +
+            'stimpaks, etc. to mis-branch and NPCs to ignore their healing items.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_equipped_armor_serialization',
+        kind: 'procedure',
+        description:
+            'Critter.serialize(): now persists equippedArmorPID (the PID of the currently ' +
+            'equipped armor). Critter.fromMapObject() deserialization now restores equippedArmor ' +
+            'by searching the deserialized inventory for a matching armor item. Prevents party ' +
+            'members and map NPCs from losing their armor DT/DR/AC bonuses after save/load.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'get_combat_free_move_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A8: get_combat_free_move(obj) → free-movement AP for the current combat ' +
+            'turn. Reads obj.freeMoveAP; returns 0 for non-objects or when not in combat. ' +
+            'Required by level-scaling and difficulty-adjustment scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'set_combat_free_move_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A9: set_combat_free_move(obj, ap) — set free-movement AP for the ' +
+            'current combat turn (clamped to >= 0). Used by difficulty and level-scaling ' +
+            'combat scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'tile_add_remove_blocking_no_throw',
+        kind: 'opcode',
+        description:
+            'opcodes 0x8140 (tile_add_blocking) and 0x8141 (tile_remove_blocking): previously ' +
+            'caused unknown-opcode halts. Now implemented as safe no-ops that pop their two ' +
+            'arguments. No runtime tile-block registry exists in the browser build; the no-op ' +
+            'keeps the VM stack balanced.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'give_karma_take_karma_opcodes',
+        kind: 'opcode',
+        description:
+            'opcodes 0x8142 (give_karma) and 0x8143 (take_karma): previously caused unknown-' +
+            'opcode halts in scripts using the Fallout 2 compiled opcode form (some compilers ' +
+            'emit native opcodes rather than expanding the give_karma macro). Both now update ' +
+            'GVAR_PLAYER_REPUTATION (GVAR_0) and sync reputation.karma.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'dialogue_reaction_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x814D (dialogue_reaction(how_much)): previously caused unknown-opcode ' +
+            'halts in NPC dialogue scripts. Now implemented as a safe no-op that pops its ' +
+            'single argument. The browser build does not track a per-dialogue reaction score; ' +
+            'accepting the call keeps VM stack balanced and dialogue scripts running.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
