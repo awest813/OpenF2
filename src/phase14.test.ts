@@ -488,7 +488,10 @@ describe('Phase 14-I — checklist accuracy for new procedure types', () => {
     it('stub count has decreased after de-stubbing tile_is_visible, reg_anim_*, metarule_18', () => {
         const summary = stubChecklistSummary()
         // All four de-stubbed entries moved to 'partial'; none remain as 'stub'.
-        // proto_data, inven_cmds, obj_can_hear_obj, has_trait_worn, critter_add_trait_weight remain stubs.
-        expect(summary.stub).toBeLessThanOrEqual(5)
+        // proto_data, inven_cmds, obj_can_hear_obj, has_trait_worn, critter_add_trait_weight were
+        // promoted to partial/implemented by Phase 14–53. Phase 54 added 6 new sfall stubs
+        // (force_encounter, force_encounter_with_flags, get_last_pers_obj, obj_remove_script,
+        // obj_add_script, obj_run_proc) that are intentionally stub-level no-ops.
+        expect(summary.stub).toBeLessThanOrEqual(11)
     })
 })

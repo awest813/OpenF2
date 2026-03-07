@@ -22,8 +22,8 @@ import { StatSet } from './char.js'
 // ===========================================================================
 
 describe('Phase 51-A — Player base stats/skills persistence (BLK-035)', () => {
-    it('SAVE_VERSION is 14', () => {
-        expect(SAVE_VERSION).toBe(14)
+    it('SAVE_VERSION is 15', () => {
+        expect(SAVE_VERSION).toBe(15)
     })
 
     it('v13 → v14 migration adds playerBaseStats defaulting to {}', () => {
@@ -41,7 +41,7 @@ describe('Phase 51-A — Player base stats/skills persistence (BLK-035)', () => 
             playerActiveHand: 0,
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(14)
+        expect(migrated.version).toBe(15)
         expect(migrated.playerBaseStats).toEqual({})
     })
 
@@ -94,7 +94,7 @@ describe('Phase 51-A — Player base stats/skills persistence (BLK-035)', () => 
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(14)
+        expect(migrated.version).toBe(15)
         expect(migrated.playerBaseStats).toEqual({})
         expect(migrated.playerSkillValues).toEqual({})
     })

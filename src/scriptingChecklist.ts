@@ -3308,6 +3308,141 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 54 entries
+    {
+        id: 'blk_041_xp_on_kill',
+        kind: 'procedure',
+        description:
+            'BLK-041: Auto-award XP on critter kill. critterKill() now checks whether ' +
+            'the source is the player and awards pro.extra.XPValue XP to the player when ' +
+            'it is.  A level-up check runs immediately after, granting skill points ' +
+            '(10 + INT/2) per level gained.  This mirrors Fallout 2 engine behaviour ' +
+            'where the engine itself awards combat-kill XP (not scripts).',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_042_player_weapon_slot_save',
+        kind: 'procedure',
+        description:
+            'BLK-042: Player equipped weapon slots (leftHand/rightHand) persisted in ' +
+            'save schema v15.  When the player drags a weapon from inventory to an ' +
+            'equipment slot the item is removed from inventory.  Save schema v15 adds ' +
+            'playerLeftHandPID and playerRightHandPID; the serialized weapon is included ' +
+            'in the inventory save so it can be re-equipped on load.  This prevents the ' +
+            'player from losing their equipped weapon across save/load cycles.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_043_skill_points_on_level_up',
+        kind: 'procedure',
+        description:
+            'BLK-043: Skill points awarded per level-up in give_exp_points. ' +
+            'Formula: max(1, 10 + floor(INT/2)) + 2 * Educated_perk_rank. ' +
+            'Matches Fallout 2 formula so the player can invest in skills as they ' +
+            'level up through the campaign.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_044_inven_unwield_active_hand',
+        kind: 'procedure',
+        description:
+            'BLK-044: inven_unwield(obj) now respects activeHand for the player. ' +
+            'activeHand=0 clears leftHand (primary slot); activeHand=1 clears rightHand ' +
+            '(secondary slot).  NPC behaviour unchanged (always clears rightHand). ' +
+            'This fixes cases where scripts called inven_unwield expecting the active ' +
+            'weapon to be removed but the wrong slot was cleared.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_game_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D0: get_game_mode() → bitmask of current game mode. ' +
+            'Browser build: bit 0 = always set (normal), bit 1 = combat mode ' +
+            '(inCombat flag).  Scripts use this to skip combat-only logic when not in combat.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_force_encounter',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D1: force_encounter(mapId) — trigger a forced random encounter. ' +
+            'Browser build: no-op (random encounter system not fully implemented).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_force_encounter_with_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D2: force_encounter_with_flags(mapId, flags) — force encounter. ' +
+            'Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_last_pers_obj',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D3: get_last_pers_obj() → last critter that started persistent ' +
+            'combat.  Browser build: returns 0 (no persistent combat tracking).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_is_disabled',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D4: obj_is_disabled(obj) → 1 if the object\'s AI is disabled. ' +
+            'Browser build: partial — no per-object disable flag; always returns 0.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_remove_script',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D5: obj_remove_script(obj) — remove script from an object. ' +
+            'Browser build: no-op (no SID-based script registry).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_add_script',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D6: obj_add_script(obj, sid) — attach a script by SID. ' +
+            'Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_run_proc',
+        kind: 'opcode',
+        description:
+            'sfall 0x81D7: obj_run_proc(obj, proc_name) — run a named procedure. ' +
+            'Browser build: no-op (cannot dynamically invoke named procs by string).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

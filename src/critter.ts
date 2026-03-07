@@ -280,6 +280,34 @@ export function critterKill(
             }
             globalState.critterKillCounts[kt] = (globalState.critterKillCounts[kt] ?? 0) + 1
         }
+
+        // BLK-041: Auto-award XP to the player killer.
+        // In Fallout 2, the engine automatically grants the base XP reward stored
+        // in the critter proto (CRITTER_DATA_EXPERIENCE / data_member 48) when a
+        // critter is killed.  Without this, the player never gains XP from combat,
+        // making level-up and skill development impossible.
+        if (source && source.isPlayer === true) {
+            const xpValue: number = (obj as any).pro?.extra?.XPValue ?? 0
+            if (xpValue > 0) {
+                const player = source as any
+                player.xp = (player.xp ?? 0) + xpValue
+                // Level-up check: level N is reached at N*(N+1)/2 * 1000 total XP.
+                const oldLevel: number = player.level ?? 1
+                while (player.xp >= ((player.level ?? 1) * ((player.level ?? 1) + 1) / 2) * 1000) {
+                    player.level = (player.level ?? 1) + 1
+                    // Fallout 2: award skill points on level-up (10 + INT/2, min 1).
+                    const intScore: number = typeof player.getStat === 'function'
+                        ? (player.getStat('INT') ?? 5) : 5
+                    const points = Math.max(1, 10 + Math.floor(intScore / 2))
+                    if (player.skills && typeof player.skills.skillPoints === 'number') {
+                        player.skills.skillPoints += points
+                    }
+                }
+                if ((player.level ?? 1) > oldLevel) {
+                    console.log('[XP] You reached level ' + player.level + '!')
+                }
+            }
+        }
     }
 
     if (useScript === undefined || useScript === true) {

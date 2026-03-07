@@ -99,8 +99,8 @@ describe('Phase 50-B — active_hand() opcode is implemented (BLK-034)', () => {
 // ===========================================================================
 
 describe('Phase 50-C — save schema v13: playerActiveHand migration', () => {
-    it('SAVE_VERSION is 14', () => {
-        expect(SAVE_VERSION).toBe(14)
+    it('SAVE_VERSION is 15', () => {
+        expect(SAVE_VERSION).toBe(15)
     })
 
     it('v12 → v13 migration adds playerActiveHand defaulting to 0', () => {
@@ -117,7 +117,7 @@ describe('Phase 50-C — save schema v13: playerActiveHand migration', () => {
             playerPcFlags: 0,
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(14)
+        expect(migrated.version).toBe(15)
         expect(migrated.playerActiveHand).toBe(0)
     })
 
@@ -133,7 +133,7 @@ describe('Phase 50-C — save schema v13: playerActiveHand migration', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(14)
+        expect(migrated.version).toBe(15)
         expect(migrated.playerActiveHand).toBe(0)
     })
 
