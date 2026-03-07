@@ -1088,6 +1088,20 @@ export class Critter extends Obj {
             } else {
                 obj.perkRanks = {}
             }
+            // Restore equipped armor from the persisted PID.
+            // Search the already-deserialized inventory for a matching armor item
+            // and point equippedArmor at it so armor DT/DR/AC bonuses are active.
+            // Note: if multiple inventory slots share the same PID (extremely
+            // unusual but possible after stacked add_obj_to_inven calls), the
+            // first match is used, which matches the behavior of wield_obj_critter.
+            if (typeof mobj.equippedArmorPID === 'number') {
+                const armorItem = obj.inventory.find(
+                    (inv: any) => inv.pid === mobj.equippedArmorPID && inv.subtype === 'armor'
+                )
+                if (armorItem) {
+                    obj.equippedArmor = armorItem
+                }
+            }
         }
 
         return obj
@@ -1529,6 +1543,13 @@ export class Critter extends Obj {
         // Serialize charTraits as a sorted number array for stable JSON output
         obj.charTraits = Array.from(this.charTraits).sort((a, b) => a - b)
 
+        // Persist equipped armor PID so armor bonuses survive save/load.
+        // We store only the PID; on deserialization the matching inventory
+        // item is located and equippedArmor is restored from it.
+        if (this.equippedArmor && this.equippedArmor.pid !== undefined) {
+            obj.equippedArmorPID = this.equippedArmor.pid
+        }
+
         return obj
     }
 }
@@ -1553,6 +1574,13 @@ interface SerializedCritter extends SerializedObj {
 
     /** Perk ranks granted to this critter by scripts (e.g. critter_add_trait TRAIT_PERK). */
     perkRanks?: Record<number, number>
+
+    /**
+     * PID of the currently equipped armor item (added in Phase 48).
+     * On deserialization the matching inventory item is restored as equippedArmor
+     * so DT/DR/AC bonuses survive save/load cycles.
+     */
+    equippedArmorPID?: number
 }
 
 const SERIALIZED_CRITTER_PROPS = ['stats', 'skills', 'aiNum', 'teamNum', 'hostile', 'isPlayer', 'dead', 'perkRanks']

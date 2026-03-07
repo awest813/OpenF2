@@ -396,6 +396,36 @@ export module ScriptVMBridge {
        ,0x81A5: bridged("get_year", 0)                  // get_year() → in-game calendar year
        ,0x81A6: bridged("get_month", 0)                 // get_month() → in-game calendar month (1–12)
        ,0x81A7: bridged("get_day", 0)                   // get_day() → in-game calendar day of month (1–31)
+
+       // sfall extended opcodes 0x81A8–0x81A9 — combat free movement
+       ,0x81A8: bridged("get_combat_free_move", 1)       // get_combat_free_move(obj) → free AP for movement this combat turn
+       ,0x81A9: bridged("set_combat_free_move", 2, false) // set_combat_free_move(obj, ap) — set free movement AP
+
+       // Phase 48 — gap opcodes in 0x8140–0x814D range
+       // tile_add_blocking / tile_remove_blocking — safe no-ops (no runtime tile-block registry)
+       ,0x8140: function() { this.pop(); this.pop() } // tile_add_blocking(tile, rotation) — no-op
+       ,0x8141: function() { this.pop(); this.pop() } // tile_remove_blocking(tile, rotation) — no-op
+
+       // give_karma / take_karma — add or subtract from GVAR_PLAYER_REPUTATION (GVAR_0).
+       // In Fallout 2 these are sometimes compiled as standalone opcodes when the
+       // macro expansion is inlined by the script compiler.
+       ,0x8142: function() { // give_karma(obj, amount) — award karma to GVAR_0
+            const amount = this.pop()
+            this.pop() // obj — Fallout 2 apply karma to player only
+            const current = this.scriptObj.global_var(0)
+            this.scriptObj.set_global_var(0, (typeof current === 'number' ? current : 0) + (typeof amount === 'number' ? amount : 0))
+        }
+       ,0x8143: function() { // take_karma(obj, amount) — penalise karma
+            const amount = this.pop()
+            this.pop() // obj
+            const current = this.scriptObj.global_var(0)
+            this.scriptObj.set_global_var(0, (typeof current === 'number' ? current : 0) - (typeof amount === 'number' ? amount : 0))
+        }
+
+       // dialogue_reaction — adjust current NPC reaction during dialogue.
+       // The browser build does not track a per-dialogue reaction score; we
+       // accept the argument and return 0 rather than crashing on unknown opcode.
+       ,0x814D: function() { this.pop() } // dialogue_reaction(how_much) — no-op (no reaction system)
     }
     Object.assign(opMap, bridgeOpMap)
 

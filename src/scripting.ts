@@ -503,6 +503,11 @@ export module Scripting {
 
         set_global_var(gvar: number, value: any) {
             globalVars[gvar] = value
+            // GVAR_0 = GVAR_PLAYER_REPUTATION is Fallout 2's canonical karma store.
+            // Sync the reputation system so getKarma() and the UI stay consistent.
+            if (gvar === 0 && globalState.reputation) {
+                globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
+            }
             info('set_global_var: ' + gvar + ' = ' + value, 'gvars')
             log('set_global_var', arguments, 'gvars')
         }
@@ -834,9 +839,13 @@ export module Scripting {
                     // METARULE_TILE_ACCESSIBILITY: 1 if tile is accessible to the given critter.
                     return 1
                 case 53:
-                    // METARULE_HAVE_DRUG: 1 if the critter has the specified drug in inventory.
-                    // No drug item classification; return 0.
-                    return 0
+                    // METARULE_HAVE_DRUG: 1 if the critter (target) has any drug item in its
+                    // inventory.  A "drug" item has subtype === 2 in the PRO sub-type table
+                    // (0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key).
+                    if (!isGameObject(target)) return 0
+                    return (target as any).inventory?.some(
+                        (inv: any) => inv.subtype === 'drug' || (inv.pro?.extra?.subType === 2)
+                    ) ? 1 : 0
                 case 54:
                     // METARULE_WEAPON_IS_SUITABLE: 1 if a weapon is suitable for use.
                     // Return 1 (always suitable) as a safe default.
@@ -1184,8 +1193,30 @@ export module Scripting {
                     return
                 }
             }
-            if (amount > 0)
-                warn('item_caps_adjust: no caps item found in inventory; amount discarded', undefined, this)
+            // No existing caps item — create one when adding a positive amount.
+            // Fallout 2 scripts commonly call item_caps_adjust(critter, n) to
+            // hand the player money without pre-seeding a caps item in inventory.
+            if (amount > 0) {
+                let capsItem: Obj | null = null
+                try {
+                    capsItem = createObjectWithPID(MONEY_PID, -1)
+                } catch (e) {
+                    // createObjectWithPID throws when PRO data is unavailable (e.g. tests).
+                    // Fall through to the stub path below.
+                    info('item_caps_adjust: createObjectWithPID failed (' + e + '), using minimal stub', 'inventory')
+                }
+                if (capsItem) {
+                    capsItem.amount = amount
+                    obj.inventory.push(capsItem)
+                } else {
+                    // PRO not available — create a minimal stub caps object so the
+                    // amount is not silently discarded.  The stub has just enough
+                    // fields for item_caps_total and subsequent item_caps_adjust calls.
+                    const stub = { pid: MONEY_PID, amount, type: 'item', subtype: 'misc',
+                                   approxEq(o: any) { return o.pid === MONEY_PID } } as any
+                    obj.inventory.push(stub)
+                }
+            }
         }
         move_obj_inven_to_obj(obj: Obj, other: Obj) {
             if (obj === null || other === null) {
@@ -1238,7 +1269,9 @@ export module Scripting {
             obj.addInventoryItem(item, count)
         }
         rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
-            // Remove up to count copies of item from obj's inventory
+            // Remove up to count copies of item from obj's inventory, draining
+            // multiple stacks if necessary (stacks are rare but can occur after
+            // separate add_obj_to_inven calls with cloned item references).
             if (!isGameObject(obj)) {
                 warn('rm_mult_objs_from_inven: not a game object', undefined, this)
                 return 0
@@ -1247,15 +1280,17 @@ export module Scripting {
                 warn('rm_mult_objs_from_inven: item not a game object: ' + item, undefined, this)
                 return 0
             }
-            for (let i = obj.inventory.length - 1; i >= 0; i--) {
+            let remaining = count
+            // Iterate backward so splicing does not skip entries.
+            for (let i = obj.inventory.length - 1; i >= 0 && remaining > 0; i--) {
                 if (obj.inventory[i].approxEq(item)) {
-                    const removed = Math.min(count, obj.inventory[i].amount)
+                    const removed = Math.min(remaining, obj.inventory[i].amount)
                     obj.inventory[i].amount -= removed
+                    remaining -= removed
                     if (obj.inventory[i].amount <= 0) obj.inventory.splice(i, 1)
-                    return removed
                 }
             }
-            return 0
+            return count - remaining
         }
         add_obj_to_inven(obj: Obj, item: Obj) {
             this.add_mult_objs_to_inven(obj, item, 1)
@@ -1465,7 +1500,10 @@ export module Scripting {
                 case 3: // PCSTAT_reputation
                     return globalVars[0] !== undefined ? globalVars[0] : 0
                 case 4: // PCSTAT_karma
-                    return globalState.reputation.getKarma()
+                    // In Fallout 2, both PCSTAT_reputation (3) and PCSTAT_karma (4) read
+                    // GVAR_PLAYER_REPUTATION (GVAR_0).  Scripts modify karma via
+                    // set_global_var(0, ...) so globalVars[0] is always current.
+                    return globalVars[0] !== undefined ? globalVars[0] : 0
                 case 5: // PCSTAT_max_pc_stat — the number of valid pcstat indices (0–4), so 5
                     return 5
                 default:
@@ -3250,6 +3288,27 @@ export module Scripting {
         get_day(): number {
             const days = Math.floor(globalState.gameTickTime / (10 * 86400))
             return (days % 30) + 1
+        }
+
+        // sfall extended opcode — get free movement AP for the current combat turn (0x81A8).
+        // "Free move" AP are bonus movement points that can only be spent on movement,
+        // not attacks.  Returns the critter's current freeMoveAP field; defaults to 0.
+        get_combat_free_move(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_combat_free_move: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).freeMoveAP ?? 0
+        }
+
+        // sfall extended opcode — set free movement AP for the current combat turn (0x81A9).
+        // Clamped to >= 0.  Used by level-scaling and difficulty scripts.
+        set_combat_free_move(obj: Obj, ap: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_combat_free_move: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).freeMoveAP = Math.max(0, typeof ap === 'number' ? ap : 0)
         }
 
         _serialize(): SerializedScript {
