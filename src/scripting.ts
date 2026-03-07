@@ -2121,6 +2121,17 @@ export module Scripting {
         obj_name(obj: Obj) {
             return obj.name
         }
+        // set_name(obj, name) — set the display name of an object or critter (opcode 0x80A8).
+        // Used by character-creation scripts to set the player's name and by NPC
+        // scripts that rename critters dynamically (e.g. to distinguish clones).
+        // BLK-050: Previously absent; now assigns name directly on the game object.
+        set_name(obj: Obj, name: string): void {
+            if (!isGameObject(obj)) {
+                warn('set_name: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).name = String(name ?? '')
+        }
         obj_item_subtype(obj: Obj) {
             if (!isGameObject(obj)) {
                 warn('obj_item_subtype: not game object: ' + obj)
@@ -3788,6 +3799,101 @@ export module Scripting {
         obj_is_disabled_sfall(obj: Obj): number {
             log('obj_is_disabled_sfall', arguments)
             return 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 56 — sfall extended opcodes 0x81E0–0x81E7
+        // -----------------------------------------------------------------------
+
+        // sfall 0x81E0 — get_current_map_id_sfall():
+        // Return the current map index.  Alias of metarule(46, 0) / metarule(55, 0).
+        // Scripts use this to branch on which map the player is currently in without
+        // needing to call a multi-arg metarule.
+        get_current_map_id_sfall(): number {
+            return currentMapID !== null ? currentMapID : 0
+        }
+
+        // sfall 0x81E1 — get_object_dude_distance(obj):
+        // Return the tile distance (in hexes) from obj to the player character.
+        // Returns -1 if obj is not a game object or the player is unavailable.
+        // Useful for range/proximity checks in AI and encounter scripts.
+        get_object_dude_distance(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_dude_distance: not a game object: ' + obj, undefined, this)
+                return -1
+            }
+            const player = globalState.player
+            if (!player || !obj.position || !player.position) return -1
+            const objTile = toTileNum(obj.position)
+            const playerTile = toTileNum(player.position)
+            return this.tile_distance(objTile, playerTile)
+        }
+
+        // sfall 0x81E2 — get_critter_attack_mode_sfall(obj):
+        // Return the critter's current attack-mode index (0=unarmed, 1=melee, 2=ranged).
+        // Browser build: partial — no per-critter attack-mode flag; always returns 0.
+        get_critter_attack_mode_sfall(obj: Obj): number {
+            log('get_critter_attack_mode_sfall', arguments)
+            return 0
+        }
+
+        // sfall 0x81E3 — set_critter_attack_mode_sfall(obj, mode):
+        // Set the critter's attack-mode index.  Browser build: no-op.
+        set_critter_attack_mode_sfall(obj: Obj, _mode: number): void {
+            log('set_critter_attack_mode_sfall', arguments)
+        }
+
+        // sfall 0x81E4 — get_map_first_run_sfall():
+        // Return 1 if the current map is being visited for the first time in this
+        // playthrough, 0 otherwise.  Uses the same mapFirstRun flag as map_first_run.
+        get_map_first_run_sfall(): number {
+            return mapFirstRun ? 1 : 0
+        }
+
+        // sfall 0x81E5 — get_script_type_sfall():
+        // Return the type of the currently executing script (0=map, 1=critter/NPC,
+        // 2=item, 3=scenery, 4=door, 5=container).  Browser build: returns 0.
+        get_script_type_sfall(): number {
+            log('get_script_type_sfall', arguments)
+            return 0
+        }
+
+        // sfall 0x81E6 — get_tile_pid_sfall(tile, elev):
+        // Return the PID of the first non-critter object found at the specified tile
+        // and elevation.  Returns 0 if no object is present.
+        // Useful for scripts that probe what's on the floor before triggering.
+        get_tile_pid_sfall(tile: number, elev: number): number {
+            if (!globalState.gMap) return 0
+            const objects = typeof globalState.gMap.getObjects === 'function'
+                ? globalState.gMap.getObjects(elev)
+                : []
+            const tilePos = fromTileNum(tile)
+            if (!tilePos) return 0
+            for (const o of objects) {
+                if (!isGameObject(o)) continue
+                if (o.type === 'critter') continue
+                if (o.position && o.position.x === tilePos.x && o.position.y === tilePos.y) {
+                    return o.pid ?? 0
+                }
+            }
+            return 0
+        }
+
+        // sfall 0x81E7 — get_critter_skill_points(obj, skill):
+        // Return the base skill-point allocation for the given skill on a critter.
+        // Uses the same skill-name lookup as set_critter_skill_points (0x8181).
+        get_critter_skill_points(obj: Obj, skill: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_skill_points: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const skillName = skillNumToName[skill]
+            if (!skillName) {
+                warn('get_critter_skill_points: unknown skill number: ' + skill, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            return critter.skills?.getBase(skillName) ?? 0
         }
 
         _serialize(): SerializedScript {

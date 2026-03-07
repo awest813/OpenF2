@@ -298,3 +298,43 @@ Gate: **PASS** — all 2519 tests green, tsc clean.
 - [x] phase54.test.ts: 27 regression tests, all passing
 
 Gate: **PASS** — all 2546 tests green, tsc clean.
+
+---
+
+## Phase 55 — Player armor persistence (BLK-045), party migration (BLK-046), perk tracking (BLK-047), sfall opcodes 0x81D8–0x81DF
+
+- [x] **BLK-045**: Player equipped armor (`equippedArmor`) lost on save/load — save schema v16 adds `playerArmorPID`; armor included in inventory save; both load paths re-equip from inventory by PID on load.
+- [x] **BLK-046**: Missing `party` field in old saves caused aborted load — `migrateSave()` normalization now defaults `save.party = []` when absent.
+- [x] **BLK-047**: Perk credits not tracked on level-up — `give_exp_points()` increments `playerPerksOwed` every 3 levels; `get_perk_owed`/`set_perk_owed` functional; persisted in save schema v16.
+- [x] New sfall opcode 0x81D8: `get_drop_amount(obj)` → 0 (stub)
+- [x] New sfall opcode 0x81D9: `set_drop_amount(obj, amount)` → no-op
+- [x] New sfall opcode 0x81DA: `art_exists(artPath)` → 0 (partial)
+- [x] New sfall opcode 0x81DB: `obj_item_subtype(obj)` → item subtype int (alias of 0x80C9)
+- [x] New sfall opcode 0x81DC: `get_critter_level(obj)` → character level (alias of get_npc_level)
+- [x] New sfall opcode 0x81DD: `hero_art_id(type)` → 0 (stub)
+- [x] New sfall opcode 0x81DE: `get_current_inven_size(critter)` → inventory item count (alias)
+- [x] New sfall opcode 0x81DF: `set_critter_burst_disable(obj, disable)` → no-op
+- [x] Save schema bumped from v15 to v16; migration defaults; normalization for playerArmorPID and playerPerksOwed
+- [x] phase55.test.ts: regression tests, all passing
+
+Gate: **PASS** — all 2584 tests green, tsc clean.
+
+---
+
+## Phase 56 — Player name/gender save (BLK-048), level-up consistency (BLK-049), set_name opcode (BLK-050), sfall opcodes 0x81E0–0x81E7
+
+- [x] **BLK-048**: Player name and gender not persisted in saves — save schema v17 adds `playerName` and `playerGender`; both snapshotted in `save()` and restored in `applyExtraSaveState()`; migration from v16 defaults to 'Player'/'male'; normalization rejects invalid values.
+- [x] **BLK-049**: Level-up via `critterKill()` XP path missing Educated perk bonus and perk credits — `critterKill()` now applies `(perkRanks[47] ?? 0) * 2` bonus skill points and increments `globalState.playerPerksOwed` every 3 levels, matching `give_exp_points()`.
+- [x] **BLK-050**: `set_name(obj, name)` opcode (0x80A8) absent — added to `scripting.ts` and registered in `vm_bridge.ts`; assigns name directly on the game object; prevents VM stack corruption in character-creation and NPC rename scripts.
+- [x] New sfall opcode 0x81E0: `get_current_map_id_sfall()` → current map index (alias of metarule(46,0))
+- [x] New sfall opcode 0x81E1: `get_object_dude_distance(obj)` → tile distance to player (fully implemented)
+- [x] New sfall opcode 0x81E2: `get_critter_attack_mode_sfall(obj)` → 0 (partial)
+- [x] New sfall opcode 0x81E3: `set_critter_attack_mode_sfall(obj, mode)` → no-op
+- [x] New sfall opcode 0x81E4: `get_map_first_run_sfall()` → 1 if first-run, 0 otherwise (alias of map_first_run)
+- [x] New sfall opcode 0x81E5: `get_script_type_sfall()` → 0 (partial)
+- [x] New sfall opcode 0x81E6: `get_tile_pid_sfall(tile, elev)` → PID of first non-critter object at tile (partial)
+- [x] New sfall opcode 0x81E7: `get_critter_skill_points(obj, skill)` → base skill allocation (fully implemented)
+- [x] Save schema bumped from v16 to v17; v16→v17 migration adds playerName/playerGender defaults
+- [x] phase56.test.ts: 33 regression tests, all passing
+
+Gate: **PASS** — all 2617 tests green, tsc clean.

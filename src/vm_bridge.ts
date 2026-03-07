@@ -177,6 +177,7 @@ export module ScriptVMBridge {
        ,0x8147: bridged("move_obj_inven_to_obj", 2, false)
        ,0x8100: bridged("obj_pid", 1)
        ,0x80A4: bridged("obj_name", 1)
+       ,0x80A8: bridged("set_name", 2, false)           // set_name(obj, name) — BLK-050
        ,0x8149: bridged("obj_art_fid", 1)
        ,0x8150: bridged("obj_on_screen", 1)
        ,0x80f5: bridged("obj_can_hear_obj", 2)
@@ -712,6 +713,42 @@ export module ScriptVMBridge {
        // 0x81DF — set_critter_burst_disable(obj, disable): disable or enable the
        // burst-fire mode for a critter's weapon.  Browser build: no-op.
        ,0x81DF: function() { this.pop(); this.pop() } // set_critter_burst_disable — no-op
+
+       // -----------------------------------------------------------------------
+       // Phase 56 — sfall extended opcodes 0x81E0–0x81E7
+       // -----------------------------------------------------------------------
+
+       // 0x81E0 — get_current_map_id_sfall(): return the current map index.
+       // Alias of metarule(46, 0) / metarule(55, 0).  Useful for map-specific branches.
+       ,0x81E0: bridged("get_current_map_id_sfall", 0) // get_current_map_id() → mapID
+
+       // 0x81E1 — get_object_dude_distance(obj): return tile distance from obj to dude_obj.
+       // Useful for range/proximity checks in AI and encounter scripts.
+       ,0x81E1: bridged("get_object_dude_distance", 1) // get_object_dude_distance(obj) → tiles
+
+       // 0x81E2 — get_critter_attack_mode(obj): return attack-mode index (0=unarmed).
+       // Browser build: partial — no per-critter attack-mode flag; returns 0.
+       ,0x81E2: bridged("get_critter_attack_mode_sfall", 1) // get_critter_attack_mode(obj) → 0
+
+       // 0x81E3 — set_critter_attack_mode(obj, mode): set attack-mode index.
+       // Browser build: no-op.
+       ,0x81E3: bridged("set_critter_attack_mode_sfall", 2, false) // set_critter_attack_mode — no-op
+
+       // 0x81E4 — get_map_first_run_sfall(): return 1 if map is being run for first time.
+       // Alias of map_first_run (0x80A0); exposed as a dedicated sfall opcode.
+       ,0x81E4: bridged("get_map_first_run_sfall", 0) // get_map_first_run() → 0|1
+
+       // 0x81E5 — get_script_type_sfall(): return script type (0=map, 1=critter, etc.).
+       // Browser build: partial — returns 0 (no per-script type tracking).
+       ,0x81E5: bridged("get_script_type_sfall", 0) // get_script_type() → 0
+
+       // 0x81E6 — get_tile_pid_sfall(tile, elev): return PID of first non-critter
+       // object at tile/elev, or 0 if none.  Useful for floor-probe scripts.
+       ,0x81E6: bridged("get_tile_pid_sfall", 2) // get_tile_pid(tile, elev) → pid | 0
+
+       // 0x81E7 — get_critter_skill_points(obj, skill): return base skill-point
+       // allocation for the given skill number on a critter.
+       ,0x81E7: bridged("get_critter_skill_points", 2) // get_critter_skill_points(obj, skill) → points
     }
     Object.assign(opMap, bridgeOpMap)
 

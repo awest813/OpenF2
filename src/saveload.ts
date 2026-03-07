@@ -119,6 +119,13 @@ function applyExtraSaveState(save: SaveGame): void {
     if (typeof save.playerPerksOwed === 'number') {
         globalState.playerPerksOwed = save.playerPerksOwed
     }
+    // BLK-048: Restore player name and gender so character identity survives reload.
+    if (globalState.player && typeof save.playerName === 'string') {
+        globalState.player.name = save.playerName
+    }
+    if (globalState.player && (save.playerGender === 'male' || save.playerGender === 'female')) {
+        ;(globalState.player as any).gender = save.playerGender
+    }
 }
 
 // Saving and loading support
@@ -332,6 +339,14 @@ export function save(name: string, slot = -1, callback?: () => void): void {
 
     // BLK-047: Snapshot pending perk-selection credits.
     save.playerPerksOwed = globalState.playerPerksOwed ?? 0
+
+    // BLK-048: Snapshot player name and gender so character identity survives reload.
+    // These fields are set during character creation and may be modified by scripts
+    // (e.g. set_name(dude_obj, name)); without persistence they revert to class defaults.
+    if (globalState.player) {
+        save.playerName = globalState.player.name ?? 'Player'
+        save.playerGender = (globalState.player as any).gender ?? 'male'
+    }
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
