@@ -945,6 +945,34 @@ export module ScriptVMBridge {
 
        // 0x8217 — get_object_weight_sfall(obj): return object weight in pounds.
        ,0x8217: bridged("get_object_weight_sfall", 1) // get_object_weight(obj) → pounds
+
+       // -----------------------------------------------------------------------
+       // Phase 63 — sfall extended opcodes 0x8218–0x821F
+       // -----------------------------------------------------------------------
+
+       // 0x8218 — get_year_sfall(): return current in-game year.
+       ,0x8218: bridged("get_year_sfall", 0) // get_year() → year (2241+)
+
+       // 0x8219 — get_month_sfall(): return current in-game month (1–12).
+       ,0x8219: bridged("get_month_sfall", 0) // get_month() → month
+
+       // 0x821A — get_day_sfall(): return current in-game day of month.
+       ,0x821A: bridged("get_day_sfall", 0) // get_day() → day
+
+       // 0x821B — get_time_sfall(): return current in-game time (HHMM).
+       ,0x821B: bridged("get_time_sfall", 0) // get_time() → HHMM
+
+       // 0x821C — get_critter_kill_type_sfall(obj): return kill-type constant.
+       ,0x821C: bridged("get_critter_kill_type_sfall", 1) // get_critter_kill_type(obj) → type
+
+       // 0x821D — get_npc_pids_sfall(): return NPC PID list (stub → 0).
+       ,0x821D: bridged("get_npc_pids_sfall", 0) // get_npc_pids() → 0
+
+       // 0x821E — get_proto_num_sfall(obj): return prototype number (PID).
+       ,0x821E: bridged("get_proto_num_sfall", 1) // get_proto_num(obj) → pid
+
+       // 0x821F — mark_area_known_sfall(areaID, markState): mark world-map area.
+       ,0x821F: bridged("mark_area_known_sfall", 2, false) // mark_area_known(areaID, state)
     }
     Object.assign(opMap, bridgeOpMap)
 

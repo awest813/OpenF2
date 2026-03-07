@@ -4352,6 +4352,117 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 63 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-066: obj_carrying_pid_obj equipped-slot check
+    {
+        id: 'blk_066_obj_carrying_pid_obj_equipped',
+        kind: 'procedure',
+        description:
+            'BLK-066: obj_carrying_pid_obj(obj, pid) now checks equipped item slots ' +
+            '(leftHand, rightHand, equippedArmor) in addition to the inventory array. ' +
+            'In Fallout 2, equipped items are removed from inventory; scripts that test ' +
+            'whether an NPC is carrying a weapon would previously miss equipped items.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-067: party_member_obj null guard
+    {
+        id: 'blk_067_party_member_obj_null_guard',
+        kind: 'procedure',
+        description:
+            'BLK-067: party_member_obj(pid) now guards against a null gParty, ' +
+            'returning 0 instead of crashing during early init or in tests.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8218-0x821F
+    {
+        id: 'sfall_get_year',
+        kind: 'opcode',
+        description:
+            'sfall 0x8218: get_year_sfall() — return current in-game year (2241+) ' +
+            'derived from gameTickTime.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_month',
+        kind: 'opcode',
+        description:
+            'sfall 0x8219: get_month_sfall() — return current in-game month (1–12) ' +
+            'using 30-day month approximation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_day',
+        kind: 'opcode',
+        description:
+            'sfall 0x821A: get_day_sfall() — return current in-game day of month (1–30).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_time',
+        kind: 'opcode',
+        description:
+            'sfall 0x821B: get_time_sfall() — return current in-game time as HHMM ' +
+            '(e.g. 1430 = 2:30 PM).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_kill_type_0x821c',
+        kind: 'opcode',
+        description:
+            'sfall 0x821C: get_critter_kill_type_sfall(obj) — return kill-type constant ' +
+            '(0=men, 3=super mutants, …) from critter.killType.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_npc_pids',
+        kind: 'opcode',
+        description:
+            'sfall 0x821D: get_npc_pids_sfall() — return NPC PID list. ' +
+            'Browser build: returns 0 (not implemented).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_proto_num',
+        kind: 'opcode',
+        description:
+            'sfall 0x821E: get_proto_num_sfall(obj) — return prototype number (PID). ' +
+            'Alias of obj_pid().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_mark_area_known',
+        kind: 'opcode',
+        description:
+            'sfall 0x821F: mark_area_known_sfall(areaID, markState) — mark or unmark ' +
+            'a world-map location.  Delegates to globalState.markAreaKnown.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

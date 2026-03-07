@@ -1421,6 +1421,20 @@ export module Scripting {
                 return 0
             }
 
+            // BLK-066: Also check equipped slots (leftHand, rightHand, equippedArmor).
+            // In Fallout 2, equipped items are removed from the inventory array and placed
+            // in dedicated slots, so a simple inventory scan would miss them.  Scripts
+            // commonly use obj_carrying_pid_obj() to detect whether an NPC has a specific
+            // weapon equipped before giving them ammo or initiating trade.
+            const equipped = [
+                (obj as any).leftHand,
+                (obj as any).rightHand,
+                (obj as any).equippedArmor,
+            ]
+            for (const slot of equipped) {
+                if (slot && slot.pid === pid) return slot
+            }
+
             for (var i = 0; i < obj.inventory.length; i++) {
                 if (obj.inventory[i].pid === pid) return obj.inventory[i]
             }
@@ -3457,6 +3471,9 @@ export module Scripting {
         // party
         party_member_obj(pid: number) {
             log('party_member_obj', arguments, 'party')
+            // BLK-067: Guard against null gParty to prevent crash during early init
+            // or when tests run without a full game-state setup.
+            if (!globalState.gParty) return 0
             return globalState.gParty.getPartyMemberByPID(pid) || 0
         }
         party_add(obj: Critter) {
@@ -4513,6 +4530,78 @@ export module Scripting {
                 return 0
             }
             return (obj as any).pro?.extra?.weight ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 63 — sfall extended opcodes 0x8218–0x821F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8218 — get_year_sfall():
+        // Return the current in-game year (2241 at game start).
+        // Derived from gameTickTime: 10 ticks = 1 second; 1 year = 365 * 86400 seconds.
+        get_year_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            return 2241 + Math.floor(totalSecs / (365 * 86400))
+        }
+
+        // sfall 0x8219 — get_month_sfall():
+        // Return the current in-game month (1–12).
+        // Uses a 30-day month approximation (Fallout 2 uses 365-day years, 30-day months).
+        get_month_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            return Math.floor(dayOfYear / 30) + 1
+        }
+
+        // sfall 0x821A — get_day_sfall():
+        // Return the current in-game day of the month (1–30, approximate).
+        get_day_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            return (dayOfYear % 30) + 1
+        }
+
+        // sfall 0x821B — get_time_sfall():
+        // Return the current in-game time in minutes since midnight (0–1439).
+        // This matches Fallout 2's time() script opcode which returns HHMM as number.
+        get_time_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const secsToday = Math.floor(totalSecs) % 86400
+            const hour = Math.floor(secsToday / 3600)
+            const minute = Math.floor((secsToday % 3600) / 60)
+            return hour * 100 + minute
+        }
+
+        // sfall 0x821C — get_critter_kill_type_sfall(obj):
+        // Return the kill-type constant for a critter (used for XP and kill counts).
+        // 0=men, 1=women, 2=children, 3=super mutants, …
+        // Alias of the Phase-58 opcode 0x81F4; reads from pro.extra.killType.
+        // Note: this method is already defined in Phase 58 at 0x81F4; the 0x821C
+        // opcode entry in vm_bridge.ts is a second binding to the same function.
+
+        // sfall 0x821D — get_npc_pids_sfall():
+        // Return an array of PIDs of active party member NPCs.
+        // Browser build: returns 0 (not implemented; party tracking is minimal).
+        get_npc_pids_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x821E — get_proto_num_sfall(obj):
+        // Return the prototype number (PID) of an object.
+        // Alias of obj_pid() exposed under the sfall opcode convention.
+        get_proto_num_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).pid ?? 0
+        }
+
+        // sfall 0x821F — mark_area_known_sfall(areaID, markState):
+        // Mark or unmark a world-map location as known.
+        // markState: 0 = hide, 1 = reveal.
+        // Delegates to globalState.markAreaKnown if registered by the world-map system.
+        mark_area_known_sfall(areaID: number, markState: number): void {
+            if (typeof globalState.markAreaKnown === 'function') {
+                globalState.markAreaKnown(areaID, markState)
+            }
         }
 
         _serialize(): SerializedScript {
