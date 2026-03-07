@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
 [![TypeScript](https://img.shields.io/badge/engine-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-1817%20passing-2ea44f.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-Vitest-2ea44f.svg)](#contributing)
 [![Platform](https://img.shields.io/badge/platform-browser%20first-orange.svg)](#mission)
 
 OpenF2 is an open-source reimplementation of the Fallout 2 engine.
@@ -15,7 +15,7 @@ OpenF2 exists to make Fallout 2 playable on modern platforms without relying on 
 
 Core goals:
 
-- **Faithful Fallout 2 gameplay** using original assets and data formats
+- **Faithful reproduction of Fallout 2 gameplay mechanics** using original assets and data formats
 - **Cross-platform runtime** via web technology (browser-first architecture)
 - **Open engine development** with transparent implementation and tests
 - **Mod-friendly architecture** with override layers and script extensibility
@@ -31,7 +31,7 @@ Core goals:
 
 ## Project Maturity Report (Code-Verified)
 
-This summary is based on current code in `src/` and the existing test suite (`npm test` currently reports **1817 passing tests**).
+This summary is based on current code in `src/` and the existing test suite (validated with `npm test` during this documentation update).
 
 ### Engine Status Dashboard
 
@@ -57,9 +57,9 @@ This summary is based on current code in `src/` and the existing test suite (`np
 
 From `src/scriptingChecklist.ts`:
 
-- **Implemented:** 89 tracked entries
-- **Partial:** 34 tracked entries
-- **Stub-only blockers:** none marked as `stub`, but multiple high-impact entries are still partial
+- A large share of tracked scripting/runtime entries are implemented
+- A meaningful set of entries are still partial and remain the biggest fidelity risk
+- No entries are currently marked as pure `stub`, but several high-impact behaviors are still incomplete
 
 Most critical partials include `proto_data`, animation queue callbacks (`reg_anim_*`), and script-side visibility/LOS style helpers.
 
@@ -172,7 +172,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed milestones.
 
 OpenF2 is browser-first and can evolve into broader web deployment:
 
-- **Runtime target:** WebAssembly-compatible packaging for engine/runtime tooling
+- **Runtime target:** keep the current TypeScript/browser runtime as default, while optionally packaging performance-sensitive modules via WebAssembly where it provides clear benefits
 - **Rendering targets:** current WebGL path, future WebGPU option
 - **Tooling path:** Emscripten/wasm workflows where native code interop is required
 - **Deployment goal:** playable in modern desktop browsers first, mobile exploration later

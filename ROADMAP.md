@@ -14,7 +14,7 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 ## Current Project Status
 
 - Core engine runtime is functioning (map loading, rendering, input, combat loop, UI panels, save/load).
-- Test suite is active and extensive (`npm test` currently reports 1817 passing tests).
+- Test suite is active and extensive (validated with `npm test` during this documentation update).
 - Largest remaining risk to complete playability is **scripting/runtime parity** and edge-case fidelity.
 
 ### System Status Dashboard
@@ -141,7 +141,7 @@ These are intentionally out-of-critical-path experiments:
 
 - Co-op / netplay prototypes
 - Multiplayer state synchronization experiments
-- Browser-hosted shared world-state experimentation
+- Browser-hosted shared world-state experimentation (for example: synchronizing travel/location state between multiple connected clients in a prototype session)
 
 They should not delay the core objective of complete Fallout 2 single-player fidelity.
 
