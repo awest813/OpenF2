@@ -55,6 +55,7 @@ export interface BatchStats {
 
 export class SpriteBatch {
     private _commands: DrawCommand[] = []
+    private _commandPool: DrawCommand[] = []
     private _open = false
     private _beginTime = 0
     private _lastStats: BatchStats = { drawCount: 0, uniqueTextures: 0, bindsSaved: 0, frameTimeMs: 0 }
@@ -62,7 +63,7 @@ export class SpriteBatch {
     /** Open a new frame.  Must be called before draw(). */
     begin(): void {
         if (this._open) throw new Error('SpriteBatch.begin() called while batch is already open')
-        this._commands = []
+        this._commands.length = 0
         this._beginTime = performance.now()
         this._open = true
     }
@@ -88,6 +89,19 @@ export class SpriteBatch {
         layer: DrawLayer = DrawLayer.Object,
     ): void {
         if (!this._open) throw new Error('SpriteBatch.draw() called outside begin/end block')
+        const cmd = this._commandPool.pop()
+        if (cmd) {
+            cmd.textureKey = textureKey
+            cmd.x = x
+            cmd.y = y
+            cmd.width = width
+            cmd.height = height
+            cmd.frame = frame
+            cmd.layer = layer
+            this._commands.push(cmd)
+            return
+        }
+
         this._commands.push({ textureKey, x, y, width, height, frame, layer })
     }
 
@@ -109,16 +123,29 @@ export class SpriteBatch {
             return a.textureKey < b.textureKey ? -1 : a.textureKey > b.textureKey ? 1 : 0
         })
 
-        // Compute stats.
+        // Compute stats without creating temporary arrays/Sets.
         const drawCount = this._commands.length
-        const uniqueTextures = new Set(this._commands.map((c) => c.textureKey)).size
+        let uniqueTextures = 0
+        let prevTexture = ''
+        let first = true
+        for (let i = 0; i < drawCount; i++) {
+            const texture = this._commands[i].textureKey
+            if (first || texture !== prevTexture) {
+                uniqueTextures++
+                prevTexture = texture
+                first = false
+            }
+        }
         const bindsSaved = Math.max(0, drawCount - uniqueTextures)
         const frameTimeMs = performance.now() - this._beginTime
 
         this._lastStats = { drawCount, uniqueTextures, bindsSaved, frameTimeMs }
 
-        const result = this._commands
-        this._commands = []
+        const result = this._commands.slice()
+        for (let i = 0; i < this._commands.length; i++) {
+            this._commandPool.push(this._commands[i])
+        }
+        this._commands.length = 0
         return result
     }
 
