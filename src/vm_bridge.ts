@@ -239,7 +239,7 @@ export module ScriptVMBridge {
             //console.log("TARGET=%o, proc=%o this=%o", targetFn, this.intfile.proceduresTable[target], this)
             var targetProc = this.intfile.proceduresTable[target]?.name
             if (!targetProc) {
-                console.warn('[vm_bridge] giq_option: procedure at index ' + target + ' not found — option skipped')
+                console.warn(`[vm_bridge] giq_option: procedure at index ${target} not found — option skipped`)
                 return
             }
             // TODO: do we save the current PC as the return address?
@@ -260,7 +260,7 @@ export module ScriptVMBridge {
 
             var targetProc = this.intfile.proceduresTable[target]?.name
             if (!targetProc) {
-                console.warn('[vm_bridge] gsay_option: procedure at index ' + target + ' not found — option skipped')
+                console.warn(`[vm_bridge] gsay_option: procedure at index ${target} not found — option skipped`)
                 return
             }
             var targetFn = () => { this.call(targetProc!) }

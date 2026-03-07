@@ -135,7 +135,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     }, // op_floor
     0x801b: function () {
         if (this.dataStack.length === 0) {
-            // Underflow in op_dup — push 0 rather than crashing.
+            // Data stack underflow: push 0 rather than crashing.
             console.warn('[ScriptVM] op_dup: data stack underflow — pushing 0')
             this.push(0)
             return
@@ -168,7 +168,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         const procIdx = this.pop()
         const proc = this.intfile.proceduresTable[procIdx]
         if (!proc) {
-            // Missing procedure table entry — cannot validate, continue silently.
+            // Missing procedure table entry — warn and skip validation.
             console.warn('[ScriptVM] op_check_arg_count: no procedure at index ' + procIdx + ' — skipping check')
             return
         }
@@ -176,8 +176,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
             // Arg count mismatch is a script-level bug; warn but continue so the
             // call can still proceed rather than crashing the entire game.
             console.warn(
-                '[ScriptVM] op_check_arg_count: expected ' + proc.argc +
-                ' args, got ' + argc + ' args when calling ' + proc.name + ' — continuing'
+                `[ScriptVM] op_check_arg_count: expected ${proc.argc} args, got ${argc} args when calling ${proc.name} — continuing`
             )
         }
     },

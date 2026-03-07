@@ -297,7 +297,10 @@ export function objectOnScreen(obj: Obj): boolean {
 export function objectTransparentAt(obj: Obj, position: Point) {
     const frame = obj.frame !== undefined ? obj.frame : 0
     const imageInfo = globalState.imageInfo[obj.art]
-    if (!imageInfo) return true // no image info — treat as transparent
+    if (!imageInfo) {
+        console.warn('[renderer] objectTransparentAt: no imageInfo for art "' + obj.art + '" — assuming transparent')
+        return true // no image info — treat as transparent
+    }
     const sx = imageInfo.frameOffsets[obj.orientation]?.[frame]?.sx ?? 0
 
     if (!globalState.tempCanvasCtx) {

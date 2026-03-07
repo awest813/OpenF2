@@ -24,6 +24,12 @@ import { Worldmap } from "./worldmap.js";
 
 // Random Encounter system
 
+/** Fallout 2 perk IDs used by the encounter system (from PERKS.MSG). */
+const PERK_CAUTIOUS_NATURE = 16
+const PERK_SCOUT           = 22
+const PERK_RANGER          = 28
+const PERK_EXPLORER        = 29
+
 export module Encounters {
     enum Tok {
         IF = 0,
@@ -329,9 +335,9 @@ export module Encounters {
         // These perks are not yet in perks.ts but can be granted by scripts; check
         // perkRanks directly so the bonuses activate as soon as a script awards them.
         var perkRanks = globalState.player.perkRanks ?? {}
-        if ((perkRanks[22] ?? 0) > 0) roll += 1  // Scout
-        if ((perkRanks[28] ?? 0) > 0) roll += 1  // Ranger
-        if ((perkRanks[29] ?? 0) > 0) roll += 2  // Explorer
+        if ((perkRanks[PERK_SCOUT] ?? 0) > 0) roll += 1
+        if ((perkRanks[PERK_RANGER] ?? 0) > 0) roll += 1
+        if ((perkRanks[PERK_EXPLORER] ?? 0) > 0) roll += 2
 
         // Remove chances from roll until either we reach the end of the list or the roll runs out.
         // If our roll does *not* run out (i.e., its value exceeds totalChance), then
@@ -380,7 +386,7 @@ export module Encounters {
                     case "surrounding":
                         var roll = globalState.player.getStat("PER") + getRandomInt(-2, 2)
                         // Cautious Nature perk (Fallout 2 perk ID 16): +3 to formation spacing.
-                        if (((globalState.player.perkRanks ?? {})[16] ?? 0) > 0) roll += 3
+                        if (((globalState.player.perkRanks ?? {})[PERK_CAUTIOUS_NATURE] ?? 0) > 0) roll += 3
 
                         if(roll < 0)
                             roll = 0
