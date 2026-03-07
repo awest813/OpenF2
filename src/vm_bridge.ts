@@ -917,6 +917,34 @@ export module ScriptVMBridge {
 
        // 0x820F — get_map_script_id_sfall(): return current map script ID.
        ,0x820F: bridged("get_map_script_id_sfall", 0) // get_map_script_id() → sid
+
+       // -----------------------------------------------------------------------
+       // Phase 62 — sfall extended opcodes 0x8210–0x8217
+       // -----------------------------------------------------------------------
+
+       // 0x8210 — critter_is_fleeing_sfall(obj): return 1 if critter is fleeing.
+       ,0x8210: bridged("critter_is_fleeing_sfall", 1) // critter_is_fleeing(obj) → 0|1
+
+       // 0x8211 — get_perk_name_sfall(perkId): return perk display name string.
+       ,0x8211: bridged("get_perk_name_sfall", 1) // get_perk_name(perkId) → string
+
+       // 0x8212 — get_critter_perk_sfall(critter, perkId): return perk rank.
+       ,0x8212: bridged("get_critter_perk_sfall", 2) // get_critter_perk(obj, id) → rank
+
+       // 0x8213 — obj_is_open_sfall(obj): return 1 if object is open.
+       ,0x8213: bridged("obj_is_open_sfall", 1) // obj_is_open(obj) → 0|1
+
+       // 0x8214 — get_world_map_x_sfall(): return worldmap x position.
+       ,0x8214: bridged("get_world_map_x_sfall", 0) // get_world_map_x() → x
+
+       // 0x8215 — get_world_map_y_sfall(): return worldmap y position.
+       ,0x8215: bridged("get_world_map_y_sfall", 0) // get_world_map_y() → y
+
+       // 0x8216 — set_world_map_pos_sfall(x, y): set worldmap position.
+       ,0x8216: bridged("set_world_map_pos_sfall", 2, false) // set_world_map_pos(x, y)
+
+       // 0x8217 — get_object_weight_sfall(obj): return object weight in pounds.
+       ,0x8217: bridged("get_object_weight_sfall", 1) // get_object_weight(obj) → pounds
     }
     Object.assign(opMap, bridgeOpMap)
 

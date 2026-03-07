@@ -399,13 +399,16 @@ export class Combat {
             if (hex !== null) obj.orientation = hex.direction
         }
 
-        // attack!
-        obj.staticAnimation('attack', callback)
-
+        // Calculate hit and damage synchronously before starting the animation so
+        // that we can wrap the callback if the last enemy was just killed (BLK-062).
         var who = obj.isPlayer ? 'You' : obj.name
         var targetName = target.isPlayer ? 'you' : target.name
         var hitRoll = this.rollHit(obj, target, region)
         this.log('hit% is ' + this.getHitChance(obj, target, region).hit)
+
+        // BLK-062: Track whether this attack killed the last non-player combatant so
+        // combat can be ended automatically after the animation completes.
+        let shouldAutoEnd = false
 
         if (hitRoll.hit === true) {
             var critModifier = hitRoll.crit ? hitRoll.DM : 2
@@ -415,7 +418,11 @@ export class Combat {
 
             critterDamage(target, damage, obj)
 
-            if (target.dead) this.perish(target)
+            if (target.dead) {
+                this.perish(target)
+                // BLK-062: All non-player combatants dead → auto-end after animation.
+                shouldAutoEnd = this.canEndCombat()
+            }
         } else {
             this.log(who + ' missed ' + targetName + (hitRoll.crit === true ? ' critically' : ''))
             if (hitRoll.crit === true) {
@@ -436,10 +443,36 @@ export class Combat {
                 CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
             }
         }
+
+        // BLK-062: When the last enemy dies, wrap the animation callback so that
+        // nextTurn() is called automatically after the animation finishes.
+        // nextTurn() will detect numActive===0 (all enemies dead) and call end().
+        const effectiveCallback: (() => void) | undefined = shouldAutoEnd
+            ? () => {
+                if (callback) callback()
+                if (globalState.inCombat && globalState.combat === this) {
+                    this.nextTurn()
+                }
+            }
+            : callback
+
+        // attack!
+        obj.staticAnimation('attack', effectiveCallback)
     }
 
     perish(obj: Critter) {
         this.log('...And killed them.')
+    }
+
+    // BLK-063: Return true when all non-player combatants are dead (i.e. combat
+    // can be safely ended).  Used by auto-end-combat (BLK-062) and may be
+    // queried by the UI or scripts to determine current combat viability.
+    canEndCombat(): boolean {
+        for (const c of this.combatants) {
+            if (c.isPlayer) continue
+            if (!c.dead) return false
+        }
+        return true
     }
 
     getCombatAIMessage(id: number) {
@@ -660,7 +693,8 @@ export class Combat {
     }
 
     end() {
-        // TODO: check number of active combatants to see if we can end
+        // BLK-063: canEndCombat() is called by nextTurn() (numActive===0) and by
+        // the BLK-062 auto-end callback.  The former TODO is now resolved.
 
         // Set all combatants to non-hostile and remove their outline
         for (const combatant of this.combatants) {

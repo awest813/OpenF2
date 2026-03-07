@@ -499,6 +499,36 @@ export module Scripting {
         _script: Script
     }
 
+    // BLK-064: Fallout 2 engine-appropriate defaults for well-known INI config keys.
+    // Keys are stored in lower-case for O(1) case-insensitive lookup.
+    // Scripts that call get_ini_setting() receive these defaults when the browser
+    // build cannot read the actual INI files, preventing settings from appearing
+    // falsely disabled (0) when the FO2 engine default is non-zero.
+    const INI_SETTING_DEFAULTS: Readonly<Record<string, number>> = {
+        'main.speedinterfacecounteranims': 1,
+        'main.fps': 60,
+        'main.brightmaps': 0,
+        'main.singlecore': 1,
+        'main.subtitles': 0,
+        'main.languagefilter': 0,
+        'main.running': 1,
+        'sound.sound': 1,
+        'sound.music': 1,
+        'sound.speech': 1,
+        'sound.sfxvolume': 117,
+        'sound.musicvolume': 117,
+        'sound.speechvolume': 117,
+        'preferences.game_difficulty': 1,
+        'preferences.combat_difficulty': 1,
+        'preferences.violence_level': 3,
+        'preferences.target_highlight': 2,
+        'preferences.combat_looks': 0,
+        'preferences.item_highlight': 1,
+        'preferences.combat_messages': 1,
+        'preferences.combat_taunts': 1,
+        'preferences.running_burning_guy': 1,
+    }
+
     export class Script {
         // Stuff we hacked in
         _didOverride = false // Did the procedure call override the default action?
@@ -1524,6 +1554,10 @@ export module Scripting {
             }
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
+            // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
+            // Fallout 2 returns -1 when placement fails; we mirror that here so
+            // calling scripts can detect and handle the failure gracefully.
+            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) return -1
             // Place the critter at tileNum; move_to handles finding a nearby tile if
             // the exact position is occupied.
             return this.move_to(obj, tileNum, elevation)
@@ -3435,9 +3469,15 @@ export module Scripting {
         }
 
         // sfall extended opcode — read an INI setting by key string (0x8198).
-        // Partial: the browser build has no INI file layer; always returns 0.
+        // BLK-064: Returns sensible Fallout 2 defaults for well-known config keys.
+        // Full INI file access is not available in the browser build; returning
+        // engine-appropriate defaults prevents scripts from treating absent settings
+        // as explicitly disabled (0) when the actual FO2 default is non-zero.
         get_ini_setting(key: string): number {
-            log('get_ini_setting', arguments)
+            const normalized = key.toLowerCase()
+            if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, normalized)) {
+                return INI_SETTING_DEFAULTS[normalized]
+            }
             return 0
         }
 
@@ -4394,6 +4434,85 @@ export module Scripting {
         // or 0 if no map script is loaded.
         get_map_script_id_sfall(): number {
             return (globalState.gMap as any)?.mapObj?.scriptID ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 62 — sfall extended opcodes 0x8210–0x8217
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8210 — critter_is_fleeing_sfall(obj):
+        // Return 1 if the critter is currently fleeing (low-HP flight behaviour),
+        // else 0.  Reads the isFleeing flag set by the AI flee code path.
+        critter_is_fleeing_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_is_fleeing_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).isFleeing ? 1 : 0
+        }
+
+        // sfall 0x8211 — get_perk_name_sfall(perkId):
+        // Return the localised display name of a perk by its numeric ID.
+        // Browser build: perk name table is not loaded; returns empty string.
+        get_perk_name_sfall(perkId: number): string {
+            return ''
+        }
+
+        // sfall 0x8212 — get_critter_perk_sfall(critter, perkId):
+        // Return the rank of a perk possessed by a critter (0 if not possessed).
+        // Reads from critter.perkRanks which is updated by critter_add_trait PERK calls.
+        get_critter_perk_sfall(obj: Obj, perkId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_perk_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).perkRanks?.[perkId] ?? 0
+        }
+
+        // sfall 0x8213 — obj_is_open_sfall(obj):
+        // Return 1 if the object (door/container) is currently in the open state,
+        // else 0.  Reads the open flag on the object.
+        obj_is_open_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('obj_is_open_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).open === true ? 1 : 0
+        }
+
+        // sfall 0x8214 — get_world_map_x_sfall():
+        // Return the player's current world-map tile x-coordinate.
+        // Returns -1 when the player is not on the world map (inside a local map).
+        get_world_map_x_sfall(): number {
+            return globalState.worldPosition?.x ?? -1
+        }
+
+        // sfall 0x8215 — get_world_map_y_sfall():
+        // Return the player's current world-map tile y-coordinate.
+        // Returns -1 when the player is not on the world map.
+        get_world_map_y_sfall(): number {
+            return globalState.worldPosition?.y ?? -1
+        }
+
+        // sfall 0x8216 — set_world_map_pos_sfall(x, y):
+        // Update the player's stored world-map position.
+        // Used by travel and teleport scripts to reposition the player.
+        // Only takes effect when the player is already on the world map.
+        set_world_map_pos_sfall(x: number, y: number): void {
+            if (globalState.worldPosition !== undefined) {
+                globalState.worldPosition = { x, y }
+            }
+        }
+
+        // sfall 0x8217 — get_object_weight_sfall(obj):
+        // Return the weight of an object in pounds from its prototype data.
+        // Returns 0 for non-item objects or when prototype data is unavailable.
+        get_object_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_weight_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.weight ?? 0
         }
 
         _serialize(): SerializedScript {

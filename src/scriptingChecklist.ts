@@ -4210,6 +4210,148 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 62 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-062: Combat auto-end after player kills last enemy
+    {
+        id: 'blk_062_combat_auto_end_after_kill',
+        kind: 'procedure',
+        description:
+            'BLK-062: Combat.attack() now wraps the animation callback to call nextTurn() ' +
+            'automatically when the last non-player combatant is killed.  ' +
+            'nextTurn() detects numActive===0 and calls end(), so combat ends without ' +
+            'requiring an explicit "End Turn" button press after the last enemy dies.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-063: canEndCombat() helper
+    {
+        id: 'blk_063_can_end_combat_helper',
+        kind: 'procedure',
+        description:
+            'BLK-063: Combat.canEndCombat() returns true when all non-player combatants ' +
+            'are dead.  Used internally by auto-end (BLK-062).  The TODO comment in ' +
+            'Combat.end() is resolved; ending is triggered by nextTurn() or auto-end.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-064: get_ini_setting common-key defaults
+    {
+        id: 'blk_064_get_ini_setting_defaults',
+        kind: 'opcode',
+        description:
+            'BLK-064: get_ini_setting(key) now returns sensible FO2 engine defaults for ' +
+            '~20 well-known config keys (SpeedInterfaceCounterAnims=1, FPS=60, sound=1, ' +
+            'etc.).  Unknown keys still return 0.  Full INI file access is unavailable ' +
+            'in the browser build but engine-appropriate defaults prevent scripts from ' +
+            'treating absent settings as explicitly disabled.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-065: critter_attempt_placement null guard
+    {
+        id: 'blk_065_critter_attempt_placement_guard',
+        kind: 'procedure',
+        description:
+            'BLK-065: critter_attempt_placement(obj, tileNum, elev) now returns -1 ' +
+            '(failure) when obj is null/non-game-object or tileNum is ≤0.  This mirrors ' +
+            'the Fallout 2 engine return value for failed placement and prevents move_to ' +
+            'from crashing on invalid inputs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8210-0x8217
+    {
+        id: 'sfall_critter_is_fleeing',
+        kind: 'opcode',
+        description:
+            'sfall 0x8210: critter_is_fleeing_sfall(obj) — return 1 if critter is ' +
+            'currently fleeing (low-HP flight behaviour).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_perk_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x8211: get_perk_name_sfall(perkId) — return display name of perk. ' +
+            'Browser build: returns empty string (perk name table not loaded).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_perk',
+        kind: 'opcode',
+        description:
+            'sfall 0x8212: get_critter_perk_sfall(critter, perkId) — return rank of ' +
+            'perk possessed by critter.  Reads from critter.perkRanks.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_obj_is_open',
+        kind: 'opcode',
+        description:
+            'sfall 0x8213: obj_is_open_sfall(obj) — return 1 if object is open ' +
+            '(door/container state), else 0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_world_map_x',
+        kind: 'opcode',
+        description:
+            'sfall 0x8214: get_world_map_x_sfall() — return player world-map x ' +
+            'coordinate, or -1 when inside a local map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_world_map_y',
+        kind: 'opcode',
+        description:
+            'sfall 0x8215: get_world_map_y_sfall() — return player world-map y ' +
+            'coordinate, or -1 when inside a local map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_world_map_pos',
+        kind: 'opcode',
+        description:
+            'sfall 0x8216: set_world_map_pos_sfall(x, y) — update stored world-map ' +
+            'position.  No-op when the player is not on the world map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x8217: get_object_weight_sfall(obj) — return object weight in ' +
+            'pounds from prototype data.  Returns 0 for non-items.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
