@@ -206,7 +206,12 @@ export module Lighting {
 
                 var light = baseLight
                 for (var k = 0; k < edx; k++) {
-                    if (intensityIdx < 0 || intensityIdx >= intensity_map.length) throw 'guard'
+                    if (intensityIdx < 0 || intensityIdx >= intensity_map.length) {
+                        // Index out of bounds — skip this lighting step to prevent
+                        // buffer overflow; may result in partial lighting but won't crash.
+                        console.warn('[lighting] intensity_map index ' + intensityIdx + ' out of bounds [0,' + intensity_map.length + ') — skipping')
+                        break
+                    }
                     intensity_map[intensityIdx++] = light
                     light += lightInc
                 }

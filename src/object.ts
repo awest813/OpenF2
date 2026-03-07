@@ -173,11 +173,11 @@ function objectFindIndex(obj: Obj): number {
 }
 
 function objectZCompare(a: Obj, b: Obj): number {
-    const aY = a.position.y
-    const bY = b.position.y
+    const aY = a.position?.y ?? 0
+    const bY = b.position?.y ?? 0
 
-    const aX = a.position.x
-    const bX = b.position.x
+    const aX = a.position?.x ?? 0
+    const bX = b.position?.x ?? 0
 
     if (aY === bY) {
         if (aX < bX) {
@@ -199,7 +199,8 @@ function objectZCompare(a: Obj, b: Obj): number {
         return 1
     }
 
-    throw 'unreachable'
+    // All coordinate comparisons exhausted (e.g. NaN positions) — treat as equal.
+    return 0
 }
 
 function objectZOrder(obj: Obj, index: number): void {

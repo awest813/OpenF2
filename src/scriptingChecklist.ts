@@ -2248,6 +2248,271 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+    // -------------------------------------------------------------------------
+    // Phase 47 entries
+    // -------------------------------------------------------------------------
+    {
+        id: 'vm_op_dup_underflow_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_dup (0x801b): data-stack underflow previously threw a string ' +
+            'that crashed the entire game. Now logs console.warn and pushes 0 instead, so ' +
+            'scripts with dup-before-push bugs continue executing rather than hard-crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_check_arg_count_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_check_arg_count (0x8027): argument count mismatch previously ' +
+            'threw a string that crashed the entire game. Now logs console.warn and continues — ' +
+            'the call still proceeds so sfall-extended or modded scripts with minor arity ' +
+            'differences do not abort the session.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_lookup_string_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_lookup_string_proc (0x8028): when the procedure name is not in ' +
+            'the intfile procedures table the implicit property access threw a TypeError. Now ' +
+            'logs console.warn and pushes 0 so the script can handle the missing proc gracefully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_call_missing_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_call (0x8005): when the procedure index is out of range in ' +
+            'proceduresTable the implicit property access threw a TypeError. Now logs console.warn ' +
+            'and halts the VM gracefully instead of crashing the entire game session.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_opcode_9001_missing_symbol_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts opcode 0x9001 (push identifier / string): when the requested ' +
+            'identifier or string number is absent from the intfile tables, the engine ' +
+            'previously threw an Error that crashed the session. Now logs console.warn and ' +
+            'pushes an empty string so downstream code receives a safe fallback.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'vm_division_by_zero_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts opcodes 0x803c (integer division) and 0x803d (modulo): division or ' +
+            'modulo by zero previously threw a string that crashed the game. Now logs ' +
+            'console.warn and returns 0 so scripts with divide-by-zero edge cases continue.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'encounter_player_level_evalcond',
+        kind: 'procedure',
+        description:
+            'encounters.ts evalCond(): the "player.level" condition check previously always ' +
+            'returned 0. Now reads globalState.player.level (falling back to 1 when the player ' +
+            'is not yet initialised). Encounter conditions gated on player level now fire ' +
+            'correctly, enabling level-gated spawns throughout the world map.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'encounter_perk_roll_bonuses',
+        kind: 'procedure',
+        description:
+            'encounters.ts pickEncounter(): Scout (perk ID 22), Ranger (perk ID 28), and ' +
+            'Explorer (perk ID 29) now add +1/+1/+2 to the encounter roll respectively, ' +
+            'matching the Fallout 2 formula. Bonuses are read from player.perkRanks so they ' +
+            'activate as soon as a script grants the perk.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'encounter_cautious_nature_formation',
+        kind: 'procedure',
+        description:
+            'encounters.ts positionCritters(): the Cautious Nature perk (Fallout 2 perk ID 16) ' +
+            'now adds +3 to the surrounding-formation spacing roll, increasing the distance ' +
+            'at which hostile critters are placed when the formation is "surrounding". ' +
+            'Check uses player.perkRanks[16] so it activates via critter_add_trait.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'gsay_option_implemented',
+        kind: 'opcode',
+        description:
+            'vm_bridge.ts opcode 0x811F (gsay_option): was entirely missing — any dialogue ' +
+            'script calling gsay_option() silently dropped all options and players saw no ' +
+            'conversation choices. Now implemented as a custom handler that pops ' +
+            '(msgList, msgID, target, reaction), resolves the procedure name via ' +
+            'proceduresTable, and calls scripting.ts gsay_option() which adds the option ' +
+            'unconditionally via uiAddDialogueOption. Companion to giq_option (0x8121) ' +
+            'which adds options conditionally on INT.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'blocker',
+    },
+    {
+        id: 'objectZCompare_nan_safe',
+        kind: 'procedure',
+        description:
+            'object.ts objectZCompare(): previously threw the string "unreachable" when ' +
+            'object position coordinates were NaN or undefined (e.g. objects created ' +
+            'without a position). Now returns 0 (equal) in that case and uses ' +
+            'optional-chaining on position coordinates to avoid TypeError on null ' +
+            'positions, preventing crashes during map render sorting.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'giq_option_missing_proc_safe',
+        kind: 'procedure',
+        description:
+            'vm_bridge.ts giq_option (0x8121): previously threw a TypeError when ' +
+            'proceduresTable[target] was undefined (e.g. corrupted or empty target). ' +
+            'Now checks with ?. and logs console.warn + returns early so dialogue ' +
+            'continues without crashing the session.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'data_city_txt_invalid_area_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseAreas(): sections in city.txt that do not match "Area N" (e.g. ' +
+            'comment sections or mod-specific headers) previously threw a string crashing ' +
+            'the world map loader. Now logs console.warn and skips the section so the rest ' +
+            'of city.txt loads successfully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'data_city_txt_unknown_map_entrance_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseAreas(): city.txt entrances that reference a map name not found in ' +
+            'the maps lookup table previously threw an Error crashing the world map loader. ' +
+            'Now logs console.warn and skips the entrance so the area still loads with its ' +
+            'remaining valid entrances.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'data_area_containing_map_no_mapAreas_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts areaContainingMap(): calling this function before globalState.mapAreas ' +
+            'is loaded previously threw an Error. Now logs console.warn and returns null so ' +
+            'callers receive a safe sentinel without crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'data_maps_txt_invalid_category_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseMapInfo(): sections in maps.txt that do not match "Map N" ' +
+            'previously threw an Error. Now logs console.warn and skips the section. ' +
+            'Also hardens invalid random_start_point entries: skip with warning instead ' +
+            'of throwing so map info loads fully even with partial data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'lightmap_tile_num_in_direction_invalid_dir_no_throw',
+        kind: 'procedure',
+        description:
+            'lightmap.ts tile_num_in_direction(): an invalid direction (< 0 or > 5) ' +
+            'previously threw a string crashing the renderer during lighting updates. ' +
+            'Now logs console.warn and returns -1 so lighting gracefully handles ' +
+            'corrupted or edge-case map data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'lighting_intensity_map_out_of_bounds_no_throw',
+        kind: 'procedure',
+        description:
+            'lighting.ts intensity_map loop: when the computed intensityIdx falls outside ' +
+            '[0, intensity_map.length), the code previously threw the string "guard" ' +
+            'crashing the renderer. Now logs console.warn and breaks out of the inner ' +
+            'loop so lighting continues for subsequent tiles even on corrupt light data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'util_parseIni_key_before_section_no_throw',
+        kind: 'procedure',
+        description:
+            'util.ts parseIni(): a key=value pair appearing before the first [section] ' +
+            'header previously threw a string crashing any code that loaded such an INI ' +
+            '(e.g. AI.TXT, ddraw.ini). Now logs console.warn and skips the line so the ' +
+            'rest of the file is parsed successfully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'renderer_objectRenderInfo_no_imageInfo_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectRenderInfo(): when globalState.imageInfo[obj.art] is ' +
+            'undefined (image loaded but metadata not yet available), previously threw ' +
+            'a string crashing the renderer. Now logs console.warn and returns null so ' +
+            'the object is simply skipped during this render frame.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'renderer_objectBoundingBox_no_imageInfo_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectBoundingBox(): missing imageInfo previously threw a string ' +
+            'crashing hit-testing. Now logs console.warn and returns null so callers ' +
+            'treat the object as having no bounding box (click-through).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'renderer_objectTransparentAt_no_tempCanvasCtx_no_throw',
+        kind: 'procedure',
+        description:
+            'renderer.ts objectTransparentAt(): a null tempCanvasCtx (and missing imageInfo) ' +
+            'previously threw an Error crashing click transparency testing. Now guards both ' +
+            'conditions with console.warn + return true (transparent) so the game continues ' +
+            'without a crash if the temp canvas is unavailable.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

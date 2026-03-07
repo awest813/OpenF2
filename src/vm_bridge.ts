@@ -237,13 +237,35 @@ export module ScriptVMBridge {
             // wrap target in a function
             //var targetFn = () => { this.call() }
             //console.log("TARGET=%o, proc=%o this=%o", targetFn, this.intfile.proceduresTable[target], this)
-            var targetProc = this.intfile.proceduresTable[target].name
+            var targetProc = this.intfile.proceduresTable[target]?.name
+            if (!targetProc) {
+                console.warn(`[vm_bridge] giq_option: procedure at index ${target} not found — option skipped`)
+                return
+            }
             // TODO: do we save the current PC as the return address?
             // otherwise when end_dialogue is reached, we will have
             // interrupted to this targetFn, and have no way back
-            var targetFn = () => { this.call(targetProc) }
+            var targetFn = () => { this.call(targetProc!) }
 
             this.scriptObj.giq_option(iqTest, msgList, msgId, targetFn, reaction)
+        }
+
+       // gsay_option (0x811F) — adds a dialogue option without an INT requirement.
+       // Opcode takes 4 args: msgList, msgID, target (procedure index), reaction.
+       ,0x811F: function() { // gsay_option
+            var reaction = this.pop()
+            var target = this.pop()
+            var msgId = this.pop()
+            var msgList = this.pop()
+
+            var targetProc = this.intfile.proceduresTable[target]?.name
+            if (!targetProc) {
+                console.warn(`[vm_bridge] gsay_option: procedure at index ${target} not found — option skipped`)
+                return
+            }
+            var targetFn = () => { this.call(targetProc!) }
+
+            this.scriptObj.gsay_option(msgList, msgId, targetFn, reaction)
         }
 
        ,0x811b: function() { // get_year: compute current game year from gameTickTime

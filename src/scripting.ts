@@ -2237,6 +2237,17 @@ export module Scripting {
             log('end_dialogue', arguments)
             dialogueExit()
         }
+        gsay_option(msgList: number, msgID: string | number, target: any, reaction: number) {
+            log('gsay_option', arguments)
+            var msg = getScriptMessage(msgList, msgID)
+            if (msg === null || msg === '') {
+                warn('gsay_option: msg is null/empty — option skipped', undefined, this)
+                return
+            }
+            info('DIALOGUE OPTION: ' + msg, 'dialogue')
+            dialogueOptionProcs.push(target.bind(this))
+            uiAddDialogueOption(msg, dialogueOptionProcs.length - 1)
+        }
         giq_option(iqTest: number, msgList: number, msgID: string | number, target: any, reaction: number) {
             log('giQ_Option', arguments)
             var msg = getScriptMessage(msgList, msgID)

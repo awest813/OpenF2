@@ -96,9 +96,13 @@ describe('op_div (0x803c)', () => {
         expect(vm.pop()).toBe(-3)
     })
 
-    it('throws on division by zero', () => {
+    it('warns and returns 0 on division by zero', () => {
         const vm = makeVM([10, 0])
-        expect(() => exec(0x803c, vm)).toThrow('division by zero')
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        exec(0x803c, vm)
+        expect(vm.pop()).toBe(0)
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('division by zero'))
+        warnSpy.mockRestore()
     })
 })
 
@@ -109,9 +113,13 @@ describe('op_mod (0x803d)', () => {
         expect(vm.pop()).toBe(1)
     })
 
-    it('throws on modulo by zero', () => {
+    it('warns and returns 0 on modulo by zero', () => {
         const vm = makeVM([10, 0])
-        expect(() => exec(0x803d, vm)).toThrow('modulo by zero')
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        exec(0x803d, vm)
+        expect(vm.pop()).toBe(0)
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('modulo by zero'))
+        warnSpy.mockRestore()
     })
 })
 
@@ -328,9 +336,13 @@ describe('op_dup (0x801b)', () => {
         expect(vm.dataStack).toEqual([1, 2, 3, 3])
     })
 
-    it('throws on data stack underflow', () => {
+    it('warns and pushes 0 on data stack underflow', () => {
         const vm = makeVM()
-        expect(() => exec(0x801b, vm)).toThrow('data stack underflow')
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        exec(0x801b, vm)
+        expect(vm.dataStack).toEqual([0])
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('underflow'))
+        warnSpy.mockRestore()
     })
 })
 
