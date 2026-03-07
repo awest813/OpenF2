@@ -177,7 +177,9 @@ export class Weapon {
     getMaximumRange(attackType: number): number {
         if (attackType === 1) return this.weapon.pro.extra.maxRange1
         if (attackType === 2) return this.weapon.pro.extra.maxRange2
-        else throw 'invalid attack type ' + attackType
+        // Unknown attack type — return a safe minimum range rather than crashing.
+        console.warn('getMaximumRange: unknown attack type ' + attackType + ' — returning 1')
+        return 1
     }
 
     getAPCost(attackMode: number): number {
@@ -222,7 +224,9 @@ export class Weapon {
             return modeSkinMap[this.attackOne.mode]
         }
 
-        throw 'TODO'
+        // No attack mode mapped — return default skin so animations don't crash.
+        console.warn('getAttackSkin: no attack mode mapping for weapon — using default skin "a"')
+        return 'a'
     }
 
     getAnim(anim: string): string | null {

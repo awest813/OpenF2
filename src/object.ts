@@ -64,7 +64,8 @@ function objectSwapItem(a: Obj, item: Obj, b: Obj, amount: number) {
 
     const idx = objectFindItemIndex(a, item)
     if (idx === -1) {
-        throw 'item (' + item + ') does not exist in a'
+        console.warn('objectSwapItem: item (' + item + ') does not exist in source — skipping swap')
+        return
     }
     if (amount !== undefined && amount < item.amount) {
         // just deduct amount from a and give amount to b

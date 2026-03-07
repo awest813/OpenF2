@@ -1554,6 +1554,149 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+    // -----------------------------------------------------------------------
+    // Phase 40 — combat/critter/object crash-path hardening
+    // -----------------------------------------------------------------------
+    {
+        id: 'combat_ai_txt_missing',
+        kind: 'procedure',
+        description:
+            'AI.init(): AI.TXT not found or unparseable — warn and continue with empty AI table ' +
+            'so combat can still start without crashing the browser.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'combat_ai_packet_missing',
+        kind: 'procedure',
+        description:
+            'AI constructor: no AI packet for critter aiNum — warn and use a sensible default ' +
+            'packet so the critter can still participate in combat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'combat_critter_no_stats',
+        kind: 'procedure',
+        description:
+            'Combat constructor: critter has no stats object — warn and exclude from combatants ' +
+            'rather than throwing, preventing a hard browser crash.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'combat_player_not_found',
+        kind: 'procedure',
+        description:
+            'Combat constructor: player not found among combatants — warn and return early ' +
+            'rather than throwing, so the game can recover.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'combat_get_hit_chance_no_weapon',
+        kind: 'procedure',
+        description:
+            'getHitChance: weapon object present but has no weapon data — warn and return ' +
+            '{hit:-1,crit:-1} so combat continues without crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'combat_get_hit_chance_nan',
+        kind: 'procedure',
+        description:
+            'getHitChance: NaN result from hit chance calculation — warn and clamp to 0 ' +
+            'rather than throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'combat_get_damage_no_weapon',
+        kind: 'procedure',
+        description:
+            'getDamageDone: no weapon equipped or weapon has no data — warn and return 0 ' +
+            'rather than throwing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'combat_walk_ap_desync',
+        kind: 'procedure',
+        description:
+            'walkUpTo / doAITurn movement: AP subtraction desync — warn, force AP to 0, and ' +
+            'continue rather than throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'combat_ai_no_weapon',
+        kind: 'procedure',
+        description:
+            'doAITurn: AI critter has no equipped weapon or weapon data — warn and skip turn ' +
+            'rather than throwing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'combat_force_turn_not_found',
+        kind: 'procedure',
+        description:
+            'forceTurn: critter not found in combatant list — warn and return early rather ' +
+            'than throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_invalid_attack_type',
+        kind: 'procedure',
+        description:
+            'WeaponData.getMaximumRange: unknown attackType — warn and return 1 rather than ' +
+            'throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'critter_get_attack_skin_todo',
+        kind: 'procedure',
+        description:
+            'WeaponData.getAttackSkin: no attack mode mapping — warn and return default skin "a" ' +
+            'rather than throwing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'combat_event_unknown_event',
+        kind: 'procedure',
+        description:
+            'Scripting.combatEvent: unknown event type — warn and return false rather than ' +
+            'throwing, so combat script dispatch continues.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'object_swap_item_not_found',
+        kind: 'procedure',
+        description:
+            'objectSwapItem: item not found in source inventory — warn and return early ' +
+            'rather than throwing, preventing inventory management crashes.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
