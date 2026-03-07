@@ -254,14 +254,17 @@ describe('hit-chance fidelity regression tests', () => {
         expect(combat.getHitChance(shooter, target, 'torso')).toEqual({ hit: -1, crit: -1 })
     })
 
-    it('throws when hit chance becomes NaN (guard path)', () => {
+    it('clamps NaN hit chance to 0 (no throw — guard path hardened)', () => {
         const combat = Object.create(Combat.prototype) as Combat
         vi.spyOn(combat, 'getHitDistanceModifier').mockReturnValue(0)
         const { shooter, target } = makeShooterTarget({
             target: { getStat: vi.fn((name: string) => (name === 'AC' ? Number.NaN : 0)) },
         })
 
-        expect(() => combat.getHitChance(shooter, target, 'torso')).toThrow('something went wrong with hit chance calculation')
+        // Previously threw; now warns and clamps hitChance to 0 so combat can continue.
+        expect(() => combat.getHitChance(shooter, target, 'torso')).not.toThrow()
+        const result = combat.getHitChance(shooter, target, 'torso')
+        expect(result.hit).toBe(0)
     })
 })
 

@@ -3409,7 +3409,8 @@ export module Scripting {
                 fixed_param = 4
                 break // COMBAT_SUBTYPE_TURN
             default:
-                throw 'combatEvent: unknown event ' + event
+                console.warn('combatEvent: unknown event ' + event + ' — ignoring')
+                return false
         }
 
         if (!obj._script.combat_p_proc) return false

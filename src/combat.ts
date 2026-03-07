@@ -98,7 +98,12 @@ export class AI {
 
         AI.aiTxt = {}
         var ini = parseIni(getFileText('data/data/ai.txt'))
-        if (ini === null) throw "couldn't load AI.TXT"
+        if (ini === null) {
+            // AI.TXT unavailable (e.g. asset not yet loaded); leave table empty
+            // so that AI critters fall back to a default packet rather than crashing.
+            console.warn("combat: couldn't load AI.TXT — AI critters will use default packet")
+            return
+        }
         for (var key in ini) {
             ini[key].keyName = key
             AI.aiTxt[ini[key].packet_num] = ini[key]
@@ -116,7 +121,11 @@ export class AI {
         if (AI.aiTxt === null) AI.init()
 
         this.info = AI.getPacketInfo(this.combatant.aiNum)
-        if (!this.info) throw 'no AI packet for ' + combatant.toString() + ' (packet ' + this.combatant.aiNum + ')'
+        if (!this.info) {
+            // Unknown AI packet — use a safe default so combat doesn't crash.
+            console.warn('combat: no AI packet for ' + combatant.toString() + ' (packet ' + this.combatant.aiNum + ') — using defaults')
+            this.info = { chance: 50, min_hp: 0, max_dist: 5, run_start: 278, run_end: 289, move_start: 250, move_end: 253 }
+        }
     }
 }
 
@@ -136,9 +145,16 @@ export class Combat {
                 if (obj.dead || !obj.visible) return false
 
                 // TODO: should we initialize AI elsewhere, like in Critter?
-                if (!obj.isPlayer && !obj.ai) obj.ai = new AI(obj)
+                if (!obj.isPlayer && !obj.ai) {
+                    try { obj.ai = new AI(obj) } catch(e) {
+                        console.warn('combat: could not create AI for ' + obj.toString() + ': ' + e)
+                    }
+                }
 
-                if (obj.stats === undefined) throw 'no stats'
+                if (obj.stats === undefined) {
+                    console.warn('combat: critter ' + obj.toString() + ' has no stats — skipping')
+                    return false
+                }
                 obj.dead = false
                 obj.AP = new ActionPoints(obj)
                 return true
@@ -148,7 +164,15 @@ export class Combat {
         }) as Critter[]
 
         this.playerIdx = this.combatants.findIndex((x) => x.isPlayer)
-        if (this.playerIdx === -1) throw "combat: couldn't find player?"
+        if (this.playerIdx === -1) {
+            // Player not found among live combatants — bail out gracefully.
+            console.warn("combat: couldn't find player among combatants")
+            this.player = null as any
+            this.turnNum = 1
+            this.whoseTurn = 0
+            this.inPlayerTurn = false
+            return
+        }
 
         this.player = this.combatants[this.playerIdx] as Player
         this.turnNum = 1
@@ -228,7 +252,11 @@ export class Combat {
         var weapon = weaponObj.weapon
         var weaponSkill
 
-        if (!weapon) throw Error('getHitChance: No weapon')
+        if (!weapon) {
+            // Weapon object present but has no weapon data — treat as unarmed.
+            console.warn('getHitChance: weapon object has no weapon data')
+            return { hit: -1, crit: -1 }
+        }
 
         if (weapon.weaponSkillType === undefined) {
             this.log('weaponSkillType is undefined')
@@ -244,7 +272,10 @@ export class Combat {
         var hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
         var critChance = baseCrit + regionPenalty
 
-        if (isNaN(hitChance)) throw 'something went wrong with hit chance calculation'
+        if (isNaN(hitChance)) {
+            console.warn('getHitChance: NaN hit chance — clamping to 0')
+            hitChance = 0
+        }
 
         // 1 in 20 chance of failing needs to be preserved
         hitChance = Math.min(95, hitChance)
@@ -287,9 +318,15 @@ export class Combat {
 
     getDamageDone(obj: Critter, target: Critter, critModifer: number) {
         var weapon = obj.equippedWeapon
-        if (!weapon) throw Error('getDamageDone: No weapon')
+        if (!weapon) {
+            console.warn('getDamageDone: no equipped weapon — returning 0 damage')
+            return 0
+        }
         var wep = weapon.weapon
-        if (!wep) throw Error('getDamageDone: Weapon has no weapon data')
+        if (!wep) {
+            console.warn('getDamageDone: weapon has no weapon data — returning 0 damage')
+            return 0
+        }
         var damageType = wep.getDamageType()
 
         var RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
@@ -390,15 +427,19 @@ export class Combat {
         if (obj.walkTo(target, false, callback, maxDistance)) {
             const moveCost = Math.max(0, obj.path.path.length - 1)
             // OK
-            if (obj.AP!.subtractMoveAP(moveCost) === false)
-                throw (
-                    'subtraction issue: has AP: ' +
+            if (obj.AP!.subtractMoveAP(moveCost) === false) {
+                console.warn(
+                    'walkUpTo: AP subtraction desync: has AP: ' +
                     obj.AP!.getAvailableMoveAP() +
                     ' needs AP:' +
                     moveCost +
-                    ' and maxDist was:' +
-                    maxDistance
+                    ' maxDist:' +
+                    maxDistance +
+                    ' — forcing AP to 0'
                 )
+                obj.AP!.combat = 0
+                obj.AP!.move = 0
+            }
             return true
         }
 
@@ -452,9 +493,15 @@ export class Combat {
         }
 
         var weaponObj = obj.equippedWeapon
-        if (!weaponObj) throw Error('AI has no weapon')
+        if (!weaponObj) {
+            console.warn('doAITurn: AI critter ' + obj.name + ' has no weapon — skipping turn')
+            return this.nextTurn()
+        }
         var weapon = weaponObj.weapon
-        if (!weapon) throw Error('AI weapon has no weapon data')
+        if (!weapon) {
+            console.warn('doAITurn: AI critter ' + obj.name + ' weapon has no weapon data — skipping turn')
+            return this.nextTurn()
+        }
         var fireDistance = weapon.getMaximumRange(1)
         this.log(
             'DEBUG: weapon: ' +
@@ -493,15 +540,19 @@ export class Combat {
                     // OK
                     didCreep = true
                     const moveCost = Math.max(0, obj.path.path.length - 1)
-                    if (AP.subtractMoveAP(moveCost) === false)
-                        throw (
-                            'subtraction issue: has AP: ' +
+                    if (AP.subtractMoveAP(moveCost) === false) {
+                        console.warn(
+                            'doAITurn: AP subtraction desync: has AP: ' +
                             AP.getAvailableMoveAP() +
                             ' needs AP:' +
                             moveCost +
-                            ' and maxDist was:' +
-                            maxDistance
+                            ' maxDist:' +
+                            maxDistance +
+                            ' — forcing AP to 0'
                         )
+                        AP.combat = 0
+                        AP.move = 0
+                    }
                     break
                 }
             }
@@ -519,7 +570,10 @@ export class Combat {
                 return this.nextTurn()
             }
 
-            if (obj.equippedWeapon === null) throw 'combatant has no equipped weapon'
+            if (obj.equippedWeapon === null) {
+                console.warn('doAITurn: combatant ' + obj.name + ' has no equipped weapon — skipping attack')
+                return this.nextTurn()
+            }
 
             this.attack(obj, target, 'torso', function () {
                 obj.clearAnim()
@@ -563,7 +617,10 @@ export class Combat {
         if (obj.isPlayer) this.whoseTurn = this.playerIdx - 1
         else {
             var idx = this.combatants.indexOf(obj)
-            if (idx === -1) throw "forceTurn: no combatant '" + obj.name + ''
+            if (idx === -1) {
+                console.warn("forceTurn: no combatant '" + obj.name + "' in combatant list — ignoring")
+                return
+            }
 
             this.whoseTurn = idx - 1
         }
