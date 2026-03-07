@@ -3803,6 +3803,111 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 58 entries
+    {
+        id: 'blk_054_critter_name_persistence',
+        kind: 'procedure',
+        description:
+            'BLK-054: Critter names set via set_name() now survive save/load.  ' +
+            'Critter.fromMapObject() restores mobj.name after init() to prevent the ' +
+            'proto text overwriting script-assigned custom names on deserialization.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_055_tile_contains_null_position_guard',
+        kind: 'procedure',
+        description:
+            'BLK-055: tile_contains_pid_obj() and tile_contains_obj_pid() now skip ' +
+            'objects with null/undefined position instead of crashing on .position.x ' +
+            'access.  Prevents crashes during map transitions when some objects lack ' +
+            'a position (e.g. after an explosion removes them).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_xp',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F0: get_critter_xp_sfall(obj) — return the XP value of a critter ' +
+            'from its proto data.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_sid',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F1: get_object_sid_sfall(obj) — return the script SID for a game ' +
+            'object, or 0 if it has no script.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_game_mode_ex',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F2: get_game_mode_ex_sfall() — extended game mode bitfield.  ' +
+            'Browser build: alias of get_game_mode_sfall(), returns 0 (field mode).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_pid',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F3: get_object_pid_sfall(obj) — return the prototype ID (PID) of a ' +
+            'game object.  Equivalent to obj_pid (0x80D0).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_kill_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F4: get_critter_kill_type_sfall(obj) — return the kill-type index ' +
+            'of a critter for kill-count attribution.  Reads pro.extra.killType.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_tile_at',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F5: get_tile_at_sfall(x, y) — convert hex-grid (x, y) coordinates ' +
+            'to a Fallout 2 tile number.  Inverse of fromTileNum.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F6: get_object_type_sfall(obj) — return the object type as an ' +
+            'integer (0=item, 1=critter, 2=scenery, 3=wall, 4=tile, 5=misc).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_critter_at',
+        kind: 'opcode',
+        description:
+            'sfall 0x81F7: critter_at_sfall(tile, elev) — return the first non-player ' +
+            'critter at the given tile/elevation, or 0 if none present.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

@@ -2356,6 +2356,9 @@ export module Scripting {
             var pos = fromTileNum(tile)
             var objects = globalState.gMap.getObjects(elevation)
             for (var i = 0; i < objects.length; i++) {
+                // BLK-055: Guard against objects without a position (edge case during
+                // map transitions or after explosive removal).
+                if (!objects[i].position) continue
                 if (objects[i].position.x === pos.x && objects[i].position.y === pos.y && objects[i].pid === pid) {
                     return objects[i]
                 }
@@ -2390,6 +2393,8 @@ export module Scripting {
             var pos = fromTileNum(tile)
             var objs = (globalState.gMap?.getObjects(elevation)) ?? []
             for (var i = 0; i < objs.length; i++) {
+                // BLK-055: Guard against objects without a position.
+                if (!objs[i].position) continue
                 if (objs[i].position.x === pos.x && objs[i].position.y === pos.y && objs[i].pid === pid) return 1
             }
             return 0
@@ -3964,6 +3969,101 @@ export module Scripting {
         // Browser build: no-op (no tile-override system).
         set_tile_fid_sfall(_tile: number, _elev: number, _fid: number): void {
             log('set_tile_fid_sfall', arguments)
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 58 — sfall extended opcodes 0x81F0–0x81F7
+        // -----------------------------------------------------------------------
+
+        // sfall 0x81F0 — get_critter_xp_sfall(obj):
+        // Return the XP value of a critter from its proto data.  Used by loot/reward
+        // scripts that want to award a custom XP amount.  Returns 0 for non-critters.
+        get_critter_xp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_xp_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.XPValue ?? 0
+        }
+
+        // sfall 0x81F1 — get_object_sid_sfall(obj):
+        // Return the script SID (Script ID) associated with a game object.
+        // Returns 0 if the object has no script.
+        get_object_sid_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_sid_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).script ?? 0
+        }
+
+        // sfall 0x81F2 — get_game_mode_ex_sfall():
+        // Extended game mode bitfield (superset of get_game_mode).
+        // Browser build: alias of get_game_mode_sfall — returns 0 (field mode).
+        get_game_mode_ex_sfall(): number {
+            return this.get_game_mode_sfall()
+        }
+
+        // sfall 0x81F3 — get_object_pid_sfall(obj):
+        // Return the prototype ID (PID) of a game object.
+        // Equivalent to obj_pid(obj) (0x80D0) but exposed as a dedicated sfall opcode.
+        get_object_pid_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_pid_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return obj.pid ?? 0
+        }
+
+        // sfall 0x81F4 — get_critter_kill_type_sfall(obj):
+        // Return the kill-type index of a critter (used by get_critter_kills to
+        // attribute kill-counts per type).  Returns the proto's killType field.
+        get_critter_kill_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_kill_type_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.killType ?? 0
+        }
+
+        // sfall 0x81F5 — get_tile_at_sfall(x, y):
+        // Convert a hex-grid (x, y) coordinate pair to a Fallout 2 tile number.
+        // The inverse of fromTileNum — equivalent to toTileNum({x, y}).
+        get_tile_at_sfall(x: number, y: number): number {
+            if (typeof x !== 'number' || typeof y !== 'number') {
+                warn('get_tile_at_sfall: non-numeric coordinates', undefined, this)
+                return 0
+            }
+            return toTileNum({ x, y })
+        }
+
+        // sfall 0x81F6 — get_object_type_sfall(obj):
+        // Return the object type as an integer:
+        //   0 = item, 1 = critter, 2 = scenery, 3 = wall, 4 = tile, 5 = misc.
+        // Browser build: maps obj.type string to the Fallout 2 numeric index.
+        get_object_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_type_sfall: not a game object: ' + obj, undefined, this)
+                return 5
+            }
+            const typeMap: { [t: string]: number } = {
+                item: 0, critter: 1, scenery: 2, wall: 3, tile: 4, misc: 5,
+            }
+            return typeMap[obj.type] ?? 5
+        }
+
+        // sfall 0x81F7 — critter_at_sfall(tile, elev):
+        // Return the first non-player critter found at the given tile/elevation, or
+        // 0 if no critter is present.  Useful for ambush-trigger and trap scripts.
+        critter_at_sfall(tile: number, elev: number): Obj | number {
+            const pos = fromTileNum(tile)
+            const objects = globalState.gMap?.getObjects(elev) ?? []
+            for (const o of objects) {
+                if (!isGameObject(o) || o.type !== 'critter') continue
+                if (!o.position) continue
+                if (o.position.x === pos.x && o.position.y === pos.y) return o
+            }
+            return 0
         }
 
         _serialize(): SerializedScript {

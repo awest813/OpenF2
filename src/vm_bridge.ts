@@ -784,6 +784,42 @@ export module ScriptVMBridge {
        // 0x81EF — set_tile_fid_sfall(tile, elev, fid): override floor-tile FID.
        // Browser build: no-op (no tile-override system).
        ,0x81EF: bridged("set_tile_fid_sfall", 3, false) // set_tile_fid — no-op
+
+       // -----------------------------------------------------------------------
+       // Phase 58 — sfall extended opcodes 0x81F0–0x81F7
+       // -----------------------------------------------------------------------
+
+       // 0x81F0 — get_critter_xp_sfall(obj): return critter's XP value from proto.
+       // Used by loot/reward scripts; returns 0 for non-critters.
+       ,0x81F0: bridged("get_critter_xp_sfall", 1) // get_critter_xp(obj) → xp
+
+       // 0x81F1 — get_object_sid_sfall(obj): return the script SID for an object.
+       // Returns 0 if the object has no script.
+       ,0x81F1: bridged("get_object_sid_sfall", 1) // get_object_sid(obj) → sid | 0
+
+       // 0x81F2 — get_game_mode_ex_sfall(): extended game mode bitfield; alias of
+       // get_game_mode_sfall in the browser build (returns 0 = field mode).
+       ,0x81F2: bridged("get_game_mode_ex_sfall", 0) // get_game_mode_ex() → 0
+
+       // 0x81F3 — get_object_pid_sfall(obj): return the prototype ID of an object.
+       // Equivalent to obj_pid (0x80D0) but exposed as a dedicated sfall opcode.
+       ,0x81F3: bridged("get_object_pid_sfall", 1) // get_object_pid(obj) → pid
+
+       // 0x81F4 — get_critter_kill_type_sfall(obj): return kill-type index for a
+       // critter.  Used to attribute kill-counts per species.
+       ,0x81F4: bridged("get_critter_kill_type_sfall", 1) // get_critter_kill_type(obj) → type
+
+       // 0x81F5 — get_tile_at_sfall(x, y): convert hex-grid coordinates to a
+       // Fallout 2 tile number.  Inverse of fromTileNum.
+       ,0x81F5: bridged("get_tile_at_sfall", 2) // get_tile_at(x, y) → tile
+
+       // 0x81F6 — get_object_type_sfall(obj): return the object type as an integer
+       // (0=item, 1=critter, 2=scenery, 3=wall, 4=tile, 5=misc).
+       ,0x81F6: bridged("get_object_type_sfall", 1) // get_object_type(obj) → type int
+
+       // 0x81F7 — critter_at_sfall(tile, elev): return the first non-player critter
+       // at the given tile/elevation, or 0 if none.
+       ,0x81F7: bridged("critter_at_sfall", 2) // critter_at(tile, elev) → obj | 0
     }
     Object.assign(opMap, bridgeOpMap)
 
