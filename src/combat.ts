@@ -652,7 +652,14 @@ export class Combat {
         }
     }
 
-    nextTurn(): void {
+    nextTurn(skipDepth: number = 0): void {
+        // Guard against infinite skip-recursion when all remaining combatants in a
+        // round are dead/non-hostile.  One full rotation of the combatant list is
+        // the maximum useful skip depth; beyond that we force-end combat.
+        if (skipDepth > this.combatants.length + 2) {
+            console.warn('[combat] nextTurn: skip depth exceeded combatant count — forcing combat end')
+            return this.end()
+        }
         // Capture unused AP from the critter whose turn is ending and grant it as a
         // temporary AC bonus (Fallout 2 mechanic: each unused AP → +1 AC until next turn).
         const prevTurnCritter = this.combatants[this.whoseTurn]
@@ -692,7 +699,7 @@ export class Combat {
         } else {
             this.inPlayerTurn = false
             var critter = this.combatants[this.whoseTurn]
-            if (critter.dead === true || critter.hostile !== true) return this.nextTurn()
+            if (critter.dead === true || critter.hostile !== true) return this.nextTurn(skipDepth + 1)
 
             // Clear the AC bonus from this critter's previous turn before resetting AP.
             critter.stats.acBonus = 0

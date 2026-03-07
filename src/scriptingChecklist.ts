@@ -1920,6 +1920,130 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+    // -------------------------------------------------------------------------
+    // Phase 44 entries
+    // -------------------------------------------------------------------------
+    {
+        id: 'vm_bridge_push_undefined_guard',
+        kind: 'procedure',
+        description:
+            'vm_bridge.ts bridged(): push(r) changed to push(r ?? 0) so that any ' +
+            'scripting procedure that returns undefined without an explicit value ' +
+            'pushes a safe 0 onto the VM data stack instead of corrupting it with ' +
+            'undefined, which would cause arithmetic/comparison faults downstream.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'map_var_bare_return_fix',
+        kind: 'procedure',
+        description:
+            'scripting.ts map_var(): two early-return paths (no map script, no script ' +
+            'name) now return 0 instead of bare undefined, preventing VM stack ' +
+            'corruption when bridged via opcode 0x80C3 with pushResult=true.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'destroy_object_calls_destroy_p_proc',
+        kind: 'procedure',
+        description:
+            'map.ts destroyObject(): now calls Scripting.destroy(obj) before ' +
+            'removeObject(), firing the object\'s destroy_p_proc script (e.g. for ' +
+            'NPC death reactions, loot drops, and quest state updates). A reentrance ' +
+            'guard prevents infinite recursion if the script calls destroy_object on ' +
+            'itself.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'next_turn_skip_depth_guard',
+        kind: 'procedure',
+        description:
+            'combat.ts nextTurn(): added skipDepth parameter (default 0) that ' +
+            'increments each time a dead/non-hostile combatant is skipped. If it ' +
+            'exceeds the combatant count the method forces combat.end() instead of ' +
+            'recursing indefinitely, preventing a stack-overflow soft-hang when all ' +
+            'remaining AI turns are skippable.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'get_world_map_x',
+        kind: 'opcode',
+        description:
+            'sfall 0x819C: get_world_map_x() → current world-map X position from ' +
+            'globalState.worldPosition. Returns 0 if no world position is stored.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'get_world_map_y',
+        kind: 'opcode',
+        description:
+            'sfall 0x819D: get_world_map_y() → current world-map Y position from ' +
+            'globalState.worldPosition. Returns 0 if no world position is stored.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_world_map_pos',
+        kind: 'opcode',
+        description:
+            'sfall 0x819E: set_world_map_pos(x, y) — updates globalState.worldPosition ' +
+            'to the given coordinates, allowing scripts to teleport the world-map cursor.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'in_world_map',
+        kind: 'opcode',
+        description:
+            'sfall 0x819F: in_world_map() → 1 if the player is currently on the world ' +
+            'map (no game map loaded), 0 otherwise. Partial: uses gMap.name to infer ' +
+            'world-map state.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'get_critter_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A0: get_critter_level(obj) → character level of the given ' +
+            'critter. Falls back to 1 for NPCs with no explicit level set.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_critter_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A1: set_critter_level(obj, level) — override a critter\'s ' +
+            'character level (clamped to ≥1). Used by level-scaling encounter scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'get_object_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x81A2: get_object_weight(obj) → object weight in lbs. Reads from ' +
+            'pro.extra.weight or pro.weight (stored as g×10 in proto data; divided by ' +
+            '10 to get lbs). Returns 0 for non-game-objects.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

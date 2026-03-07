@@ -521,13 +521,13 @@ export module Scripting {
         }
         map_var(mvar: number) {
             if (this._mapScript === undefined) {
-                warn('map_var: no map script')
-                return
+                warn('map_var: no map script — returning 0 (mvar=' + mvar + ')', undefined, this)
+                return 0
             }
             var scriptName = this._mapScript.scriptName
             if (scriptName === undefined) {
-                warn('map_var: map script has no name')
-                return
+                warn('map_var: map script has no name — returning 0 (mvar=' + mvar + ')', undefined, this)
+                return 0
             } else if (mapVars[scriptName] === undefined) mapVars[scriptName] = {}
             else if (mapVars[scriptName][mvar] === undefined) {
                 warn('map_var: setting default value (0) for MVAR ' + mvar, 'mvars')
@@ -3134,6 +3134,61 @@ export module Scripting {
         // Partial: returns 0; hook scripts are not implemented in the browser build.
         get_sfall_arg(): number {
             log('get_sfall_arg', arguments)
+            return 0
+        }
+
+        // sfall extended opcode — return the world-map X coordinate (0x819C).
+        get_world_map_x(): number {
+            return globalState.worldPosition ? globalState.worldPosition.x : 0
+        }
+
+        // sfall extended opcode — return the world-map Y coordinate (0x819D).
+        get_world_map_y(): number {
+            return globalState.worldPosition ? globalState.worldPosition.y : 0
+        }
+
+        // sfall extended opcode — teleport world-map cursor to (x, y) (0x819E).
+        set_world_map_pos(x: number, y: number): void {
+            log('set_world_map_pos', arguments)
+            globalState.worldPosition = { x, y }
+        }
+
+        // sfall extended opcode — 1 if the player is currently on the world map (0x819F).
+        // Partial: returns 1 when no map is loaded (between maps), 0 otherwise.
+        in_world_map(): number {
+            return !globalState.gMap || !globalState.gMap.name ? 1 : 0
+        }
+
+        // sfall extended opcode — return the character level of a critter (0x81A0).
+        get_critter_level(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_level: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            // `level` is defined on Player; NPCs carry it as a dynamic property.
+            return (obj as any).level ?? 1
+        }
+
+        // sfall extended opcode — override a critter's character level (0x81A1).
+        set_critter_level(obj: Obj, level: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_level: not a critter: ' + obj, undefined, this)
+                return
+            }
+            // `level` is defined on Player; set it as a dynamic property for NPCs.
+            ;(obj as any).level = Math.max(1, level)
+        }
+
+        // sfall extended opcode — return the weight of an object in lbs (0x81A2).
+        get_object_weight(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_weight: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            // Weight is stored in proto data as weight in lbs * 10 (grams).
+            const pro = (obj as any).pro
+            if (pro?.extra?.weight !== undefined) return Math.round(pro.extra.weight / 10)
+            if (pro?.weight !== undefined) return Math.round(pro.weight / 10)
             return 0
         }
 

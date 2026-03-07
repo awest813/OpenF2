@@ -46,7 +46,12 @@ export module ScriptVMBridge {
 
             var r = targetFn.apply(this.scriptObj, args)
             if(pushResult)
-                this.push(r)
+                // Guard against undefined returns from stub/partial procedures.
+                // Any procedure that returns without an explicit value would push
+                // `undefined` onto the VM data stack, corrupting subsequent arithmetic
+                // and comparisons.  Coerce to 0 (the Fallout 2 "false/null" sentinel)
+                // so the stack stays in a known state.
+                this.push(r ?? 0)
         }
     }
 
@@ -353,6 +358,15 @@ export module ScriptVMBridge {
        ,0x8199: bridged("active_hand", 0)               // active_hand() → 0=primary/1=secondary (partial: 0)
        ,0x819A: bridged("set_sfall_return", 1, false)   // set_sfall_return(val) — set hook-script return value (no-op)
        ,0x819B: bridged("get_sfall_arg", 0)             // get_sfall_arg() → hook-script argument (partial: 0)
+
+       // sfall extended opcodes 0x819C–0x81A2 — world-map, critter level, misc
+       ,0x819C: bridged("get_world_map_x", 0)           // get_world_map_x() → current world-map X position
+       ,0x819D: bridged("get_world_map_y", 0)           // get_world_map_y() → current world-map Y position
+       ,0x819E: bridged("set_world_map_pos", 2, false)  // set_world_map_pos(x, y) — teleport world-map cursor
+       ,0x819F: bridged("in_world_map", 0)              // in_world_map() → 1 if player is on world map
+       ,0x81A0: bridged("get_critter_level", 1)         // get_critter_level(obj) → character level of critter
+       ,0x81A1: bridged("set_critter_level", 2, false)  // set_critter_level(obj, level) — override critter level
+       ,0x81A2: bridged("get_object_weight", 1)         // get_object_weight(obj) → weight of object in lbs
     }
     Object.assign(opMap, bridgeOpMap)
 

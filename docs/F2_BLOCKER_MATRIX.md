@@ -52,7 +52,11 @@ Status guidance:
 
 ---
 
-## Latest phase runs
+| BLK-023 | HIGH | VM/Scripting | VM bridge stack safety | `src/vm_bridge.ts` | Any scripting procedure returning `undefined` (bare `return` in an early-return path) would push `undefined` onto the VM data stack. Subsequent arithmetic and comparisons on that `undefined` value would silently corrupt script execution, producing wrong quest flags and NaN-based stat calculations. `map_var()` (opcode 0x80C3) was the highest-frequency hit: both its "no map script" and "no script name" early-exit paths were bare `return` statements with no value. | Call `map_var()` from a critter script (no map script attached) or any bridged procedure that hits an early return without a value. | `push(r)` in `vm_bridge.ts` changed to `push(r ?? 0)` (systemic guard); `map_var()` early returns changed to `return 0` explicitly. No undefined value can reach the VM stack. | `src/phase44.test.ts` | @engine | CLOSED | push(r ?? 0) guard added in vm_bridge.ts; map_var bare returns fixed; regression tests for both. |
+
+| BLK-024 | HIGH | Map/Objects | destroy_p_proc not fired | `src/map.ts` | `GameMap.destroyObject()` removed an object from the map but never invoked `Scripting.destroy(obj)`, so all `destroy_p_proc` callbacks were silently skipped. NPC death scripts (loot drops, quest state changes, dialog state) never fired on scripted object removal. | Script a critter with a `destroy_p_proc` and call `destroy_object()` on it; observe the destroy_p_proc callback is never executed. | `destroyObject()` now calls `Scripting.destroy(obj)` before `removeObject()`, with a reentrance guard (`_destroyingObjects: Set<Obj>`) to prevent infinite recursion if the script itself calls `destroy_object` on the same object. | `src/phase44.test.ts` | @engine | CLOSED | Scripting.destroy() called from destroyObject(); reentrance guard prevents self-destruct loops. |
+
+| BLK-025 | MEDIUM | Combat | nextTurn infinite skip loop | `src/combat.ts` | `Combat.nextTurn()` recursively skipped dead/non-hostile combatants via `return this.nextTurn()`. With a large group of combatants where all AI slots cycle dead/non-hostile, the recursion depth could exhaust the call stack before `numActive === 0` terminates via `end()`. | Run a combat encounter where all AI combatants are killed mid-turn so that every remaining AI slot is dead when `nextTurn()` tries to assign their turn. | `nextTurn(skipDepth=0)` now accepts a skip counter incremented on each recursive dead/non-hostile skip. When `skipDepth > combatants.length + 2` the method forces `end()` instead of recursing, bounding the maximum stack depth to one full rotation of the combatant list. | `src/phase44.test.ts` | @engine | CLOSED | skipDepth guard forces end() after one full combatant-list rotation. |
 
 - Phase 26 early-campaign route suite (`src/phase26.test.ts`) passed with no new critical blockers opened.
 - UI2 interaction fidelity suites (`src/ui2/ui2.test.ts`, `src/ui2/panelParity.test.ts`) passed after barter exchange-commit fix.
@@ -72,6 +76,8 @@ Status guidance:
 - Full project regression run (`npm test`) passed: 56 files / 1906 tests.
 - Phase 39 suite (`src/phase39.test.ts`) passed: dialogue/inventory/map/elevator crash-causing throws converted to safe returns (getScriptMessage, item_caps_total, create_object_sid, start_gdialog, gdialog_mod_barter, gsay_reply, metarule(15), message parser); anim negative-code stub silenced; new sfall opcodes 0x8198–0x819B (get_ini_setting, active_hand, set_sfall_return, get_sfall_arg).
 - Full project regression run (`npm test`) passed: 57 files / 1953 tests.
+- Phase 44 suite (`src/phase44.test.ts`) passed: VM bridge push(r ?? 0) undefined-stack guard (BLK-023); map_var() bare returns → return 0 (BLK-023); destroyObject() calls destroy_p_proc with reentrance guard (BLK-024); nextTurn() skip-depth guard prevents infinite recursion (BLK-025); new sfall opcodes 0x819C–0x81A2 (get_world_map_x/y, set_world_map_pos, in_world_map, get/set_critter_level, get_object_weight).
+- Full project regression run (`npm test`) passed: 62 files / 2075 tests.
 
 ## Closure checklist (required)
 
