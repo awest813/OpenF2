@@ -21,11 +21,11 @@ import globalState from './globalState.js'
 // ===========================================================================
 
 describe('Phase 55-A — BLK-045: Player armor persistence save schema', () => {
-    it('SAVE_VERSION is 16', () => {
-        expect(SAVE_VERSION).toBe(16)
+    it('SAVE_VERSION is 17', () => {
+        expect(SAVE_VERSION).toBe(17)
     })
 
-    it('migrateSave v15 → v16 leaves playerArmorPID as undefined (no armor)', () => {
+    it('migrateSave v15 → v17 leaves playerArmorPID as undefined (no armor)', () => {
         const raw: any = {
             version: 15,
             currentMap: 'test',
@@ -35,11 +35,11 @@ describe('Phase 55-A — BLK-045: Player armor persistence save schema', () => {
             savedMaps: { test: { name: 'test', objects: [], tiles: [] } },
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(16)
+        expect(save.version).toBe(17)
         expect(save.playerArmorPID).toBeUndefined()
     })
 
-    it('migrateSave v15 → v16 defaults playerPerksOwed to 0', () => {
+    it('migrateSave v15 → v17 defaults playerPerksOwed to 0', () => {
         const raw: any = {
             version: 15,
             currentMap: 'test',

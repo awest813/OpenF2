@@ -3567,6 +3567,123 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 56 entries
+    {
+        id: 'blk_048_player_name_gender_save',
+        kind: 'procedure',
+        description:
+            'BLK-048: Player name and gender persisted in save schema v17. ' +
+            'Player.name (set during character creation / set_name opcode) and ' +
+            'player.gender (checked via get_critter_stat STAT_gender) reverted to ' +
+            'class defaults on every reload. Save schema v17 adds playerName and ' +
+            'playerGender; both save and load paths snapshot/restore them.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_049_critter_kill_level_up_consistency',
+        kind: 'procedure',
+        description:
+            'BLK-049: Level-up via critterKill() XP path now applies Educated perk ' +
+            'bonus (+2 skill pts per rank) and awards perk credit every 3 levels, ' +
+            'matching give_exp_points() and Fallout 2 behaviour.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_050_set_name_opcode',
+        kind: 'procedure',
+        description:
+            'BLK-050: set_name(obj, name) opcode (0x80A8) implemented.  Previously ' +
+            'absent, causing VM stack corruption on every call from character-creation ' +
+            'and NPC rename scripts.  Now assigns name directly on the game object.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_current_map_id_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E0: get_current_map_id_sfall() — return the current map index. ' +
+            'Alias of metarule(46,0); fully implemented.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_dude_distance',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E1: get_object_dude_distance(obj) — return tile distance from ' +
+            'obj to the player character.  Fully implemented; returns -1 for invalid input.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_attack_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E2: get_critter_attack_mode(obj) — return attack-mode index. ' +
+            'Browser build: partial — returns 0 (no per-critter attack-mode tracking).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_attack_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E3: set_critter_attack_mode(obj, mode) — set attack-mode index. ' +
+            'Browser build: no-op.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_map_first_run_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E4: get_map_first_run_sfall() — return 1 if map is first-run, 0 otherwise. ' +
+            'Alias of map_first_run (0x80A0); fully implemented.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_script_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E5: get_script_type_sfall() — return script type (0=map, 1=critter, etc.). ' +
+            'Browser build: partial — always returns 0.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_tile_pid',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E6: get_tile_pid_sfall(tile, elev) — return PID of first non-critter ' +
+            'object at tile/elev, 0 if none.  Partially implemented.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_skill_points',
+        kind: 'opcode',
+        description:
+            'sfall 0x81E7: get_critter_skill_points(obj, skill) — return base skill-point ' +
+            'allocation for skill on a critter.  Fully implemented via SkillSet.getBase().',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

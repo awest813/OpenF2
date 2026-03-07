@@ -492,6 +492,7 @@ describe('Phase 14-I — checklist accuracy for new procedure types', () => {
         // promoted to partial/implemented by Phase 14–53. Phase 54 added 6 new sfall stubs
         // (force_encounter, force_encounter_with_flags, get_last_pers_obj, obj_remove_script,
         // obj_add_script, obj_run_proc) that are intentionally stub-level no-ops.
-        expect(summary.stub).toBeLessThanOrEqual(11)
+        // Phase 56 added 1 additional stub (sfall_set_critter_attack_mode).
+        expect(summary.stub).toBeLessThanOrEqual(12)
     })
 })

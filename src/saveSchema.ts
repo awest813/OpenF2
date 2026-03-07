@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 16
+export const SAVE_VERSION = 17
 
 export interface SaveGame {
     id?: number
@@ -223,6 +223,28 @@ export interface SaveGame {
      */
     playerPerksOwed?: number
 
+    /**
+     * The player character's name (added in v17 / BLK-048).
+     *
+     * The name can be set during character creation and by scripts using
+     * `set_name(dude_obj, name)`.  Without persistence it reverts to the
+     * class default ("Player") on every reload.
+     *
+     * Defaults to 'Player' for saves that predate v17.
+     */
+    playerName?: string
+
+    /**
+     * The player character's gender (added in v17 / BLK-048).
+     *
+     * Gender is checked by many Fallout 2 scripts via
+     * `get_critter_stat(dude_obj, STAT_gender)` (stat 34).  Without
+     * persistence it reverts to 'male' on every reload.
+     *
+     * Defaults to 'male' for saves that predate v17.
+     */
+    playerGender?: string
+
     player: {
         position: Point
         orientation: number
@@ -369,6 +391,14 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerPerksOwed === undefined) save.playerPerksOwed = 0
             save.version = 16
             // falls through
+        case 16:
+            // v16 → v17: add player name and gender (BLK-048).
+            // playerName: string — defaults to 'Player' (class default).
+            // playerGender: 'male'|'female' — defaults to 'male' (class default).
+            if (save.playerName === undefined) save.playerName = 'Player'
+            if (save.playerGender === undefined) save.playerGender = 'male'
+            save.version = 17
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -423,6 +453,14 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // Normalize playerPerksOwed: must be a non-negative integer; clamp out-of-range values.
     if (typeof save.playerPerksOwed !== 'number' || !Number.isInteger(save.playerPerksOwed) || save.playerPerksOwed < 0) {
         save.playerPerksOwed = 0
+    }
+    // Normalize playerName: must be a non-empty string; fall back to 'Player'.
+    if (typeof save.playerName !== 'string' || save.playerName.trim() === '') {
+        save.playerName = 'Player'
+    }
+    // Normalize playerGender: must be 'male' or 'female'; fall back to 'male'.
+    if (save.playerGender !== 'male' && save.playerGender !== 'female') {
+        save.playerGender = 'male'
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

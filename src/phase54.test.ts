@@ -156,11 +156,11 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
 // ===========================================================================
 
 describe('Phase 54-B — BLK-042: Save schema v15 — player weapon slot persistence', () => {
-    it('SAVE_VERSION is 16', () => {
-        expect(SAVE_VERSION).toBe(16)
+    it('SAVE_VERSION is 17', () => {
+        expect(SAVE_VERSION).toBe(17)
     })
 
-    it('v14 save migrates to v15 with undefined playerLeftHandPID/playerRightHandPID', () => {
+    it('v14 save migrates toward v15 with undefined playerLeftHandPID/playerRightHandPID', () => {
         const raw = {
             version: 14,
             name: 'test',
@@ -174,12 +174,12 @@ describe('Phase 54-B — BLK-042: Save schema v15 — player weapon slot persist
             playerSkillValues: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(16)
+        expect(migrated.version).toBe(17)
         expect(migrated.playerLeftHandPID).toBeUndefined()
         expect(migrated.playerRightHandPID).toBeUndefined()
     })
 
-    it('v1 save migrates all the way to v16', () => {
+    it('v1 save migrates all the way to v17', () => {
         const raw = {
             name: 'ancient',
             timestamp: 0,
@@ -190,7 +190,7 @@ describe('Phase 54-B — BLK-042: Save schema v15 — player weapon slot persist
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(16)
+        expect(migrated.version).toBe(17)
         expect(migrated.playerLeftHandPID).toBeUndefined()
         expect(migrated.playerRightHandPID).toBeUndefined()
     })

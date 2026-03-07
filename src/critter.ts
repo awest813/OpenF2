@@ -295,12 +295,23 @@ export function critterKill(
                 const oldLevel: number = player.level ?? 1
                 while (player.xp >= ((player.level ?? 1) * ((player.level ?? 1) + 1) / 2) * 1000) {
                     player.level = (player.level ?? 1) + 1
-                    // Fallout 2: award skill points on level-up (10 + INT/2, min 1).
+                    // BLK-049: Award skill points on level-up using the full Fallout 2
+                    // formula: base 10 + floor(INT/2) + 2 per rank of Educated perk.
+                    // This mirrors the formula in give_exp_points().
                     const intScore: number = typeof player.getStat === 'function'
                         ? (player.getStat('INT') ?? 5) : 5
-                    const points = Math.max(1, 10 + Math.floor(intScore / 2))
+                    /** Perk ID 47 = Educated: +2 skill points per level per rank. */
+                    const PERK_ID_EDUCATED = 47
+                    const educatedBonus = ((player.perkRanks as Record<number, number>)?.[PERK_ID_EDUCATED] ?? 0) * 2
+                    const points = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
                     if (player.skills && typeof player.skills.skillPoints === 'number') {
                         player.skills.skillPoints += points
+                    }
+                    // BLK-049: Award a perk credit every 3 levels (levels 3, 6, 9, …),
+                    // matching Fallout 2 behaviour.  Uses globalState so that the
+                    // counter is shared with give_exp_points() and is persisted.
+                    if (player.level % 3 === 0) {
+                        globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
                     }
                 }
                 if ((player.level ?? 1) > oldLevel) {
