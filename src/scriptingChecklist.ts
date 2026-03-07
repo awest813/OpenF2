@@ -3045,6 +3045,127 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // Phase 52 entries
+    {
+        id: 'metarule3_106_elevation',
+        kind: 'metarule',
+        description:
+            'BLK-036: METARULE3_TILE_GET_NEXT_CRITTER(106) — previously used ' +
+            'gMap.objectsAtPosition() which only searched the current floor, ignoring the ' +
+            'elevation argument. Now uses gMap.getObjects(elevation) + position filter so ' +
+            'multi-floor maps (Vaults, Oil Rig) return the correct critter at the target tile. ' +
+            'Also implements the lastCritter iteration parameter for enumerating all critters ' +
+            'at a tile in sequence.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'tile_contains_obj_pid_elevation',
+        kind: 'procedure',
+        description:
+            'BLK-037: tile_contains_obj_pid(tile, elevation, pid) — previously returned 0 ' +
+            'whenever the elevation argument did not equal the current floor, even if the ' +
+            'queried object existed on that floor. Now uses gMap.getObjects(elevation) with ' +
+            'position + PID filtering so cross-floor object checks work correctly on multi- ' +
+            'level maps.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_critter_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BE: get_critter_weapon(critter, slot) → weapon game object or 0. ' +
+            'slot 0 = primary hand (rightHand), slot 1 = secondary hand (leftHand). ' +
+            'Returns 0 if no weapon is equipped in the specified slot. ' +
+            'Used by combat-AI and equipment scripts to inspect critter loadout.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_critter_inven_size',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BF: critter_inven_size(critter) → count of items in critter inventory. ' +
+            'Returns 0 for non-critters or critters with no inventory. ' +
+            'Prevents unknown-opcode crashes in loot and inventory-size scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_sfall_args_count',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C0: get_sfall_args_count() → 0. ' +
+            'Returns the number of arguments passed to the current hook script. ' +
+            'Browser build has no hook scripts; always returns 0. ' +
+            'Prevents unknown-opcode crashes in hook-script-aware mods.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_sfall_arg_at',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C1: get_sfall_arg_at(idx) → 0. ' +
+            'Returns a hook-script argument by index. Browser build returns 0 always. ' +
+            'Prevents unknown-opcode crashes in hook-aware mods.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_sfall_arg',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C2: set_sfall_arg(idx, val) — no-op. ' +
+            'Writes a value back into a hook-script argument buffer. ' +
+            'No-op in the browser build. Prevents unknown-opcode crashes.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_lighting',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C3: get_object_lighting(obj) → light level (0–65536). ' +
+            'Partial: returns the global ambient light level as an approximation. ' +
+            'Per-object lighting is not modelled in the browser build. ' +
+            'Prevents unknown-opcode crashes in lighting-aware scripts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_team',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C4: get_critter_team(critter) → team number. ' +
+            'Returns critter.teamNum (0 = default). Team numbers control which factions ' +
+            'will fight each other. Used by faction-alignment scripts. ' +
+            'Prevents unknown-opcode crashes in faction scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_team',
+        kind: 'opcode',
+        description:
+            'sfall 0x81C5: set_critter_team(critter, team) — set team number. ' +
+            'Sets critter.teamNum. Used by faction-switch and story-beat scripts ' +
+            '(e.g. turning a neutral NPC hostile). Prevents unknown-opcode crashes.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
