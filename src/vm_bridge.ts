@@ -332,6 +332,10 @@ export module ScriptVMBridge {
        // sfall extended opcodes 0x8190–0x8191 — type conversion
        ,0x8190: bridged("string_to_int", 1)             // string_to_int(str) → parse string as base-10 integer (0 on failure)
        ,0x8191: bridged("int_to_string", 1)             // int_to_string(n) → decimal string representation of integer
+
+       // sfall extended opcodes 0x8192–0x8193 — string format and script detection
+       ,0x8192: bridged("sprintf", 2)                   // sprintf(format, arg) → C-style single-arg formatted string
+       ,0x8193: bridged("obj_has_script", 1)            // obj_has_script(obj) → 1 if obj has a script, 0 otherwise
     }
     Object.assign(opMap, bridgeOpMap)
 

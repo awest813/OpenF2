@@ -1231,6 +1231,69 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'high',
         impact: 'medium',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 37 — sprintf, obj_has_script, game_mode bitmask, kill tracking,
+    //            metarule unknown-id silence
+    // -----------------------------------------------------------------------
+    {
+        id: 'critter_kill_count_tracking',
+        kind: 'procedure',
+        description:
+            'critterKill() now increments globalState.critterKillCounts[killType] when a ' +
+            'non-player critter is killed.  Previously kills were never counted so ' +
+            'get_critter_kills() always returned 0; scripts that check kill tallies for ' +
+            'quest completion or perk eligibility now receive accurate counts.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'sprintf',
+        kind: 'opcode',
+        description:
+            'sfall 0x8192: sprintf(format, arg) → C-style single-argument formatted string. ' +
+            'Supports %d/%i (decimal), %s (string), %x (hex), %c (char), %% (literal %). ' +
+            'One of the most commonly used sfall opcodes for building display strings, UI ' +
+            'labels, and debug output in Fallout 2 scripts.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'obj_has_script',
+        kind: 'opcode',
+        description:
+            'sfall 0x8193: obj_has_script(obj) → 1 if the object has a script attached, ' +
+            '0 otherwise.  Used to safely gate conditional script calls and prevent ' +
+            'crashes when triggering interactions on unscripted objects.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'get_game_mode_bitmask',
+        kind: 'opcode',
+        description:
+            'get_game_mode() now returns a meaningful bitmask: 0x01=combat active, ' +
+            '0x02=dialogue active.  Previously returned 0 always.  Scripts that gate ' +
+            'combat-only or dialogue-only logic on this value now behave correctly.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'metarule_unknown_silent',
+        kind: 'metarule',
+        description:
+            'metarule() unknown IDs (above the currently defined range of 1–56) now ' +
+            'log silently instead of emitting a stub hit.  Eliminates console flooding ' +
+            'from scripts that probe sfall-specific or future metarule IDs that are ' +
+            'not yet defined in the browser build.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

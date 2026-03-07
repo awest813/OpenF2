@@ -829,11 +829,15 @@ export module Scripting {
                     // Return 1 (always suitable) as a safe default.
                     return 1
                 default:
-                    stub('metarule', arguments)
+                    // Unknown metarule IDs above the defined range — log silently
+                    // and return 0 rather than emitting a stub hit that floods the
+                    // console during normal gameplay.  This covers sfall-specific
+                    // extensions and future vanilla IDs not yet mapped.
+                    log('metarule (unknown id=' + id + ')', arguments)
                     break
             }
             // Default return for any case that uses break instead of return
-            // (e.g. elevator case 15, stub default) — ensures VM stack gets a
+            // (e.g. elevator case 15, unknown id) — ensures VM stack gets a
             // valid number rather than undefined.
             return 0
         }
@@ -2606,6 +2610,43 @@ export module Scripting {
             return Math.trunc(n).toString()
         }
 
+        // sfall extended opcode — C-style single-argument string format (0x8192).
+        // sprintf(format, arg) → formatted string.
+        // Supports: %d/%i (decimal int), %s (string), %x (hex int), %c (char), %% (literal %).
+        // This is one of the most commonly used sfall opcodes; many scripts use it for
+        // display messages, UI labels, and debug output.
+        sprintf(fmt: any, arg: any): string {
+            if (typeof fmt !== 'string') return String(fmt ?? '')
+            // Replace each format specifier with the corresponding formatted value.
+            // The %%|%([disxci]) pattern handles: %% → literal %, and %d/%i/%s/%x/%c specifiers.
+            return fmt.replace(/%%|%([disxci])/g, (match: string, spec?: string) => {
+                if (!spec) return '%'
+                const n = typeof arg === 'number' ? Math.trunc(arg) : (parseInt(String(arg), 10) || 0)
+                switch (spec) {
+                    case 'd':
+                    case 'i':
+                        return n.toString()
+                    case 's':
+                        return typeof arg === 'string' ? arg : String(arg ?? '')
+                    case 'x':
+                        return (n >>> 0).toString(16)
+                    case 'c':
+                        return typeof arg === 'number' ? String.fromCharCode(arg) : ''
+                    default:
+                        return match
+                }
+            })
+        }
+
+        // sfall extended opcode — check whether an object has a script attached (0x8193).
+        // obj_has_script(obj) → 1 if obj has a script, 0 otherwise.
+        // Used by scripts that conditionally call procedures only on scripted objects
+        // to avoid crashing when triggering NPC interactions on unscripted objects.
+        obj_has_script(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any)._script ? 1 : 0
+        }
+
         // sfall extended opcodes — weapon ammo PID getter/setter (0x8178–0x8179)
         get_weapon_ammo_pid(weapon: Obj): number {
             // Return the ammo type PID currently loaded in the weapon.
@@ -2666,10 +2707,17 @@ export module Scripting {
         }
 
         // sfall extended opcode — current game mode bitmask (0x817E).
-        // Returns 0 in the scripting VM context (no special mode flags active).
-        // Partial: the engine does not maintain a mode-flags register.
+        // Returns a bitmask encoding the current engine state:
+        //   0x01 = combat is active
+        //   0x02 = dialogue is active
+        //   0x04 = world map is open
+        //   0x08 = barter mode is active
+        // Scripts use this to gate combat-only or dialogue-only code paths.
         get_game_mode(): number {
-            return 0
+            let mode = 0
+            if (globalState.inCombat) mode |= 1
+            if (currentDialogueObject !== null) mode |= 2
+            return mode
         }
 
         // sfall extended opcode — set the repeat interval for the global map script (0x817F).
