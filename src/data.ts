@@ -186,7 +186,10 @@ export function loadMessage(name: string) {
     for (var i = 0; i < lines.length; i++) {
         // e.g. {100}{}{You have entered a dark cave in the side of a mountain.}
         var m = lines[i].match(/\{(\d+)\}\{.*\}\{(.*)\}/)
-        if (m === null) throw 'message parsing: not a valid line: ' + lines[i]
+        if (m === null) {
+            console.warn('message parsing: skipping invalid line: ' + lines[i])
+            continue
+        }
         // HACK: replace unicode replacement character with an apostrophe (because the Web sucks at character encodings)
         globalState.messageFiles[name][m[1]] = m[2].replace(/\ufffd/g, "'")
     }
@@ -203,10 +206,13 @@ export function getLstId(lst: string, id: number): string | null {
     return lstFiles[lst][id]
 }
 
-export function lookupScriptName(scriptID: number): string {
+export function lookupScriptName(scriptID: number): string | null {
     console.log('SID: ' + scriptID)
     const lookupName = getLstId('scripts/scripts', scriptID - 1)
-    if (lookupName === null) throw Error('lookupScriptName: failed to look up script name')
+    if (lookupName === null) {
+        console.warn('lookupScriptName: no entry for script ID ' + scriptID + ' — returning null')
+        return null
+    }
     return lookupName.split('.')[0].toLowerCase()
 }
 

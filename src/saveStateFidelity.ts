@@ -125,7 +125,11 @@ export function hydrateStateFromSave(
     state: LoadDataState,
     inventoryDeserializer: (obj: SaveGame['player']['inventory'][number]) => any
 ): void {
-    validateSaveForHydration(save)
+    const validationError = validateSaveForHydration(save)
+    if (validationError !== null) {
+        console.warn(validationError + ' — aborting load')
+        return
+    }
 
     const savedMap = save.savedMaps[save.currentMap]
 
@@ -186,21 +190,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null
 }
 
-export function validateSaveForHydration(save: SaveGame): void {
+export function validateSaveForHydration(save: SaveGame): string | null {
     if (!isRecord(save.savedMaps)) {
-        throw new Error('[SaveLoad] Save is missing map data (savedMaps)')
+        return '[SaveLoad] Save is missing map data (savedMaps)'
     }
 
     const savedMap = save.savedMaps[save.currentMap]
     if (!savedMap) {
-        throw new Error(`[SaveLoad] Save references missing current map '${save.currentMap}'`)
+        return `[SaveLoad] Save references missing current map '${save.currentMap}'`
     }
 
     if (!save.player || !Array.isArray(save.player.inventory)) {
-        throw new Error('[SaveLoad] Save player inventory is missing or invalid')
+        return '[SaveLoad] Save player inventory is missing or invalid'
     }
 
     if (!Array.isArray(save.party)) {
-        throw new Error('[SaveLoad] Save party data is missing or invalid')
+        return '[SaveLoad] Save party data is missing or invalid'
     }
+
+    return null
 }

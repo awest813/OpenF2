@@ -230,14 +230,19 @@ describe('Phase 24-D — critter_state prone flag', () => {
         expect(script.critter_state(c) & 1).toBe(1)
     })
 
-    it('returns 2 for a knocked-down (prone) critter', () => {
-        const c = makeCritter({ dead: false, knockedDown: true })
-        expect(script.critter_state(c) & 2).toBe(2)
+    it('returns 2 for a knocked-out (stunned) critter', () => {
+        const c = makeCritter({ dead: false, knockedDown: false, knockedOut: true })
+        expect(script.critter_state(c) & 0x02).toBe(0x02)
     })
 
-    it('returns 3 for a dead AND knocked-down critter (both bits set)', () => {
+    it('returns 4 for a knocked-down (prone) critter', () => {
+        const c = makeCritter({ dead: false, knockedDown: true })
+        expect(script.critter_state(c) & 0x04).toBe(0x04)
+    })
+
+    it('returns 5 for a dead AND knocked-down critter (both bits set)', () => {
         const c = makeCritter({ dead: true, knockedDown: true })
-        expect(script.critter_state(c)).toBe(3)
+        expect(script.critter_state(c)).toBe(5)
     })
 
     it('returns 0 for a non-game-object', () => {

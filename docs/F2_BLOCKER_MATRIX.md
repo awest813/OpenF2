@@ -78,6 +78,8 @@ Status guidance:
 - Full project regression run (`npm test`) passed: 57 files / 1953 tests.
 - Phase 44 suite (`src/phase44.test.ts`) passed: VM bridge push(r ?? 0) undefined-stack guard (BLK-023); map_var() bare returns → return 0 (BLK-023); destroyObject() calls destroy_p_proc with reentrance guard (BLK-024); nextTurn() skip-depth guard prevents infinite recursion (BLK-025); new sfall opcodes 0x819C–0x81A2 (get_world_map_x/y, set_world_map_pos, in_world_map, get/set_critter_level, get_object_weight).
 - Full project regression run (`npm test`) passed: 62 files / 2075 tests.
+- Phase 46 suite (`src/phase46.test.ts`) passed: BLK-026 lookupScriptName warn+null; BLK-027 loadMessage skip-invalid-line; BLK-028 party.removePartyMember warn+no-op; BLK-029 saveSchema unknown-version warn+best-effort; BLK-030 char.ts SkillSet/StatSet getBase/get warn+0; BLK-031 critter_state full bitmask (knockedOut/crippled/isFleeing); BLK-032 obj_is_locked non-object default 1→0; validateSaveForHydration returns string|null.
+- Full project regression run (`npm test`) passed: 64 files / 2151 tests.
 
 ## Closure checklist (required)
 

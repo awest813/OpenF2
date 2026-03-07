@@ -31,7 +31,8 @@ export class Party {
 
     removePartyMember(obj: Critter) {
         console.log('party member %o removed', obj)
-        if (!arrayRemove(this.party, obj)) throw Error('Could not remove party member')
+        if (!arrayRemove(this.party, obj))
+            console.warn('removePartyMember: member not in party — no-op')
     }
 
     getPartyMembers(): Critter[] {

@@ -2157,6 +2157,97 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    // -----------------------------------------------------------------------
+    // Phase 46 — deep crash hardening: data.ts / party.ts / char.ts / save system
+    // -----------------------------------------------------------------------
+    {
+        id: 'lookupScriptName_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts lookupScriptName: throw when script ID is not in scripts.lst replaced with ' +
+            'console.warn + return null. getScriptName in scripting.ts updated to string|null. ' +
+            'The existing null-guard in getScriptMessage now fires correctly.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'loadMessage_invalid_line_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts loadMessage: throw on non-standard message file line replaced with ' +
+            'console.warn + continue (skip). Matches the Phase 39 fix already in scripting.ts ' +
+            'loadMessageFile. Prevents crashes when game message files have comments or irregular lines.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'party_remove_no_throw',
+        kind: 'procedure',
+        description:
+            'party.ts Party.removePartyMember: throw when the member is not found in the party ' +
+            'replaced with console.warn + no-op. Prevents crash when scripts call party_remove on ' +
+            'an NPC that has already left or been killed.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'char_skill_stat_no_throw',
+        kind: 'procedure',
+        description:
+            'char.ts SkillSet.getBase/get and StatSet.getBase/get: throw for unknown skill/stat ' +
+            'names replaced with console.warn + return 0. Prevents crashes if any code path calls ' +
+            'these with an invalid string key.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'save_migration_unknown_version_no_throw',
+        kind: 'procedure',
+        description:
+            'saveSchema.ts migrateSave: throw for unknown save version replaced with ' +
+            'console.warn + treat as SAVE_VERSION (best-effort forward compatibility). ' +
+            'Saves from future engine versions will load instead of hard-crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'validate_save_no_throw',
+        kind: 'procedure',
+        description:
+            'saveStateFidelity.ts validateSaveForHydration: all four throw paths for corrupt/missing ' +
+            'save data converted to return string|null (null = valid). hydrateStateFromSave checks ' +
+            'the result and warns + aborts instead of crashing the runtime on corrupt save load.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'critter_state_full_bitmask',
+        kind: 'procedure',
+        description:
+            'scripting.ts critter_state: bitmask expanded to match Fallout 2 CRITTER_IS_* constants. ' +
+            'bit0=dead, bit1=knockedOut/stunned, bit2=knockedDown/prone, bit3=any-crippled-limb, ' +
+            'bit4=isFleeing. Previously only set bit0 (dead) and bit1 (knockedDown).',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'obj_is_locked_non_object_default',
+        kind: 'procedure',
+        description:
+            'scripting.ts obj_is_locked: changed return value for non-game-objects from 1 (locked) ' +
+            'to 0 (unlocked). Returning 1 for nulls/invalid objects was incorrectly blocking scripts ' +
+            'that check obj_is_locked before attempting to open containers or doors.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
