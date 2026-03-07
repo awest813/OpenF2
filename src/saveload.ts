@@ -206,6 +206,30 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         save.playerSkillPoints = globalState.player.skills.skillPoints
     }
 
+    // BLK-042: Snapshot player equipped weapon slots (leftHand / rightHand).
+    // When the player drags a weapon from inventory to an equipment slot, the item
+    // is removed from inventory and only accessible via player.leftHand / rightHand.
+    // Without this snapshot those weapons would be lost across save/load cycles.
+    const playerForWeapon = globalState.player as any
+    const leftHand = playerForWeapon.leftHand
+    const rightHand = playerForWeapon.rightHand
+    if (leftHand && typeof leftHand.pid === 'number' && leftHand.pid >= 1) {
+        save.playerLeftHandPID = leftHand.pid
+        // Include the serialized weapon in the inventory save so it can be found
+        // on load (equipped items are removed from inventory when dragged to slot).
+        const alreadyInLeft = save.player.inventory.some((i: any) => i.pid === leftHand.pid)
+        if (!alreadyInLeft && typeof leftHand.serialize === 'function') {
+            save.player.inventory.push(leftHand.serialize())
+        }
+    }
+    if (rightHand && typeof rightHand.pid === 'number' && rightHand.pid >= 1) {
+        save.playerRightHandPID = rightHand.pid
+        const alreadyInRight = save.player.inventory.some((i: any) => i.pid === rightHand.pid)
+        if (!alreadyInRight && typeof rightHand.serialize === 'function') {
+            save.player.inventory.push(rightHand.serialize())
+        }
+    }
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -297,6 +321,23 @@ export function load(id: number): void {
                 if (globalState.player && typeof save.playerSkillPoints === 'number') {
                     globalState.player.skills.skillPoints = save.playerSkillPoints
                 }
+                // BLK-042: Restore player equipped weapon slots from persisted PIDs.
+                // Weapons equipped via drag-drop are removed from inventory and must be
+                // re-equipped after the inventory is restored from the save.
+                if (globalState.player && typeof save.playerLeftHandPID === 'number') {
+                    const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
+                    if (leftIdx !== -1) {
+                        ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
+                        globalState.player.inventory.splice(leftIdx, 1)
+                    }
+                }
+                if (globalState.player && typeof save.playerRightHandPID === 'number') {
+                    const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
+                    if (rightIdx !== -1) {
+                        ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
+                        globalState.player.inventory.splice(rightIdx, 1)
+                    }
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -371,6 +412,21 @@ export function load(id: number): void {
                     // Restore unspent skill points (BLK-035).
                     if (globalState.player && typeof save.playerSkillPoints === 'number') {
                         globalState.player.skills.skillPoints = save.playerSkillPoints
+                    }
+                    // BLK-042: Restore player equipped weapon slots from persisted PIDs.
+                    if (globalState.player && typeof save.playerLeftHandPID === 'number') {
+                        const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
+                        if (leftIdx !== -1) {
+                            ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
+                            globalState.player.inventory.splice(leftIdx, 1)
+                        }
+                    }
+                    if (globalState.player && typeof save.playerRightHandPID === 'number') {
+                        const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
+                        if (rightIdx !== -1) {
+                            ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
+                            globalState.player.inventory.splice(rightIdx, 1)
+                        }
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

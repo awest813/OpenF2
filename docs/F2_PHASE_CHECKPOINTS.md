@@ -257,3 +257,44 @@ Gate: **PASS** — all 2383 tests green, tsc clean.
 - [x] phase52.test.ts: 64 regression tests, all passing
 
 Gate: **PASS** — all 2447 tests green, tsc clean.
+
+---
+
+## Phase 53 — NPC weapon slot save/restore (BLK-039), combat stability (BLK-040), sfall opcodes 0x81C6–0x81CF
+
+- [x] **BLK-039**: NPC critter leftHand/rightHand weapon objects not persisted — `SERIALIZED_CRITTER_PROPS` extended with `leftHandPID`/`rightHandPID`; `Critter.toMapObject` saves the PIDs; `objFromMapObject` restores by inventory search.
+- [x] **BLK-040**: `doAITurn()` dead-target crash guard — checks `target.dead` before attacking. `nextTurn()` AP initialization guard for critters added mid-round.
+- [x] New sfall opcode 0x81C6: `get_critter_base_stat(critter, stat)` → unmodified base stat
+- [x] New sfall opcode 0x81C7: `set_critter_base_stat(critter, stat, val)` → set base stat directly
+- [x] New sfall opcode 0x81C8: `critter_mod_skill_points(critter, skill, delta)` → modify skill by delta
+- [x] New sfall opcode 0x81C9: `get_critter_current_ap(critter)` → current AP
+- [x] New sfall opcode 0x81CA: `set_critter_current_ap(critter, ap)` → set AP
+- [x] New sfall opcode 0x81CB: `get_combat_target(critter)` → current combat target (0 = not in combat)
+- [x] New sfall opcode 0x81CC: `set_combat_target(critter, target)` → set combat target (partial)
+- [x] New sfall opcode 0x81CD: `get_game_time_in_seconds()` → game time in seconds
+- [x] New sfall opcode 0x81CE: `get_light_level()` → global ambient light level
+- [x] New sfall opcode 0x81CF: `set_light_level_sfall(level, update)` → set ambient light (partial)
+- [x] phase53.test.ts: 54 regression tests, all passing
+
+Gate: **PASS** — all 2519 tests green, tsc clean.
+
+---
+
+## Phase 54 — XP on kill (BLK-041), player weapon slot save/load (BLK-042), skill points on level-up (BLK-043), inven_unwield activeHand (BLK-044), sfall opcodes 0x81D0–0x81D7
+
+- [x] **BLK-041**: Player never gained XP from combat kills — `critterKill()` now auto-awards `pro.extra.XPValue` XP to the player source; level-up+skill-point check follows immediately. Mirrors Fallout 2 engine behaviour.
+- [x] **BLK-042**: Player equipped weapon (leftHand/rightHand) lost on save/load — save schema v15 adds `playerLeftHandPID`/`playerRightHandPID`; equipped weapons included in inventory save; both IDB and memory load paths re-equip from inventory by PID on load.
+- [x] **BLK-043**: Skill points not awarded on level-up — `give_exp_points()` now grants `max(1, 10 + floor(INT/2)) + 2*Educated_rank` skill points per level gained, matching Fallout 2 formula.
+- [x] **BLK-044**: `inven_unwield()` ignored activeHand — for the player it now clears `leftHand` when `activeHand=0` (primary) and `rightHand` when `activeHand=1` (secondary). NPC behaviour unchanged.
+- [x] New sfall opcode 0x81D0: `get_game_mode_sfall()` → mode bitmask (0x01=normal, 0x02=combat)
+- [x] New sfall opcode 0x81D1: `force_encounter(mapId)` → no-op (partial)
+- [x] New sfall opcode 0x81D2: `force_encounter_with_flags(mapId, flags)` → no-op (partial)
+- [x] New sfall opcode 0x81D3: `get_last_pers_obj()` → 0 (stub)
+- [x] New sfall opcode 0x81D4: `obj_is_disabled_sfall(obj)` → 0 (partial)
+- [x] New sfall opcode 0x81D5: `obj_remove_script(obj)` → no-op (stub)
+- [x] New sfall opcode 0x81D6: `obj_add_script(obj, sid)` → no-op (stub)
+- [x] New sfall opcode 0x81D7: `obj_run_proc(obj, proc_name)` → no-op (stub)
+- [x] Save schema bumped from v14 to v15; v14→v15 migration defaults `playerLeftHandPID`/`playerRightHandPID` to undefined; `sanitizeEquippedPID` helper validates PID ≥ 1
+- [x] phase54.test.ts: 27 regression tests, all passing
+
+Gate: **PASS** — all 2546 tests green, tsc clean.

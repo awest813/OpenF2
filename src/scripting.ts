@@ -1058,9 +1058,16 @@ export module Scripting {
             if (!player) return
             player.xp += xp
             uiLog('You gain ' + xp + ' experience points.')
-            // Check for level-up: level N requires N*(N-1)/2 * 1000 XP
+            // Check for level-up: level N is reached at N*(N+1)/2 * 1000 total XP.
             while (player.xp >= (player.level * (player.level + 1) / 2) * 1000) {
                 player.level++
+                // BLK-043: Award skill points on level-up (10 + INT/2, minimum 1).
+                // Fallout 2 formula: base 10 + floor(INT / 2) skill points per level.
+                // The Educated perk (perk ID 47) adds +2 per level; check perkRanks.
+                const intScore = player.getStat('INT') ?? 5
+                const educatedBonus = (player.perkRanks?.[47] ?? 0) * 2
+                const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
+                player.skills.skillPoints += pointsGained
                 uiLog('You have reached experience level ' + player.level + '.')
             }
         }
@@ -1733,8 +1740,12 @@ export module Scripting {
         // inven_unwield — make a critter put away their current weapon
         //
         // In Fallout 2 this causes the critter to holster their weapon so it returns
-        // to their inventory.  The browser build keeps the weapon object in inventory
-        // but clears the rightHand (primary weapon) slot to reflect an unwielded state.
+        // to their inventory.  The browser build clears the active weapon hand slot
+        // (determined by activeHand for the player, or rightHand for NPCs).
+        //
+        // BLK-044: Previously only cleared rightHand, leaving leftHand weapons
+        // untouched.  Now clears the appropriate slot so scripts that call
+        // inven_unwield() actually remove the weapon from the critter's combat view.
         // ---------------------------------------------------------------------------
         inven_unwield(obj: Obj) {
             log('inven_unwield', arguments)
@@ -1743,7 +1754,19 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            critter.rightHand = undefined
+            if (critter.isPlayer) {
+                // For the player, clear the currently active hand slot.
+                // activeHand: 0 = leftHand (primary), 1 = rightHand (secondary).
+                const activeHand = (critter as any).activeHand ?? 0
+                if (activeHand === 1) {
+                    critter.rightHand = undefined
+                } else {
+                    critter.leftHand = undefined
+                }
+            } else {
+                // For NPCs, clear rightHand (always their primary equipped weapon slot).
+                critter.rightHand = undefined
+            }
         }
 
         // ---------------------------------------------------------------------------
@@ -3738,6 +3761,26 @@ export module Scripting {
             if (typeof level === 'number') {
                 globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
             }
+        }
+
+        // Phase 54 — sfall 0x81D0 — get_game_mode_sfall():
+        // Returns a bitmask indicating the current game mode.
+        // Bit 0 (0x01) = normal map mode, bit 1 (0x02) = combat mode,
+        // bit 2 (0x04) = dialogue mode, bit 3 (0x08) = barter mode,
+        // bit 4 (0x10) = inventory/menu mode, bit 5 (0x20) = world-map mode.
+        get_game_mode_sfall(): number {
+            let mode = 0x01 // normal mode by default
+            if (globalState.inCombat) mode |= 0x02
+            // Additional mode flags could be set based on UIMode if needed.
+            return mode
+        }
+
+        // Phase 54 — sfall 0x81D4 — obj_is_disabled_sfall(obj):
+        // Returns 1 if the object's AI / script is disabled, 0 otherwise.
+        // Browser build: partial — no per-object disable flag; always returns 0.
+        obj_is_disabled_sfall(obj: Obj): number {
+            log('obj_is_disabled_sfall', arguments)
+            return 0
         }
 
         _serialize(): SerializedScript {

@@ -637,6 +637,43 @@ export module ScriptVMBridge {
        // 0x81CF — set_light_level(level, update): set the global ambient light level.
        // Browser build accepts the call but defers actual rendering update.
        ,0x81CF: bridged("set_light_level_sfall", 2, false) // set_light_level(level, update) — partial
+
+       // -----------------------------------------------------------------------
+       // Phase 54 — sfall extended opcodes 0x81D0–0x81D7
+       // -----------------------------------------------------------------------
+
+       // 0x81D0 — get_game_mode(): return game mode bitmask.
+       // Bits: 0x01=normal, 0x02=combat, 0x04=dialogue, 0x08=barter, 0x10=world-map.
+       // Browser build: return current mode as a best-effort flag set.
+       ,0x81D0: bridged("get_game_mode_sfall", 0) // get_game_mode() → mode bitmask
+
+       // 0x81D1 — force_encounter(mapId): trigger a forced random encounter.
+       // Browser build: no-op (random encounter system not fully implemented).
+       ,0x81D1: function() { this.pop() } // force_encounter(mapId) — no-op
+
+       // 0x81D2 — force_encounter_with_flags(mapId, flags): force encounter with options.
+       // Browser build: no-op.
+       ,0x81D2: function() { this.pop(); this.pop() } // force_encounter_with_flags — no-op
+
+       // 0x81D3 — get_last_pers_obj(): return the last critter that started persistent combat.
+       // Browser build: returns 0 (no persistent combat tracking).
+       ,0x81D3: function() { this.push(0) } // get_last_pers_obj() → 0
+
+       // 0x81D4 — obj_is_disabled(obj): return 1 if object's AI is disabled.
+       // Browser build: partial — always returns 0 (no per-object disable flag).
+       ,0x81D4: bridged("obj_is_disabled_sfall", 1) // obj_is_disabled(obj) → 0
+
+       // 0x81D5 — obj_remove_script(obj): remove script from an object.
+       // Equivalent to remove_script; accepted as a safe no-op.
+       ,0x81D5: function() { this.pop() } // obj_remove_script(obj) — no-op
+
+       // 0x81D6 — obj_add_script(obj, script_id): attach a script by SID.
+       // Browser build: no SID-based script registry; no-op.
+       ,0x81D6: function() { this.pop(); this.pop() } // obj_add_script(obj, sid) — no-op
+
+       // 0x81D7 — obj_run_proc(obj, proc_name): run a named procedure on an object.
+       // Browser build: partial no-op (cannot dynamically invoke named procs).
+       ,0x81D7: function() { this.pop(); this.pop() } // obj_run_proc(obj, proc) — no-op
     }
     Object.assign(opMap, bridgeOpMap)
 

@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 14
+export const SAVE_VERSION = 15
 
 export interface SaveGame {
     id?: number
@@ -176,6 +176,27 @@ export interface SaveGame {
      */
     playerSkillPoints?: number
 
+    /**
+     * PID of the item equipped in the player's left (primary) hand slot (added in v15 / BLK-042).
+     *
+     * The player can drag weapons from inventory to the left-hand or right-hand
+     * weapon slot.  Those equipped items are removed from the inventory array, so
+     * they would be lost on save/load without explicit tracking.  Saving the PID
+     * here (and including the serialized item in playerInventory) allows the load
+     * path to re-equip the correct weapon after loading.
+     *
+     * Undefined means no custom weapon was equipped in leftHand (uses default punch).
+     */
+    playerLeftHandPID?: number
+
+    /**
+     * PID of the item equipped in the player's right (secondary) hand slot (added in v15 / BLK-042).
+     *
+     * See playerLeftHandPID for the full explanation.  Undefined means no weapon
+     * was equipped in rightHand.
+     */
+    playerRightHandPID?: number
+
     player: {
         position: Point
         orientation: number
@@ -305,6 +326,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // playerSkillPoints: undefined means "use Player class default (10)"
             save.version = 14
             // falls through
+        case 14:
+            // v14 → v15: add player equipped weapon slot PIDs (BLK-042).
+            // Old saves default to undefined meaning no custom weapon was equipped;
+            // the load path will restore the default punch for leftHand.
+            // playerLeftHandPID and playerRightHandPID are optional and default undefined.
+            save.version = 15
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -350,6 +378,10 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             save.playerSkillPoints = undefined
         }
     }
+    // Normalize playerLeftHandPID/playerRightHandPID: must be a positive integer or undefined.
+    // A value of 0 is not a valid PID (reserved), so treat it as undefined.
+    save.playerLeftHandPID = sanitizeEquippedPID(save.playerLeftHandPID)
+    save.playerRightHandPID = sanitizeEquippedPID(save.playerRightHandPID)
 
     return save as SaveGame
 }
@@ -459,4 +491,14 @@ function sanitizeStringNumericRecord(value: unknown): Record<string, number> {
         out[key] = rawEntry
     }
     return out
+}
+
+/**
+ * Normalize an equipped weapon PID: must be a positive integer >= 1, or undefined.
+ * PIDs of 0 or negative values are invalid and treated as "no equipped weapon".
+ */
+function sanitizeEquippedPID(value: unknown): number | undefined {
+    if (value === undefined || value === null) return undefined
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) return undefined
+    return value
 }
