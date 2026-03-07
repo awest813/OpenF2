@@ -3192,6 +3192,40 @@ export module Scripting {
             return 0
         }
 
+        // sfall extended opcode — get a string value from the mod's INI configuration (0x81A3).
+        // Partial: no INI file system in browser build; returns empty string.
+        get_ini_string(key: string): string {
+            log('get_ini_string', arguments)
+            return ''
+        }
+
+        // sfall extended opcode — set the global script type (0x81A4).
+        // 0=map-update script, 1=combat script. No-op in browser build (no global script ticker).
+        set_global_script_type(type: number): void {
+            log('set_global_script_type', arguments)
+        }
+
+        // sfall extended opcode — get in-game calendar year (0x81A5).
+        // Game epoch is year 2241; uses 360-day years (12 × 30-day months).
+        get_year(): number {
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            return 2241 + Math.floor(days / 360)
+        }
+
+        // sfall extended opcode — get in-game calendar month (0x81A6).
+        // Returns 1–12; Fallout 2 uses 30-day months.
+        get_month(): number {
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            return (Math.floor(days / 30) % 12) + 1
+        }
+
+        // sfall extended opcode — get in-game calendar day of month (0x81A7).
+        // Returns 1–30; Fallout 2 uses 30-day months.
+        get_day(): number {
+            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
+            return (days % 30) + 1
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

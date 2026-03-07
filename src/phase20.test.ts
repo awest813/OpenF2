@@ -451,10 +451,10 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
         expect(e!.status).toBe('implemented')
     })
 
-    it('get_game_mode is marked partial', () => {
+    it('get_game_mode is marked implemented (upgraded in Phase 45)', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'get_game_mode')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('partial')
+        expect(e!.status).toBe('implemented')
     })
 
     it('set_global_script_repeat is marked partial', () => {
