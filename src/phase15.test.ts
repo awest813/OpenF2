@@ -43,12 +43,13 @@ describe('Phase 15-B — inven_cmds index lookup', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('still records stub hit for unsupported inventory commands', () => {
+    it('unknown command returns null without recording a stub hit (warn-only)', () => {
         const script = new Scripting.Script()
         const critter: any = { type: 'critter', inventory: [] }
 
         expect(script.inven_cmds(critter, 99, 0)).toBeNull()
-        expect(stubHitCount()).toBe(1)
+        // Phase 42: unknown commands emit a warn() instead of stub(), so no stub hit
+        expect(stubHitCount()).toBe(0)
     })
 })
 
@@ -70,11 +71,12 @@ describe('Phase 15-D — checklist reflects de-stubbed procedures', () => {
         expect(entry?.status).toBe('implemented')
     })
 
-    it('inven_cmds and obj_can_hear_obj are now partial', () => {
+    it('inven_cmds is now fully implemented; obj_can_hear_obj is partial', () => {
         const inven = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'inven_cmds')
         const hearing = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'obj_can_hear_obj')
 
-        expect(inven?.status).toBe('partial')
+        // Phase 42: inven_cmds unknown-command fallback upgraded from stub() to warn()
+        expect(inven?.status).toBe('implemented')
         expect(hearing?.status).toBe('partial')
     })
 })

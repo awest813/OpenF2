@@ -762,7 +762,6 @@ export class Obj {
         lazyLoadImage(explosion.art, () => {
             globalState.gMap.addObject(explosion)
 
-            console.log(`Explosion at (${this.position.x}, ${this.position.y}) with radius ${explosionRadius} and damage ${damage}`)
             explosion.singleAnimation(false, () => {
                 globalState.gMap.destroyObject(explosion)
 
@@ -780,7 +779,6 @@ export class Obj {
                     for (let j = 0; j < objs.length; j++) {
                         if (objs[j].type === 'critter') {
                             const critter = <Critter>objs[j]
-                            console.log(`Explosion damages ${critter.name} for ${adjustedDamage} (distance: ${distance}, falloff: ${damageFalloff.toFixed(2)})`)
                             
                             // Apply damage with explosive type (imported at module level)
                             critterDamage(critter, adjustedDamage, source as Critter, false, true, 'Explosive')
@@ -799,7 +797,6 @@ export class Obj {
 
     pickup(source: Critter) {
         if (this._script) {
-            console.log('picking up %o', this)
             Scripting.pickup(this, source)
         }
     }

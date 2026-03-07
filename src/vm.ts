@@ -71,12 +71,22 @@ export class ScriptVM {
     }
 
     pop(): any {
-        if (this.dataStack.length === 0) throw 'VM data stack underflow'
+        if (this.dataStack.length === 0) {
+            // A stack underflow is a script bug, but we recover with 0 so the
+            // rest of the script continues rather than crashing the entire game.
+            console.warn(`[ScriptVM] data stack underflow in ${this.intfile?.name ?? 'unknown'}; returning 0`)
+            return 0
+        }
         return this.dataStack.pop()
     }
 
     popAddr(): any {
-        if (this.retStack.length === 0) throw 'VM return stack underflow'
+        if (this.retStack.length === 0) {
+            // Return the sentinel value (-1) that causes op_pop_return to halt
+            // the VM gracefully — better than throwing and crashing the game.
+            console.warn(`[ScriptVM] return stack underflow in ${this.intfile?.name ?? 'unknown'}; halting script`)
+            return -1
+        }
         return this.retStack.pop()
     }
 
@@ -91,7 +101,12 @@ export class ScriptVM {
     call(procName: string, args: any[] = []): any {
         var proc = this.intfile.procedures[procName]
         // console.log("CALL " + procName + " @ " + proc.offset + " from " + this.scriptObj.scriptName)
-        if (!proc) throw 'ScriptVM: unknown procedure ' + procName
+        if (!proc) {
+            // Unknown procedure — log a warning and return undefined gracefully
+            // so the call site does not crash the entire game session.
+            console.warn(`[ScriptVM] unknown procedure "${procName}" in ${this.intfile.name}; skipping call`)
+            return undefined
+        }
 
         const isTopLevel = this.currentProcedureName === null
         const previousProcedure = this.currentProcedureName

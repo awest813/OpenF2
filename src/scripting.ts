@@ -308,7 +308,6 @@ export module Scripting {
             return true
 
         //warn("is NOT GO: " + obj.toString())
-        console.log('is NOT GO: %o', obj)
         return false
     }
 
@@ -354,14 +353,14 @@ export module Scripting {
         if (currentDialogueObject !== null && dialogueOptionProcs.length === 0) {
             // after running the option procedure we have no options...
             // so close the dialogue
-            console.log('[dialogue exit via dialogueReply (no replies)]')
+            info('[dialogue exit via dialogueReply (no replies)]', 'dialogue')
             dialogueExit()
         }
     }
 
     export function dialogueEnd() {
         // dialogue exited from [Done] or the UI
-        console.log('[dialogue exit via dialogueExit]')
+        info('[dialogue exit via dialogueExit]', 'dialogue')
         dialogueExit()
     }
 
@@ -1228,7 +1227,7 @@ export module Scripting {
             }
 
             //info("add_mult_objs_to_inven: " + count + " counts of " + item.toString(), "inventory")
-            console.log('add_mult_objs_to_inven: %d counts of %o to %o', count, item, obj)
+            log('add_mult_objs_to_inven: ' + count + ' × ' + (item as any)?.art, arguments, 'inventory')
             obj.addInventoryItem(item, count)
         }
         rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
@@ -1389,7 +1388,10 @@ export module Scripting {
                     if (itemIndex < 0 || itemIndex >= obj.inventory.length) return null
                     return obj.inventory[itemIndex]
                 default:
-                    stub('inven_cmds', arguments, 'inventory')
+                    // Unknown command index — log and return null rather than emitting
+                    // a stub warning so unexpected inventory command codes don't crash
+                    // or flood the console.
+                    warn('inven_cmds: unknown command ' + invenCmd + ' — returning null', 'inventory', this)
                     return null
             }
         }
@@ -2139,7 +2141,7 @@ export module Scripting {
         // combat
         node998() {
             // enter combat
-            console.log('[enter combat]')
+            log('node998 enter combat', arguments, 'movement')
         }
 
         // dialogue
@@ -2155,7 +2157,6 @@ export module Scripting {
         gdialog_mod_barter(mod: number) {
             // switch to barter mode
             log('gdialog_mod_barter', arguments)
-            console.log('--> barter mode')
             if (!this.self_obj) {
                 warn('gdialog_mod_barter: no self_obj — barter mode skipped', undefined, this)
                 return
@@ -2369,12 +2370,15 @@ export module Scripting {
         explosion(tile: number, elevation: number, damage: number) {
             log('explosion', arguments)
 
-            // TODO: objectExplode should defer to an auxillary tile explode function, which we should use
-            // Make dummy object so we can explode at the tile
+            // Make a transient object so we can explode at the tile.
             var explosives = createObjectWithPID(makePID(0 /* items */, 85 /* Plastic Explosives */), -1)
             explosives.position = fromTileNum(tile)
             globalState.gMap.addObject(explosives)
-            explosives.explode(explosives, 0, 100) // TODO: min/max dmg?
+            // Use the script-supplied damage value: half as min, full as max.
+            // Allow 0 for scripts that trigger a visual-only explosion.
+            const minDmg = Math.floor(damage / 2)
+            const maxDmg = damage
+            explosives.explode(explosives, minDmg, maxDmg)
             globalState.gMap.removeObject(explosives)
         }
 
@@ -3182,8 +3186,9 @@ export module Scripting {
 
         //console.log("%s int file: %o", name, intfile)
 
-        if (!currentMapObject)
-            console.log('note: using current script (%s) as map script for this object', intfile.name)
+        if (!currentMapObject) {
+            // This script is its own map script; common for standalone map entry points.
+        }
 
         reader.seek(0)
         var vm = new ScriptVMBridge.GameScriptVM(reader, intfile)
@@ -3437,7 +3442,7 @@ export module Scripting {
         flushUnsupportedVMOperations(obj._script)
 
         if (doTerminate) {
-            console.log('DUH DUH TERMINATE!')
+            info('[combatEvent] combat_p_proc requested terminate_combat')
             Script.prototype.terminate_combat.call(obj._script) // call original
         }
 

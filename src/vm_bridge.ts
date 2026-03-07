@@ -35,7 +35,13 @@ export module ScriptVMBridge {
             const targetFn = (<any>this.scriptObj)[procName]
             if(typeof targetFn !== "function") {
                 this.recordUnsupportedProcedure(this.lastOpcode, procName)
-                throw new Error(`ScriptVMBridge: missing procedure implementation ${procName} for opcode 0x${this.lastOpcode.toString(16)}`)
+                // Warn and return a safe 0 instead of throwing so the script can
+                // continue executing — a missing bridge is a stub gap, not a fatal error.
+                console.warn(
+                    `[ScriptVMBridge] missing procedure "${procName}" for opcode 0x${this.lastOpcode.toString(16)} in ${this.intfile.name}; returning 0`
+                )
+                if(pushResult) this.push(0)
+                return
             }
 
             var r = targetFn.apply(this.scriptObj, args)
@@ -209,7 +215,6 @@ export module ScriptVMBridge {
             // halt where we are, saving our return address.
             // we will resume when the dialogue system resumes us on dialogue exit
             // usually to run cleanup code.
-            console.log("halting in gsay_end (pc=0x%s)", this.pc.toString(16))
             this.retStack.push(this.pc + 2)
             this.halted = true
             this.scriptObj.gsay_end()
