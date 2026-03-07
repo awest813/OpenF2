@@ -134,7 +134,12 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         this.push(Math.floor(this.pop()))
     }, // op_floor
     0x801b: function () {
-        if (this.dataStack.length === 0) throw 'data stack underflow'
+        if (this.dataStack.length === 0) {
+            // Underflow in op_dup — push 0 rather than crashing.
+            console.warn('[ScriptVM] op_dup: data stack underflow — pushing 0')
+            this.push(0)
+            return
+        }
         this.push(this.dataStack[this.dataStack.length - 1])
     }, // op_dup
 
@@ -148,32 +153,63 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
 
     0x8028: function () {
         // op_lookup_string_proc
-        this.push(this.intfile.procedures[this.pop()].index)
+        const name = this.pop()
+        const proc = this.intfile.procedures[name]
+        if (!proc) {
+            console.warn('[ScriptVM] op_lookup_string_proc: unknown procedure "' + name + '" — pushing 0')
+            this.push(0)
+            return
+        }
+        this.push(proc.index)
     },
     0x8027: function () {
         // op_check_arg_count
         const argc = this.pop()
         const procIdx = this.pop()
         const proc = this.intfile.proceduresTable[procIdx]
-        if (argc !== proc.argc)
-            throw `vm error: expected ${proc.argc} args, got ${argc} args when calling ${proc.name}`
+        if (!proc) {
+            // Missing procedure table entry — cannot validate, continue silently.
+            console.warn('[ScriptVM] op_check_arg_count: no procedure at index ' + procIdx + ' — skipping check')
+            return
+        }
+        if (argc !== proc.argc) {
+            // Arg count mismatch is a script-level bug; warn but continue so the
+            // call can still proceed rather than crashing the entire game.
+            console.warn(
+                '[ScriptVM] op_check_arg_count: expected ' + proc.argc +
+                ' args, got ' + argc + ' args when calling ' + proc.name + ' — continuing'
+            )
+        }
     },
 
     0x8005: function () {
         // op_call
-        this.pc = this.intfile.proceduresTable[this.pop()].offset
+        const procIdx = this.pop()
+        const proc = this.intfile.proceduresTable[procIdx]
+        if (!proc) {
+            console.warn('[ScriptVM] op_call: no procedure at index ' + procIdx + ' — halting')
+            this.halted = true
+            return
+        }
+        this.pc = proc.offset
     },
     0x9001: function () {
         const num = this.script.read32()
         const nextOpcode = this.script.peek16()
 
         if (includes([0x8014, 0x8015, 0x8016], nextOpcode)) {
-            if (this.intfile.identifiers[num] === undefined)
-                throw Error('ScriptVM: 9001 requested identifier ' + num + " but it doesn't exist")
+            if (this.intfile.identifiers[num] === undefined) {
+                console.warn('[ScriptVM] 0x9001: identifier ' + num + ' not in intfile — pushing empty string')
+                this.push('')
+                return
+            }
             this.push(this.intfile.identifiers[num])
         } else {
-            if (this.intfile.strings[num] === undefined)
-                throw Error('ScriptVM: 9001 requested string ' + num + " but it doesn't exist")
+            if (this.intfile.strings[num] === undefined) {
+                console.warn('[ScriptVM] 0x9001: string ' + num + ' not in intfile — pushing empty string')
+                this.push('')
+                return
+            }
             this.push(this.intfile.strings[num])
         }
     },
@@ -198,11 +234,17 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x803a: binop((x, y) => x - y),
     0x803b: binop((x, y) => x * y),
     0x803d: binop((x, y) => {
-        if (y === 0) throw 'modulo by zero'
+        if (y === 0) {
+            console.warn('[ScriptVM] modulo by zero — returning 0')
+            return 0
+        }
         return x % y
     }),
     0x803c: binop((x, y) => {
-        if (y === 0) throw 'division by zero'
+        if (y === 0) {
+            console.warn('[ScriptVM] division by zero — returning 0')
+            return 0
+        }
         return (x / y) | 0
     }), // integer division (truncate toward zero)
 }

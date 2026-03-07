@@ -2248,6 +2248,113 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+    // -------------------------------------------------------------------------
+    // Phase 47 entries
+    // -------------------------------------------------------------------------
+    {
+        id: 'vm_op_dup_underflow_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_dup (0x801b): data-stack underflow previously threw a string ' +
+            'that crashed the entire game. Now logs console.warn and pushes 0 instead, so ' +
+            'scripts with dup-before-push bugs continue executing rather than hard-crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_check_arg_count_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_check_arg_count (0x8027): argument count mismatch previously ' +
+            'threw a string that crashed the entire game. Now logs console.warn and continues — ' +
+            'the call still proceeds so sfall-extended or modded scripts with minor arity ' +
+            'differences do not abort the session.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_lookup_string_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_lookup_string_proc (0x8028): when the procedure name is not in ' +
+            'the intfile procedures table the implicit property access threw a TypeError. Now ' +
+            'logs console.warn and pushes 0 so the script can handle the missing proc gracefully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_op_call_missing_proc_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts op_call (0x8005): when the procedure index is out of range in ' +
+            'proceduresTable the implicit property access threw a TypeError. Now logs console.warn ' +
+            'and halts the VM gracefully instead of crashing the entire game session.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'vm_opcode_9001_missing_symbol_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts opcode 0x9001 (push identifier / string): when the requested ' +
+            'identifier or string number is absent from the intfile tables, the engine ' +
+            'previously threw an Error that crashed the session. Now logs console.warn and ' +
+            'pushes an empty string so downstream code receives a safe fallback.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'vm_division_by_zero_no_throw',
+        kind: 'opcode',
+        description:
+            'vm_opcodes.ts opcodes 0x803c (integer division) and 0x803d (modulo): division or ' +
+            'modulo by zero previously threw a string that crashed the game. Now logs ' +
+            'console.warn and returns 0 so scripts with divide-by-zero edge cases continue.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'encounter_player_level_evalcond',
+        kind: 'procedure',
+        description:
+            'encounters.ts evalCond(): the "player.level" condition check previously always ' +
+            'returned 0. Now reads globalState.player.level (falling back to 1 when the player ' +
+            'is not yet initialised). Encounter conditions gated on player level now fire ' +
+            'correctly, enabling level-gated spawns throughout the world map.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'encounter_perk_roll_bonuses',
+        kind: 'procedure',
+        description:
+            'encounters.ts pickEncounter(): Scout (perk ID 22), Ranger (perk ID 28), and ' +
+            'Explorer (perk ID 29) now add +1/+1/+2 to the encounter roll respectively, ' +
+            'matching the Fallout 2 formula. Bonuses are read from player.perkRanks so they ' +
+            'activate as soon as a script grants the perk.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'encounter_cautious_nature_formation',
+        kind: 'procedure',
+        description:
+            'encounters.ts positionCritters(): the Cautious Nature perk (Fallout 2 perk ID 16) ' +
+            'now adds +3 to the surrounding-formation spacing roll, increasing the distance ' +
+            'at which hostile critters are placed when the formation is "surrounding". ' +
+            'Check uses player.perkRanks[16] so it activates via critter_add_trait.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
