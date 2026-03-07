@@ -336,6 +336,12 @@ export module ScriptVMBridge {
        // sfall extended opcodes 0x8192–0x8193 — string format and script detection
        ,0x8192: bridged("sprintf", 2)                   // sprintf(format, arg) → C-style single-arg formatted string
        ,0x8193: bridged("obj_has_script", 1)            // obj_has_script(obj) → 1 if obj has a script, 0 otherwise
+
+       // sfall extended opcodes 0x8194–0x8197 — tile FID and critter flags
+       ,0x8194: bridged("get_tile_fid", 2)              // get_tile_fid(tile, elev) → FID of floor tile (partial: 0)
+       ,0x8195: bridged("set_tile_fid", 3, false)       // set_tile_fid(tile, elev, fid) — override floor tile art (no-op)
+       ,0x8196: bridged("get_critter_flags", 1)         // get_critter_flags(obj) → critter injury/state flags bitmask
+       ,0x8197: bridged("set_critter_flags", 2, false)  // set_critter_flags(obj, flags) — bulk-set critter injury flags
     }
     Object.assign(opMap, bridgeOpMap)
 

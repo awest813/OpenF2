@@ -532,7 +532,13 @@ export module Scripting {
             return mapVars[scriptName][mvar]
         }
         set_map_var(mvar: number, value: any) {
-            if (!this._mapScript) throw Error('set_map_var: no map script')
+            if (!this._mapScript) {
+                // No map script is attached to this script instance — this can happen when
+                // non-map scripts (e.g. critter scripts) call set_map_var.  Treat as a
+                // no-op rather than throwing, to avoid crashing the browser runtime.
+                warn('set_map_var: no map script — no-op (mvar=' + mvar + ', value=' + value + ')', undefined, this)
+                return
+            }
             var scriptName = this._mapScript.scriptName
             if (scriptName === undefined) {
                 warn('map_var: map script has no name')
@@ -842,16 +848,23 @@ export module Scripting {
             return 0
         }
         metarule3(id: number, obj: any, userdata: any, radius: number): any {
-            if (id === 100) {
+            if (id < 100) {
+                // metarule3 IDs below 100 are not defined in vanilla Fallout 2.
+                // Return 0 silently so scripts probing future or sfall-specific
+                // extensions do not crash or flood the console.
+                log('metarule3 (unknown id<100, id=' + id + ')', arguments)
+                return 0
+            } else if (id === 100) {
                 // METARULE3_CLR_FIXED_TIMED_EVENTS
                 for (var i = 0; i < timeEventList.length; i++) {
                     if (timeEventList[i].obj === obj && timeEventList[i].userdata === userdata) {
                         // todo: game object equals
                         info('removing timed event (userdata ' + userdata + ')', 'timer')
                         timeEventList.splice(i, 1)
-                        return
+                        return 0
                     }
                 }
+                return 0 // no matching event found — still return 0 cleanly
             } else if (id === 101) {
                 // METARULE3_RAND: random integer in range [obj..userdata] (inclusive).
                 // Used by many encounter scripts for randomised script behaviour.
@@ -933,15 +946,12 @@ export module Scripting {
                 // METARULE3 IDs 113–115 — unspecified; return 0 as a safe default.
                 log('metarule3 ' + id + ' (safe default 0)', arguments)
                 return 0
-            } else if (id > 115) {
-                // Unrecognised metarule3 IDs above the currently defined range.
-                // Return 0 silently so that scripts using future or sfall-specific
-                // extensions do not crash with a stub warning.
+            } else {
+                // Unrecognised metarule3 IDs above 115 — return 0 silently so that
+                // scripts using future or sfall-specific extensions do not crash.
                 log('metarule3 ' + id + ' (unknown id — safe default 0)', arguments)
                 return 0
             }
-
-            stub('metarule3', arguments)
         }
         script_overrides() {
             log('script_overrides', arguments)
@@ -1324,7 +1334,12 @@ export module Scripting {
             return rollResultIsCritical(roll as any) ? 1 : 0
         }
         critter_inven_obj(obj: Critter, where: number) {
-            if (!isGameObject(obj)) throw 'critter_inven_obj: not game object'
+            if (!isGameObject(obj)) {
+                // Graceful fallback — return null instead of crashing the runtime when a
+                // script passes an unscripted or deleted object reference.
+                warn('critter_inven_obj: not game object — returning null', undefined, this)
+                return null
+            }
             if (where === 0) return obj.equippedArmor ?? null // INVEN_TYPE_WORN
             else if (where === 1) return obj.rightHand // INVEN_TYPE_RIGHT_HAND
             else if (where === 2) return obj.leftHand // INVEN_TYPE_LEFT_HAND
@@ -1419,7 +1434,10 @@ export module Scripting {
                 case 5: // PCSTAT_max_pc_stat — the number of valid pcstat indices (0–4), so 5
                     return 5
                 default:
-                    throw `get_pc_stat: unhandled ${pcstat}`
+                    // Unknown pcstat index — return 0 silently rather than throwing, so that
+                    // scripts that probe sfall-extended or future pcstat indices do not crash.
+                    warn('get_pc_stat: unknown pcstat ' + pcstat + ' — returning 0', undefined, this)
+                    return 0
             }
         }
         critter_injure(obj: Obj, how: number) {
@@ -1787,7 +1805,10 @@ export module Scripting {
                     return 0
 
                 default:
-                    stub('proto_data', arguments)
+                    // Unknown proto_data field index — return 0 silently rather than
+                    // emitting a stub hit.  Mods occasionally probe non-standard field
+                    // indices; a safe 0 is the least-surprising fallback.
+                    log('proto_data: unknown field ' + data_member + ' (safe default 0)', arguments)
                     return 0
             }
         }
@@ -2647,6 +2668,65 @@ export module Scripting {
             return (obj as any)._script ? 1 : 0
         }
 
+        // sfall extended opcode — get tile FID at tile/elevation (0x8194).
+        // get_tile_fid(tile, elevation) → FID value of the floor tile, or 0 if unavailable.
+        // Used by map scripts that inspect or modify the visual appearance of tiles.
+        get_tile_fid(tile: number, elevation: number): number {
+            log('get_tile_fid', arguments, 'tiles')
+            // Tile FID read-back is not yet wired to the renderer's tile cache.
+            // Return 0 as a safe partial implementation so scripts that check the
+            // return value do not use stale data to make destructive decisions.
+            return 0
+        }
+
+        // sfall extended opcode — set tile FID at tile/elevation (0x8195).
+        // set_tile_fid(tile, elevation, fid) — override the floor tile art.
+        // The browser build does not yet support runtime tile art patching;
+        // calls are logged and treated as a no-op until the renderer gains support.
+        set_tile_fid(tile: number, elevation: number, fid: number): void {
+            log('set_tile_fid', arguments, 'tiles')
+        }
+
+        // sfall extended opcode — get critter flags bitmask (0x8196).
+        // get_critter_flags(obj) → integer bitmask of engine-level critter flags.
+        // Maps to the `flags` field used internally by vanilla Fallout 2 critter records.
+        get_critter_flags(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_flags: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const c = obj as Critter
+            let flags = 0
+            if (c.dead)             flags |= 0x0001  // CRITTER_FLAG_DEAD
+            if (c.knockedOut)       flags |= 0x0002  // CRITTER_FLAG_KNOCKED_OUT
+            if (c.knockedDown)      flags |= 0x0004  // CRITTER_FLAG_KNOCKED_DOWN
+            if (c.crippledLeftLeg)  flags |= 0x0008  // CRITTER_FLAG_CRIPPLED_LEFT_LEG
+            if (c.crippledRightLeg) flags |= 0x0010  // CRITTER_FLAG_CRIPPLED_RIGHT_LEG
+            if (c.crippledLeftArm)  flags |= 0x0020  // CRITTER_FLAG_CRIPPLED_LEFT_ARM
+            if (c.crippledRightArm) flags |= 0x0040  // CRITTER_FLAG_CRIPPLED_RIGHT_ARM
+            if (c.blinded)          flags |= 0x0080  // CRITTER_FLAG_BLINDED
+            return flags
+        }
+
+        // sfall extended opcode — set critter flags bitmask (0x8197).
+        // set_critter_flags(obj, flags) — override engine-level critter flags in bulk.
+        // Only the flag bits that map to tracked critter injury state are written back.
+        set_critter_flags(obj: Obj, flags: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_flags: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const c = obj as Critter
+            c.dead             = !!(flags & 0x0001)
+            c.knockedOut       = !!(flags & 0x0002)
+            c.knockedDown      = !!(flags & 0x0004)
+            c.crippledLeftLeg  = !!(flags & 0x0008)
+            c.crippledRightLeg = !!(flags & 0x0010)
+            c.crippledLeftArm  = !!(flags & 0x0020)
+            c.crippledRightArm = !!(flags & 0x0040)
+            c.blinded          = !!(flags & 0x0080)
+        }
+
         // sfall extended opcodes — weapon ammo PID getter/setter (0x8178–0x8179)
         get_weapon_ammo_pid(weapon: Obj): number {
             // Return the ammo type PID currently loaded in the weapon.
@@ -2948,7 +3028,12 @@ export module Scripting {
                 // Currently no per-map fog-of-war is tracked, so we log and
                 // treat the call as a no-op rather than emitting a stub warning.
                 log('mark_area_known', arguments)
-            } else throw 'mark_area_known: invalid area type ' + areaType
+            } else {
+                // Unknown area type — log silently rather than throwing, so that scripts
+                // using sfall-extended or future area type constants do not crash the
+                // browser runtime.
+                log('mark_area_known: unknown areaType ' + areaType + ' — no-op', arguments)
+            }
         }
         wm_area_set_pos(area: number, x: number, y: number) {
             log('wm_area_set_pos', arguments)
