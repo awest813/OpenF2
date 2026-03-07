@@ -45,6 +45,20 @@ export class Player extends Critter {
     level: number = 1
     karma: number = 0
 
+    /**
+     * Player-character state flags (bitfield).
+     *
+     * Known bits:
+     *   0 = LEVEL_UP_UNUSED  (legacy; not used at runtime)
+     *   1 = LEVEL_UP2        (second level-up flag)
+     *   2 = I_AM_EVIL        (evil-alignment karma flag)
+     *   3 = SNK_MODE         (sneak mode — reduces NPC perception range)
+     *
+     * Set/cleared by pc_flag_on(flag) / pc_flag_off(flag) scripting calls.
+     * Persisted in save schema v12+.
+     */
+    pcFlags: number = 0
+
     inventory = [createObjectWithPID(41).setAmount(1337)]
 
     lightRadius = 4

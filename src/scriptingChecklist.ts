@@ -2646,6 +2646,156 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // Phase 49 entries
+    {
+        id: 'drug_tracking_metarule18',
+        kind: 'metarule',
+        description:
+            'METARULE_CRITTER_ON_DRUGS(18): returns 1 if self_obj critter is currently under ' +
+            'drug influence. Implemented via _druggedCritters Map: drug items (subtype===2) ' +
+            'mark the using critter for DRUG_EFFECT_TICKS (600) when use/useObjOn fires.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'drug_tracking_metarule44',
+        kind: 'metarule',
+        description:
+            'METARULE_WHO_ON_DRUGS(44): returns 1 if the target critter is currently under ' +
+            'drug influence. Uses same _druggedCritters Map as metarule(18). Fixes NPC healer ' +
+            'scripts (e.g. "only heal if not already on drugs" logic).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'pc_flag_on_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80A2 (pc_flag_on(flag)): set a player character state bit. Known bits: ' +
+            '3=SNK_MODE (sneak), 2=I_AM_EVIL. Now bridges to Script.pc_flag_on() which sets ' +
+            'the corresponding bit in Player.pcFlags. Previously caused unknown-opcode halts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'pc_flag_off_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80A6 (pc_flag_off(flag)): clear a player character state bit. Bridges ' +
+            'to Script.pc_flag_off(). Previously caused unknown-opcode halts in sneak scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'sneak_detection_pc_flags',
+        kind: 'procedure',
+        description:
+            'isWithinPerception now reads Player.pcFlags bit 3 (SNK_MODE) for sneak detection. ' +
+            'When sneak is active the required perception distance is divided by 4, matching ' +
+            'Fallout 2 stealth mechanics. pc_flag_on(3)/pc_flag_off(3) toggle the mode.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'inven_unwield_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80B1 (inven_unwield(obj)): make a critter holster their current weapon. ' +
+            'Implemented by clearing critter.rightHand. Previously caused unknown-opcode halts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'script_action_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80C7 (script_action): getter that pushes action_being_used. Identical ' +
+            'semantics to 0x80FA but compiled as a separate opcode by some Fallout 2 scripts. ' +
+            'Previously caused unknown-opcode halts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'map_first_run_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80A0 (map_first_run): getter that pushes 1 on first entry to a map, ' +
+            '0 on subsequent entries. Bridges to Scripting.getMapFirstRun(). Prevents unknown-' +
+            'opcode halts in map initialisation scripts.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'pickup_obj_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80D6 (pickup_obj(obj)): move a map object to the player\'s inventory. ' +
+            'Removes obj from map and pushes it onto player.inventory.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'drop_obj_opcode',
+        kind: 'opcode',
+        description:
+            'opcode 0x80D7 (drop_obj(obj)): remove an object from a critter\'s inventory and ' +
+            'place it on the ground at the critter\'s tile. Handles player and NPC critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_script_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81AA (get_script(obj)): return the script SID of an object. Returns 0 ' +
+            'in the browser build (no numeric SID model). Prevents unknown-opcode halts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_script_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81AB (set_script(obj, sid)): assign a script to an object by SID. ' +
+            'Accepted as a safe no-op in the browser build (no SID-based script registry). ' +
+            'Prevents unknown-opcode halts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_remove_script_opcode',
+        kind: 'opcode',
+        description:
+            'sfall 0x81AC (remove_script(obj)): detach a script from an object. ' +
+            'Accepted as a safe no-op. Prevents unknown-opcode halts.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'player_pc_flags_save',
+        kind: 'procedure',
+        description:
+            'Player.pcFlags (bitfield) is now serialized in save schema v12 as playerPcFlags. ' +
+            'Sneak mode (bit 3 = SNK_MODE) and other PC state flags survive save/load cycles. ' +
+            'Old saves default to 0 (no flags set) via migration.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

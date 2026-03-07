@@ -87,6 +87,38 @@ export module ScriptVMBridge {
        ,0x80BE: function() { this.push(this.scriptObj.target_obj) } // target_obj
        ,0x80F7: function() { this.push(this.scriptObj.fixed_param) } // fixed_param
 
+       // ---------------------------------------------------------------------------
+       // Phase 49 — new core opcodes
+       // ---------------------------------------------------------------------------
+
+       // 0x80A0 — map_first_run: 1 if this is the first time entering the current
+       // map in this session, 0 otherwise.  Scripts use this to run one-time setup
+       // logic (placing critters, setting up quest state) only on the first visit.
+       ,0x80A0: function() { this.push(Scripting.getMapFirstRun()) }
+
+       // 0x80A2 — pc_flag_on(flag): set a player character state bit.
+       // Known bits: 3 = SNK_MODE (sneak mode), 2 = I_AM_EVIL.
+       ,0x80A2: bridged("pc_flag_on", 1, false)
+
+       // 0x80A6 — pc_flag_off(flag): clear a player character state bit.
+       ,0x80A6: bridged("pc_flag_off", 1, false)
+
+       // 0x80B1 — inven_unwield(obj): make a critter holster their current weapon.
+       ,0x80B1: bridged("inven_unwield", 1, false)
+
+       // 0x80C7 — script_action: push the current script context action being used.
+       // Identical semantics to action_being_used (0x80FA); both map to the same
+       // script property.
+       ,0x80C7: function() { this.push(this.scriptObj.action_being_used) } // script_action
+
+       // 0x80D6 — pickup_obj(obj): move an object from the map into the player's
+       // inventory.  Used by scripted item hand-offs.
+       ,0x80D6: bridged("pickup_obj", 1, false)
+
+       // 0x80D7 — drop_obj(obj): remove an object from a critter's inventory and
+       // place it at the critter's current tile.
+       ,0x80D7: bridged("drop_obj", 1, false)
+
        ,0x8016: function() { this.mapScript()[this.pop()] = 0 } // op_export_var
        ,0x8015: function() { var name = varName.call(this, this.pop()); this.mapScript()[name] = this.pop() } // op_store_external
        ,0x8014: function() { this.push(this.mapScript()[varName.call(this, this.pop())]) } // op_fetch_external
@@ -426,6 +458,42 @@ export module ScriptVMBridge {
        // The browser build does not track a per-dialogue reaction score; we
        // accept the argument and return 0 rather than crashing on unknown opcode.
        ,0x814D: function() { this.pop() } // dialogue_reaction(how_much) — no-op (no reaction system)
+
+       // -----------------------------------------------------------------------
+       // Phase 49 — sfall extended opcodes 0x81AA–0x81AD
+       // -----------------------------------------------------------------------
+
+       // 0x81AA — get_script(obj): return the script SID attached to an object.
+       // The browser build does not expose script handles as integers; return 0
+       // (no-script / unknown) rather than crashing.  Scripts that use the
+       // return value for further calls will see a falsy 0, which typically
+       // causes them to skip script-manipulation logic gracefully.
+       ,0x81AA: function() {
+            const obj = this.pop()
+            // Guard: obj must be a non-null object with a _script property.
+            // _sid is not present in the browser build; always return 0.
+            const hasScript = obj !== null && obj !== 0 && typeof obj === 'object' && !!(obj as any)._script
+            this.push(hasScript ? 0 : 0) // always 0 — no numeric SID model
+        } // get_script(obj) → 0 (partial: no SID model in browser build)
+
+       // 0x81AB — set_script(obj, sid): assign a script to an object by SID.
+       // The browser build loads scripts by name rather than numeric SID; accept
+       // the arguments and no-op rather than crashing.
+       ,0x81AB: function() {
+            this.pop() // sid
+            this.pop() // obj
+        } // set_script(obj, sid) — no-op (no SID-based script registry)
+
+       // 0x81AC — remove_script(obj): detach the script from an object.
+       // Accepted but not implemented; scripts that remove their own script will
+       // continue to run (cannot self-terminate from within the VM call chain).
+       ,0x81AC: function() {
+            this.pop() // obj
+        } // remove_script(obj) — no-op
+
+       // 0x81AD — get_critter_current_hp2 (alias): same as get_critter_hp (0x8183).
+       // Some sfall-using mods call this opcode for NPC heal checks.
+       ,0x81AD: bridged("get_critter_hp", 1) // get_critter_hp(obj) → current HP
     }
     Object.assign(opMap, bridgeOpMap)
 
