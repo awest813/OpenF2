@@ -2355,6 +2355,46 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'medium',
     },
+    {
+        id: 'gsay_option_implemented',
+        kind: 'opcode',
+        description:
+            'vm_bridge.ts opcode 0x811F (gsay_option): was entirely missing — any dialogue ' +
+            'script calling gsay_option() silently dropped all options and players saw no ' +
+            'conversation choices. Now implemented as a custom handler that pops ' +
+            '(msgList, msgID, target, reaction), resolves the procedure name via ' +
+            'proceduresTable, and calls scripting.ts gsay_option() which adds the option ' +
+            'unconditionally via uiAddDialogueOption. Companion to giq_option (0x8121) ' +
+            'which adds options conditionally on INT.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'blocker',
+    },
+    {
+        id: 'objectZCompare_nan_safe',
+        kind: 'procedure',
+        description:
+            'object.ts objectZCompare(): previously threw the string "unreachable" when ' +
+            'object position coordinates were NaN or undefined (e.g. objects created ' +
+            'without a position). Now returns 0 (equal) in that case and uses ' +
+            'optional-chaining on position coordinates to avoid TypeError on null ' +
+            'positions, preventing crashes during map render sorting.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'giq_option_missing_proc_safe',
+        kind: 'procedure',
+        description:
+            'vm_bridge.ts giq_option (0x8121): previously threw a TypeError when ' +
+            'proceduresTable[target] was undefined (e.g. corrupted or empty target). ' +
+            'Now checks with ?. and logs console.warn + returns early so dialogue ' +
+            'continues without crashing the session.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
 ])
 
 // ---------------------------------------------------------------------------
