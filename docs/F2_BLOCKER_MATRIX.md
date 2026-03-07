@@ -32,6 +32,12 @@ Status guidance:
 
 | BLK-013 | HIGH | Save/Load | sfall global variable persistence | `sfallGlobals.ts` / `saveload.ts` | sfall string-keyed and integer-indexed global variables (`set_sfall_global` / `get_sfall_global` / `set_sfall_global_int` / `get_sfall_global_int`) were not persisted in saves, causing mods and scripts that use sfall globals for cross-map quest state to silently reset to zero on every save/load cycle. | Set sfall globals during gameplay, save, load — globals return to zero. | Save schema v11 adds `sfallGlobals: {stringKeyed, intIndexed}` field; saveload.ts serializes/deserializes both stores on every save/load; sanitization strips non-finite values. | `src/phase36.test.ts` | @engine | CLOSED | Added `serializeSfallGlobals`/`deserializeSfallGlobals`/`resetSfallGlobals` to sfallGlobals.ts; save schema v11 migration; save/load persistence. |
 
+| BLK-014 | HIGH | Runtime/Scripting | crash-causing throw statements in scripting procedures | `src/scripting.ts` | Multiple scripting procedures used `throw` for edge-case inputs, crashing the browser runtime without recovery: `get_pc_stat` on unknown pcstat index; `mark_area_known` on area type > 1; `set_map_var` when no map script is attached; `critter_inven_obj` when a non-game-object is passed. | Call any of those procedures with out-of-range or invalid inputs (e.g. script passes null object to critter_inven_obj). | All four procedures return 0/null and emit a warning instead of throwing. No runtime crash. | `src/phase38.test.ts` | @engine | CLOSED | Changed all four throw paths to warn+safe-return; added regression tests for each. |
+
+| BLK-015 | MEDIUM | Scripting/VM | metarule3 fallthrough bug and id<100 stub flood | `src/scripting.ts` | `metarule3(100, ...)` (CLR_FIXED_TIMED_EVENTS) fell through to `stub()` when the loop found no matching event, emitting a spurious stub hit and returning `undefined`. Additionally, metarule3 IDs below 100 had no safe fallback, routing to `stub()` and flooding the console. | Call `metarule3(100, obj, userdata, 0)` with a userdata value that matches no registered event; or call `metarule3(50, ...)`. | `metarule3(100, ...)` returns 0 always; metarule3 IDs < 100 return 0 silently. | `src/phase38.test.ts` | @engine | CLOSED | Added explicit `return 0` in id=100 loop; added id<100 silent default before all else-if chains; removed trailing `stub('metarule3', ...)` call. |
+
+| BLK-016 | LOW | Scripting/VM | proto_data default stub emitting stub hit for unknown fields | `src/scripting.ts` | `proto_data` default case called `stub()` for any unmapped field index, generating console noise and incrementing the stub-hit counter on every call from mods that probe non-standard proto fields. | Call `proto_data` with a field index > 64. | Returns 0 silently (log only). | `src/phase38.test.ts` | @engine | CLOSED | Changed default case from `stub(...)` to silent `log(...)` + return 0. |
+
 ---
 
 ## Latest phase runs
@@ -50,6 +56,8 @@ Status guidance:
 - Full-route scaffold suite (`src/phase35.test.ts`) passed for early→late→ending flow continuity.
 - Phase 36 suite (`src/phase36.test.ts`) passed: sfall globals persistence (save schema v11), metarule default return safety, string_to_int/int_to_string opcodes, reg_anim_func ANIM_COMPLETE callbacks.
 - Full project regression run (`npm test`) passed: 54 files / 1842 tests.
+- Phase 38 suite (`src/phase38.test.ts`) passed: crash-causing throws hardened to safe returns (get_pc_stat, mark_area_known, set_map_var, critter_inven_obj); metarule3 id=100 fallthrough fixed; metarule3 id<100 silent default; proto_data default silenced; new sfall opcodes 0x8194–0x8197 (get_tile_fid, set_tile_fid, get_critter_flags, set_critter_flags).
+- Full project regression run (`npm test`) passed: 56 files / 1906 tests.
 
 ## Closure checklist (required)
 

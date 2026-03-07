@@ -137,3 +137,22 @@ Gate: **PASS** when campaign completion is reproducible and test-backed.
 - [x] phase36.test.ts: 25 regression tests, all passing
 
 Gate: **PASS** — all 1842 tests green, tsc clean.
+
+---
+
+## Phase 38 — Runtime hardening and sfall opcode expansion
+
+- [x] `get_pc_stat` unknown pcstat index: throw → warn+return 0 (BLK-014)
+- [x] `mark_area_known` area type > 1: throw → log+no-op (BLK-014)
+- [x] `set_map_var` with no map script: throw → warn+no-op (BLK-014)
+- [x] `critter_inven_obj` with non-game-object: throw → warn+return null (BLK-014)
+- [x] `metarule3(100, ...)` CLR_FIXED_TIMED_EVENTS loop fallthrough fixed: returns 0 always (BLK-015)
+- [x] `metarule3` id < 100: silent default return 0 added; trailing `stub()` call removed (BLK-015)
+- [x] `proto_data` default case: `stub()` call changed to silent `log()` + return 0 (BLK-016)
+- [x] New sfall opcode 0x8194: `get_tile_fid(tile, elev)` → partial (returns 0)
+- [x] New sfall opcode 0x8195: `set_tile_fid(tile, elev, fid)` → no-op partial
+- [x] New sfall opcode 0x8196: `get_critter_flags(obj)` → injury-state bitmask
+- [x] New sfall opcode 0x8197: `set_critter_flags(obj, flags)` → bulk injury-state write
+- [x] phase38.test.ts: 44 regression tests, all passing
+
+Gate: **PASS** — all 1906 tests green, tsc clean.

@@ -1294,6 +1294,131 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+    // -----------------------------------------------------------------------
+    // Phase 38 — runtime hardening and sfall opcode expansion
+    // -----------------------------------------------------------------------
+    {
+        id: 'get_pc_stat_safe_default',
+        kind: 'procedure',
+        description:
+            'get_pc_stat(pcstat) unknown-index default path changed from throw to ' +
+            'warn+return 0.  Prevents runtime crash when scripts probe sfall-extended ' +
+            'or future pcstat indices not yet mapped in the browser build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'mark_area_known_safe_default',
+        kind: 'procedure',
+        description:
+            'mark_area_known(areaType, ...) unknown area-type (> 1) path changed from ' +
+            'throw to log+no-op.  Prevents runtime crash when scripts pass sfall-specific ' +
+            'area type constants (e.g. type 2 for map-level markers) not yet handled.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'set_map_var_safe_default',
+        kind: 'procedure',
+        description:
+            'set_map_var(mvar, value) when no _mapScript is attached changed from ' +
+            'throw to warn+no-op.  Prevents runtime crash when non-map critter or ' +
+            'item scripts call set_map_var without a map-script context being set.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'critter_inven_obj_safe_default',
+        kind: 'procedure',
+        description:
+            'critter_inven_obj(obj, where) when obj is not a game object changed from ' +
+            'throw to warn+return null.  Prevents runtime crash when scripts pass ' +
+            'deleted or invalid object references to inventory query calls.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'metarule3_id100_fallthrough_fix',
+        kind: 'metarule',
+        description:
+            'metarule3(100, ...) CLR_FIXED_TIMED_EVENTS now returns 0 after the event ' +
+            'loop regardless of whether a matching event was found.  Previously the ' +
+            'loop fell through to the stub() call when no event matched, causing a ' +
+            'spurious stub hit and undefined return value.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'metarule3_id_below_100_safe_default',
+        kind: 'metarule',
+        description:
+            'metarule3(id, ...) for id < 100 now returns 0 silently rather than calling ' +
+            'stub().  These IDs are not defined in vanilla Fallout 2 but may appear in ' +
+            'sfall mods; the silent 0 eliminates console flooding without affecting gameplay.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'proto_data_default_silent',
+        kind: 'procedure',
+        description:
+            'proto_data(pid, field) default case for unmapped field indices now logs ' +
+            'silently rather than emitting a stub hit.  Mods that probe non-standard ' +
+            'field indices no longer flood the console with stub warnings.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_tile_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x8194: get_tile_fid(tile, elevation) → FID of the floor tile at the ' +
+            'given position.  Partial: returns 0 (tile FID readback not yet wired to the ' +
+            'renderer cache).  Prevents unknown-opcode crashes in map-modification scripts.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_tile_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art. ' +
+            'Partial no-op: the browser renderer does not yet support runtime tile art ' +
+            'patching.  Calls are logged rather than crashing on unknown opcode.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'get_critter_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x8196: get_critter_flags(obj) → integer bitmask of engine-level ' +
+            'critter flags (dead, knocked-out, knocked-down, crippled limbs, blinded). ' +
+            'Reads live injury state from Critter object fields.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_critter_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x8197: set_critter_flags(obj, flags) — bulk-set engine-level critter ' +
+            'flags.  Writes flag bits back to the corresponding Critter injury fields ' +
+            '(dead, knockedOut, knockedDown, crippled limbs, blinded).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
