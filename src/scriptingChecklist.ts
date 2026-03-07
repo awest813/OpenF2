@@ -2943,6 +2943,108 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 51 entries
+    {
+        id: 'player_stats_persistence',
+        kind: 'procedure',
+        description:
+            'BLK-035: Player base stats (HP, SPECIAL, radiation, poison) and skill values ' +
+            'are now snapshotted in save schema v14 (playerBaseStats/playerSkillValues/ ' +
+            'playerSkillPoints). Previously, save/load reset player HP to the hardcoded ' +
+            'default (100), losing all in-session stat modifications. Both IDB and memory ' +
+            'load paths restore the full StatSet.baseStats and SkillSet.baseSkills on load.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_critter_stat_bonus',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B6: get_critter_stat_bonus(obj, stat) → stat bonus/modifier amount ' +
+            '(derived stat minus base stat). Implemented by calling stats.get(name) - ' +
+            'stats.getBase(name). Returns 0 for invalid objects/stats.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_art_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B7: obj_art_name(obj) → art path string of a game object. ' +
+            'Returns the obj.art property (e.g. "art/critters/hmjmpsaa") or "" for ' +
+            'non-objects. Used by scripts that check sprite names for gameplay logic.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_item_type_int',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B8: get_item_type_int(item) → item subtype as Fallout 2 integer. ' +
+            '0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key. ' +
+            'Delegates to obj_item_subtype for consistent subtype mapping.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_pc_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x81B9: set_pc_stat(pcstat, val) → set a player-character stat by index. ' +
+            'Supports: 0=unspent_skill_points, 1=level, 2=experience, 3/4=karma/reputation. ' +
+            'Prevents unknown-opcode crashes in scripts that drive PC progression.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_num_critters_in_radius',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BA: num_critters_in_radius(tile, elev, radius) → count of live critters ' +
+            'within the specified hex radius of a tile. Iterates gMap.getObjects() and counts ' +
+            'alive critters within hexDistance(origin, pos) <= radius. Used by AI scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_object_ai_num',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BB: get_object_ai_num(obj) → AI packet number of a critter. ' +
+            'Returns critter.aiNum (-1 if not a critter). Used by scripts checking AI behaviour.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_object_ai_num',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BC: set_object_ai_num(obj, num) → set AI packet number of a critter. ' +
+            'Sets critter.aiNum. Alias for critter_add_trait(TRAIT_OBJECT, OBJECT_AI_PACKET). ' +
+            'Prevents unknown-opcode crashes in AI-override scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_hostile_to_dude',
+        kind: 'opcode',
+        description:
+            'sfall 0x81BD: get_critter_hostile_to_dude(obj) → 1 if critter is hostile to the ' +
+            'player, 0 otherwise. Reads critter.hostile flag. Used by encounter/dialogue scripts ' +
+            'that check whether an NPC is in an aggressive stance.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

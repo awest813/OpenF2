@@ -3468,6 +3468,127 @@ export module Scripting {
             ;(obj as any).freeMoveAP = Math.max(0, typeof ap === 'number' ? ap : 0)
         }
 
+        // Phase 51 — sfall extended opcodes 0x81B6–0x81BD
+
+        // sfall 0x81B6 — get_critter_stat_bonus(obj, stat):
+        // Returns the stat modifier bonus applied to a critter's stat (derived minus base).
+        // Partial: returns 0 for most stats; implemented for HP (Max HP - base HP).
+        get_critter_stat_bonus(obj: Obj, stat: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_stat_bonus: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('get_critter_stat_bonus: unknown stat number: ' + stat + ' — returning 0', undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const derived = critter.stats.get(statName)
+            const base = critter.stats.getBase(statName)
+            return derived - base
+        }
+
+        // sfall 0x81B7 — obj_art_name(obj):
+        // Returns the art path/filename of a game object as a string.
+        // Used by scripts that want to check or display an object's sprite name.
+        obj_art_name(obj: Obj): string {
+            if (!isGameObject(obj)) {
+                warn('obj_art_name: not a game object: ' + obj, undefined, this)
+                return ''
+            }
+            return (obj as any).art ?? ''
+        }
+
+        // sfall 0x81B8 — get_item_type_int(item):
+        // Returns the Fallout 2 item subtype as a numeric constant.
+        // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key.
+        // Falls back to obj_item_subtype logic for consistency.
+        get_item_type_int(obj: Obj): number {
+            return this.obj_item_subtype(obj) ?? 0
+        }
+
+        // sfall 0x81B9 — set_pc_stat(pcstat, val):
+        // Sets a player-character stat by index.
+        // Supported: 0=unspent_skill_points, 1=level, 2=experience, 3/4=karma.
+        // Others: warn and no-op.
+        set_pc_stat(pcstat: number, val: number): void {
+            const player = globalState.player
+            if (!player) {
+                warn('set_pc_stat: no player', undefined, this)
+                return
+            }
+            switch (pcstat) {
+                case 0: // PCSTAT_unspent_skill_points
+                    player.skills.skillPoints = Math.max(0, val)
+                    return
+                case 1: // PCSTAT_level
+                    player.level = Math.max(1, val)
+                    return
+                case 2: // PCSTAT_experience
+                    player.xp = Math.max(0, val)
+                    return
+                case 3: // PCSTAT_reputation (maps to GVAR_0)
+                case 4: // PCSTAT_karma — same as reputation in FO2
+                    globalVars[0] = val
+                    return
+                default:
+                    warn('set_pc_stat: unknown pcstat ' + pcstat + ' — no-op', undefined, this)
+            }
+        }
+
+        // sfall 0x81BA — num_critters_in_radius(tile, elev, radius):
+        // Returns the number of critters within `radius` hexes of `tile` at elevation `elev`.
+        // Used by AI and encounter scripts to assess nearby threat density.
+        num_critters_in_radius(tile: number, elev: number, radius: number): number {
+            if (!globalState.gMap) return 0
+            const origin = fromTileNum(tile)
+            if (!origin) return 0
+            // Use elevation-specific object list so critters on other floors are excluded.
+            const objects = typeof globalState.gMap.getObjects === 'function'
+                ? globalState.gMap.getObjects(elev)
+                : (gameObjects ?? [])
+            let count = 0
+            for (const obj of objects) {
+                if (obj.type !== 'critter') continue
+                if ((obj as Critter).dead) continue
+                if (hexDistance(origin, obj.position) <= radius) count++
+            }
+            return count
+        }
+
+        // sfall 0x81BB — get_object_ai_num(obj):
+        // Returns the AI packet number of a critter.
+        // Used by scripts that need to inspect or override NPC behaviour.
+        get_object_ai_num(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_object_ai_num: not a critter: ' + obj, undefined, this)
+                return -1
+            }
+            return (obj as Critter).aiNum ?? -1
+        }
+
+        // sfall 0x81BC — set_object_ai_num(obj, num):
+        // Sets the AI packet number of a critter (aliases critter_add_trait TRAIT_OBJECT OBJECT_AI_PACKET).
+        set_object_ai_num(obj: Obj, num: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_object_ai_num: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).aiNum = num
+        }
+
+        // sfall 0x81BD — get_critter_hostile_to_dude(obj):
+        // Returns 1 if the critter is currently hostile to the player, 0 otherwise.
+        // Partial: checks the critter's `hostile` flag.
+        get_critter_hostile_to_dude(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_hostile_to_dude: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).hostile ? 1 : 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

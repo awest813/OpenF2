@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 13
+export const SAVE_VERSION = 14
 
 export interface SaveGame {
     id?: number
@@ -140,6 +140,42 @@ export interface SaveGame {
      */
     playerActiveHand?: number
 
+    /**
+     * Player character base stats snapshot (added in v14 / BLK-035).
+     *
+     * Stores the player's StatSet.baseStats dictionary so that current HP,
+     * radiation level, poison level, and any base SPECIAL modifications made
+     * by scripts (set_critter_stat) survive save/load cycles.
+     *
+     * Without this, the player's HP always resets to the hardcoded default
+     * (100) on every load, allowing "save-scum" healing and losing all script-
+     * driven stat modifications across sessions.
+     *
+     * Defaults to {} (use Player class defaults) for saves that predate v14.
+     */
+    playerBaseStats?: Record<string, number>
+
+    /**
+     * Player character base skill values snapshot (added in v14 / BLK-035).
+     *
+     * Stores the player's SkillSet.baseSkills dictionary so that skill-point
+     * investments made during the game survive save/load cycles.
+     *
+     * Defaults to {} for saves that predate v14.
+     */
+    playerSkillValues?: Record<string, number>
+
+    /**
+     * Player unspent skill points (added in v14 / BLK-035).
+     *
+     * Tracks the count of unspent skill points accumulated through levelling.
+     * Without this, the skill-point budget resets to the Player class default
+     * (10) on every load.
+     *
+     * Defaults to undefined (no override) for saves that predate v14.
+     */
+    playerSkillPoints?: number
+
     player: {
         position: Point
         orientation: number
@@ -260,6 +296,15 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerActiveHand === undefined) save.playerActiveHand = 0
             save.version = 13
             // falls through
+        case 13:
+            // v13 → v14: add player base-stats and skill-values snapshots (BLK-035).
+            // Old saves default to empty records so the Player class defaults remain
+            // in effect (STR=8, PE=8, END=8, CHA=8, INT=8, AGI=8, LCK=8, HP=100).
+            if (save.playerBaseStats === undefined) save.playerBaseStats = {}
+            if (save.playerSkillValues === undefined) save.playerSkillValues = {}
+            // playerSkillPoints: undefined means "use Player class default (10)"
+            save.version = 14
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -294,6 +339,16 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // Normalize playerActiveHand: must be 0 (primary) or 1 (secondary).
     if (save.playerActiveHand !== 0 && save.playerActiveHand !== 1) {
         save.playerActiveHand = 0
+    }
+    // Normalize playerBaseStats: must be a string→number record.
+    save.playerBaseStats = sanitizeStringNumericRecord(save.playerBaseStats)
+    // Normalize playerSkillValues: must be a string→number record.
+    save.playerSkillValues = sanitizeStringNumericRecord(save.playerSkillValues)
+    // Normalize playerSkillPoints: must be a non-negative integer or undefined.
+    if (save.playerSkillPoints !== undefined) {
+        if (typeof save.playerSkillPoints !== 'number' || !Number.isInteger(save.playerSkillPoints) || save.playerSkillPoints < 0) {
+            save.playerSkillPoints = undefined
+        }
     }
 
     return save as SaveGame
@@ -384,5 +439,24 @@ function sanitizeSfallGlobals(value: unknown): { stringKeyed: Record<string, num
         }
     }
 
+    return out
+}
+
+function sanitizeStringNumericRecord(value: unknown): Record<string, number> {
+    if (typeof value !== 'object' || value === null) {
+        return {}
+    }
+
+    // Note: we intentionally do not validate key names here (e.g. against a list
+    // of known stat names) because the set of valid stat/skill names is open and
+    // validated downstream in StatSet.setBase / SkillSet.setBase, which emit
+    // console warnings for unknown names and ignore them.  Stricter filtering here
+    // would break saves containing stat names added by future engine versions.
+    const out: Record<string, number> = {}
+    for (const [key, rawEntry] of Object.entries(value)) {
+        if (typeof key !== 'string' || key === '') continue
+        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) continue
+        out[key] = rawEntry
+    }
     return out
 }

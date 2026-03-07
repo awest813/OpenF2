@@ -217,3 +217,23 @@ Gate: **PASS** — all 2075 tests green, tsc clean.
 - [x] phase50.test.ts: 48 regression tests, all passing
 
 Gate: **PASS** — all 2336 tests green, tsc clean.
+
+---
+
+## Phase 51 — Player stats persistence, sfall opcodes 0x81B6–0x81BD, save schema v14
+
+- [x] **BLK-035**: Player base stats (`HP`, SPECIAL, radiation, poison) and skill values (base skills + unspent skill points) snapshotted in save schema v14 (`playerBaseStats`, `playerSkillValues`, `playerSkillPoints` fields)
+- [x] Save schema bumped to v14; v13→v14 migration defaults `playerBaseStats`/`playerSkillValues` to `{}`; `sanitizeStringNumericRecord` helper added for safe loading
+- [x] Both IDB and memory load paths restore player `StatSet.baseStats` and `SkillSet.baseSkills` + `skillPoints` on load
+- [x] Player HP now survives save/load cycles; script-driven SPECIAL modifications also persist
+- [x] New sfall opcode 0x81B6: `get_critter_stat_bonus(obj, stat)` → derived minus base stat bonus
+- [x] New sfall opcode 0x81B7: `obj_art_name(obj)` → art path string of object
+- [x] New sfall opcode 0x81B8: `get_item_type_int(item)` → item subtype as integer (0=armor, 3=weapon, etc.)
+- [x] New sfall opcode 0x81B9: `set_pc_stat(pcstat, val)` → set PC stat (0=skill_points, 1=level, 2=xp, 3/4=karma)
+- [x] New sfall opcode 0x81BA: `num_critters_in_radius(tile, elev, radius)` → count of live critters within radius hexes
+- [x] New sfall opcode 0x81BB: `get_object_ai_num(obj)` → critter AI packet number
+- [x] New sfall opcode 0x81BC: `set_object_ai_num(obj, num)` → set critter AI packet number
+- [x] New sfall opcode 0x81BD: `get_critter_hostile_to_dude(obj)` → 1 if critter hostile to player
+- [x] phase51.test.ts: 47 regression tests, all passing
+
+Gate: **PASS** — all 2383 tests green, tsc clean.

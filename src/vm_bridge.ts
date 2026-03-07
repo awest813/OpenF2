@@ -529,6 +529,37 @@ export module ScriptVMBridge {
        // 0x81B5 — remove_weapon_knockback(obj): clear weapon knockback.
        // No-op in browser build.
        ,0x81B5: function() { this.pop() } // remove_weapon_knockback — no-op
+
+       // Phase 51 — sfall extended opcodes 0x81B6–0x81BD
+
+       // 0x81B6 — get_critter_stat_bonus(obj, stat): return the stat modifier bonus
+       // (derived stat minus base stat).  Partial: mostly 0, implemented for all stats.
+       ,0x81B6: bridged("get_critter_stat_bonus", 2) // get_critter_stat_bonus(obj, stat) → bonus
+
+       // 0x81B7 — obj_art_name(obj): return the art path/filename of a game object.
+       // Used by scripts checking or logging object sprites.
+       ,0x81B7: bridged("obj_art_name", 1) // obj_art_name(obj) → art path string
+
+       // 0x81B8 — get_item_type_int(item): return item subtype as Fallout 2 integer.
+       // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key.
+       ,0x81B8: bridged("get_item_type_int", 1) // get_item_type_int(item) → subtype int
+
+       // 0x81B9 — set_pc_stat(pcstat, val): set a player-character stat by index.
+       // Supported indices: 0=unspent_skill_points, 1=level, 2=experience, 3/4=karma.
+       ,0x81B9: bridged("set_pc_stat", 2, false) // set_pc_stat(pcstat, val) — set PC stat
+
+       // 0x81BA — num_critters_in_radius(tile, elev, radius): count critters within
+       // the specified hex radius of a tile.  Used by AI and encounter scripts.
+       ,0x81BA: bridged("num_critters_in_radius", 3) // num_critters_in_radius(tile, elev, rad) → count
+
+       // 0x81BB — get_object_ai_num(obj): return the AI packet number of a critter.
+       ,0x81BB: bridged("get_object_ai_num", 1) // get_object_ai_num(obj) → ai_num
+
+       // 0x81BC — set_object_ai_num(obj, num): set the AI packet number of a critter.
+       ,0x81BC: bridged("set_object_ai_num", 2, false) // set_object_ai_num(obj, num) — set AI num
+
+       // 0x81BD — get_critter_hostile_to_dude(obj): 1 if critter is hostile to player, 0 otherwise.
+       ,0x81BD: bridged("get_critter_hostile_to_dude", 1) // get_critter_hostile_to_dude(obj) → 0/1
     }
     Object.assign(opMap, bridgeOpMap)
 
