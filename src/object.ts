@@ -1568,10 +1568,10 @@ export class Critter extends Obj {
         }
 
         // Persist equipped weapon PIDs (BLK-039)
-        if (this.leftHand?.pid !== undefined && this.leftHand.weapon != null) {
+        if (this.leftHand?.weapon != null && this.leftHand.pid !== undefined) {
             obj.leftHandPID = this.leftHand.pid
         }
-        if (this.rightHand?.pid !== undefined && this.rightHand.weapon != null) {
+        if (this.rightHand?.weapon != null && this.rightHand.pid !== undefined) {
             obj.rightHandPID = this.rightHand.pid
         }
 
