@@ -76,3 +76,76 @@ export function setSfallGlobalInt(index: number, value: number): void {
     if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) return
     sfallGlobalInts[index] = value
 }
+
+// ---------------------------------------------------------------------------
+// Persistence helpers (used by saveload.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Serialized form of the sfall global variable stores.
+ *
+ * Integer-indexed globals are stored as a sparse map (only non-zero entries)
+ * to keep save files compact — most of the 4096 slots are typically zero.
+ */
+export interface SerializedSfallGlobals {
+    /** String-keyed sfall globals (set_sfall_global / get_sfall_global). */
+    stringKeyed?: Record<string, number>
+    /** Integer-indexed sfall globals stored as sparse { index: value } map. */
+    intIndexed?: Record<number, number>
+}
+
+/**
+ * Return a serializable snapshot of the current sfall global variable stores.
+ * Only non-zero integer-indexed entries are included to keep saves compact.
+ *
+ * Note: We iterate all MAX_SFALL_INT_GLOBALS slots to find non-zero entries.
+ * This is O(4096) which is negligible at save time (< 0.1 ms in practice).
+ * A dirty-set approach would be faster but adds complexity not warranted here.
+ */
+export function serializeSfallGlobals(): SerializedSfallGlobals {
+    const stringKeyed: Record<string, number> = {}
+    for (const [k, v] of sfallGlobals.entries()) {
+        stringKeyed[k] = v
+    }
+
+    const intIndexed: Record<number, number> = {}
+    for (let i = 0; i < MAX_SFALL_INT_GLOBALS; i++) {
+        if (sfallGlobalInts[i] !== 0) {
+            intIndexed[i] = sfallGlobalInts[i]
+        }
+    }
+
+    return { stringKeyed, intIndexed }
+}
+
+/**
+ * Restore sfall global variable stores from a persisted snapshot.
+ * Overwrites all current state; call after a save is loaded.
+ */
+export function deserializeSfallGlobals(data: SerializedSfallGlobals): void {
+    sfallGlobals.clear()
+    if (data.stringKeyed) {
+        for (const [k, v] of Object.entries(data.stringKeyed)) {
+            if (typeof v === 'number' && Number.isFinite(v)) sfallGlobals.set(k, v)
+        }
+    }
+
+    sfallGlobalInts.fill(0)
+    if (data.intIndexed) {
+        for (const [rawKey, v] of Object.entries(data.intIndexed)) {
+            const idx = Number(rawKey)
+            if (Number.isInteger(idx) && idx >= 0 && idx < MAX_SFALL_INT_GLOBALS && typeof v === 'number' && Number.isFinite(v)) {
+                sfallGlobalInts[idx] = v
+            }
+        }
+    }
+}
+
+/**
+ * Reset both sfall global stores to their initial (all-zero / empty) state.
+ * Called when starting a new game or resetting for tests.
+ */
+export function resetSfallGlobals(): void {
+    sfallGlobals.clear()
+    sfallGlobalInts.fill(0)
+}

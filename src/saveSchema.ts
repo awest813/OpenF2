@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 10
+export const SAVE_VERSION = 11
 
 export interface SaveGame {
     id?: number
@@ -96,6 +96,24 @@ export interface SaveGame {
      * Defaults to {} (no scripted perks) when absent in older saves.
      */
     playerPerkRanks?: Record<number, number>
+
+    /**
+     * Snapshot of sfall extended global variable stores (added in v11).
+     *
+     * Many Fallout 2 mods use `set_sfall_global` / `get_sfall_global` (string-keyed)
+     * and `set_sfall_global_int` / `get_sfall_global_int` (integer-indexed) for
+     * cross-map persistent state (quest flags, unlock trackers, etc.).
+     * Without persisting these, any sfall-global-based logic resets to zero on
+     * every save/load cycle, silently breaking mod quest state.
+     *
+     * `stringKeyed` maps arbitrary string keys to numbers.
+     * `intIndexed` is a sparse map of non-zero integer-indexed entries (omitting
+     * all-zero slots keeps save files compact).
+     */
+    sfallGlobals?: {
+        stringKeyed?: Record<string, number>
+        intIndexed?: Record<number, number>
+    }
 
     player: {
         position: Point
@@ -198,6 +216,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerPerkRanks === undefined) save.playerPerkRanks = {}
             save.version = 10
             // falls through
+        case 10:
+            // v10 → v11: add sfall global variable snapshot.
+            // Old saves have no sfall global state — initialize to empty stores so
+            // all sfall-global-based checks start from zero (matching sfall default).
+            if (save.sfallGlobals === undefined) save.sfallGlobals = {}
+            save.version = 11
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -217,6 +242,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     save.mapAreaStates = sanitizeBooleanRecord(save.mapAreaStates)
     save.playerCharTraits = sanitizeTraitArray(save.playerCharTraits)
     save.playerPerkRanks = sanitizeNumericRecord(save.playerPerkRanks)
+    save.sfallGlobals = sanitizeSfallGlobals(save.sfallGlobals)
 
     return save as SaveGame
 }
@@ -283,4 +309,28 @@ function sanitizeTraitArray(value: unknown): number[] {
         if (!out.includes(entry)) out.push(entry)
     }
     return out.sort((a, b) => a - b)
+}
+
+function sanitizeSfallGlobals(value: unknown): { stringKeyed: Record<string, number>; intIndexed: Record<number, number> } {
+    const out = { stringKeyed: {} as Record<string, number>, intIndexed: {} as Record<number, number> }
+    if (typeof value !== 'object' || value === null) return out
+
+    const raw = value as Record<string, unknown>
+
+    if (typeof raw.stringKeyed === 'object' && raw.stringKeyed !== null) {
+        for (const [k, v] of Object.entries(raw.stringKeyed)) {
+            if (typeof v === 'number' && Number.isFinite(v)) out.stringKeyed[k] = v
+        }
+    }
+
+    if (typeof raw.intIndexed === 'object' && raw.intIndexed !== null) {
+        for (const [rawKey, v] of Object.entries(raw.intIndexed as Record<string, unknown>)) {
+            const idx = Number(rawKey)
+            if (Number.isInteger(idx) && idx >= 0 && typeof v === 'number' && Number.isFinite(v)) {
+                out.intIndexed[idx] = v
+            }
+        }
+    }
+
+    return out
 }

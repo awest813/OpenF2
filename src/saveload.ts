@@ -19,6 +19,7 @@ import { deserializeObj } from './object.js'
 import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
 import { Scripting } from './scripting.js'
+import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
@@ -181,6 +182,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // (e.g. "water pump repaired", "enemies cleared") survives reloads.
     save.mapVars = Scripting.getMapVars()
 
+    // Snapshot sfall extended global variables so that mods and scripts using
+    // set_sfall_global / get_sfall_global survive across save/load cycles.
+    save.sfallGlobals = serializeSfallGlobals()
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
@@ -243,6 +248,11 @@ export function load(id: number): void {
                 if (globalState.player && save.playerPerkRanks) {
                     globalState.player.perkRanks = { ...save.playerPerkRanks }
                 }
+                // Restore sfall global variables so that sfall-global-based quest
+                // state and mod tracking survive save/load cycles.
+                if (save.sfallGlobals) {
+                    deserializeSfallGlobals(save.sfallGlobals)
+                }
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -288,6 +298,11 @@ export function load(id: number): void {
                     // Restore player perk ranks so perk-based stat bonuses survive reload.
                     if (globalState.player && save.playerPerkRanks) {
                         globalState.player.perkRanks = { ...save.playerPerkRanks }
+                    }
+                    // Restore sfall global variables so that sfall-global-based quest
+                    // state and mod tracking survive save/load cycles.
+                    if (save.sfallGlobals) {
+                        deserializeSfallGlobals(save.sfallGlobals)
                     }
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

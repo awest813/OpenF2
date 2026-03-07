@@ -328,6 +328,10 @@ export module ScriptVMBridge {
        ,0x818D: bridged("get_critter_combat_ap", 1)     // get_critter_combat_ap(obj) → current in-combat AP
        ,0x818E: bridged("set_critter_combat_ap", 2, false) // set_critter_combat_ap(obj, ap) — set in-combat AP
        ,0x818F: bridged("get_script_return_value", 0)   // get_script_return_value() → last hook-script return value (partial: 0)
+
+       // sfall extended opcodes 0x8190–0x8191 — type conversion
+       ,0x8190: bridged("string_to_int", 1)             // string_to_int(str) → parse string as base-10 integer (0 on failure)
+       ,0x8191: bridged("int_to_string", 1)             // int_to_string(n) → decimal string representation of integer
     }
     Object.assign(opMap, bridgeOpMap)
 
