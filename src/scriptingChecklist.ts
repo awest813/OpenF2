@@ -1419,6 +1419,141 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+    // -----------------------------------------------------------------------
+    // Phase 39 — crash hardening (throw → safe return) and sfall expansion
+    // -----------------------------------------------------------------------
+    {
+        id: 'getScriptMessage_safe_default',
+        kind: 'procedure',
+        description:
+            'getScriptMessage() throw paths converted to warn+safe return: missing ' +
+            'message file now returns null with a warning; missing message key returns ' +
+            'an empty string with a warning.  Prevents runtime crash in any dialogue ' +
+            'script that references a message ID that failed to load.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'item_caps_total_safe_default',
+        kind: 'procedure',
+        description:
+            'item_caps_total(obj) throw-on-non-game-object path converted to ' +
+            'warn+return 0.  Prevents runtime crash when a non-object (e.g. deleted ' +
+            'reference) is passed in barter or inventory scripts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'create_object_sid_elev_clamp',
+        kind: 'procedure',
+        description:
+            'create_object_sid(pid, tile, elev, sid) throw-on-invalid-elevation path ' +
+            'converted to warn+clamp to [0, 2].  Prevents runtime crash when a script ' +
+            'passes an out-of-range elevation (e.g. -1 or 3) due to a data error.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'start_gdialog_safe_default',
+        kind: 'procedure',
+        description:
+            'start_gdialog() and gdialog_mod_barter() throw-on-missing-self_obj paths ' +
+            'converted to warn+no-op.  Prevents runtime crash when a dialogue script ' +
+            'is called without a valid self_obj context.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'gsay_reply_safe_default',
+        kind: 'procedure',
+        description:
+            'gsay_reply() throw-on-null-msg path converted to warn+no-op.  Prevents ' +
+            'runtime crash when a dialogue reply message is null (e.g. missing message ' +
+            'file).  Dialogue continues without setting a reply text.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'metarule_15_explicit_type_safe',
+        kind: 'metarule',
+        description:
+            'metarule(15) elevator call with explicit type (target !== -1) no longer ' +
+            'throws.  The explicit type is logged and the elevator handler is still ' +
+            'invoked, preventing a runtime crash in scripts that pass a type constant.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'message_parse_skip_invalid',
+        kind: 'procedure',
+        description:
+            'Message file parser no longer throws on invalid lines.  Malformed lines ' +
+            'are skipped with a warning so the rest of the message file is still loaded.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'anim_negative_code_silent',
+        kind: 'procedure',
+        description:
+            'anim() else branch (negative or otherwise unclassified anim code) no longer ' +
+            'calls stub() — logs silently instead.  Eliminates stub-hit noise from scripts ' +
+            'that pass vendor-specific negative anim constants.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'get_ini_setting',
+        kind: 'opcode',
+        description:
+            'sfall 0x8198: get_ini_setting(key) → integer INI value.  Partial: the ' +
+            'browser build has no INI file layer; always returns 0.  Prevents ' +
+            'unknown-opcode crashes in sfall/modded scripts that read INI options.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'active_hand',
+        kind: 'opcode',
+        description:
+            'sfall 0x8199: active_hand() → 0=primary hand, 1=secondary hand.  ' +
+            'Partial: always returns 0 (primary); active-hand state is not tracked ' +
+            'per-session.  Prevents unknown-opcode crashes in weapon/hand scripts.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'set_sfall_return',
+        kind: 'opcode',
+        description:
+            'sfall 0x819A: set_sfall_return(val) — set hook-script return value.  ' +
+            'No-op: hook scripts are not implemented in the browser build.  Prevents ' +
+            'unknown-opcode crashes in sfall hook scripts.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'get_sfall_arg',
+        kind: 'opcode',
+        description:
+            'sfall 0x819B: get_sfall_arg() → hook-script argument value.  ' +
+            'Partial: returns 0; hook scripts are not implemented.  Prevents ' +
+            'unknown-opcode crashes in sfall hook scripts.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

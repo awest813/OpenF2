@@ -334,9 +334,14 @@ export module Scripting {
         }
 
         if (scriptMessages[name] === undefined) loadMessageFile(name)
-        if (scriptMessages[name] === undefined) throw 'getScriptMessage: loadMessageFile failed?'
-        if (scriptMessages[name][msg] === undefined)
-            throw 'getScriptMessage: no message ' + msg + ' for script ' + id + ' (' + name + ')'
+        if (scriptMessages[name] === undefined) {
+            warn('getScriptMessage: message file failed to load for script ' + id + ' (' + name + ')')
+            return null
+        }
+        if (scriptMessages[name][msg] === undefined) {
+            warn('getScriptMessage: no message ' + msg + ' for script ' + id + ' (' + name + ')')
+            return ''
+        }
 
         return scriptMessages[name][msg]
     }
@@ -593,7 +598,10 @@ export module Scripting {
                 case 14:
                     return mapFirstRun // map_first_run
                 case 15: // elevator
-                    if (target !== -1) throw 'elevator given explicit type'
+                    // target === -1 is the canonical "no explicit type" call.
+                    // Some scripts pass an explicit type constant; log and proceed
+                    // rather than throwing so the elevator is still activated.
+                    if (target !== -1) log('metarule(15): elevator called with explicit type ' + target + ' (ignored)', arguments)
                     useElevatorHandler()
                     break
                 case 17:
@@ -1151,7 +1159,10 @@ export module Scripting {
             log('critter_add_trait: unknown traitType ' + traitType + ' — no-op', arguments)
         }
         item_caps_total(obj: Obj) {
-            if (!isGameObject(obj)) throw 'item_caps_total: not game object'
+            if (!isGameObject(obj)) {
+                warn('item_caps_total: not a game object — returning 0', undefined, this)
+                return 0
+            }
             return obj.money
         }
         item_caps_adjust(obj: Obj, amount: number) {
@@ -1816,7 +1827,10 @@ export module Scripting {
             // Create object of pid and possibly script
             info('create_object_sid: pid=' + pid + ' tile=' + tile + ' elev=' + elev + ' sid=' + sid, undefined, this)
 
-            if (elev < 0 || elev > 2) throw 'create_object_sid: elev out of range: elev=' + elev
+            if (elev < 0 || elev > 2) {
+                warn('create_object_sid: elev out of range (' + elev + ') — clamping to [0,2]', undefined, this)
+                elev = Math.max(0, Math.min(2, elev))
+            }
 
             var obj = createObjectWithPID(pid, sid)
             if (!obj) {
@@ -1959,8 +1973,8 @@ export module Scripting {
                 // Log silently — these appear in some modded scripts and are not blockers.
                 log('anim (unknown high code)', arguments, 'animation')
             } else {
-                stub('anim', arguments)
-                warn('anim: unknown anim request: ' + anim)
+                // Negative or otherwise unclassified anim code — log silently.
+                log('anim (unclassified code)', arguments, 'animation')
             }
         }
 
@@ -2142,13 +2156,19 @@ export module Scripting {
             // switch to barter mode
             log('gdialog_mod_barter', arguments)
             console.log('--> barter mode')
-            if (!this.self_obj) throw 'need self_obj'
+            if (!this.self_obj) {
+                warn('gdialog_mod_barter: no self_obj — barter mode skipped', undefined, this)
+                return
+            }
             uiBarterMode(this.self_obj as Critter)
         }
         start_gdialog(msgFileID: number, obj: Obj, mood: number, headNum: number, backgroundID: number) {
             log('start_gdialog', arguments)
             info('DIALOGUE START', 'dialogue')
-            if (!this.self_obj) throw 'no self_obj for start_gdialog'
+            if (!this.self_obj) {
+                warn('start_gdialog: no self_obj — dialogue start skipped', undefined, this)
+                return
+            }
             currentDialogueObject = this.self_obj as Critter
             uiStartDialogue(false, this.self_obj as Critter)
             //stub("start_gdialog", arguments)
@@ -2162,7 +2182,10 @@ export module Scripting {
         gsay_reply(msgList: number, msgID: string | number) {
             log('gSay_Reply', arguments)
             var msg = getScriptMessage(msgList, msgID)
-            if (msg === null) throw Error('gsay_reply: msg is null')
+            if (msg === null || msg === '') {
+                warn('gsay_reply: message is null/empty — reply skipped', undefined, this)
+                return
+            }
             info('REPLY: ' + msg, 'dialogue')
             uiSetDialogueReply(msg)
         }
@@ -3067,6 +3090,34 @@ export module Scripting {
             globalState.gParty.removePartyMember(obj)
         }
 
+        // sfall extended opcode — read an INI setting by key string (0x8198).
+        // Partial: the browser build has no INI file layer; always returns 0.
+        get_ini_setting(key: string): number {
+            log('get_ini_setting', arguments)
+            return 0
+        }
+
+        // sfall extended opcode — return the player's currently active hand (0x8199).
+        // 0 = primary hand (left), 1 = secondary hand (right).
+        // Partial: returns 0 (primary) as a safe default; active-hand state is not
+        // tracked separately in the browser build.
+        active_hand(): number {
+            return 0
+        }
+
+        // sfall hook-script opcode — set the return value for a hook script (0x819A).
+        // No-op in the browser build; hook scripts are not implemented.
+        set_sfall_return(val: number): void {
+            log('set_sfall_return', arguments)
+        }
+
+        // sfall hook-script opcode — get a hook-script argument by index (0x819B).
+        // Partial: returns 0; hook scripts are not implemented in the browser build.
+        get_sfall_arg(): number {
+            log('get_sfall_arg', arguments)
+            return 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -3107,7 +3158,10 @@ export module Scripting {
         for (var i = 0; i < lines.length; i++) {
             // e.g. {100}{}{You have entered a dark cave in the side of a mountain.}
             var m = lines[i].match(/\{(\d+)\}\{.*\}\{(.*)\}/)
-            if (m === null) throw 'message parsing: not a valid line: ' + lines[i]
+            if (m === null) {
+                warn('message parsing: skipping invalid line: ' + lines[i])
+                continue
+            }
             // HACK: replace unicode replacement character with an apostrophe (because the Web sucks at character encodings)
             scriptMessages[name][parseInt(m[1])] = m[2].replace(/\ufffd/g, "'")
         }
