@@ -1102,6 +1102,23 @@ export class Critter extends Obj {
                     obj.equippedArmor = armorItem
                 }
             }
+
+            // BLK-039: Restore equipped weapon slots from persisted PIDs.
+            // After the inventory is deserialized, re-find the weapon items by PID so
+            // leftHand/rightHand point to the correctly deserialized inventory objects
+            // (not the old pre-deserialization instances that init() saw).
+            if (typeof mobj.leftHandPID === 'number') {
+                const w = obj.inventory.find(
+                    (inv: any) => inv.pid === mobj.leftHandPID && inv.subtype === 'weapon'
+                ) as WeaponObj | undefined
+                if (w) obj.leftHand = w
+            }
+            if (typeof mobj.rightHandPID === 'number') {
+                const w = obj.inventory.find(
+                    (inv: any) => inv.pid === mobj.rightHandPID && inv.subtype === 'weapon'
+                ) as WeaponObj | undefined
+                if (w) obj.rightHand = w
+            }
         }
 
         return obj
@@ -1550,6 +1567,14 @@ export class Critter extends Obj {
             obj.equippedArmorPID = this.equippedArmor.pid
         }
 
+        // Persist equipped weapon PIDs (BLK-039)
+        if (this.leftHand?.pid !== undefined && this.leftHand.weapon != null) {
+            obj.leftHandPID = this.leftHand.pid
+        }
+        if (this.rightHand?.pid !== undefined && this.rightHand.weapon != null) {
+            obj.rightHandPID = this.rightHand.pid
+        }
+
         return obj
     }
 }
@@ -1581,6 +1606,14 @@ interface SerializedCritter extends SerializedObj {
      * so DT/DR/AC bonuses survive save/load cycles.
      */
     equippedArmorPID?: number
+
+    /**
+     * PIDs of the equipped weapon items (added in Phase 53 / BLK-039).
+     * On deserialization the matching inventory items are restored as leftHand/rightHand
+     * so equipped weapons survive save/load without being reset to punch.
+     */
+    leftHandPID?: number
+    rightHandPID?: number
 
     /**
      * Critical injury / status flags (added in Phase 50 / BLK-033).

@@ -3695,6 +3695,51 @@ export module Scripting {
             ;(obj as Critter).teamNum = typeof team === 'number' ? team : 0
         }
 
+        // Phase 53 — sfall 0x81C8 — critter_mod_skill_points(critter, delta):
+        // Add or subtract raw skill points from a critter. Only meaningful for the
+        // player critter — NPCs do not maintain a skill-point pool.
+        critter_mod_skill_points(obj: Obj, delta: number): void {
+            if (!isGameObject(obj)) {
+                warn('critter_mod_skill_points: not a game object', undefined, this)
+                return
+            }
+            if ((obj as any).isPlayer && globalState.player) {
+                globalState.player.skills.skillPoints = Math.max(
+                    0,
+                    (globalState.player.skills.skillPoints || 0) + (typeof delta === 'number' ? delta : 0)
+                )
+            }
+            // NPCs do not have a skill-point pool; silently ignore.
+        }
+
+        // Phase 53 — sfall 0x81CB — get_combat_target(critter):
+        // Return the current combat target of a critter.
+        // Browser build: returns 0 (no per-critter target tracking).
+        get_combat_target(obj: Obj): Obj | 0 {
+            return 0
+        }
+
+        // Phase 53 — sfall 0x81CC — set_combat_target(critter, target):
+        // Set a critter's combat target. No-op in the browser build.
+        set_combat_target(obj: Obj, target: Obj): void {
+            // No per-critter target tracking in the browser build.
+        }
+
+        // Phase 53 — sfall 0x81CD — get_game_time_in_seconds:
+        // Return game time in seconds (gameTickTime / 10).
+        get_game_time_in_seconds(): number {
+            return Math.floor(globalState.gameTickTime / 10)
+        }
+
+        // Phase 53 — sfall 0x81CF — set_light_level_sfall(level, update):
+        // Set the global ambient light level (0–65536).
+        // Browser build stores it but defers actual rendering update.
+        set_light_level_sfall(level: number, _update: number): void {
+            if (typeof level === 'number') {
+                globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
+            }
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

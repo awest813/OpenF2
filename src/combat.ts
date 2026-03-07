@@ -601,6 +601,12 @@ export class Combat {
                 return this.nextTurn()
             }
 
+            // BLK-040: Guard against attacking a target that died during our move phase.
+            if (target.dead) {
+                console.warn('doAITurn: target died before attack — re-targeting')
+                return this.doAITurn(obj, idx, depth + 1)
+            }
+
             this.attack(obj, target, 'torso', function () {
                 obj.clearAnim()
                 that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
@@ -701,9 +707,14 @@ export class Combat {
             var critter = this.combatants[this.whoseTurn]
             if (critter.dead === true || critter.hostile !== true) return this.nextTurn(skipDepth + 1)
 
+            // Guard against critters that were added mid-combat without AP initialised.
+            if (!critter.AP) {
+                console.warn('[combat] nextTurn: critter has no AP — skipping turn')
+                return this.nextTurn(skipDepth + 1)
+            }
             // Clear the AC bonus from this critter's previous turn before resetting AP.
             critter.stats.acBonus = 0
-            critter.AP!.resetAP()
+            critter.AP.resetAP()
             this.doAITurn(critter, this.whoseTurn, 1)
         }
     }
