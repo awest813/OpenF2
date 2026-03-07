@@ -393,8 +393,11 @@ export class Combat {
 
     attack(obj: Critter, target: Critter, region = 'torso', callback?: () => void) {
         // turn to face the target
-        var hex = hexNearestNeighbor(obj.position, target.position)
-        if (hex !== null) obj.orientation = hex.direction
+        // BLK-059: Guard against null positions before calling hexNearestNeighbor.
+        if (obj.position && target.position) {
+            var hex = hexNearestNeighbor(obj.position, target.position)
+            if (hex !== null) obj.orientation = hex.direction
+        }
 
         // attack!
         obj.staticAnimation('attack', callback)
@@ -457,7 +460,14 @@ export class Combat {
 
         const targets = this.combatants.filter((x) => !x.dead && x.teamNum !== obj.teamNum)
         if (targets.length === 0) return null
-        targets.sort((a, b) => hexDistance(obj.position, a.position) - hexDistance(obj.position, b.position))
+        // BLK-059: Guard null positions in the sort comparator to avoid crashes when
+        // combatants lack a position (e.g. freshly added or off-map).
+        if (!obj.position) return targets[0] ?? null
+        targets.sort((a, b) => {
+            const da = a.position ? hexDistance(obj.position!, a.position) : Infinity
+            const db = b.position ? hexDistance(obj.position!, b.position) : Infinity
+            return da - db
+        })
         return targets[0]
     }
 
@@ -505,7 +515,7 @@ export class Combat {
             console.log('[AI has no target]')
             return this.nextTurn()
         }
-        var distance = hexDistance(obj.position, target.position)
+        var distance = obj.position && target.position ? hexDistance(obj.position, target.position) : 0
         var AP = obj.AP!
         var messageRoll = rollSkillCheck(obj.ai.info.chance, 0, false)
 
@@ -526,7 +536,7 @@ export class Combat {
 
             // todo: pick the closest edge of the map
             this.maybeTaunt(obj, 'run', messageRoll)
-            const targetPos = { x: 128, y: obj.position.y } // left edge
+            const targetPos = { x: 128, y: obj.position?.y ?? 0 } // left edge
             const callback = () => {
                 obj.clearAnim()
                 that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
@@ -712,7 +722,10 @@ export class Combat {
             // BLK-051: Guard against null ai (AI failed to init for this critter).
             // Fall back to a safe default max_dist so the loop can still complete.
             const maxDist: number = obj.ai?.info?.max_dist ?? 20
-            var inRange = hexDistance(obj.position, this.player.position) <= maxDist
+            // BLK-059: Guard null positions to prevent hexDistance crash.
+            var inRange = (obj.position && this.player.position)
+                ? hexDistance(obj.position, this.player.position) <= maxDist
+                : false
 
             if (inRange || obj.hostile) {
                 obj.hostile = true

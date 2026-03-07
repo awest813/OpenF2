@@ -4018,6 +4018,99 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+
+    // Phase 60 entries
+    {
+        id: 'blk_059_combat_null_position_guards',
+        kind: 'procedure',
+        description:
+            'BLK-059: Added null-position guards to combat.ts: attack() orientation ' +
+            'flip, findTarget() sort comparator, doAITurn() distance calc, nextTurn() ' +
+            'range check.  Prevents crashes when combatants lack a map position.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_critter_current_hp',
+        kind: 'opcode',
+        description:
+            'sfall 0x8200: get_critter_current_hp_sfall(obj) — return critter current HP ' +
+            '(alias of critter_hp via sfall convention).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_level2',
+        kind: 'opcode',
+        description:
+            'sfall 0x8201: get_critter_level_sfall2(obj) — return critter level (used by ' +
+            'level-scaling and encounter scripts).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_num_nearby_critters',
+        kind: 'opcode',
+        description:
+            'sfall 0x8202: get_num_nearby_critters_sfall(obj, radius, team) — count living ' +
+            'critters within radius hexes of obj belonging to team (-1 = any).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_is_critter_hostile',
+        kind: 'opcode',
+        description:
+            'sfall 0x8203: is_critter_hostile_sfall(obj) — return 1 if critter is hostile ' +
+            'to the player.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_hostile',
+        kind: 'opcode',
+        description:
+            'sfall 0x8204: set_critter_hostile_sfall(obj, hostile) — set the hostile flag ' +
+            'on a critter.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_inven_slot',
+        kind: 'opcode',
+        description:
+            'sfall 0x8205: get_inven_slot_sfall(critter, slot) — return the item in the ' +
+            'given equipment slot (0=left, 1=right, 2=armor).  Returns 0 if empty.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_body_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x8206: get_critter_body_type_sfall(obj) — return critter body type ' +
+            '(0=biped, 1=quadruped, 2=robotic) from proto.extra.bodyType.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x8207: get_flags_sfall(obj) — return the raw Fallout 2 object flags ' +
+            'bitmask from obj.flags.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

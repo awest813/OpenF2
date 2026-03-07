@@ -4182,6 +4182,113 @@ export module Scripting {
             return (weapon.weapon as any)?.pro?.extra?.maxRange1 ?? 1
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 60 — sfall extended opcodes 0x8200–0x8207
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8200 — get_critter_current_hp_sfall(obj):
+        // Return the critter's current HP.  Alias of critter_hp() via sfall convention.
+        get_critter_current_hp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_current_hp_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('HP') ?? 0
+        }
+
+        // sfall 0x8201 — get_critter_level_sfall2(obj):
+        // Return the critter's current level.  Used by level-scaling and encounter scripts.
+        // The name suffix '2' avoids collision with the existing get_critter_level alias.
+        get_critter_level_sfall2(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_level_sfall2: not a critter: ' + obj, undefined, this)
+                return 1
+            }
+            return (obj as any).level ?? 1
+        }
+
+        // sfall 0x8202 — get_num_nearby_critters_sfall(obj, radius, team):
+        // Return the number of living critters within radius hexes of obj that belong
+        // to the given team.  Pass -1 for team to count all critters regardless of team.
+        get_num_nearby_critters_sfall(obj: Obj, radius: number, team: number): number {
+            if (!isGameObject(obj)) {
+                warn('get_num_nearby_critters_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            if (!obj.position) return 0
+            const elev = globalState.currentElevation ?? 0
+            const objects = globalState.gMap?.getObjects(elev) ?? []
+            let count = 0
+            for (const o of objects) {
+                if (!isGameObject(o) || o.type !== 'critter') continue
+                if ((o as Critter).dead) continue
+                if (!o.position) continue
+                if (team !== -1 && (o as Critter).teamNum !== team) continue
+                if (hexDistance(obj.position, o.position) <= radius) count++
+            }
+            return count
+        }
+
+        // sfall 0x8203 — is_critter_hostile_sfall(obj):
+        // Return 1 if the critter is currently hostile to the player, 0 otherwise.
+        is_critter_hostile_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('is_critter_hostile_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).hostile ? 1 : 0
+        }
+
+        // sfall 0x8204 — set_critter_hostile_sfall(obj, hostile):
+        // Set the hostile flag on a critter.
+        set_critter_hostile_sfall(obj: Obj, hostile: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_hostile_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).hostile = hostile !== 0
+        }
+
+        // sfall 0x8205 — get_inven_slot_sfall(critter, slot):
+        // Return the item in the given inventory slot (0=left, 1=right, 2=armor).
+        // Returns 0 if the slot is empty or the argument is not a critter.
+        get_inven_slot_sfall(obj: Obj, slot: number): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_inven_slot_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            switch (slot) {
+                case 0: return critter.leftHand ?? 0
+                case 1: return critter.rightHand ?? 0
+                case 2: return critter.equippedArmor ?? 0
+                default:
+                    warn('get_inven_slot_sfall: unknown slot ' + slot, undefined, this)
+                    return 0
+            }
+        }
+
+        // sfall 0x8206 — get_critter_body_type_sfall(obj):
+        // Return the critter body type: 0=biped, 1=quadruped, 2=robotic.
+        // Reads pro.extra.bodyType if available; defaults to 0 (biped).
+        get_critter_body_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_body_type_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.bodyType ?? 0
+        }
+
+        // sfall 0x8207 — get_flags_sfall(obj):
+        // Return the raw Fallout 2 flags bitmask for a game object.
+        get_flags_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_flags_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).flags ?? 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

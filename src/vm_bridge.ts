@@ -849,6 +849,44 @@ export module ScriptVMBridge {
 
        // 0x81FF — get_critter_range_sfall(obj): return max attack range of equipped weapon.
        ,0x81FF: bridged("get_critter_range_sfall", 1) // get_critter_range(obj) → range
+
+       // -----------------------------------------------------------------------
+       // Phase 60 — sfall extended opcodes 0x8200–0x8207
+       // -----------------------------------------------------------------------
+
+       // 0x8200 — get_critter_current_hp_sfall(obj): return critter's current HP.
+       // Alias of critter_hp(obj) (opcode 0x8107) exposed as sfall convention.
+       ,0x8200: bridged("get_critter_current_hp_sfall", 1) // get_critter_current_hp(obj) → hp
+
+       // 0x8201 — get_critter_level_sfall(obj): return critter's current level.
+       // Used by level-scaling and encounter scripts.
+       ,0x8201: bridged("get_critter_level_sfall2", 1) // get_critter_level(obj) → level
+
+       // 0x8202 — get_num_nearby_critters_sfall(obj, radius, team):
+       // Return the number of living critters within radius hexes of obj that belong
+       // to team.  Pass -1 for team to count all critters regardless of team.
+       ,0x8202: bridged("get_num_nearby_critters_sfall", 3) // get_num_nearby_critters(obj, radius, team) → count
+
+       // 0x8203 — is_critter_hostile_sfall(obj):
+       // Return 1 if the critter is currently hostile to the player, else 0.
+       ,0x8203: bridged("is_critter_hostile_sfall", 1) // is_critter_hostile(obj) → 0|1
+
+       // 0x8204 — set_critter_hostile_sfall(obj, hostile):
+       // Set the hostile flag on a critter.
+       ,0x8204: bridged("set_critter_hostile_sfall", 2, false) // set_critter_hostile(obj, hostile)
+
+       // 0x8205 — get_inven_slot_sfall(critter, slot):
+       // Return the item in the given inventory slot (0=left, 1=right, 2=armor).
+       // Returns 0 if the slot is empty or the object is not a critter.
+       ,0x8205: bridged("get_inven_slot_sfall", 2) // get_inven_slot(critter, slot) → obj | 0
+
+       // 0x8206 — get_critter_body_type_sfall(obj):
+       // Return the critter body type (0=biped, 1=quadruped, 2=robotic).
+       ,0x8206: bridged("get_critter_body_type_sfall", 1) // get_critter_body_type(obj) → int
+
+       // 0x8207 — get_flags_sfall(obj):
+       // Return the raw flags bitmask stored on a game object.
+       ,0x8207: bridged("get_flags_sfall", 1) // get_flags(obj) → flags
     }
     Object.assign(opMap, bridgeOpMap)
 
