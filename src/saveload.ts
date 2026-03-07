@@ -33,6 +33,94 @@ function applyLoadedMapAreaStates(mapAreaStates: Record<number, boolean> | undef
     }
 }
 
+/**
+ * Apply all per-save extended fields that are not covered by `hydrateStateFromSave`.
+ *
+ * Both the IDB and in-memory load paths are identical from this point onward.
+ * Extracting the logic here prevents the two paths from diverging when new
+ * save fields are added (e.g. BLK-034 through BLK-047).
+ */
+function applyExtraSaveState(save: SaveGame): void {
+    // Restore script global variables (GVAR_*) so quest flags and
+    // world state set before the save are fully intact on resume.
+    if (save.scriptGlobalVars) {
+        Scripting.setGlobalVars(save.scriptGlobalVars)
+    }
+    // Restore per-map script variables (MVAR_*) so map state
+    // (e.g. "water pump repaired") is preserved across reloads.
+    if (save.mapVars) {
+        Scripting.setMapVars(save.mapVars)
+    }
+    applyLoadedMapAreaStates(save.mapAreaStates)
+    // Restore player character-creation traits so trait-based
+    // script checks return correct values after loading.
+    if (globalState.player && Array.isArray(save.playerCharTraits)) {
+        globalState.player.charTraits = new Set(save.playerCharTraits)
+    }
+    // Restore player perk ranks so perk-based stat bonuses survive reload.
+    if (globalState.player && save.playerPerkRanks) {
+        globalState.player.perkRanks = { ...save.playerPerkRanks }
+    }
+    // Restore sfall global variables so that sfall-global-based quest
+    // state and mod tracking survive save/load cycles.
+    if (save.sfallGlobals) {
+        deserializeSfallGlobals(save.sfallGlobals)
+    }
+    // Restore player character state flags (sneak mode, etc.).
+    if (globalState.player && typeof save.playerPcFlags === 'number') {
+        globalState.player.pcFlags = save.playerPcFlags
+    }
+    // Restore active hand selection (BLK-034).
+    if (globalState.player && typeof save.playerActiveHand === 'number') {
+        ;(globalState.player as any).activeHand = save.playerActiveHand
+    }
+    // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
+    if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
+        for (const [statName, statValue] of Object.entries(save.playerBaseStats)) {
+            globalState.player.stats.setBase(statName, statValue)
+        }
+    }
+    // Restore player base skill values so skill investments survive reload (BLK-035).
+    if (globalState.player && save.playerSkillValues && Object.keys(save.playerSkillValues).length > 0) {
+        for (const [skillName, skillValue] of Object.entries(save.playerSkillValues)) {
+            globalState.player.skills.setBase(skillName, skillValue)
+        }
+    }
+    // Restore unspent skill points (BLK-035).
+    if (globalState.player && typeof save.playerSkillPoints === 'number') {
+        globalState.player.skills.skillPoints = save.playerSkillPoints
+    }
+    // BLK-042: Restore player equipped weapon slots from persisted PIDs.
+    // Weapons equipped via drag-drop are removed from inventory and must be
+    // re-equipped after the inventory is restored from the save.
+    if (globalState.player && typeof save.playerLeftHandPID === 'number') {
+        const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
+        if (leftIdx !== -1) {
+            ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
+            globalState.player.inventory.splice(leftIdx, 1)
+        }
+    }
+    if (globalState.player && typeof save.playerRightHandPID === 'number') {
+        const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
+        if (rightIdx !== -1) {
+            ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
+            globalState.player.inventory.splice(rightIdx, 1)
+        }
+    }
+    // BLK-045: Restore player equipped armor from persisted PID.
+    if (globalState.player && typeof save.playerArmorPID === 'number') {
+        const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
+        if (armorIdx !== -1) {
+            ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
+            globalState.player.inventory.splice(armorIdx, 1)
+        }
+    }
+    // BLK-047: Restore pending perk-selection credits.
+    if (typeof save.playerPerksOwed === 'number') {
+        globalState.playerPerksOwed = save.playerPerksOwed
+    }
+}
+
 // Saving and loading support
 
 let db: IDBDatabase | null = null
@@ -287,84 +375,7 @@ export function load(id: number): void {
 
                 console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                 hydrateStateFromSave(save, globalState, deserializeObj)
-                // Restore script global variables (GVAR_*) so quest flags and
-                // world state set before the save are fully intact on resume.
-                if (save.scriptGlobalVars) {
-                    Scripting.setGlobalVars(save.scriptGlobalVars)
-                }
-                // Restore per-map script variables (MVAR_*) so map state
-                // (e.g. "water pump repaired") is preserved across reloads.
-                if (save.mapVars) {
-                    Scripting.setMapVars(save.mapVars)
-                }
-                applyLoadedMapAreaStates(save.mapAreaStates)
-                // Restore player character-creation traits so trait-based
-                // script checks return correct values after loading.
-                if (globalState.player && Array.isArray(save.playerCharTraits)) {
-                    globalState.player.charTraits = new Set(save.playerCharTraits)
-                }
-                // Restore player perk ranks so perk-based stat bonuses survive reload.
-                if (globalState.player && save.playerPerkRanks) {
-                    globalState.player.perkRanks = { ...save.playerPerkRanks }
-                }
-                // Restore sfall global variables so that sfall-global-based quest
-                // state and mod tracking survive save/load cycles.
-                if (save.sfallGlobals) {
-                    deserializeSfallGlobals(save.sfallGlobals)
-                }
-                // Restore player character state flags (sneak mode, etc.).
-                if (globalState.player && typeof save.playerPcFlags === 'number') {
-                    globalState.player.pcFlags = save.playerPcFlags
-                }
-                // Restore active hand selection (BLK-034).
-                if (globalState.player && typeof save.playerActiveHand === 'number') {
-                    ;(globalState.player as any).activeHand = save.playerActiveHand
-                }
-                // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
-                if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
-                    for (const [statName, statValue] of Object.entries(save.playerBaseStats)) {
-                        globalState.player.stats.setBase(statName, statValue)
-                    }
-                }
-                // Restore player base skill values so skill investments survive reload (BLK-035).
-                if (globalState.player && save.playerSkillValues && Object.keys(save.playerSkillValues).length > 0) {
-                    for (const [skillName, skillValue] of Object.entries(save.playerSkillValues)) {
-                        globalState.player.skills.setBase(skillName, skillValue)
-                    }
-                }
-                // Restore unspent skill points (BLK-035).
-                if (globalState.player && typeof save.playerSkillPoints === 'number') {
-                    globalState.player.skills.skillPoints = save.playerSkillPoints
-                }
-                // BLK-042: Restore player equipped weapon slots from persisted PIDs.
-                // Weapons equipped via drag-drop are removed from inventory and must be
-                // re-equipped after the inventory is restored from the save.
-                if (globalState.player && typeof save.playerLeftHandPID === 'number') {
-                    const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
-                    if (leftIdx !== -1) {
-                        ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
-                        globalState.player.inventory.splice(leftIdx, 1)
-                    }
-                }
-                if (globalState.player && typeof save.playerRightHandPID === 'number') {
-                    const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
-                    if (rightIdx !== -1) {
-                        ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
-                        globalState.player.inventory.splice(rightIdx, 1)
-                    }
-                }
-                // BLK-045: Restore player equipped armor from persisted PID.
-                if (globalState.player && typeof save.playerArmorPID === 'number') {
-                    const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
-                    if (armorIdx !== -1) {
-                        ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
-                        globalState.player.inventory.splice(armorIdx, 1)
-                    }
-                }
-                // BLK-047: Restore pending perk-selection credits.
-                if (typeof save.playerPerksOwed === 'number') {
-                    globalState.playerPerksOwed = save.playerPerksOwed
-                }
+                applyExtraSaveState(save)
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -394,79 +405,7 @@ export function load(id: number): void {
 
                     console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                     hydrateStateFromSave(save, globalState, deserializeObj)
-                    // Restore script global variables (GVAR_*).
-                    if (save.scriptGlobalVars) {
-                        Scripting.setGlobalVars(save.scriptGlobalVars)
-                    }
-                    // Restore per-map script variables (MVAR_*).
-                    if (save.mapVars) {
-                        Scripting.setMapVars(save.mapVars)
-                    }
-                    applyLoadedMapAreaStates(save.mapAreaStates)
-                    // Restore player character-creation traits.
-                    if (globalState.player && Array.isArray(save.playerCharTraits)) {
-                        globalState.player.charTraits = new Set(save.playerCharTraits)
-                    }
-                    // Restore player perk ranks so perk-based stat bonuses survive reload.
-                    if (globalState.player && save.playerPerkRanks) {
-                        globalState.player.perkRanks = { ...save.playerPerkRanks }
-                    }
-                    // Restore sfall global variables so that sfall-global-based quest
-                    // state and mod tracking survive save/load cycles.
-                    if (save.sfallGlobals) {
-                        deserializeSfallGlobals(save.sfallGlobals)
-                    }
-                    // Restore player character state flags (sneak mode, etc.).
-                    if (globalState.player && typeof save.playerPcFlags === 'number') {
-                        globalState.player.pcFlags = save.playerPcFlags
-                    }
-                    // Restore active hand selection (BLK-034).
-                    if (globalState.player && typeof save.playerActiveHand === 'number') {
-                        ;(globalState.player as any).activeHand = save.playerActiveHand
-                    }
-                    // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
-                    if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
-                        for (const [statName, statValue] of Object.entries(save.playerBaseStats)) {
-                            globalState.player.stats.setBase(statName, statValue)
-                        }
-                    }
-                    // Restore player base skill values so skill investments survive reload (BLK-035).
-                    if (globalState.player && save.playerSkillValues && Object.keys(save.playerSkillValues).length > 0) {
-                        for (const [skillName, skillValue] of Object.entries(save.playerSkillValues)) {
-                            globalState.player.skills.setBase(skillName, skillValue)
-                        }
-                    }
-                    // Restore unspent skill points (BLK-035).
-                    if (globalState.player && typeof save.playerSkillPoints === 'number') {
-                        globalState.player.skills.skillPoints = save.playerSkillPoints
-                    }
-                    // BLK-042: Restore player equipped weapon slots from persisted PIDs.
-                    if (globalState.player && typeof save.playerLeftHandPID === 'number') {
-                        const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
-                        if (leftIdx !== -1) {
-                            ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
-                            globalState.player.inventory.splice(leftIdx, 1)
-                        }
-                    }
-                    if (globalState.player && typeof save.playerRightHandPID === 'number') {
-                        const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
-                        if (rightIdx !== -1) {
-                            ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
-                            globalState.player.inventory.splice(rightIdx, 1)
-                        }
-                    }
-                    // BLK-045: Restore player equipped armor from persisted PID.
-                    if (globalState.player && typeof save.playerArmorPID === 'number') {
-                        const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
-                        if (armorIdx !== -1) {
-                            ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
-                            globalState.player.inventory.splice(armorIdx, 1)
-                        }
-                    }
-                    // BLK-047: Restore pending perk-selection credits.
-                    if (typeof save.playerPerksOwed === 'number') {
-                        globalState.playerPerksOwed = save.playerPerksOwed
-                    }
+                    applyExtraSaveState(save)
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                         error,

@@ -363,6 +363,8 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // v15 → v16: add player equipped armor PID (BLK-045) and perk owed count
             // (BLK-047).  Both default to undefined/0 so old saves continue to work.
             // playerArmorPID: undefined means no armor was equipped (default clothing).
+            //   Not set here because it is optional; the normalization pass below
+            //   calls sanitizeEquippedPID() which validates and strips invalid values.
             // playerPerksOwed: 0 means no pending perk selections.
             if (save.playerPerksOwed === undefined) save.playerPerksOwed = 0
             save.version = 16
