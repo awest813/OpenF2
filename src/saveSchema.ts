@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 15
+export const SAVE_VERSION = 16
 
 export interface SaveGame {
     id?: number
@@ -197,6 +197,32 @@ export interface SaveGame {
      */
     playerRightHandPID?: number
 
+    /**
+     * PID of the armor item the player has equipped (added in v16 / BLK-045).
+     *
+     * Armor equipped via the inventory drag-and-drop UI is stored in
+     * `player.equippedArmor` and removed from the inventory array, so it would
+     * be permanently lost across save/load cycles without this field.  The save
+     * path serializes the armor into `player.inventory` (like weapon slots in
+     * BLK-042) and stores the PID here so the load path can re-equip it.
+     *
+     * Undefined means no armor was equipped (player wears default clothing).
+     */
+    playerArmorPID?: number
+
+    /**
+     * Number of perk-selection credits owed to the player (added in v16 / BLK-047).
+     *
+     * In Fallout 2 the player earns one perk selection every 3 levels (levels
+     * 3, 6, 9, …).  This counter increments in `give_exp_points` each time a
+     * multiple-of-3 level is crossed.  Scripts and sfall mods read it via
+     * `get_perk_owed()` and update it via `set_perk_owed()`.  Persisting it
+     * prevents perks accrued before a save from being silently lost.
+     *
+     * Defaults to 0 (no perks owed) for saves that predate v16.
+     */
+    playerPerksOwed?: number
+
     player: {
         position: Point
         orientation: number
@@ -333,6 +359,16 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // playerLeftHandPID and playerRightHandPID are optional and default undefined.
             save.version = 15
             // falls through
+        case 15:
+            // v15 → v16: add player equipped armor PID (BLK-045) and perk owed count
+            // (BLK-047).  Both default to undefined/0 so old saves continue to work.
+            // playerArmorPID: undefined means no armor was equipped (default clothing).
+            //   Not set here because it is optional; the normalization pass below
+            //   calls sanitizeEquippedPID() which validates and strips invalid values.
+            // playerPerksOwed: 0 means no pending perk selections.
+            if (save.playerPerksOwed === undefined) save.playerPerksOwed = 0
+            save.version = 16
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -382,6 +418,17 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // A value of 0 is not a valid PID (reserved), so treat it as undefined.
     save.playerLeftHandPID = sanitizeEquippedPID(save.playerLeftHandPID)
     save.playerRightHandPID = sanitizeEquippedPID(save.playerRightHandPID)
+    // Normalize playerArmorPID: must be a positive integer or undefined.
+    save.playerArmorPID = sanitizeEquippedPID(save.playerArmorPID)
+    // Normalize playerPerksOwed: must be a non-negative integer; clamp out-of-range values.
+    if (typeof save.playerPerksOwed !== 'number' || !Number.isInteger(save.playerPerksOwed) || save.playerPerksOwed < 0) {
+        save.playerPerksOwed = 0
+    }
+    // Defensive: ensure party is always an array so validateSaveForHydration never
+    // aborts on saves written without the party field (e.g. very old sessions).
+    if (!Array.isArray(save.party)) {
+        save.party = []
+    }
 
     return save as SaveGame
 }
