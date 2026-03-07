@@ -234,17 +234,18 @@ describe('player:levelUp event perksAvailable', () => {
     it('emits perksAvailable=0 when not a perk level (level 2)', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
-        let received: { newLevel: number; perksAvailable: number } | null = null
+        let received: { entityId: number; newLevel: number; perksAvailable: number } | null = null
         EventBus.on('player:levelUp', (e) => { received = e })
         awardXP(1, stats, skills, 1000, false, 0)
         expect(received).not.toBeNull()
         expect(received!.perksAvailable).toBe(0)
+        expect(received!.entityId).toBe(1)
     })
 
     it('emits perksAvailable=1 at a perk level (level 3) without Skilled', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
-        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        const events: Array<{ entityId: number; newLevel: number; perksAvailable: number }> = []
         EventBus.on('player:levelUp', (e) => { events.push(e) })
         awardXP(1, stats, skills, 3000, false, 0)
         const level3Event = events.find((e) => e.newLevel === 3)
@@ -254,7 +255,7 @@ describe('player:levelUp event perksAvailable', () => {
     it('emits perksAvailable=0 at level 3 with Skilled (perk schedule shifts to every 4th)', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
-        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        const events: Array<{ entityId: number; newLevel: number; perksAvailable: number }> = []
         EventBus.on('player:levelUp', (e) => { events.push(e) })
         awardXP(1, stats, skills, 3000, true /* hasTraitSkilled */, 0)
         const level3Event = events.find((e) => e.newLevel === 3)
@@ -264,7 +265,7 @@ describe('player:levelUp event perksAvailable', () => {
     it('emits perksAvailable=1 at level 4 with Skilled', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
-        const events: Array<{ newLevel: number; perksAvailable: number }> = []
+        const events: Array<{ entityId: number; newLevel: number; perksAvailable: number }> = []
         EventBus.on('player:levelUp', (e) => { events.push(e) })
         awardXP(1, stats, skills, 6000, true /* hasTraitSkilled */, 0)
         const level4Event = events.find((e) => e.newLevel === 4)
@@ -369,5 +370,115 @@ describe('removeTraits', () => {
         removeTraits([1], stats, skills)
         expect(stats.strengthMod).toBe(0)
         expect(stats.maxAP).toBe(maxAPBefore)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// awardXP — edge cases and guards
+// ---------------------------------------------------------------------------
+
+describe('awardXP edge cases', () => {
+    it('returns 0 and does not modify XP when amount is 0', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const xpBefore = stats.xp
+        const gained = awardXP(1, stats, skills, 0, false, 0)
+        expect(gained).toBe(0)
+        expect(stats.xp).toBe(xpBefore)
+    })
+
+    it('returns 0 and does not modify XP when amount is negative', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        const xpBefore = stats.xp
+        const gained = awardXP(1, stats, skills, -100, false, 0)
+        expect(gained).toBe(0)
+        expect(stats.xp).toBe(xpBefore)
+    })
+
+    it('player:xpGain event includes entityId matching the playerId argument', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        let eventEntityId: number | undefined
+        EventBus.on('player:xpGain', (e) => { eventEntityId = e.entityId })
+        awardXP(42, stats, skills, 500, false, 0)
+        expect(eventEntityId).toBe(42)
+        EventBus.clear('player:xpGain')
+    })
+
+    it('player:levelUp event includes entityId matching the playerId argument', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        let eventEntityId: number | undefined
+        EventBus.on('player:levelUp', (e) => { eventEntityId = e.entityId })
+        awardXP(99, stats, skills, 1000, false, 0)
+        expect(eventEntityId).toBe(99)
+        EventBus.clear('player:levelUp')
+    })
+
+    it('does not emit player:xpGain for amount=0', () => {
+        const stats = makeStats()
+        const skills = makeSkills(stats)
+        let fired = false
+        EventBus.on('player:xpGain', () => { fired = true })
+        awardXP(1, stats, skills, 0, false, 0)
+        expect(fired).toBe(false)
+        EventBus.clear('player:xpGain')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Perk effects — Action Boy stacks correctly
+// ---------------------------------------------------------------------------
+
+describe('Action Boy multi-rank maxAP', () => {
+    it('increases maxAP by +1 on each grant (no double-counting)', () => {
+        const stats = makeStats({ level: 12, agility: 5 })
+        const skills = makeSkills(stats)
+        const basAP = stats.maxAP
+        const perks: Map<number, number> = new Map()
+
+        grantPerk(6 /* Action Boy */, stats, skills, perks)
+        expect(stats.maxAP).toBe(basAP + 1)
+
+        grantPerk(6, stats, skills, perks)
+        expect(stats.maxAP).toBe(basAP + 2)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// derivedStats — resistance clamping
+// ---------------------------------------------------------------------------
+
+describe('resistance clamping in recomputeDerivedStats', () => {
+    it('clamps poisonResistance to 100 when mods push it above 100', () => {
+        const stats = makeStats({ endurance: 10, poisonResistanceMod: 1000 })
+        // 5 * 10 + 1000 = 1050 without clamping
+        expect(stats.poisonResistance).toBe(100)
+    })
+
+    it('clamps poisonResistance to 0 when mods push it below 0', () => {
+        const stats = makeStats({ endurance: 1, poisonResistanceMod: -100 })
+        expect(stats.poisonResistance).toBe(0)
+    })
+
+    it('clamps radiationResistance to 100 when mods push it above 100', () => {
+        const stats = makeStats({ endurance: 10, radiationResistanceMod: 1000 })
+        expect(stats.radiationResistance).toBe(100)
+    })
+
+    it('clamps radiationResistance to 0 when mods push it below 0', () => {
+        const stats = makeStats({ endurance: 1, radiationResistanceMod: -100 })
+        expect(stats.radiationResistance).toBe(0)
+    })
+
+    it('clamps criticalChance to 100 when mods push it above 100', () => {
+        const stats = makeStats({ luck: 10, criticalChanceMod: 200 })
+        expect(stats.criticalChance).toBe(100)
+    })
+
+    it('clamps criticalChance to 0 when mods push it below 0', () => {
+        const stats = makeStats({ luck: 1, criticalChanceMod: -100 })
+        expect(stats.criticalChance).toBe(0)
     })
 })

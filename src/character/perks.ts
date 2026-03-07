@@ -81,7 +81,10 @@ export const PERKS: Perk[] = [
         id: 1, name: 'Bonus Move', ranks: 2,
         description: 'For each rank of this perk, you receive 2 free Action Points each combat turn that can only be used for movement.',
         prerequisites: { minLevel: 3 },
-        apply(s) { s.maxAPMod += 2; s.maxAP += 2 },
+        // Only modify the persistent modifier; grantPerk() calls recomputeDerivedStats()
+        // which will set maxAP = 5 + ceil(AGI/2) + maxAPMod. Writing directly to maxAP
+        // here would just be overwritten on the very next line of grantPerk().
+        apply(s) { s.maxAPMod += 2 },
     },
     {
         id: 2, name: 'Empathy', ranks: 1,
@@ -119,7 +122,10 @@ export const PERKS: Perk[] = [
         id: 6, name: 'Action Boy', ranks: 2,
         description: '+1 AP per rank.',
         prerequisites: { minLevel: 12, minAgility: 5 },
-        apply(s) { s.maxAPMod += 1; s.maxAP += 1 },
+        // Only modify the persistent modifier; grantPerk() calls recomputeDerivedStats()
+        // which will set maxAP = 5 + ceil(AGI/2) + maxAPMod. Writing directly to maxAP
+        // here would just be overwritten on the very next line of grantPerk().
+        apply(s) { s.maxAPMod += 1 },
     },
     {
         id: 7, name: 'Better Criticals', ranks: 1,
