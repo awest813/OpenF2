@@ -942,18 +942,34 @@ export module Scripting {
                 const max = typeof userdata === 'number' ? userdata : 0
                 return getRandomInt(min, max)
             } else if (id === 106) {
-                // METARULE3_TILE_GET_NEXT_CRITTER
-                // As far as I know, with lastCritter == 0, it just grabs the critter that is not the player at the tile. TODO: Test this!
-                // TODO: use elevation
-                var tile = obj,
-                    elevation = userdata,
-                    lastCritter = radius
-                var objs = globalState.gMap.objectsAtPosition(fromTileNum(tile))
+                // METARULE3_TILE_GET_NEXT_CRITTER(tile, elevation, lastCritter)
+                // Returns the first (or next, if lastCritter is non-zero) non-player
+                // critter standing on the given tile at the specified elevation.
+                // With lastCritter == 0: return the first matching critter.
+                // With lastCritter != 0: return the critter after lastCritter in the
+                //   encounter list (supports iterating all critters at a tile).
+                // BLK-036: now uses getObjects(elevation) so multi-floor maps return
+                // the correct critter without being biased by the current floor.
+                var tile = obj
+                var tileElevation = typeof userdata === 'number' ? userdata : (globalState.currentElevation ?? 0)
+                var lastCritter: any = radius
+                var tilePos = fromTileNum(typeof tile === 'number' ? tile : 0)
+                var allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
+                var critters = allObjs.filter(function(o) {
+                    return o.type === 'critter' &&
+                        !(o as Critter).isPlayer &&
+                        o.position.x === tilePos.x &&
+                        o.position.y === tilePos.y
+                })
                 log('metarule3 106 (tile_get_next_critter)', arguments)
-                for (var i = 0; i < objs.length; i++) {
-                    if (objs[i].type === 'critter' && !(<Critter>objs[i]).isPlayer) return objs[i]
+                if (!lastCritter || lastCritter === 0) {
+                    // Return the first non-player critter at the tile.
+                    return critters.length > 0 ? critters[0] : 0
                 }
-                return 0 // no critter found at that position (TODO: test)
+                // Return the critter immediately after lastCritter in the list.
+                var idx = critters.findIndex(function(o: any) { return o === lastCritter })
+                if (idx >= 0 && idx + 1 < critters.length) return critters[idx + 1]
+                return 0 // no critter found (or lastCritter was the last one)
             } else if (id === 102) {
                 // METARULE3_CHECK_WALKING_ALLOWED: 1 if movement is permitted at the given tile.
                 // No path-blocking registry in the script VM context; always return 1 (partial).
@@ -2327,13 +2343,13 @@ export module Scripting {
             return tile_in_tile_rect(_t, _ur, _lr, _ll, _ul) ? 1 : 0
         }
         tile_contains_obj_pid(tile: number, elevation: number, pid: number) {
-            if (elevation !== globalState.currentElevation) {
-                warn('tile_contains_obj_pid: not same elevation')
-                return 0
-            }
-            var objs = globalState.gMap.objectsAtPosition(fromTileNum(tile))
+            // BLK-037: use getObjects(elevation) so that objects on a non-current
+            // floor are correctly found (previously returned 0 whenever the elevation
+            // did not match the current floor, even when the target floor existed).
+            var pos = fromTileNum(tile)
+            var objs = (globalState.gMap?.getObjects(elevation)) ?? []
             for (var i = 0; i < objs.length; i++) {
-                if (objs[i].pid === pid) return 1
+                if (objs[i].position.x === pos.x && objs[i].position.y === pos.y && objs[i].pid === pid) return 1
             }
             return 0
         }
@@ -3587,6 +3603,96 @@ export module Scripting {
                 return 0
             }
             return (obj as Critter).hostile ? 1 : 0
+        }
+
+        // Phase 52 — sfall extended opcodes 0x81BE–0x81C5
+
+        // sfall 0x81BE — get_critter_weapon(critter, slot):
+        // Returns the game object equipped in the specified weapon slot of a critter.
+        //   slot 0 = primary hand (rightHand — the main weapon hand)
+        //   slot 1 = secondary hand (leftHand — the off-hand / secondary weapon)
+        // Returns 0 if no weapon is equipped in that slot or the object is not a critter.
+        // Used by combat AI and equipment scripts to inspect what a critter is wielding.
+        get_critter_weapon(obj: Obj, slot: number): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_weapon: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            if (slot === 0) {
+                const w = critter.rightHand
+                return (w && (w as any).pid) ? w : 0
+            } else if (slot === 1) {
+                const w = critter.leftHand
+                return (w && (w as any).pid) ? w : 0
+            }
+            return 0
+        }
+
+        // sfall 0x81BF — critter_inven_size(critter):
+        // Returns the total number of items currently in the critter's inventory.
+        // Returns 0 for non-critters or critters with empty / missing inventory.
+        // Used by scripts that need to check whether a critter is carrying anything.
+        critter_inven_size(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_inven_size: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).inventory?.length ?? 0
+        }
+
+        // sfall 0x81C0 — get_sfall_args_count():
+        // Returns the number of arguments passed to the currently executing hook script.
+        // The browser build does not implement hook scripts; always returns 0.
+        get_sfall_args_count(): number {
+            return 0
+        }
+
+        // sfall 0x81C1 — get_sfall_arg_at(idx):
+        // Returns the hook-script argument at the given zero-based index.
+        // The browser build does not implement hook scripts; always returns 0.
+        get_sfall_arg_at(idx: number): number {
+            log('get_sfall_arg_at', arguments)
+            return 0
+        }
+
+        // sfall 0x81C2 — set_sfall_arg(idx, val):
+        // Writes a value back into the hook-script argument at the given index.
+        // No-op in the browser build (no hook script argument buffer).
+        set_sfall_arg(idx: number, val: number): void {
+            log('set_sfall_arg', arguments)
+        }
+
+        // sfall 0x81C3 — get_object_lighting(obj):
+        // Returns the current light level received by obj (0–65536).
+        // Partial: returns the global ambient light level as a reasonable approximation;
+        // per-object lighting is not modelled separately in the browser build.
+        get_object_lighting(obj: Obj): number {
+            log('get_object_lighting', arguments)
+            return globalState.ambientLightLevel ?? 65536
+        }
+
+        // sfall 0x81C4 — get_critter_team(critter):
+        // Returns the team number of the given critter.  Team numbers control which
+        // factions will attack each other in combat (same team = allied).
+        // Returns 0 for non-critters.
+        get_critter_team(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_team: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).teamNum ?? 0
+        }
+
+        // sfall 0x81C5 — set_critter_team(critter, team):
+        // Sets the team number of the given critter.  Used by faction-switch scripts
+        // (e.g. turning a neutral NPC hostile by moving them to the player-enemy team).
+        set_critter_team(obj: Obj, team: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_team: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as Critter).teamNum = typeof team === 'number' ? team : 0
         }
 
         _serialize(): SerializedScript {

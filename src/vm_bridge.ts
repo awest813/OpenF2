@@ -560,6 +560,41 @@ export module ScriptVMBridge {
 
        // 0x81BD — get_critter_hostile_to_dude(obj): 1 if critter is hostile to player, 0 otherwise.
        ,0x81BD: bridged("get_critter_hostile_to_dude", 1) // get_critter_hostile_to_dude(obj) → 0/1
+
+       // Phase 52 — sfall extended opcodes 0x81BE–0x81C5
+
+       // 0x81BE — get_critter_weapon(critter, slot): return the weapon in the specified hand.
+       //   slot 0 = primary hand (rightHand); slot 1 = secondary hand (leftHand).
+       // Returns the weapon game object or 0 if no weapon is equipped in that slot.
+       ,0x81BE: bridged("get_critter_weapon", 2) // get_critter_weapon(critter, slot) → weapon obj | 0
+
+       // 0x81BF — critter_inven_size(critter): return count of items in critter's inventory.
+       // Enables scripts to check how many items a critter is carrying (e.g. for loot scripts).
+       ,0x81BF: bridged("critter_inven_size", 1) // critter_inven_size(critter) → count
+
+       // 0x81C0 — get_sfall_args_count(): return number of arguments for the current hook script.
+       // Browser build has no hook scripts; always returns 0.
+       ,0x81C0: bridged("get_sfall_args_count", 0) // get_sfall_args_count() → 0
+
+       // 0x81C1 — get_sfall_arg_at(idx): return hook-script argument at index.
+       // Browser build has no hook scripts; always returns 0.
+       ,0x81C1: bridged("get_sfall_arg_at", 1) // get_sfall_arg_at(idx) → 0
+
+       // 0x81C2 — set_sfall_arg(idx, val): write a value back into a hook-script argument.
+       // No-op in the browser build (no hook script argument buffer).
+       ,0x81C2: bridged("set_sfall_arg", 2, false) // set_sfall_arg(idx, val) — no-op
+
+       // 0x81C3 — get_object_lighting(obj): return the light level received by obj (0–65536).
+       // Partial: returns the global ambient light level.
+       ,0x81C3: bridged("get_object_lighting", 1) // get_object_lighting(obj) → light level
+
+       // 0x81C4 — get_critter_team(critter): return the team number of a critter.
+       // Team numbers control which factions are allied/hostile to each other.
+       ,0x81C4: bridged("get_critter_team", 1) // get_critter_team(critter) → teamNum
+
+       // 0x81C5 — set_critter_team(critter, team): set the team number of a critter.
+       // Used by faction-switch and story-beat scripts.
+       ,0x81C5: bridged("set_critter_team", 2, false) // set_critter_team(critter, team) — set
     }
     Object.assign(opMap, bridgeOpMap)
 

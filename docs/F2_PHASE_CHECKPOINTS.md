@@ -237,3 +237,23 @@ Gate: **PASS** — all 2336 tests green, tsc clean.
 - [x] phase51.test.ts: 47 regression tests, all passing
 
 Gate: **PASS** — all 2383 tests green, tsc clean.
+
+---
+
+## Phase 52 — Multi-floor map fixes (BLK-036/037), sfall opcodes 0x81BE–0x81C5
+
+- [x] **BLK-036**: `metarule3(106)` TILE_GET_NEXT_CRITTER — elevation parameter was silently ignored; now uses `gMap.getObjects(elevation)` + position filter. Also implements `lastCritter` iteration for enumerating multiple critters at one tile.
+- [x] **BLK-037**: `tile_contains_obj_pid(tile, elev, pid)` — returned 0 for any elevation ≠ current floor; now uses `gMap.getObjects(elevation)` + position/PID filter matching `tile_contains_pid_obj` behaviour.
+- [x] **BLK-038**: sfall opcodes 0x81BE–0x81C5 were absent; scripts calling them corrupted the VM stack. All eight now registered: `get_critter_weapon`, `critter_inven_size`, `get_sfall_args_count`, `get_sfall_arg_at`, `set_sfall_arg`, `get_object_lighting`, `get_critter_team`, `set_critter_team`.
+- [x] New sfall opcode 0x81BE: `get_critter_weapon(critter, slot)` → weapon object in hand slot (0=primary, 1=secondary)
+- [x] New sfall opcode 0x81BF: `critter_inven_size(critter)` → total item count in critter inventory
+- [x] New sfall opcode 0x81C0: `get_sfall_args_count()` → 0 (no hook args)
+- [x] New sfall opcode 0x81C1: `get_sfall_arg_at(idx)` → 0 (partial)
+- [x] New sfall opcode 0x81C2: `set_sfall_arg(idx, val)` → no-op (partial)
+- [x] New sfall opcode 0x81C3: `get_object_lighting(obj)` → ambient light level (partial)
+- [x] New sfall opcode 0x81C4: `get_critter_team(critter)` → critter.teamNum
+- [x] New sfall opcode 0x81C5: `set_critter_team(critter, team)` → set critter.teamNum
+- [x] scriptingChecklist.ts: 10 new entries (BLK-036/037/038 + 8 new opcodes)
+- [x] phase52.test.ts: 64 regression tests, all passing
+
+Gate: **PASS** — all 2447 tests green, tsc clean.
