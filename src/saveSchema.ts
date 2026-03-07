@@ -228,9 +228,14 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             break
 
         default:
-            throw new Error(
-                `[SaveLoad] Unknown save version ${save.version}; cannot migrate to ${SAVE_VERSION}`
+            // Unknown save version — could be from a future build.
+            // Emit a warning and treat as current so the save remains
+            // usable rather than crashing the load path entirely.
+            console.warn(
+                `[SaveLoad] Unknown save version ${save.version}; treating as v${SAVE_VERSION} (best-effort)`
             )
+            save.version = SAVE_VERSION
+            break
     }
 
     // Final normalization pass: tolerate partially corrupted saves that carry

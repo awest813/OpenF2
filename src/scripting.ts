@@ -316,7 +316,7 @@ export module Scripting {
         return obj.isSpatial === true
     }
 
-    function getScriptName(id: number): string {
+    function getScriptName(id: number): string | null {
         // return getLstId("scripts/scripts", id - 1).split(".")[0].toLowerCase()
         return lookupScriptName(id)
     }
@@ -1414,9 +1414,24 @@ export module Scripting {
                 return 0
             }
 
+            // critter_state() returns a bitmask encoding the critter's current
+            // condition.  Bit positions match the Fallout 2 CRITTER_IS_* constants:
+            //   bit 0 (0x01): dead
+            //   bit 1 (0x02): stunned / knocked out (unconscious)
+            //   bit 2 (0x04): knocked down (prone)
+            //   bit 3 (0x08): any crippled body part
+            //   bit 4 (0x10): fleeing
             var state = 0
-            if (obj.dead === true) state |= 1
-            if ((obj as any).knockedDown === true) state |= 2 // prone / knocked down
+            if (obj.dead === true) state |= 0x01
+            if ((obj as any).knockedOut === true) state |= 0x02
+            if ((obj as any).knockedDown === true) state |= 0x04
+            const hasCrippledLimb =
+                (obj as any).crippledLeftLeg ||
+                (obj as any).crippledRightLeg ||
+                (obj as any).crippledLeftArm ||
+                (obj as any).crippledRightArm
+            if (hasCrippledLimb) state |= 0x08
+            if ((obj as any).isFleeing === true) state |= 0x10
 
             return state
         }
@@ -1577,7 +1592,7 @@ export module Scripting {
             log('obj_is_locked', arguments)
             if (!isGameObject(obj)) {
                 warn('obj_is_locked: not game object: ' + obj, undefined, this)
-                return 1
+                return 0
             }
             return obj.locked ? 1 : 0
         }

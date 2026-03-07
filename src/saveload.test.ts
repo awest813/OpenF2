@@ -4,7 +4,7 @@
  * questLog/reputation fields added in version 3.
  */
 
-import { beforeEach, afterEach, describe, it, expect } from 'vitest'
+import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData, validateSaveForHydration } from './saveStateFidelity.js'
 import { resetSaveBackendForTests, save, saveList, saveLoadInit, load } from './saveload.js'
@@ -128,9 +128,15 @@ describe('migrateSave', () => {
         expect(save.reputation?.karma).toBe(100)
     })
 
-    it('throws for an unknown save version', () => {
+    it('warns and uses save as-is for an unknown save version (forward-compatible)', () => {
         const raw = { version: 999, player: {}, party: [], savedMaps: {} }
-        expect(() => migrateSave(raw)).toThrow()
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        try {
+            const result = migrateSave(raw)
+            expect(result.version).toBe(SAVE_VERSION)
+        } finally {
+            warnSpy.mockRestore()
+        }
     })
 
     it('sanitizes malformed numeric/boolean records in migrated saves', () => {
@@ -391,7 +397,7 @@ describe('save validation and failure clarity', () => {
         })
     })
 
-    it('throws actionable errors for incomplete/corrupt saves before mutating runtime state', () => {
+    it('returns an error string for incomplete/corrupt saves (does not throw)', () => {
         const missingMapSave = {
             version: SAVE_VERSION,
             name: 'Corrupt',
@@ -403,9 +409,9 @@ describe('save validation and failure clarity', () => {
             savedMaps: {},
         }
 
-        expect(() => validateSaveForHydration(missingMapSave as any)).toThrow(
-            "[SaveLoad] Save references missing current map 'missing_map'"
-        )
+        const error = validateSaveForHydration(missingMapSave as any)
+        expect(typeof error).toBe('string')
+        expect(error).toContain("missing_map")
     })
 })
 

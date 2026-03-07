@@ -47,8 +47,10 @@ export class SkillSet {
     getBase(skill: string): number {
         const skillDep = skillDependencies[skill];
 
-        if(!skillDep)
-            throw Error(`No dependencies for skill '${skill}'`);
+        if(!skillDep) {
+            console.warn(`SkillSet.getBase: no dependencies for skill '${skill}' — returning 0`);
+            return 0;
+        }
 
         return this.baseSkills[skill] || skillDep.startValue;
     }
@@ -57,8 +59,10 @@ export class SkillSet {
         const base = this.getBase(skill);
         const skillDep = skillDependencies[skill];
 
-        if(!skillDep)
-            throw Error(`No dependencies for skill '${skill}'`);
+        if(!skillDep) {
+            console.warn(`SkillSet.get: no dependencies for skill '${skill}' — returning 0`);
+            return 0;
+        }
 
         let skillValue = base;
 
@@ -171,8 +175,10 @@ export class StatSet {
     getBase(stat: string): number {
         const statDep = statDependencies[stat];
 
-        if(!statDep)
-            throw Error(`No dependencies for stat '${stat}'`);
+        if(!statDep) {
+            console.warn(`StatSet.getBase: no dependencies for stat '${stat}' — returning 0`);
+            return 0;
+        }
 
         return this.baseStats[stat] || statDep.defaultValue;
     }
@@ -182,8 +188,10 @@ export class StatSet {
 
         const statDep = statDependencies[stat];
 
-        if(!statDep)
-            throw Error(`No dependencies for stat '${stat}'`);
+        if(!statDep) {
+            console.warn(`StatSet.get: no dependencies for stat '${stat}' — returning 0`);
+            return 0;
+        }
 
         let statValue = base;
         if(this.useBonuses) {
