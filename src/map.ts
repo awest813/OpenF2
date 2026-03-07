@@ -92,6 +92,9 @@ export class GameMap {
     /** Reused A* finder instance. */
     private readonly pathFinder = new PF.AStarFinder()
 
+    /** Guard set to prevent reentrant destroy_p_proc calls on the same object. */
+    private readonly _destroyingObjects: Set<Obj> = new Set()
+
     private ensurePathMatrix(): void {
         if (this.pathMatrix.length === HEX_GRID_SIZE) {
             return
@@ -147,9 +150,19 @@ export class GameMap {
     }
 
     destroyObject(obj: Obj): void {
+        // Notify the object's script via destroy_p_proc before removing it from
+        // the map so that scripted death / cleanup logic fires correctly.
+        // Guard against reentrant destroy calls (e.g. if destroy_p_proc itself
+        // calls destroy_object on the same object).
+        if (!this._destroyingObjects.has(obj)) {
+            this._destroyingObjects.add(obj)
+            try {
+                Scripting.destroy(obj)
+            } finally {
+                this._destroyingObjects.delete(obj)
+            }
+        }
         this.removeObject(obj)
-
-        // TODO: notify scripts with destroy_p_proc
     }
 
     hasRoofAt(pos: Point, elevation?: number): boolean {

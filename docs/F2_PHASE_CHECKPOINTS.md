@@ -176,3 +176,23 @@ Gate: **PASS** — all 1906 tests green, tsc clean.
 - [x] phase39.test.ts: 47 regression tests, all passing
 
 Gate: **PASS** — all 1953 tests green, tsc clean.
+
+---
+
+## Phase 44 — VM stack safety, destroy_p_proc, combat guard, sfall expansion
+
+- [x] `vm_bridge.ts` `push(r)` → `push(r ?? 0)`: systemic guard preventing undefined values from corrupting VM data stack (BLK-023)
+- [x] `map_var()` bare early returns → `return 0`: prevents undefined push via opcode 0x80C3 (BLK-023)
+- [x] `map.ts` `destroyObject()` calls `Scripting.destroy(obj)` before removal: fires `destroy_p_proc` callbacks for all scripted objects (BLK-024)
+- [x] Reentrance guard (`_destroyingObjects: Set<Obj>`) prevents infinite recursion if `destroy_p_proc` calls `destroy_object` on the same object
+- [x] `combat.ts` `nextTurn(skipDepth)`: skip-depth counter bounds recursion to one full combatant-list rotation; forces `end()` if exceeded (BLK-025)
+- [x] New sfall opcode 0x819C: `get_world_map_x()` → world-map X position
+- [x] New sfall opcode 0x819D: `get_world_map_y()` → world-map Y position
+- [x] New sfall opcode 0x819E: `set_world_map_pos(x, y)` — teleport world-map cursor
+- [x] New sfall opcode 0x819F: `in_world_map()` → 1 if no game map loaded
+- [x] New sfall opcode 0x81A0: `get_critter_level(obj)` → character level
+- [x] New sfall opcode 0x81A1: `set_critter_level(obj, level)` — override level
+- [x] New sfall opcode 0x81A2: `get_object_weight(obj)` → weight in lbs from proto data
+- [x] phase44.test.ts: 34 regression tests, all passing
+
+Gate: **PASS** — all 2075 tests green, tsc clean.
