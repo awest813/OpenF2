@@ -524,8 +524,10 @@ export module Lightmap {
     // eax = tile, edx = direction, ebx = distance
     function tile_num_in_direction(tileNum: number, dir: number, distance: number): number {
         //console.log("tileNum: " + tileNum + " (" + tileNum.toString(16) + ")")
-        if(dir < 0 || dir > 5)
-            throw "tile_num_in_direction: dir = " + dir
+        if(dir < 0 || dir > 5) {
+            console.warn('tile_num_in_direction (lighting): dir=' + dir + ' out of range [0,5] — returning -1')
+            return -1
+        }
         if(distance === 0)
             return tileNum
 

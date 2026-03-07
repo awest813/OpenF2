@@ -81,7 +81,10 @@ function parseAreas(data: string): AreaMap {
     for (var _area in areas) {
         var area = areas[_area]
         var match = _area.match(/Area (\d+)/)
-        if (match === null) throw 'city.txt: invalid area name: ' + area.area_name
+        if (match === null) {
+            console.warn('city.txt: skipping section with invalid area name: ' + _area)
+            continue
+        }
         var areaID = parseInt(match[1])
         var worldPos = area.world_pos.split(',').map((x: string) => parseInt(x))
 
@@ -115,7 +118,10 @@ function parseAreas(data: string): AreaMap {
 
                 const mapLookupName = s[3].trim()
                 const mapName = lookupMapNameFromLookup(mapLookupName)
-                if (!mapName) throw Error("Couldn't look up map name")
+                if (!mapName) {
+                    console.warn('city.txt: area ' + areaID + ' entrance "' + mapLookupName + '" has no map — skipping entrance')
+                    continue
+                }
 
                 const entrance = {
                     startState: s[0],
@@ -138,7 +144,10 @@ function parseAreas(data: string): AreaMap {
 }
 
 function areaContainingMap(mapName: string) {
-    if (!globalState.mapAreas) throw Error('globalState.mapAreas not loaded')
+    if (!globalState.mapAreas) {
+        console.warn('areaContainingMap: globalState.mapAreas not loaded — returning null')
+        return null
+    }
     for (var area in globalState.mapAreas) {
         var entrances = globalState.mapAreas[area].entrances
         for (var i = 0; i < entrances.length; i++) {
@@ -227,17 +236,26 @@ function parseMapInfo() {
     const ini = parseIni(text)
     for (var category in ini) {
         const m = category.match(/Map (\d+)/)
-        if (!m) throw Error('maps.txt: invalid category: ' + category)
+        if (!m) {
+            console.warn('maps.txt: skipping section with invalid category: ' + category)
+            continue
+        }
 
         let id: string | number = m[1]
-        if (id === null) throw 'maps.txt: invalid category: ' + category
+        if (id === null) {
+            console.warn('maps.txt: skipping section with null ID in category: ' + category)
+            continue
+        }
         id = parseInt(id)
 
         var randomStartPoints = []
         for (var key in ini[category]) {
             if (key.indexOf('random_start_point_') === 0) {
                 var startPoint = ini[category][key].match(/elev:(\d), tile_num:(\d+)/)
-                if (startPoint === null) throw 'invalid random_start_point: ' + ini[category][key]
+                if (startPoint === null) {
+                    console.warn('maps.txt: skipping invalid random_start_point: ' + ini[category][key])
+                    continue
+                }
                 randomStartPoints.push({ elevation: parseInt(startPoint[1]), tileNum: parseInt(startPoint[2]) })
             }
         }

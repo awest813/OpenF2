@@ -2395,6 +2395,77 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'high',
     },
+    {
+        id: 'data_city_txt_invalid_area_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseAreas(): sections in city.txt that do not match "Area N" (e.g. ' +
+            'comment sections or mod-specific headers) previously threw a string crashing ' +
+            'the world map loader. Now logs console.warn and skips the section so the rest ' +
+            'of city.txt loads successfully.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'data_city_txt_unknown_map_entrance_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseAreas(): city.txt entrances that reference a map name not found in ' +
+            'the maps lookup table previously threw an Error crashing the world map loader. ' +
+            'Now logs console.warn and skips the entrance so the area still loads with its ' +
+            'remaining valid entrances.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'data_area_containing_map_no_mapAreas_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts areaContainingMap(): calling this function before globalState.mapAreas ' +
+            'is loaded previously threw an Error. Now logs console.warn and returns null so ' +
+            'callers receive a safe sentinel without crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'data_maps_txt_invalid_category_no_throw',
+        kind: 'procedure',
+        description:
+            'data.ts parseMapInfo(): sections in maps.txt that do not match "Map N" ' +
+            'previously threw an Error. Now logs console.warn and skips the section. ' +
+            'Also hardens invalid random_start_point entries: skip with warning instead ' +
+            'of throwing so map info loads fully even with partial data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'lightmap_tile_num_in_direction_invalid_dir_no_throw',
+        kind: 'procedure',
+        description:
+            'lightmap.ts tile_num_in_direction(): an invalid direction (< 0 or > 5) ' +
+            'previously threw a string crashing the renderer during lighting updates. ' +
+            'Now logs console.warn and returns -1 so lighting gracefully handles ' +
+            'corrupted or edge-case map data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+    {
+        id: 'lighting_intensity_map_out_of_bounds_no_throw',
+        kind: 'procedure',
+        description:
+            'lighting.ts intensity_map loop: when the computed intensityIdx falls outside ' +
+            '[0, intensity_map.length), the code previously threw the string "guard" ' +
+            'crashing the renderer. Now logs console.warn and breaks out of the inner ' +
+            'loop so lighting continues for subsequent tiles even on corrupt light data.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { opMap, VMContext } from './vm_opcodes.js'
 import globalState from './globalState.js'
+import { SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -471,5 +472,47 @@ describe('Phase 47-K — objectZCompare returns 0 instead of throwing for NaN po
         // because NaN comparisons always return false.
         const fallsThrough = !(aY === bY) && !(aY < bY) && !(aY > bY)
         expect(fallsThrough).toBe(true)
+    })
+})
+
+// ===========================================================================
+// Phase 47-L — data.ts city.txt / maps.txt parsing throw → warn+skip
+// ===========================================================================
+
+describe('Phase 47-L — data.ts parseAreas city.txt robustness', () => {
+    it('SCRIPTING_STUB_CHECKLIST contains data_city_txt_invalid_area_no_throw entry', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'data_city_txt_invalid_area_no_throw')
+        expect(entry).toBeDefined()
+        expect(entry!.status).toBe('implemented')
+    })
+
+    it('SCRIPTING_STUB_CHECKLIST contains data_city_txt_unknown_map_entrance_no_throw entry', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'data_city_txt_unknown_map_entrance_no_throw')
+        expect(entry).toBeDefined()
+        expect(entry!.status).toBe('implemented')
+    })
+
+    it('SCRIPTING_STUB_CHECKLIST contains data_maps_txt_invalid_category_no_throw entry', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'data_maps_txt_invalid_category_no_throw')
+        expect(entry).toBeDefined()
+        expect(entry!.status).toBe('implemented')
+    })
+})
+
+// ===========================================================================
+// Phase 47-M — lightmap.ts / lighting.ts throw → warn+safe return
+// ===========================================================================
+
+describe('Phase 47-M — lightmap/lighting crash hardening', () => {
+    it('SCRIPTING_STUB_CHECKLIST contains lightmap_tile_num_in_direction_invalid_dir_no_throw', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'lightmap_tile_num_in_direction_invalid_dir_no_throw')
+        expect(entry).toBeDefined()
+        expect(entry!.status).toBe('implemented')
+    })
+
+    it('SCRIPTING_STUB_CHECKLIST contains lighting_intensity_map_out_of_bounds_no_throw', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'lighting_intensity_map_out_of_bounds_no_throw')
+        expect(entry).toBeDefined()
+        expect(entry!.status).toBe('implemented')
     })
 })
