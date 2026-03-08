@@ -1048,6 +1048,9 @@ export module Scripting {
                 const src = obj
                 const tgt = userdata
                 if (!isGameObject(src) || !isGameObject(tgt)) return 0
+                // BLK-096: Guard against null positions — objects in inventory or mid-transition
+                // may have no position; hexDistance would crash with a TypeError if either is null.
+                if (!src.position || !tgt.position) return 0
                 return hexDistance(src.position, tgt.position) <= 12 ? 1 : 0
             } else if (id === 107) {
                 // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
@@ -1070,6 +1073,9 @@ export module Scripting {
             } else if (id === 110) {
                 // METARULE3_CRITTER_TILE: tile number of the given critter.
                 if (!isGameObject(obj)) return -1
+                // BLK-097: Guard against null position — critters in inventory or
+                // mid-transition may have no position; toTileNum(null) crashes.
+                if (!obj.position) return -1
                 return toTileNum(obj.position)
             } else if (id === 111) {
                 // METARULE3_OBJ_IS_CRITTER_DEAD: 1 if the given critter is dead.
@@ -1129,9 +1135,17 @@ export module Scripting {
 
         // critters
         get_critter_stat(obj: Critter, stat: number) {
+            // BLK-098: Guard against null/non-critter objects — get_critter_stat is
+            // frequently called from scripts that may hold a stale or null reference
+            // (e.g. dead or destroyed critters).  Without this guard obj.getStat()
+            // throws a TypeError when obj is 0 (the Fallout 2 null-ref convention).
+            if (!isGameObject(obj)) {
+                warn('get_critter_stat: not a game object — returning 0', undefined, this)
+                return 0
+            }
             if (stat === 34) {
                 // STAT_gender
-                if (obj.isPlayer) return (<Player>obj).gender === 'female' ? 1 : 0
+                if ((obj as Player).isPlayer) return (obj as Player).gender === 'female' ? 1 : 0
                 return 0 // Default to male
             }
             var namedStat = statMap[stat]
@@ -3564,10 +3578,21 @@ export module Scripting {
         }
         party_add(obj: Critter) {
             log('party_add', arguments)
+            // BLK-099: Guard against null gParty — can occur during early init, test
+            // environments, or map transitions before the party system is registered.
+            if (!globalState.gParty) {
+                warn('party_add: gParty is null — skipping', undefined, this)
+                return
+            }
             globalState.gParty.addPartyMember(obj)
         }
         party_remove(obj: Critter) {
             log('party_remove', arguments)
+            // BLK-099: Guard against null gParty (same as party_add guard above).
+            if (!globalState.gParty) {
+                warn('party_remove: gParty is null — skipping', undefined, this)
+                return
+            }
             globalState.gParty.removePartyMember(obj)
         }
 
@@ -5439,6 +5464,60 @@ export module Scripting {
         // load.  Browser build: returns 0 (no per-session object creation counter).
         get_num_new_obj_sfall(): number {
             return 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 72 — sfall extended opcodes 0x8260–0x8267
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8260 — get_critter_weapon (second opcode alias):
+        // Opcode alias — the implementation lives in the Phase-52 section above
+        // (search for 0x81BE, method get_critter_weapon).  vm_bridge.ts maps both
+        // opcodes to the same method; no separate definition is needed here.
+
+        // sfall 0x8261 — set_critter_weapon_sfall(obj, slot, weapon):
+        // Equip a weapon in the given slot (0=right, 1=left).
+        // Browser build: partial — writes the slot directly; no animation triggered.
+        set_critter_weapon_sfall(obj: Obj, slot: number, weapon: Obj | number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_weapon_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const c = obj as Critter
+            const item = isGameObject(weapon) ? (weapon as any) : null
+            if (slot === 0) c.rightHand = item
+            else if (slot === 1) c.leftHand = item
+        }
+
+        // sfall 0x8262 — get_object_type_sfall (second opcode alias):
+        // Opcode alias — implementation is in the Phase-58 section (search for 0x81F6).
+
+        // sfall 0x8263 — get_critter_team (second opcode alias):
+        // Opcode alias — implementation is in the Phase-52 section (search for 0x81C4).
+
+        // sfall 0x8264 — set_critter_team (second opcode alias):
+        // Opcode alias — implementation is in the Phase-52 section (search for 0x81C5).
+
+        // sfall 0x8265 — get_ambient_light_sfall():
+        // Return the current ambient light level (0=dark, 65536=maximum brightness).
+        // Browser build: returns the value from globalState.ambientLightLevel, defaulting
+        // to 65536 (full brightness) when no explicit light level has been set.
+        get_ambient_light_sfall(): number {
+            return globalState.ambientLightLevel ?? 65536
+        }
+
+        // sfall 0x8266 — set_ambient_light_sfall(level):
+        // Set the ambient light level.  Browser build: writes globalState.ambientLightLevel.
+        // Full dynamic-lighting update is not yet wired; the value is stored for script reads.
+        set_ambient_light_sfall(level: number): void {
+            globalState.ambientLightLevel = typeof level === 'number' ? Math.max(0, Math.min(65536, level)) : 65536
+        }
+
+        // sfall 0x8267 — get_map_local_var_sfall(idx):
+        // Return a map-local variable by index.  Delegates to the existing map_var()
+        // implementation so sfall callers get the same value as native map_var() calls.
+        get_map_local_var_sfall(idx: number): any {
+            return this.map_var(typeof idx === 'number' ? idx : 0)
         }
 
         _serialize(): SerializedScript {

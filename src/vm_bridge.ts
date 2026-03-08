@@ -1197,6 +1197,34 @@ export module ScriptVMBridge {
 
        // 0x825F — get_num_new_obj_sfall(): return count of scripted objects created.
        ,0x825F: bridged("get_num_new_obj_sfall", 0) // get_num_new_obj() → 0
+
+       // -----------------------------------------------------------------------
+       // Phase 72 — sfall extended opcodes 0x8260–0x8267
+       // -----------------------------------------------------------------------
+
+       // 0x8260 — get_critter_weapon (second opcode alias for 0x81BE).
+       ,0x8260: bridged("get_critter_weapon", 2) // get_critter_weapon(obj, slot) → obj|0
+
+       // 0x8261 — set_critter_weapon_sfall(obj, slot, weapon): equip weapon in slot.
+       ,0x8261: bridged("set_critter_weapon_sfall", 3, false) // set_critter_weapon(obj, slot, weapon)
+
+       // 0x8262 — get_object_type_sfall (second opcode alias for 0x81F6).
+       ,0x8262: bridged("get_object_type_sfall", 1) // get_object_type(obj) → 0|1|2|3
+
+       // 0x8263 — get_critter_team (second opcode alias for 0x81C4).
+       ,0x8263: bridged("get_critter_team", 1) // get_critter_team(obj) → team
+
+       // 0x8264 — set_critter_team (second opcode alias for 0x81C5).
+       ,0x8264: bridged("set_critter_team", 2, false) // set_critter_team(obj, team)
+
+       // 0x8265 — get_ambient_light_sfall(): return ambient light level (0–65536).
+       ,0x8265: bridged("get_ambient_light_sfall", 0) // get_ambient_light() → 0..65536
+
+       // 0x8266 — set_ambient_light_sfall(level): set ambient light level.
+       ,0x8266: bridged("set_ambient_light_sfall", 1, false) // set_ambient_light(level)
+
+       // 0x8267 — get_map_local_var_sfall(idx): return map local variable by index.
+       ,0x8267: bridged("get_map_local_var_sfall", 1) // get_map_local_var(idx) → value
     }
     Object.assign(opMap, bridgeOpMap)
 
