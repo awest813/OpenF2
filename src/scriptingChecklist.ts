@@ -4774,6 +4774,134 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 67 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'blk_073_move_to_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-073: move_to() null-gMap guard.  When move_to() was called with a ' +
+            'different elevation than the current one, it unconditionally accessed ' +
+            'globalState.gMap.changeElevation() / removeObject() / addObject() without ' +
+            'checking for null.  During map transitions or before a map is loaded ' +
+            'this caused an uncaught TypeError.  Now guards with an early warning ' +
+            'and skips the elevation change if gMap is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_074_rm_timer_event_null_obj',
+        kind: 'procedure',
+        description:
+            'BLK-074: rm_timer_event() null-obj guard.  Scripts that cancel timers on ' +
+            'destroyed objects sometimes pass 0/null as the object reference.  The ' +
+            'unconditional info() call at the start of rm_timer_event accessed obj.pid ' +
+            'and crashed.  Now returns early with a warning when obj is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_075_player_injury_flags',
+        kind: 'procedure',
+        description:
+            'BLK-075: Player injury flags persistence in save schema v19.  ' +
+            'Crippled limbs (crippledLeftLeg, crippledRightLeg, crippledLeftArm, ' +
+            'crippledRightArm) and blindness are now stored as a bitmask in ' +
+            'playerInjuryFlags and restored on load.  Without this, critical-hit ' +
+            'permanent injuries vanished after every save/reload cycle, letting ' +
+            'players bypass gameplay penalties.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_radiation',
+        kind: 'opcode',
+        description:
+            'sfall 0x8238: get_critter_radiation_sfall(obj) — return critter radiation ' +
+            'level.  Alias of get_radiation(); returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_radiation',
+        kind: 'opcode',
+        description:
+            'sfall 0x8239: set_critter_radiation_sfall(obj, val) — set critter radiation ' +
+            'level to the given absolute value (clamped to [0, 1000]).  Unlike ' +
+            'radiation_add/radiation_dec which adjust relative to current, this ' +
+            'sets it directly.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_poison',
+        kind: 'opcode',
+        description:
+            'sfall 0x823A: get_critter_poison_sfall(obj) — return critter poison level. ' +
+            'Alias of get_poison(); returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_poison',
+        kind: 'opcode',
+        description:
+            'sfall 0x823B: set_critter_poison_sfall(obj, val) — set critter poison level ' +
+            'to the given absolute value (clamped to [0, 1000]).  Unlike poison() which ' +
+            'adjusts relatively, this sets it directly.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_critter_in_party',
+        kind: 'opcode',
+        description:
+            'sfall 0x823C: critter_in_party_sfall(obj) — return 1 if the given critter ' +
+            'is in the player party (gParty.members), 0 otherwise.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_proto_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x823D: get_critter_proto_flags_sfall(obj) — return proto flags ' +
+            'bitmask stored on the object.  Reads obj.flags; returns 0 if absent.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_proto_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x823E: set_critter_proto_flags_sfall(obj, flags) — set proto flags ' +
+            'bitmask on object.  Stores flags on obj for subsequent reads. Partial.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_party_count',
+        kind: 'opcode',
+        description:
+            'sfall 0x823F: get_party_count_sfall() — return current number of critters ' +
+            'in the player party.  Reads gParty.members length; returns 0 if no party.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

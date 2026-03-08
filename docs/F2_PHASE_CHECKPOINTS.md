@@ -338,3 +338,24 @@ Gate: **PASS** — all 2584 tests green, tsc clean.
 - [x] phase56.test.ts: 33 regression tests, all passing
 
 Gate: **PASS** — all 2617 tests green, tsc clean.
+
+---
+
+## Phase 67 — move_to null-gMap guard (BLK-073), rm_timer_event null-obj guard (BLK-074), player injury flags save schema v19 (BLK-075), sfall opcodes 0x8238–0x823F
+
+- [x] **BLK-073**: `move_to()` null-gMap guard — when elevation differed from current, `globalState.gMap.changeElevation()` / `removeObject()` / `addObject()` were called without checking for null. During map transitions or early-boot, this caused an uncaught TypeError. Now guards with an early warning when gMap is null.
+- [x] **BLK-074**: `rm_timer_event()` null-obj guard — scripts sometimes call `rm_timer_event(0)` when cancelling timers on destroyed objects. The unconditional `obj.pid` access at the start of the function crashed. Now returns early with a warning when `obj` is null/undefined.
+- [x] **BLK-075**: Player injury flags persistence in save schema v19 — crippled limbs (`crippledLeftLeg`, `crippledRightLeg`, `crippledLeftArm`, `crippledRightArm`) and `blinded` state stored as a bitmask in `playerInjuryFlags`; persisted in save and restored on load so critical-hit permanent penalties survive save/reload.
+- [x] New sfall opcode 0x8238: `get_critter_radiation_sfall(obj)` → radiation level (alias of get_radiation)
+- [x] New sfall opcode 0x8239: `set_critter_radiation_sfall(obj, val)` → set radiation level (absolute, clamped [0,1000])
+- [x] New sfall opcode 0x823A: `get_critter_poison_sfall(obj)` → poison level (alias of get_poison)
+- [x] New sfall opcode 0x823B: `set_critter_poison_sfall(obj, val)` → set poison level (absolute, clamped [0,1000])
+- [x] New sfall opcode 0x823C: `critter_in_party_sfall(obj)` → 1 if critter is in player party, 0 otherwise
+- [x] New sfall opcode 0x823D: `get_critter_proto_flags_sfall(obj)` → proto flags bitmask on object (partial)
+- [x] New sfall opcode 0x823E: `set_critter_proto_flags_sfall(obj, flags)` → set proto flags on object (partial)
+- [x] New sfall opcode 0x823F: `get_party_count_sfall()` → current party member count
+- [x] Save schema bumped from v18 to v19; v18→v19 migration defaults `playerInjuryFlags = 0`; normalization masks to 0x1F
+- [x] Older tests (phase49–56, phase66) updated from hardcoded `toBe(18)` to `SAVE_VERSION`/dynamic
+- [x] phase67.test.ts: 35 regression tests, all passing
+
+Gate: **PASS** — all 2961 tests green, tsc clean.

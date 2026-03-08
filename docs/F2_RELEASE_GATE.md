@@ -47,7 +47,7 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **84 files, 2926 tests passed**.
+- Full regression run: `npm test` → **85 files, 2961 tests passed**.
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
 - Phase 50: critter status-flag persistence (BLK-033), active-hand tracking (BLK-034), save schema v13, sfall opcodes 0x81AE–0x81B5, checklist upgrades for proto_data/tile_is_visible/metarule_18/21/35/44/46/55/anim.
 - Phase 51: player stats/skills persisted in save schema v14 (BLK-035); sfall opcodes 0x81B6–0x81BD.
@@ -58,3 +58,4 @@ Reason:
 - Phase 56: player name/gender save schema v17 (BLK-048); XP level-up consistency (BLK-049); set_name opcode (BLK-050); sfall opcodes 0x81E0–0x81E7.
 - Phase 57–65: 49 sfall opcodes 0x81E8–0x822F; null guards BLK-051–070.
 - Phase 66: car fuel save/load schema v18 (BLK-071); tile_contains_pid_obj null-gMap guard (BLK-072); sfall opcodes 0x8230–0x8237 (object name, gender, combat round, AP, carry weight).
+- Phase 67: move_to null-gMap guard (BLK-073); rm_timer_event null-obj guard (BLK-074); player injury flags save schema v19 (BLK-075); sfall opcodes 0x8238–0x823F (radiation, poison, party, proto-flags).

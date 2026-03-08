@@ -67,8 +67,8 @@ function makePlayerObj(overrides: Record<string, any> = {}): any {
 // ===========================================================================
 
 describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
-    it('SAVE_VERSION is 18', () => {
-        expect(SAVE_VERSION).toBe(18)
+    it('SAVE_VERSION was 18 (now superseded to 19)', () => {
+        expect(SAVE_VERSION).toBe(19)
     })
 
     it('migrateSave adds playerName="Player" for saves without the field', () => {
@@ -176,7 +176,7 @@ describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
             savedMaps: { arroyo: { name: 'arroyo', objects: [], mapScript: null } },
         }
         const migrated = migrateSave(raw as any)
-        expect(migrated.version).toBe(18)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerName).toBe('Player')
         expect(migrated.playerGender).toBe('male')
     })
@@ -447,7 +447,7 @@ describe('Phase 56-E — Save schema v17 migration completeness', () => {
             savedMaps: { arroyo: { name: 'arroyo', objects: [], mapScript: null } },
         }
         const migrated = migrateSave(raw as any)
-        expect(migrated.version).toBe(18)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerPerksOwed).toBe(0) // from v16
         expect(migrated.playerName).toBe('Player')  // from v17
         expect(migrated.playerGender).toBe('male')  // from v17
@@ -472,7 +472,7 @@ describe('Phase 56-E — Save schema v17 migration completeness', () => {
         expect(migrated.playerGender).toBe('female')
         expect(migrated.playerPerksOwed).toBe(2)
         expect(migrated.carFuel).toBe(0) // from v18 migration
-        expect(migrated.version).toBe(18)
+        expect(migrated.version).toBe(SAVE_VERSION)
     })
 })
 

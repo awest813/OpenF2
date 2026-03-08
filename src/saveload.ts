@@ -128,6 +128,18 @@ function applyExtraSaveState(save: SaveGame): void {
     }
     // BLK-071: Restore car fuel level so the vehicle remains fueled after reload.
     globalState.carFuel = typeof save.carFuel === 'number' ? save.carFuel : 0
+    // BLK-075: Restore player injury flags so crippled limbs survive reload.
+    // Bit mapping: 0x01=crippledLeftLeg, 0x02=crippledRightLeg,
+    //              0x04=crippledLeftArm, 0x08=crippledRightArm, 0x10=blinded.
+    if (globalState.player && typeof save.playerInjuryFlags === 'number') {
+        const flags = save.playerInjuryFlags
+        const p = globalState.player as any
+        p.crippledLeftLeg = !!(flags & 0x01)
+        p.crippledRightLeg = !!(flags & 0x02)
+        p.crippledLeftArm = !!(flags & 0x04)
+        p.crippledRightArm = !!(flags & 0x08)
+        p.blinded = !!(flags & 0x10)
+    }
 }
 
 // Saving and loading support
@@ -353,6 +365,20 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // BLK-071: Snapshot car fuel level so the vehicle remains fueled after reload.
     // The car is acquired mid-game and its fuel is managed by sfall opcodes 0x8229/0x822A.
     save.carFuel = globalState.carFuel ?? 0
+
+    // BLK-075: Snapshot player injury flags so crippled limbs survive reload.
+    // Bit mapping: 0x01=crippledLeftLeg, 0x02=crippledRightLeg,
+    //              0x04=crippledLeftArm, 0x08=crippledRightArm, 0x10=blinded.
+    if (globalState.player) {
+        const p = globalState.player as any
+        let injuryFlags = 0
+        if (p.crippledLeftLeg) injuryFlags |= 0x01
+        if (p.crippledRightLeg) injuryFlags |= 0x02
+        if (p.crippledLeftArm) injuryFlags |= 0x04
+        if (p.crippledRightArm) injuryFlags |= 0x08
+        if (p.blinded) injuryFlags |= 0x10
+        save.playerInjuryFlags = injuryFlags
+    }
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(

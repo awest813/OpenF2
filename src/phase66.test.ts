@@ -47,8 +47,8 @@ afterEach(() => {
 // ===========================================================================
 
 describe('Phase 66-A — BLK-071: carFuel save schema v18 migration', () => {
-    it('SAVE_VERSION is 18', () => {
-        expect(SAVE_VERSION).toBe(18)
+    it('SAVE_VERSION was 18 (now superseded to 19)', () => {
+        expect(SAVE_VERSION).toBe(19)
     })
 
     it('migrates a v17 save to v18 and sets carFuel = 0', () => {
@@ -75,7 +75,7 @@ describe('Phase 66-A — BLK-071: carFuel save schema v18 migration', () => {
             savedMaps: {},
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(18)
+        expect(save.version).toBe(SAVE_VERSION)
         expect(save.carFuel).toBe(0)
     })
 
@@ -89,7 +89,7 @@ describe('Phase 66-A — BLK-071: carFuel save schema v18 migration', () => {
             savedMaps: {},
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(18)
+        expect(save.version).toBe(SAVE_VERSION)
         expect(save.carFuel).toBe(0)
     })
 

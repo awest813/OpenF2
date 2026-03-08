@@ -1057,6 +1057,34 @@ export module ScriptVMBridge {
 
        // 0x8237 — get_critter_current_weight_sfall(obj): return current carried weight.
        ,0x8237: bridged("get_critter_current_weight_sfall", 1) // get_critter_current_weight(obj) → lbs
+
+       // -----------------------------------------------------------------------
+       // Phase 67 — sfall extended opcodes 0x8238–0x823F
+       // -----------------------------------------------------------------------
+
+       // 0x8238 — get_critter_radiation_sfall(obj): return radiation level.
+       ,0x8238: bridged("get_critter_radiation_sfall", 1) // get_critter_radiation(obj) → level
+
+       // 0x8239 — set_critter_radiation_sfall(obj, val): set radiation level (absolute).
+       ,0x8239: bridged("set_critter_radiation_sfall", 2, false) // set_critter_radiation(obj, val)
+
+       // 0x823A — get_critter_poison_sfall(obj): return poison level.
+       ,0x823A: bridged("get_critter_poison_sfall", 1) // get_critter_poison(obj) → level
+
+       // 0x823B — set_critter_poison_sfall(obj, val): set poison level (absolute).
+       ,0x823B: bridged("set_critter_poison_sfall", 2, false) // set_critter_poison(obj, val)
+
+       // 0x823C — critter_in_party_sfall(obj): return 1 if critter is in party.
+       ,0x823C: bridged("critter_in_party_sfall", 1) // critter_in_party(obj) → 0|1
+
+       // 0x823D — get_critter_proto_flags_sfall(obj): return proto flags bitmask.
+       ,0x823D: bridged("get_critter_proto_flags_sfall", 1) // get_critter_proto_flags(obj) → flags
+
+       // 0x823E — set_critter_proto_flags_sfall(obj, flags): set proto flags.
+       ,0x823E: bridged("set_critter_proto_flags_sfall", 2, false) // set_critter_proto_flags(obj, flags)
+
+       // 0x823F — get_party_count_sfall(): return party member count.
+       ,0x823F: bridged("get_party_count_sfall", 0) // get_party_count() → count
     }
     Object.assign(opMap, bridgeOpMap)
 
