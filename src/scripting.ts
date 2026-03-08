@@ -2368,6 +2368,12 @@ export module Scripting {
         destroy_object(obj: Obj) {
             // destroy object from world
             log('destroy_object', arguments)
+            // BLK-069: Guard against null gMap and null obj to prevent crashes when
+            // scripts destroy objects during map transitions or test runs.
+            if (!globalState.gMap || !obj) {
+                warn('destroy_object: gMap or obj is null — skipping', undefined, this)
+                return
+            }
             globalState.gMap.destroyObject(obj)
         }
         set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, rotation: number) {
@@ -4604,6 +4610,98 @@ export module Scripting {
             }
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 64 — sfall extended opcodes 0x8220–0x8227
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8220 — get_cursor_mode_sfall():
+        // Return the current cursor mode index.
+        // Browser build: no cursor mode state; returns 0 (default/action cursor).
+        get_cursor_mode_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x8221 — set_cursor_mode_sfall(mode):
+        // Set the current cursor mode.
+        // Browser build: no-op; cursor mode is handled by the HTML/CSS layer.
+        set_cursor_mode_sfall(mode: number): void {
+            // no-op in browser build
+        }
+
+        // sfall 0x8222 — set_flags_sfall(obj, flags):
+        // Set the extended flags word on an object.
+        // BLK-070: Companion to get_flags_sfall() (Phase 61 0x8207); allows scripts
+        // to persistently modify object flags (used by combat AI and item-state scripts).
+        // Writes directly to obj.flags to match get_flags_sfall's read location.
+        set_flags_sfall(obj: Obj, flags: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_flags_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).flags = flags
+        }
+
+        // sfall 0x8223 — critter_skill_level_sfall(obj, skillId):
+        // Return the effective (modified) skill value for a critter.
+        // Reads the skill via getSkill which applies tag-bonuses and SPECIAL modifiers.
+        critter_skill_level_sfall(obj: Obj, skillId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_skill_level_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const skillName = skillNumToName[skillId]
+            if (!skillName) {
+                warn('critter_skill_level_sfall: unknown skill id ' + skillId, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getSkill(skillName) ?? 0
+        }
+
+        // sfall 0x8224 — get_active_weapon_sfall(obj):
+        // Return the object currently wielded in the critter's active hand.
+        // Returns 0 when no weapon is equipped.
+        get_active_weapon_sfall(obj: Obj): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_active_weapon_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const activeHand = (critter as any).activeHand ?? 0
+            const weapon = activeHand === 1
+                ? ((critter as any).leftHand ?? (critter as any).rightHand)
+                : ((critter as any).rightHand ?? (critter as any).leftHand)
+            return weapon ?? 0
+        }
+
+        // sfall 0x8225 — get_inven_ap_cost_sfall(obj, item):
+        // Return the AP cost to use an item from inventory on a target.
+        // Browser build: returns 0 (AP costs are handled by the UI/combat layer).
+        get_inven_ap_cost_sfall(obj: Obj, item: Obj): number {
+            return 0
+        }
+
+        // sfall 0x8226 — obj_can_see_tile_sfall(obj, tileNum):
+        // Return 1 if the critter can see the given tile (LOS check).
+        // Browser build: returns 1 when distance is ≤ perception×5 (simplified LOS).
+        obj_can_see_tile_sfall(obj: Obj, tileNum: number): number {
+            if (!isGameObject(obj) || !obj.position) return 0
+            const dest = fromTileNum(tileNum)
+            if (!dest) return 0
+            const dist = hexDistance(obj.position, dest)
+            const per = isGameObject(obj) && obj.type === 'critter'
+                ? (obj as Critter).getStat('PER')
+                : 5
+            return dist <= per * 5 ? 1 : 0
+        }
+
+        // sfall 0x8227 — get_map_enter_position_sfall(type):
+        // Return a map-entry position value.
+        // type=0: tile, type=1: elevation, type=2: rotation
+        // Browser build: returns -1 (no saved map-entry position).
+        get_map_enter_position_sfall(type: number): number {
+            return -1
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -4925,8 +5023,6 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
 
-        // TODO: script_overrides
-
         // hack so that the procedure is allowed to finish before
         // we actually terminate combat
         var doTerminate: any = false // did combat_p_proc terminate combat?
@@ -4942,7 +5038,11 @@ export module Scripting {
             Script.prototype.terminate_combat.call(obj._script) // call original
         }
 
-        return doTerminate
+        // BLK-068: Return true when either terminate_combat was requested OR when
+        // script_overrides() was called by combat_p_proc.  In Fallout 2, calling
+        // script_overrides() inside combat_p_proc tells the engine to skip the
+        // default AI combat processing for this critter's turn.
+        return doTerminate || obj._script._didOverride
     }
 
     export function updateMap(mapScript: Script, objects: Obj[], elevation: number) {

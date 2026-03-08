@@ -973,6 +973,34 @@ export module ScriptVMBridge {
 
        // 0x821F — mark_area_known_sfall(areaID, markState): mark world-map area.
        ,0x821F: bridged("mark_area_known_sfall", 2, false) // mark_area_known(areaID, state)
+
+       // -----------------------------------------------------------------------
+       // Phase 64 — sfall extended opcodes 0x8220–0x8227
+       // -----------------------------------------------------------------------
+
+       // 0x8220 — get_cursor_mode_sfall(): return current cursor mode.
+       ,0x8220: bridged("get_cursor_mode_sfall", 0) // get_cursor_mode() → 0
+
+       // 0x8221 — set_cursor_mode_sfall(mode): set cursor mode (no-op).
+       ,0x8221: bridged("set_cursor_mode_sfall", 1, false) // set_cursor_mode(mode)
+
+       // 0x8222 — set_flags_sfall(obj, flags): set extended flags on object.
+       ,0x8222: bridged("set_flags_sfall", 2, false) // set_flags(obj, flags)
+
+       // 0x8223 — critter_skill_level_sfall(obj, skillId): return skill level.
+       ,0x8223: bridged("critter_skill_level_sfall", 2) // critter_skill_level(obj, id) → level
+
+       // 0x8224 — get_active_weapon_sfall(obj): return active weapon object.
+       ,0x8224: bridged("get_active_weapon_sfall", 1) // get_active_weapon(obj) → obj|0
+
+       // 0x8225 — get_inven_ap_cost_sfall(obj, item): return AP cost (stub 0).
+       ,0x8225: bridged("get_inven_ap_cost_sfall", 2) // get_inven_ap_cost(obj, item) → 0
+
+       // 0x8226 — obj_can_see_tile_sfall(obj, tileNum): LOS check to tile.
+       ,0x8226: bridged("obj_can_see_tile_sfall", 2) // obj_can_see_tile(obj, tile) → 0|1
+
+       // 0x8227 — get_map_enter_position_sfall(type): return map-entry position.
+       ,0x8227: bridged("get_map_enter_position_sfall", 1) // get_map_enter_position(type) → -1
     }
     Object.assign(opMap, bridgeOpMap)
 

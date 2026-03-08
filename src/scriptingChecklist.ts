@@ -4463,6 +4463,126 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 64 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-068: combatEvent script_overrides detection
+    {
+        id: 'blk_068_combat_event_override_detection',
+        kind: 'procedure',
+        description:
+            'BLK-068: Scripting.combatEvent() now returns true when script_overrides() ' +
+            'is called in combat_p_proc (in addition to terminate_combat).  This allows ' +
+            'scripted NPC combat turns to suppress the default AI processing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-069: destroy_object null guard
+    {
+        id: 'blk_069_destroy_object_null_guard',
+        kind: 'procedure',
+        description:
+            'BLK-069: destroy_object(obj) now guards against null gMap and null obj, ' +
+            'logging a warning instead of crashing during map transitions.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-070: set_flags_sfall
+    {
+        id: 'blk_070_set_flags_sfall',
+        kind: 'opcode',
+        description:
+            'BLK-070: set_flags_sfall(obj, flags) now writes the flags value to ' +
+            'obj.pro.extra.flags, making it persistent and readable by get_flags_sfall().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8220-0x8227
+    {
+        id: 'sfall_get_cursor_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x8220: get_cursor_mode_sfall() — return cursor mode (0 in browser).',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_cursor_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x8221: set_cursor_mode_sfall(mode) — set cursor mode (no-op in browser).',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x8222: set_flags_sfall(obj, flags) — set extended flags on object. ' +
+            'Writes to obj.pro.extra.flags.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_critter_skill_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x8223: critter_skill_level_sfall(obj, skillId) — return effective ' +
+            'skill level for a critter via getSkill().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_active_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x8224: get_active_weapon_sfall(obj) — return the object in the ' +
+            'critter\'s active hand (rightHand or leftHand).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_inven_ap_cost',
+        kind: 'opcode',
+        description:
+            'sfall 0x8225: get_inven_ap_cost_sfall(obj, item) — return AP cost (stub 0).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_can_see_tile',
+        kind: 'opcode',
+        description:
+            'sfall 0x8226: obj_can_see_tile_sfall(obj, tileNum) — return 1 if critter ' +
+            'can see tile (distance ≤ PER×5).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_map_enter_position',
+        kind: 'opcode',
+        description:
+            'sfall 0x8227: get_map_enter_position_sfall(type) — return map entry ' +
+            'position value.  Browser build: returns -1.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
