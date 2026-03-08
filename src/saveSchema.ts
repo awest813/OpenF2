@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 17
+export const SAVE_VERSION = 18
 
 export interface SaveGame {
     id?: number
@@ -245,6 +245,17 @@ export interface SaveGame {
      */
     playerGender?: string
 
+    /**
+     * Car fuel level managed by sfall get/set_car_fuel_amount opcodes (added in v18 / BLK-071).
+     *
+     * The in-game car becomes drivable mid-game (after Gecko/Vault City) and its
+     * fuel is set/read by world-map scripts.  Without persistence the fuel resets
+     * to 0 on every reload, rendering the car useless after the first session.
+     *
+     * Clamped to [0, 80 000] (sfall max).  Defaults to 0 for saves that predate v18.
+     */
+    carFuel?: number
+
     player: {
         position: Point
         orientation: number
@@ -399,6 +410,14 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerGender === undefined) save.playerGender = 'male'
             save.version = 17
             // falls through
+        case 17:
+            // v17 → v18: add car fuel level (BLK-071).
+            // Old saves default to 0 (empty tank) so the car has no fuel after
+            // migration.  Players who had fuel before must refuel; this is safe
+            // because the car was not fully drivable in pre-v18 builds anyway.
+            if (save.carFuel === undefined) save.carFuel = 0
+            save.version = 18
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -461,6 +480,12 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // Normalize playerGender: must be 'male' or 'female'; fall back to 'male'.
     if (save.playerGender !== 'male' && save.playerGender !== 'female') {
         save.playerGender = 'male'
+    }
+    // Normalize carFuel (BLK-071): must be a finite non-negative integer, clamped to [0, 80000].
+    if (typeof save.carFuel !== 'number' || !Number.isFinite(save.carFuel)) {
+        save.carFuel = 0
+    } else {
+        save.carFuel = Math.max(0, Math.min(80000, Math.floor(save.carFuel)))
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

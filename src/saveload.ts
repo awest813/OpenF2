@@ -126,6 +126,8 @@ function applyExtraSaveState(save: SaveGame): void {
     if (globalState.player && (save.playerGender === 'male' || save.playerGender === 'female')) {
         ;(globalState.player as any).gender = save.playerGender
     }
+    // BLK-071: Restore car fuel level so the vehicle remains fueled after reload.
+    globalState.carFuel = typeof save.carFuel === 'number' ? save.carFuel : 0
 }
 
 // Saving and loading support
@@ -347,6 +349,10 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         save.playerName = globalState.player.name ?? 'Player'
         save.playerGender = (globalState.player as any).gender ?? 'male'
     }
+
+    // BLK-071: Snapshot car fuel level so the vehicle remains fueled after reload.
+    // The car is acquired mid-game and its fuel is managed by sfall opcodes 0x8229/0x822A.
+    save.carFuel = globalState.carFuel ?? 0
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     console.log(

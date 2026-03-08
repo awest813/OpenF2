@@ -1029,6 +1029,34 @@ export module ScriptVMBridge {
 
        // 0x822F — get_tile_pid_at_sfall(tileNum, elevation): return PID at tile.
        ,0x822F: bridged("get_tile_pid_at_sfall", 2) // get_tile_pid_at(tile, elev) → pid
+
+       // -----------------------------------------------------------------------
+       // Phase 66 — sfall extended opcodes 0x8230–0x8237
+       // -----------------------------------------------------------------------
+
+       // 0x8230 — get_object_name_sfall(obj): return display name of any object.
+       ,0x8230: bridged("get_object_name_sfall", 1) // get_object_name(obj) → name
+
+       // 0x8231 — get_critter_gender_sfall(obj): return critter gender (0=male,1=female).
+       ,0x8231: bridged("get_critter_gender_sfall", 1) // get_critter_gender(obj) → 0|1
+
+       // 0x8232 — get_combat_round_sfall(): return current combat round (0 outside combat).
+       ,0x8232: bridged("get_combat_round_sfall", 0) // get_combat_round() → round
+
+       // 0x8233 — get_critter_action_points_sfall(obj): return critter AP.
+       ,0x8233: bridged("get_critter_action_points_sfall", 1) // get_critter_ap(obj) → ap
+
+       // 0x8234 — set_critter_action_points_sfall(obj, ap): set critter AP.
+       ,0x8234: bridged("set_critter_action_points_sfall", 2, false) // set_critter_ap(obj, ap)
+
+       // 0x8235 — get_critter_max_ap_sfall(obj): return critter max AP per turn.
+       ,0x8235: bridged("get_critter_max_ap_sfall", 1) // get_critter_max_ap(obj) → max_ap
+
+       // 0x8236 — get_critter_carry_weight_sfall(obj): return carry weight capacity.
+       ,0x8236: bridged("get_critter_carry_weight_sfall", 1) // get_critter_carry_weight(obj) → lbs
+
+       // 0x8237 — get_critter_current_weight_sfall(obj): return current carried weight.
+       ,0x8237: bridged("get_critter_current_weight_sfall", 1) // get_critter_current_weight(obj) → lbs
     }
     Object.assign(opMap, bridgeOpMap)
 

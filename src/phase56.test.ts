@@ -67,8 +67,8 @@ function makePlayerObj(overrides: Record<string, any> = {}): any {
 // ===========================================================================
 
 describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
-    it('SAVE_VERSION is 17', () => {
-        expect(SAVE_VERSION).toBe(17)
+    it('SAVE_VERSION is 18', () => {
+        expect(SAVE_VERSION).toBe(18)
     })
 
     it('migrateSave adds playerName="Player" for saves without the field', () => {
@@ -165,7 +165,7 @@ describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
         expect(migrated.playerGender).toBe('male')
     })
 
-    it('migrateSave from version 1 reaches v17 with playerName/playerGender defaults', () => {
+    it('migrateSave from version 1 reaches v18 with playerName/playerGender defaults', () => {
         const raw = {
             version: 1,
             name: 'ancient',
@@ -176,7 +176,7 @@ describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
             savedMaps: { arroyo: { name: 'arroyo', objects: [], mapScript: null } },
         }
         const migrated = migrateSave(raw as any)
-        expect(migrated.version).toBe(17)
+        expect(migrated.version).toBe(18)
         expect(migrated.playerName).toBe('Player')
         expect(migrated.playerGender).toBe('male')
     })
@@ -435,7 +435,7 @@ describe('Phase 56-D — sfall opcodes 0x81E0–0x81E7', () => {
 // ===========================================================================
 
 describe('Phase 56-E — Save schema v17 migration completeness', () => {
-    it('migrating from v15 reaches v17 with all expected new fields', () => {
+    it('migrating from v15 reaches v18 with all expected new fields', () => {
         const raw = {
             version: 15,
             name: 'test',
@@ -447,13 +447,13 @@ describe('Phase 56-E — Save schema v17 migration completeness', () => {
             savedMaps: { arroyo: { name: 'arroyo', objects: [], mapScript: null } },
         }
         const migrated = migrateSave(raw as any)
-        expect(migrated.version).toBe(17)
+        expect(migrated.version).toBe(18)
         expect(migrated.playerPerksOwed).toBe(0) // from v16
         expect(migrated.playerName).toBe('Player')  // from v17
         expect(migrated.playerGender).toBe('male')  // from v17
     })
 
-    it('v17 save passes through migration unchanged', () => {
+    it('v17 save migrates to v18 preserving existing fields', () => {
         const raw = {
             version: 17,
             name: 'current',
@@ -471,6 +471,8 @@ describe('Phase 56-E — Save schema v17 migration completeness', () => {
         expect(migrated.playerName).toBe('Cassidy')
         expect(migrated.playerGender).toBe('female')
         expect(migrated.playerPerksOwed).toBe(2)
+        expect(migrated.carFuel).toBe(0) // from v18 migration
+        expect(migrated.version).toBe(18)
     })
 })
 

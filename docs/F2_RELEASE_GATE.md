@@ -47,10 +47,14 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **72 files, 2546 tests passed**.
+- Full regression run: `npm test` → **84 files, 2926 tests passed**.
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
 - Phase 50: critter status-flag persistence (BLK-033), active-hand tracking (BLK-034), save schema v13, sfall opcodes 0x81AE–0x81B5, checklist upgrades for proto_data/tile_is_visible/metarule_18/21/35/44/46/55/anim.
 - Phase 51: player stats/skills persisted in save schema v14 (BLK-035); sfall opcodes 0x81B6–0x81BD.
 - Phase 52: metarule3(106) elevation-aware (BLK-036); tile_contains_obj_pid elevation-aware (BLK-037); sfall opcodes 0x81BE–0x81C5 (BLK-038).
 - Phase 53: NPC weapon slot save/restore (BLK-039); AI dead-target guard (BLK-040); sfall opcodes 0x81C6–0x81CF.
 - Phase 54: XP on kill (BLK-041); player weapon slot save/load schema v15 (BLK-042); skill points on level-up (BLK-043); inven_unwield activeHand (BLK-044); sfall opcodes 0x81D0–0x81D7.
+- Phase 55: player armor save/load schema v16 (BLK-045); perk owed tracking (BLK-047); sfall opcodes 0x81D8–0x81DF.
+- Phase 56: player name/gender save schema v17 (BLK-048); XP level-up consistency (BLK-049); set_name opcode (BLK-050); sfall opcodes 0x81E0–0x81E7.
+- Phase 57–65: 49 sfall opcodes 0x81E8–0x822F; null guards BLK-051–070.
+- Phase 66: car fuel save/load schema v18 (BLK-071); tile_contains_pid_obj null-gMap guard (BLK-072); sfall opcodes 0x8230–0x8237 (object name, gender, combat round, AP, carry weight).
