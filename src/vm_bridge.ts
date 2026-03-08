@@ -1085,6 +1085,34 @@ export module ScriptVMBridge {
 
        // 0x823F — get_party_count_sfall(): return party member count.
        ,0x823F: bridged("get_party_count_sfall", 0) // get_party_count() → count
+
+       // -----------------------------------------------------------------------
+       // Phase 68 — sfall extended opcodes 0x8240–0x8247
+       // -----------------------------------------------------------------------
+
+       // 0x8240 — get_critter_damage_type_sfall(obj): return default damage type.
+       ,0x8240: bridged("get_critter_damage_type_sfall", 1) // get_critter_damage_type(obj) → type
+
+       // 0x8241 — set_critter_damage_type_sfall(obj, type): set damage type.
+       ,0x8241: bridged("set_critter_damage_type_sfall", 2, false) // set_critter_damage_type(obj, type)
+
+       // 0x8242 — get_combat_free_move_sfall(): return free tile-move count this turn.
+       ,0x8242: bridged("get_combat_free_move_sfall", 0) // get_combat_free_move() → tiles
+
+       // 0x8243 — set_combat_free_move_sfall(obj, tiles): set free tile-moves for critter.
+       ,0x8243: bridged("set_combat_free_move_sfall", 2, false) // set_combat_free_move(obj, tiles)
+
+       // 0x8244 — get_base_stat_sfall(obj, stat_id): return base stat value.
+       ,0x8244: bridged("get_base_stat_sfall", 2) // get_base_stat(obj, stat_id) → value
+
+       // 0x8245 — set_base_stat_sfall(obj, stat_id, value): set base stat value.
+       ,0x8245: bridged("set_base_stat_sfall", 3, false) // set_base_stat(obj, stat_id, value)
+
+       // 0x8246 — get_game_difficulty_sfall(): return game difficulty (0=easy,1=normal,2=hard).
+       ,0x8246: bridged("get_game_difficulty_sfall", 0) // get_game_difficulty() → 0|1|2
+
+       // 0x8247 — get_violence_level_sfall(): return violence level (0=minimal,1=normal,2=max).
+       ,0x8247: bridged("get_violence_level_sfall", 0) // get_violence_level() → 0|1|2
     }
     Object.assign(opMap, bridgeOpMap)
 

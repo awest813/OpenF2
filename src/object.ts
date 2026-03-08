@@ -327,10 +327,15 @@ export class Obj {
         obj.type = getPROTypeName(pidType)
         obj.pid = pid
         obj.pro = pro
-        obj.flags = obj.pro.flags
+        // BLK-081: Guard against null proto data.  loadPRO() returns null when
+        // the prototype file is unavailable (e.g. in tests or for unknown PIDs).
+        // Previously the unconditional obj.pro.flags access threw a TypeError.
+        // Now safely defaults to 0 when pro is null, and skips pro-dependent
+        // fields so the object is still usable as a basic game object.
+        obj.flags = pro != null ? pro.flags : 0
 
         // TODO: Subclasses
-        if (pidType == 0) {
+        if (pidType == 0 && pro != null) {
             // item
             obj.subtype = getPROSubTypeName(pro.extra.subtype)
             obj.name = getMessage('pro_item', pro.textID)
@@ -342,7 +347,9 @@ export class Obj {
             }
         }
 
-        if (obj.pro !== undefined) {
+        // BLK-081 (cont.): use != null (covers both null and undefined) so the
+        // art fallback also triggers when pro is null (not just when it is undefined).
+        if (obj.pro != null) {
             obj.art = lookupArt(makePID(obj.pro.frmType, obj.pro.frmPID))
         } else {
             obj.art = 'art/items/RESERVED'

@@ -4902,6 +4902,183 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 68 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'blk_076_obj_can_see_obj_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-076: objCanSeeObj() null-gMap + null-position guard.  The internal ' +
+            'objCanSeeObj helper called globalState.gMap.hexLinecast() without checking ' +
+            'that gMap is non-null, and also accessed obj.position / target.position ' +
+            'without null checks.  During map transitions or before the first map loads ' +
+            'this caused an uncaught TypeError.  Now guards: if gMap or either position ' +
+            'is null, returns true (conservatively unobstructed) instead of crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_077_explosion_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-077: explosion() null-gMap guard.  explosion() called ' +
+            'globalState.gMap.addObject() and removeObject() without first checking ' +
+            'that gMap is non-null.  Any explosion triggered during a map transition ' +
+            '(e.g. an area-effect bomb in a scripted cut-scene) would throw a TypeError ' +
+            'and crash the game.  Now emits a warning and returns early when gMap is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_078_load_map_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-078: load_map() null-gMap guard.  load_map() called ' +
+            'globalState.gMap.loadMap() / loadMapByID() without checking that gMap is ' +
+            'non-null.  Scripts that call load_map() before a map has been initialized ' +
+            '(e.g. during startup or in tests) would throw a TypeError.  Now emits a ' +
+            'warning and returns early when gMap is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_079_create_object_sid_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-079: create_object_sid() null-gMap guard.  create_object_sid() called ' +
+            'globalState.gMap.addObject() without checking that gMap is non-null.  When ' +
+            'scripts create objects before a map is loaded (e.g. in map_enter_p_proc ' +
+            'before the map fully initializes) this caused a TypeError crash.  Now emits ' +
+            'a warning and returns null when gMap is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_080_save_gmap_name_null_guard',
+        kind: 'procedure',
+        description:
+            'BLK-080: save() null-gMap guard in log message.  The save() function in ' +
+            'saveload.ts accessed globalState.gMap.name in a log message without ' +
+            'checking that gMap is non-null.  Calling save() before a map is loaded ' +
+            '(e.g. in tests or during character creation) caused a TypeError crash.  ' +
+            'Now uses optional chaining: gMap?.name ?? "(none)".',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_damage_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x8240: get_critter_damage_type_sfall(obj) — return the default ' +
+            'melee damage type for a critter (0=normal, 1=laser, 2=fire, 3=plasma, ' +
+            '4=electrical, 5=EMP, 6=explosion).  Browser build: reads obj.damageType; ' +
+            'defaults to 0 (normal) when not set.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_damage_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x8241: set_critter_damage_type_sfall(obj, type) — set the default ' +
+            'melee damage type for a critter.  Stores the clamped value on obj.damageType ' +
+            'for subsequent reads.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_combat_free_move',
+        kind: 'opcode',
+        description:
+            'sfall 0x8242: get_combat_free_move_sfall() — return the number of free ' +
+            'tile-moves available this combat turn.  Browser build: returns 0 (no ' +
+            'free-move tracking; the AP model covers all movement).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_combat_free_move',
+        kind: 'opcode',
+        description:
+            'sfall 0x8243: set_combat_free_move_sfall(obj, tiles) — set free tile-moves ' +
+            'for a critter this turn.  Browser build: no-op (free-move is not tracked).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_base_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x8244: get_base_stat_sfall(obj, stat_id) — return the base ' +
+            '(unmodified) value of a SPECIAL/derived stat for any critter.  Uses the ' +
+            'numeric stat-ID mapping and reads via stats.getBase().  Returns 0 for ' +
+            'non-critters or unknown stat IDs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_base_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x8245: set_base_stat_sfall(obj, stat_id, value) — set the base ' +
+            'value of a SPECIAL/derived stat for a critter.  Uses modifyBase() to ' +
+            'apply the delta from the current base.  No-op for unknown stat IDs or ' +
+            'non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_game_difficulty',
+        kind: 'opcode',
+        description:
+            'sfall 0x8246: get_game_difficulty_sfall() — return the current game ' +
+            'difficulty setting (0=easy, 1=normal, 2=hard).  Browser build: always ' +
+            'returns 1 (normal); no difficulty system implemented.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'blk_081_obj_from_pid_null_pro_guard',
+        kind: 'procedure',
+        description:
+            'BLK-081: Obj.fromPID_() null-proto guard.  When loadPRO() cannot find a ' +
+            'prototype file for the given PID (e.g. unknown items, test environments, ' +
+            'or corrupted data files), it returns null.  The unconditional ' +
+            'obj.flags = obj.pro.flags access on the following line then threw a TypeError ' +
+            'and crashed any code path through createObjectWithPID.  Now guards: ' +
+            'obj.flags = pro != null ? pro.flags : 0, and skips pro-dependent field ' +
+            'initialization (subtype, name, invArt) when pro is null.  The object is ' +
+            'still usable for basic game-object operations.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_violence_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x8247: get_violence_level_sfall() — return the current violence level ' +
+            'setting (0=minimal, 1=normal, 2=maximum blood).  Browser build: always ' +
+            'returns 2 (maximum); no violence-level control implemented.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
