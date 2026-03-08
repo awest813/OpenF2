@@ -5079,6 +5079,151 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 69 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'blk_082_float_msg_window_performance',
+        kind: 'procedure',
+        description:
+            'BLK-082: float_msg() used window.performance.now() directly instead of ' +
+            'the typeof-guarded performance.now() pattern used by get_uptime().  In ' +
+            'Node.js test environments the window global does not exist, so every ' +
+            'float_msg() call threw a ReferenceError.  Now uses ' +
+            'typeof performance !== "undefined" ? performance.now() : 0, matching ' +
+            'the established safe-fallback pattern.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_083_tile_is_visible_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-083: tile_is_visible() accessed globalState.player.position without ' +
+            'a null guard.  When the player object exists but has not yet been placed ' +
+            'on the map (e.g. during initial script execution before map_enter_p_proc ' +
+            'completes), player.position is null and hexDistance() crashed with a ' +
+            'TypeError.  Now returns 1 (visible) when player.position is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_084_set_exit_grids_null_game_objects',
+        kind: 'procedure',
+        description:
+            'BLK-084: set_exit_grids() used the non-null assertion gameObjects! without ' +
+            'a real null guard.  Scripts that call set_exit_grids during startup or ' +
+            'before a map is loaded (when gameObjects is null) caused a TypeError ' +
+            'crash.  Now emits a warning and returns early when gameObjects is null.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_085_obj_can_hear_obj_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-085: obj_can_hear_obj() called hexDistance(a.position, b.position) ' +
+            'without checking that either position is non-null.  Objects in inventory ' +
+            'or mid-map-transition often have a null position, causing hexDistance to ' +
+            'crash.  Now guards: if either position is null, returns 0 (out of earshot) ' +
+            'instead of crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_map_limits',
+        kind: 'opcode',
+        description:
+            'sfall 0x8248: get_map_limits_sfall(which) — return the map dimension in ' +
+            'tiles (0=width, 1=height).  Fallout 2 maps are always 200×200; browser ' +
+            'build always returns 200.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_is_valid',
+        kind: 'opcode',
+        description:
+            'sfall 0x8249: obj_is_valid_sfall(obj) — return 1 if the argument is a ' +
+            'valid game object, 0 otherwise.  Used by scripts to guard against stale ' +
+            'or deleted object references before calling procedures.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_string_length',
+        kind: 'opcode',
+        description:
+            'sfall 0x824A: get_string_length_sfall(str) — return the length of a ' +
+            'string.  Returns 0 for non-string inputs.  Used by scripts doing string ' +
+            'parsing and formatting.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_char_code',
+        kind: 'opcode',
+        description:
+            'sfall 0x824B: get_char_code_sfall(str, pos) — return the UTF-16 character ' +
+            'code at zero-based position pos in str.  Returns -1 when str is not a ' +
+            'string or pos is out of range.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_string_contains',
+        kind: 'opcode',
+        description:
+            'sfall 0x824C: string_contains_sfall(haystack, needle) — return 1 if ' +
+            'haystack contains needle (case-sensitive), 0 otherwise.  Returns 0 for ' +
+            'non-string inputs.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_string_index_of',
+        kind: 'opcode',
+        description:
+            'sfall 0x824D: string_index_of_sfall(haystack, needle) — return the first ' +
+            'zero-based index of needle in haystack, or -1 if not found.  Returns -1 ' +
+            'for non-string inputs.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_script_id',
+        kind: 'opcode',
+        description:
+            'sfall 0x824E: get_object_script_id_sfall(obj) — return the numeric script ' +
+            'SID attached to an object, or -1 when the object has no script.  Used by ' +
+            'scripts to verify or compare script attachments.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_script_field',
+        kind: 'opcode',
+        description:
+            'sfall 0x824F: get_script_field_sfall(field) — read a named field from ' +
+            'the current script execution context.  Browser build: returns 0 for all ' +
+            'field queries; engine-internal script fields are not exposed.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

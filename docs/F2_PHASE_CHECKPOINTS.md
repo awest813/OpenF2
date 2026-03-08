@@ -359,3 +359,23 @@ Gate: **PASS** — all 2617 tests green, tsc clean.
 - [x] phase67.test.ts: 35 regression tests, all passing
 
 Gate: **PASS** — all 2961 tests green, tsc clean.
+
+---
+
+## Phase 69 — float_msg window guard (BLK-082), tile_is_visible null position guard (BLK-083), set_exit_grids null gameObjects guard (BLK-084), obj_can_hear_obj null position guard (BLK-085), sfall opcodes 0x8248–0x824F
+
+- [x] **BLK-082**: `float_msg()` `window.performance.now()` crash guard — `float_msg()` used `window.performance.now()` directly.  In Node.js test environments and some non-browser runtimes the `window` global does not exist, causing a ReferenceError on every call.  Now uses `typeof performance !== 'undefined' ? performance.now() : 0`, matching the safe-fallback pattern used by `get_uptime()`.
+- [x] **BLK-083**: `tile_is_visible()` null `player.position` guard — `tile_is_visible()` checked `globalState.player` but not `globalState.player.position`.  During early script execution before the player is placed on the map, `player.position` is null and `hexDistance(null, …)` crashed.  Now returns 1 (visible) when position is null.
+- [x] **BLK-084**: `set_exit_grids()` null `gameObjects` guard — `set_exit_grids()` used the TypeScript non-null assertion `gameObjects!` without a real null check.  Scripts calling it before `enterMap`/`updateMap` (when `gameObjects` is null) received a TypeError crash.  Now emits a warning and returns early when `gameObjects` is null.
+- [x] **BLK-085**: `obj_can_hear_obj()` null position guard — `obj_can_hear_obj()` called `hexDistance(a.position, b.position)` without checking that positions are non-null.  Objects in inventory or mid-map-transition have a null position.  Now returns 0 (out of earshot) when either position is null.
+- [x] New sfall opcode 0x8248: `get_map_limits_sfall(which)` → 200 (map is always 200×200)
+- [x] New sfall opcode 0x8249: `obj_is_valid_sfall(obj)` → 1 if valid game object, 0 otherwise
+- [x] New sfall opcode 0x824A: `get_string_length_sfall(str)` → length of string
+- [x] New sfall opcode 0x824B: `get_char_code_sfall(str, pos)` → char code at position
+- [x] New sfall opcode 0x824C: `string_contains_sfall(haystack, needle)` → 1 if found
+- [x] New sfall opcode 0x824D: `string_index_of_sfall(haystack, needle)` → first index or -1
+- [x] New sfall opcode 0x824E: `get_object_script_id_sfall(obj)` → numeric script SID or -1
+- [x] New sfall opcode 0x824F: `get_script_field_sfall(field)` → 0 (browser context field read)
+- [x] phase69.test.ts: regression tests for all BLK items and sfall opcodes
+
+Gate: **PASS** — all 3039 tests green, tsc clean.
