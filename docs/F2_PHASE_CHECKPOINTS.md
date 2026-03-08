@@ -379,3 +379,107 @@ Gate: **PASS** — all 2961 tests green, tsc clean.
 - [x] phase69.test.ts: regression tests for all BLK items and sfall opcodes
 
 Gate: **PASS** — all 3039 tests green, tsc clean.
+
+---
+
+## Phase 70 — canSee() null position guard (BLK-086), isWithinPerception() null position guard (BLK-087), metarule3(106) filter null position guard (BLK-088), num_critters_in_radius() null position guard (BLK-089), updateCritter() toTileNum null position guard (BLK-090), sfall opcodes 0x8250–0x8257
+
+- [x] **BLK-086**: `canSee()` null position guard — checked before hexDistance call.
+- [x] **BLK-087**: `isWithinPerception()` null position guard — checked before hexDistance call.
+- [x] **BLK-088**: `metarule3(106)` filter null position guard — objects with null position skipped.
+- [x] **BLK-089**: `num_critters_in_radius()` null position guard — objects with null position skipped.
+- [x] **BLK-090**: `updateCritter()` `toTileNum` null position guard — returns 0 when position is null.
+- [x] New sfall opcode 0x8250: `get_object_art_fid_sfall(obj)` → fid
+- [x] New sfall opcode 0x8251: `set_object_art_fid_sfall(obj, fid)` → no-op
+- [x] New sfall opcode 0x8252: `get_item_subtype_sfall(obj)` → -1|0..6
+- [x] New sfall opcode 0x8253: `get_combat_target_sfall(obj)` → obj|0
+- [x] New sfall opcode 0x8254: `set_combat_target_sfall(obj, target)` → no-op
+- [x] New sfall opcode 0x8255: `combat_is_initialized_sfall()` → 0|1
+- [x] New sfall opcode 0x8256: `get_attack_type_sfall(obj, slot)` → 0
+- [x] New sfall opcode 0x8257: `get_map_script_idx_sfall()` → -1
+- [x] phase70.test.ts: regression tests for all BLK items and sfall opcodes
+
+Gate: **PASS** — all 3083 tests green, tsc clean.
+
+---
+
+## Phase 71 — objectsAtPosition null-position guard (BLK-091), recalcPath null-position guard (BLK-092), getHitDistanceModifier null-position guard (BLK-093), doAITurn hexNeighbors null guard (BLK-094), doAITurn sort null guard (BLK-095), sfall opcodes 0x8258–0x825F
+
+- [x] **BLK-091**: `objectsAtPosition()` null position guard.
+- [x] **BLK-092**: `recalcPath()` null position guard.
+- [x] **BLK-093**: `getHitDistanceModifier()` null position guard.
+- [x] **BLK-094**: `doAITurn()` hexNeighbors null guard.
+- [x] **BLK-095**: `doAITurn()` sort null guard.
+- [x] New sfall opcode 0x8258: `get_critter_hurt_state_sfall(obj)` → bitmask
+- [x] New sfall opcode 0x8259: `set_critter_hurt_state_sfall(obj, state)` → no-op
+- [x] New sfall opcode 0x825A: `get_critter_is_fleeing_sfall(obj)` → 0|1
+- [x] New sfall opcode 0x825B: `set_critter_is_fleeing_sfall(obj, val)` → no-op
+- [x] New sfall opcode 0x825C: `get_tile_blocked_sfall(tile)` → 0|1
+- [x] New sfall opcode 0x825D: `get_critter_hit_pts_sfall(obj)` → max_hp
+- [x] New sfall opcode 0x825E: `critter_add_trait_sfall(obj, trait, val)` → no-op
+- [x] New sfall opcode 0x825F: `get_num_new_obj_sfall()` → 0
+- [x] phase71.test.ts: regression tests for all BLK items and sfall opcodes
+
+Gate: **PASS** — all 3125 tests green, tsc clean.
+
+---
+
+## Phase 72 — metarule3(105) null-position guard (BLK-096), metarule3(110) null-position guard (BLK-097), get_critter_stat null-object guard (BLK-098), party_add/party_remove null-gParty guard (BLK-099), sfall opcodes 0x8260–0x8267
+
+- [x] **BLK-096**: `metarule3(105)` null position guard.
+- [x] **BLK-097**: `metarule3(110)` null position guard.
+- [x] **BLK-098**: `get_critter_stat()` null-object guard.
+- [x] **BLK-099**: `party_add()`/`party_remove()` null-gParty guard.
+- [x] New sfall opcode 0x8260: `get_critter_weapon_sfall(obj, slot)` → weapon alias
+- [x] New sfall opcode 0x8261: `set_critter_weapon_sfall(obj, slot, weapon)` → no-op
+- [x] New sfall opcode 0x8262: `get_object_type_sfall(obj)` → 0|1|2|3 alias
+- [x] New sfall opcode 0x8263: `get_critter_team(obj)` → team alias
+- [x] New sfall opcode 0x8264: `set_critter_team(obj, team)` → alias
+- [x] New sfall opcode 0x8265: `get_ambient_light_sfall()` → 0..65536
+- [x] New sfall opcode 0x8266: `set_ambient_light_sfall(level)` → no-op
+- [x] New sfall opcode 0x8267: `get_map_local_var_sfall(idx)` → value
+- [x] phase72.test.ts: regression tests for all BLK items and sfall opcodes
+
+Gate: **PASS** — all 3176 tests green, tsc clean.
+
+---
+
+## Phase 73 — play_sfx() null audioEngine guard (BLK-100), walkTo() null position guard (BLK-101), walkTo() window.performance.now() guard (BLK-102), map loadMap null audioEngine guard (BLK-103), reg_anim_obj_move_to_tile null position guard (BLK-104), sfall opcodes 0x8268–0x826F
+
+- [x] **BLK-100**: `play_sfx()` null audioEngine guard.
+- [x] **BLK-101**: `walkTo()` null position guard (object.ts).
+- [x] **BLK-102**: `walkTo()` `window.performance.now()` safe fallback (object.ts).
+- [x] **BLK-103**: `loadMap()` null audioEngine guard (map.ts).
+- [x] **BLK-104**: `reg_anim_obj_move_to_tile()` null position guard.
+- [x] New sfall opcode 0x8268: `get_critter_ap_sfall(obj)` → current AP
+- [x] New sfall opcode 0x8269: `set_critter_ap_sfall(obj, ap)` → set AP
+- [x] New sfall opcode 0x826A: `get_object_flags_sfall(obj)` → flags bitmask
+- [x] New sfall opcode 0x826B: `set_object_flags_sfall(obj, flags)` → write flags
+- [x] New sfall opcode 0x826C: `critter_is_dead_sfall(obj)` → 0|1
+- [x] New sfall opcode 0x826D: `get_obj_light_level_sfall(obj)` → 0..65536
+- [x] New sfall opcode 0x826E: `set_obj_light_level_sfall(obj, level)` → clamp [0,65536]
+- [x] New sfall opcode 0x826F: `get_elevation_sfall()` → 0|1|2
+- [x] phase73.test.ts: regression tests for all BLK items and sfall opcodes
+
+Gate: **PASS** — all 3212 tests green, tsc clean.
+
+---
+
+## Phase 74 — game_time_advance() non-finite ticks guard (BLK-105), give_exp_points() non-finite XP guard (BLK-106), gsay_option() null/non-function target guard (BLK-107), critter_attempt_placement() null gMap guard (BLK-108), add_timer_event() non-positive ticks guard (BLK-109), sfall opcodes 0x8270–0x8277
+
+- [x] **BLK-105**: `game_time_advance()` non-finite ticks guard — NaN/Infinity ticks would corrupt `globalState.gameTickTime`, breaking all time-based events (timed events, drug timers, in-game clock). Now guards with `isFinite()` and returns early.
+- [x] **BLK-106**: `give_exp_points()` non-finite XP guard — NaN/Infinity XP would corrupt `player.xp`, causing the level-up while-loop comparison to always return false (NaN >= threshold is always false) and permanently prevent level-up. Now guards and returns early.
+- [x] **BLK-107**: `gsay_option()` null/non-function target guard — scripts occasionally pass 0 or a non-callable as the dialogue handler; `target.bind(this)` would throw a TypeError and abort the entire dialogue session. Now substitutes a no-op so the option still appears in the UI.
+- [x] **BLK-108**: `critter_attempt_placement()` null gMap guard — delegates to `move_to()` which calls `gMap.changeElevation()` without a null check; during map transitions this threw an uncaught TypeError. Returns -1 (placement failure) when gMap is null.
+- [x] **BLK-109**: `add_timer_event()` non-positive ticks guard — zero or negative ticks caused the event to fire on the very next `game_time_advance()` call, potentially producing re-entrant callbacks. Now clamps to a minimum of 1 tick.
+- [x] New sfall opcode 0x8270: `get_tile_at_object_sfall(obj)` → tile number or -1
+- [x] New sfall opcode 0x8271: `critter_get_flee_state_sfall(obj)` → 0|1
+- [x] New sfall opcode 0x8272: `critter_set_flee_state_sfall(obj, val)` → set isFleeing
+- [x] New sfall opcode 0x8273: `get_combat_difficulty_sfall()` → 1 (alias of 0x81EC)
+- [x] New sfall opcode 0x8274: `get_object_proto_sfall(obj)` → 0 (stub)
+- [x] New sfall opcode 0x8275: `get_critter_hit_chance_sfall(attacker, target)` → 0..100
+- [x] New sfall opcode 0x8276: `get_tile_distance_sfall(tile1, tile2)` → hex distance
+- [x] New sfall opcode 0x8277: `get_tile_in_direction_sfall(tile, dir, count)` → tile (alias of tile_num_in_direction)
+- [x] phase74.test.ts: 58 regression tests, all passing
+
+Gate: **PASS** — all 3270 tests green, tsc clean.

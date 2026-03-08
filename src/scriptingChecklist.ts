@@ -5894,6 +5894,176 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // BLK-105
+    {
+        id: 'blk_105_game_time_advance_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-105: game_time_advance() non-finite ticks guard.  Scripts that pass NaN ' +
+            'or Infinity as the tick count caused globalState.gameTickTime to become NaN, ' +
+            'silently breaking every subsequent time-based event (timed events, drug timers, ' +
+            'in-game clock display).  Now guards with isFinite() and returns early.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+
+    // BLK-106
+    {
+        id: 'blk_106_give_exp_points_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-106: give_exp_points() non-finite XP guard.  Passing NaN/Infinity as the ' +
+            'XP value corrupted player.xp so the level-up while-loop comparison always ' +
+            'returned false (NaN >= threshold is always false), permanently preventing ' +
+            'the player from levelling up.  Now guards and returns early.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'high',
+    },
+
+    // BLK-107
+    {
+        id: 'blk_107_gsay_option_non_function_target',
+        kind: 'procedure',
+        description:
+            'BLK-107: gsay_option() null/non-function target guard.  Scripts occasionally ' +
+            'pass 0 or a non-callable value as the dialogue option handler.  The unconditional ' +
+            'target.bind(this) call threw a TypeError and aborted the entire dialogue ' +
+            'session.  Now substitutes a no-op handler so the option still appears in the UI.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-108
+    {
+        id: 'blk_108_critter_attempt_placement_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-108: critter_attempt_placement() null gMap guard.  The function delegated ' +
+            'directly to move_to() without first checking globalState.gMap.  move_to() calls ' +
+            'gMap.changeElevation() unconditionally; during map transitions or in test ' +
+            'environments this threw a TypeError.  Returns -1 (placement failure) when gMap ' +
+            'is null so callers can handle gracefully.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-109
+    {
+        id: 'blk_109_add_timer_event_non_positive_ticks',
+        kind: 'procedure',
+        description:
+            'BLK-109: add_timer_event() non-positive/non-finite ticks guard.  Zero, negative, ' +
+            'NaN, or Infinity tick values caused the event to be scheduled in the past or never, ' +
+            'making it fire on the very next game_time_advance() call and potentially producing ' +
+            're-entrant callbacks.  Now clamps to a minimum of 1 tick (ticks = 1 when invalid).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x8270 — get_tile_at_object_sfall
+    {
+        id: 'sfall_get_tile_at_object',
+        kind: 'opcode',
+        description:
+            'sfall 0x8270: get_tile_at_object_sfall(obj) — return the tile number under obj, ' +
+            'or -1 when obj has no position.  Used by AI scripts that need the tile ' +
+            'coordinates of dynamic objects without converting through hex geometry.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8271 — critter_get_flee_state_sfall
+    {
+        id: 'sfall_critter_get_flee_state',
+        kind: 'opcode',
+        description:
+            'sfall 0x8271: critter_get_flee_state_sfall(obj) — return 1 if the critter is ' +
+            'currently fleeing, 0 otherwise.  Alias of the isFleeing flag.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8272 — critter_set_flee_state_sfall
+    {
+        id: 'sfall_critter_set_flee_state',
+        kind: 'opcode',
+        description:
+            'sfall 0x8272: critter_set_flee_state_sfall(obj, fleeing) — set/clear the ' +
+            'critter fleeing flag (1 = fleeing, 0 = not fleeing).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8273 — get_combat_difficulty_sfall (Phase 74 alias alias)
+    {
+        id: 'sfall_get_combat_difficulty_74',
+        kind: 'opcode',
+        description:
+            'sfall 0x8273: get_combat_difficulty_sfall() — alias opcode pointing to the same ' +
+            'implementation as 0x81EC.  Browser build always returns 1 (Normal).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8274 — get_object_proto_sfall
+    {
+        id: 'sfall_get_object_proto',
+        kind: 'opcode',
+        description:
+            'sfall 0x8274: get_object_proto_sfall(obj) — return the proto data block for ' +
+            'obj.  Browser build returns 0 (stub); full proto table not yet in VM scope.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8275 — get_critter_hit_chance_sfall
+    {
+        id: 'sfall_get_critter_hit_chance',
+        kind: 'opcode',
+        description:
+            'sfall 0x8275: get_critter_hit_chance_sfall(attacker, target) — return ' +
+            'computed hit chance (0–100).  Delegates to combat.getHitChance when in ' +
+            'combat; returns 0 otherwise.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8276 — get_tile_distance_sfall
+    {
+        id: 'sfall_get_tile_distance',
+        kind: 'opcode',
+        description:
+            'sfall 0x8276: get_tile_distance_sfall(tile1, tile2) — return hex distance ' +
+            'between two tile numbers.  Fully implemented via fromTileNum + hexDistance.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8277 — get_tile_in_direction_sfall
+    {
+        id: 'sfall_get_tile_in_direction',
+        kind: 'opcode',
+        description:
+            'sfall 0x8277: get_tile_in_direction_sfall(tile, dir, count) — return the tile ' +
+            'number reached by stepping count hexes in direction dir from tile.  Alias ' +
+            'of tile_num_in_direction().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

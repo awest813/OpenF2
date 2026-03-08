@@ -59,3 +59,12 @@ Reason:
 - Phase 57–65: 49 sfall opcodes 0x81E8–0x822F; null guards BLK-051–070.
 - Phase 66: car fuel save/load schema v18 (BLK-071); tile_contains_pid_obj null-gMap guard (BLK-072); sfall opcodes 0x8230–0x8237 (object name, gender, combat round, AP, carry weight).
 - Phase 67: move_to null-gMap guard (BLK-073); rm_timer_event null-obj guard (BLK-074); player injury flags save schema v19 (BLK-075); sfall opcodes 0x8238–0x823F (radiation, poison, party, proto-flags).
+- Phase 68: get_critter_damage_type (BLK-076–081); sfall opcodes 0x8240–0x8247 (damage type, free move, base stat, difficulty, violence).
+- Phase 69: float_msg window guard (BLK-082); tile_is_visible null position guard (BLK-083); set_exit_grids null gameObjects guard (BLK-084); obj_can_hear_obj null position guard (BLK-085); sfall opcodes 0x8248–0x824F.
+- Phase 70: canSee/isWithinPerception/metarule3(106)/num_critters_in_radius/updateCritter null position guards (BLK-086–090); sfall opcodes 0x8250–0x8257.
+- Phase 71: objectsAtPosition/recalcPath/getHitDistanceModifier/doAITurn null guards (BLK-091–095); sfall opcodes 0x8258–0x825F.
+- Phase 72: metarule3(105/110)/get_critter_stat/party_add/party_remove null guards (BLK-096–099); sfall opcodes 0x8260–0x8267.
+- Phase 73: play_sfx/walkTo/loadMap/reg_anim_obj_move_to_tile null guards (BLK-100–104); sfall opcodes 0x8268–0x826F.
+- Phase 74: game_time_advance/give_exp_points non-finite guards (BLK-105–106); gsay_option null-target guard (BLK-107); critter_attempt_placement null-gMap guard (BLK-108); add_timer_event non-positive ticks guard (BLK-109); sfall opcodes 0x8270–0x8277.
+
+**Updated gate status:** `READY` — 92 files, 3270 tests passed, tsc clean.
