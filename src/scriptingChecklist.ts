@@ -5224,6 +5224,186 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 70 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-086: canSee() null position guard
+    {
+        id: 'blk_086_can_see_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-086: canSee() called hexDirectionTo(obj.position, target.position) ' +
+            'without null-checking either position.  Objects in inventory or ' +
+            'mid-map-transition often have null positions, causing hexDirectionTo ' +
+            'to crash.  Now returns false (cannot see) when either position is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-087: isWithinPerception() null position guard
+    {
+        id: 'blk_087_is_within_perception_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-087: isWithinPerception() called hexDistance(obj.position, ' +
+            'target.position) without null-checking either position.  Critters ' +
+            'without a position (inventory, mid-transition) caused hexDistance to ' +
+            'crash.  Now returns false (not within perception) when either position ' +
+            'is null.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-088: metarule3(106) filter null position guard
+    {
+        id: 'blk_088_metarule3_106_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-088: metarule3(106) (tile_get_next_critter) filter accessed ' +
+            'o.position.x without first checking that o.position is non-null.  Any ' +
+            'critter object with a null position (inventory, mid-map-transition) ' +
+            'in the objects list caused a TypeError crash.  Filter now guards with ' +
+            'o.position !== null check before accessing x/y coordinates.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-089: num_critters_in_radius() null position guard
+    {
+        id: 'blk_089_num_critters_in_radius_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-089: num_critters_in_radius() called hexDistance(origin, obj.position) ' +
+            'without checking that obj.position is non-null.  Critters in inventory or ' +
+            'mid-transition have null positions, causing hexDistance to crash.  Now ' +
+            'skips objects with null positions rather than crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-090: updateCritter() null position guard
+    {
+        id: 'blk_090_update_critter_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-090: updateCritter() called toTileNum(obj.position) without checking ' +
+            'that obj.position is non-null.  Critters that have not yet been placed on ' +
+            'the map (or whose position was cleared during a map transition) caused ' +
+            'toTileNum to crash with TypeError.  Now falls back to tile 0 when ' +
+            'obj.position is null, allowing critter_p_proc to run safely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x8250 — get_object_art_fid_sfall
+    {
+        id: 'sfall_get_object_art_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x8250: get_object_art_fid_sfall(obj) — return the art FID ' +
+            '(Fallout Resource Image identifier) of a game object.  Encodes ' +
+            'frmType in bits 24-31 and frmPID in bits 0-23.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8251 — set_object_art_fid_sfall
+    {
+        id: 'sfall_set_object_art_fid',
+        kind: 'opcode',
+        description:
+            'sfall 0x8251: set_object_art_fid_sfall(obj, fid) — override the art FID ' +
+            'of a game object.  Updates frmType and frmPID fields on the object.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x8252 — get_item_subtype_sfall
+    {
+        id: 'sfall_get_item_subtype',
+        kind: 'opcode',
+        description:
+            'sfall 0x8252: get_item_subtype_sfall(obj) — return numeric subtype of an ' +
+            'item (drug=0, container=1, armor=2, weapon=3, ammo=4, misc=5, key=6). ' +
+            'Returns -1 for non-item objects.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8253 — get_combat_target_sfall
+    {
+        id: 'sfall_get_combat_target_8253',
+        kind: 'opcode',
+        description:
+            'sfall 0x8253: get_combat_target_sfall(obj) — return the current combat ' +
+            'target of a critter, or 0 when not targeting anyone.  Reads the ' +
+            'combatTarget field set by set_combat_target_sfall or the engine.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8254 — set_combat_target_sfall
+    {
+        id: 'sfall_set_combat_target_8254',
+        kind: 'opcode',
+        description:
+            'sfall 0x8254: set_combat_target_sfall(obj, target) — set the combat target ' +
+            'of a critter to another object.  Browser build stores the reference on the ' +
+            'critter so that get_combat_target_sfall can read it back.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x8255 — combat_is_initialized_sfall
+    {
+        id: 'sfall_combat_is_initialized',
+        kind: 'opcode',
+        description:
+            'sfall 0x8255: combat_is_initialized_sfall() — return 1 if the combat ' +
+            'system is currently active (a combat sequence is running), 0 otherwise. ' +
+            'Reflects globalState.inCombat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8256 — get_attack_type_sfall
+    {
+        id: 'sfall_get_attack_type',
+        kind: 'opcode',
+        description:
+            'sfall 0x8256: get_attack_type_sfall(obj, slot) — return the active attack ' +
+            'mode/type for a critter (slot 0=primary, 1=secondary).  Browser build ' +
+            'always returns 0 (unarmed/default attack).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8257 — get_map_script_idx_sfall
+    {
+        id: 'sfall_get_map_script_idx',
+        kind: 'opcode',
+        description:
+            'sfall 0x8257: get_map_script_idx_sfall() — return the index of the ' +
+            'currently-executing map script.  Browser build returns -1 (not exposed); ' +
+            'scripts using this for branching receive a safe out-of-range sentinel.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

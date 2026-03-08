@@ -1141,6 +1141,34 @@ export module ScriptVMBridge {
 
        // 0x824F — get_script_field_sfall(field): return 0 (browser context field read).
        ,0x824F: bridged("get_script_field_sfall", 1) // get_script_field(field) → 0
+
+       // -----------------------------------------------------------------------
+       // Phase 70 — sfall extended opcodes 0x8250–0x8257
+       // -----------------------------------------------------------------------
+
+       // 0x8250 — get_object_art_fid_sfall(obj): return FID of game object.
+       ,0x8250: bridged("get_object_art_fid_sfall", 1) // get_object_art_fid(obj) → fid
+
+       // 0x8251 — set_object_art_fid_sfall(obj, fid): set art FID on game object.
+       ,0x8251: bridged("set_object_art_fid_sfall", 2, false) // set_object_art_fid(obj, fid)
+
+       // 0x8252 — get_item_subtype_sfall(obj): return item subtype index (-1 for non-items).
+       ,0x8252: bridged("get_item_subtype_sfall", 1) // get_item_subtype(obj) → -1|0..6
+
+       // 0x8253 — get_combat_target_sfall(obj): return combat target critter or 0.
+       ,0x8253: bridged("get_combat_target_sfall", 1) // get_combat_target(obj) → obj|0
+
+       // 0x8254 — set_combat_target_sfall(obj, target): set combat target for critter.
+       ,0x8254: bridged("set_combat_target_sfall", 2, false) // set_combat_target(obj, target)
+
+       // 0x8255 — combat_is_initialized_sfall(): return 1 if in combat, 0 otherwise.
+       ,0x8255: bridged("combat_is_initialized_sfall", 0) // combat_is_initialized() → 0|1
+
+       // 0x8256 — get_attack_type_sfall(obj, slot): return attack type for critter slot.
+       ,0x8256: bridged("get_attack_type_sfall", 2) // get_attack_type(obj, slot) → 0
+
+       // 0x8257 — get_map_script_idx_sfall(): return current map script index or -1.
+       ,0x8257: bridged("get_map_script_idx_sfall", 0) // get_map_script_idx() → -1
     }
     Object.assign(opMap, bridgeOpMap)
 

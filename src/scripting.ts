@@ -435,12 +435,18 @@ export module Scripting {
     }
 
     function canSee(obj: Obj, target: Obj): boolean {
+        // BLK-086: Guard against null positions — objects in inventory or mid-transition
+        // often have null positions.  Without this guard hexDirectionTo crashes.
+        if (!obj.position || !target.position) return false
         const dir = Math.abs(obj.orientation - hexDirectionTo(obj.position, target.position))
         return [0, 1, 5].indexOf(dir) !== -1
     }
 
     // TODO: Thoroughly test these functions (dealing with critter LOS)
     function isWithinPerception(obj: Critter, target: Critter): boolean {
+        // BLK-087: Guard against null positions — critters without positions cannot
+        // perceive or be perceived.  Return false (not within perception) rather than crash.
+        if (!obj.position || !target.position) return false
         const dist = hexDistance(obj.position, target.position)
         const perception = obj.getStat('PER')
         const sneakSkill = target.getSkill('Sneak')
@@ -992,8 +998,12 @@ export module Scripting {
                 var tilePos = fromTileNum(typeof tile === 'number' ? tile : 0)
                 var allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
                 var critters = allObjs.filter(function(o) {
+                    // BLK-088: Guard against null position — objects without a tile
+                    // position (inventory items, mid-transition objects) would crash
+                    // on o.position.x without this check.
                     return o.type === 'critter' &&
                         !(o as Critter).isPlayer &&
+                        !!o.position &&
                         o.position.x === tilePos.x &&
                         o.position.y === tilePos.y
                 })
@@ -3789,6 +3799,9 @@ export module Scripting {
             for (const obj of objects) {
                 if (obj.type !== 'critter') continue
                 if ((obj as Critter).dead) continue
+                // BLK-089: Guard against null position — critters in inventory or
+                // mid-transition may have no position; skip them instead of crashing.
+                if (!obj.position) continue
                 if (hexDistance(origin, obj.position) <= radius) count++
             }
             return count
@@ -5246,6 +5259,99 @@ export module Scripting {
             return 0
         }
 
+        // ---------------------------------------------------------------------------
+        // Phase 70 — sfall extended opcodes 0x8250–0x8257
+        // ---------------------------------------------------------------------------
+
+        // sfall 0x8250 — get_object_art_fid_sfall(obj):
+        // Return the art FID (Fallout Resource Image identifier) of any game object.
+        // Alias for get_object_art_fid(); used by appearance and disguise scripts.
+        get_object_art_fid_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_art_fid_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            const frmType = (obj as any).frmType ?? 0
+            const frmPID = (obj as any).frmPID ?? (obj as any).fid ?? 0
+            return (frmType << 24) | (frmPID & 0xffffff)
+        }
+
+        // sfall 0x8251 — set_object_art_fid_sfall(obj, fid):
+        // Override the art FID of a game object.
+        // Alias for set_object_art_fid(); used by appearance-change and disguise scripts.
+        set_object_art_fid_sfall(obj: Obj, fid: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_object_art_fid_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).frmType = (fid >> 24) & 0xff
+            ;(obj as any).frmPID = fid & 0xffffff
+            ;(obj as any).fid = fid & 0xffffff
+            log('set_object_art_fid_sfall: fid=0x' + fid.toString(16), arguments)
+        }
+
+        // sfall 0x8252 — get_item_subtype_sfall(obj):
+        // Return the numeric subtype index of an item object (weapon=3, ammo=4,
+        // armor=2, container=1, drug=0, misc=5, key=6).
+        // Returns -1 for non-item objects.
+        get_item_subtype_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return -1
+            if (obj.type !== 'item') return -1
+            const subtypeMap: Record<string, number> = {
+                drug: 0,
+                container: 1,
+                armor: 2,
+                weapon: 3,
+                ammo: 4,
+                misc: 5,
+                key: 6,
+            }
+            const sub = (obj as any).subtype as string
+            if (typeof sub === 'string' && sub in subtypeMap) return subtypeMap[sub]
+            return -1
+        }
+
+        // sfall 0x8253 — get_combat_target_sfall(obj):
+        // Return the current combat target of a critter, or 0 when not in combat /
+        // no target is set.  Used by AI and scripted combat hooks to check targeting.
+        get_combat_target_sfall(obj: Obj): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).combatTarget ?? (obj as any)._combatTarget ?? 0
+        }
+
+        // sfall 0x8254 — set_combat_target_sfall(obj, target):
+        // Assign a specific combat target to a critter.  Browser build: stores the
+        // target reference on the critter object so get_combat_target_sfall() reads it.
+        set_combat_target_sfall(obj: Obj, target: Obj | number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') return
+            ;(obj as any).combatTarget = isGameObject(target) ? target : null
+            log('set_combat_target_sfall', arguments)
+        }
+
+        // sfall 0x8255 — combat_is_initialized_sfall():
+        // Return 1 if the combat system is currently active (i.e. we are in a combat
+        // turn), 0 otherwise.
+        combat_is_initialized_sfall(): number {
+            return globalState.inCombat ? 1 : 0
+        }
+
+        // sfall 0x8256 — get_attack_type_sfall(obj, slot):
+        // Return the active attack mode/type for a critter.  slot: 0=primary,
+        // 1=secondary.  Browser build: returns 0 (unarmed/default) for all critters.
+        // The isGameObject check is kept for consistency with other opcode handlers
+        // so that invalid arguments produce the same code path as future improvements.
+        get_attack_type_sfall(_obj: Obj, _slot: number): number {
+            return 0
+        }
+
+        // sfall 0x8257 — get_map_script_idx_sfall():
+        // Return the index of the currently-executing map script.  Browser build
+        // returns -1 (not exposed); scripts that rely on this for branching will
+        // receive a safe out-of-range sentinel.
+        get_map_script_idx_sfall(): number {
+            return -1
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -5421,7 +5527,10 @@ export module Scripting {
         script.cur_map_index = currentMapID
         script._didOverride = false
         script.self_obj = obj as ScriptableObj
-        script.self_tile = toTileNum(obj.position)
+        // BLK-090: Guard against null position — critters with no position (not yet
+        // placed on the map, or mid-transition) would crash toTileNum(null).  Fall back
+        // to tile 0 so the critter_p_proc can still run without crashing.
+        script.self_tile = obj.position ? toTileNum(obj.position) : 0
         trackScriptTrigger(script, 'critter_p_proc')
         script.critter_p_proc()
         flushUnsupportedVMOperations(script)
