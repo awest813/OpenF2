@@ -1113,6 +1113,34 @@ export module ScriptVMBridge {
 
        // 0x8247 — get_violence_level_sfall(): return violence level (0=minimal,1=normal,2=max).
        ,0x8247: bridged("get_violence_level_sfall", 0) // get_violence_level() → 0|1|2
+
+       // -----------------------------------------------------------------------
+       // Phase 69 — sfall extended opcodes 0x8248–0x824F
+       // -----------------------------------------------------------------------
+
+       // 0x8248 — get_map_limits_sfall(which): return map width (which=0) or height (which=1).
+       ,0x8248: bridged("get_map_limits_sfall", 1) // get_map_limits(which) → 200
+
+       // 0x8249 — obj_is_valid_sfall(obj): return 1 if obj is a valid game object.
+       ,0x8249: bridged("obj_is_valid_sfall", 1) // obj_is_valid(obj) → 0|1
+
+       // 0x824A — get_string_length_sfall(str): return length of string.
+       ,0x824A: bridged("get_string_length_sfall", 1) // get_string_length(str) → length
+
+       // 0x824B — get_char_code_sfall(str, pos): return char code at pos.
+       ,0x824B: bridged("get_char_code_sfall", 2) // get_char_code(str, pos) → code|-1
+
+       // 0x824C — string_contains_sfall(haystack, needle): 1 if found.
+       ,0x824C: bridged("string_contains_sfall", 2) // string_contains(hay, needle) → 0|1
+
+       // 0x824D — string_index_of_sfall(haystack, needle): first index or -1.
+       ,0x824D: bridged("string_index_of_sfall", 2) // string_index_of(hay, needle) → index|-1
+
+       // 0x824E — get_object_script_id_sfall(obj): return numeric script SID or -1.
+       ,0x824E: bridged("get_object_script_id_sfall", 1) // get_object_script_id(obj) → sid|-1
+
+       // 0x824F — get_script_field_sfall(field): return 0 (browser context field read).
+       ,0x824F: bridged("get_script_field_sfall", 1) // get_script_field(field) → 0
     }
     Object.assign(opMap, bridgeOpMap)
 

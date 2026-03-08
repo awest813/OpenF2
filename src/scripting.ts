@@ -1466,6 +1466,14 @@ export module Scripting {
                 warn(`obj_can_hear_obj: not game object: a=${a} b=${b}`, undefined, this)
                 return 0
             }
+            // BLK-085: Guard against null positions — objects without a position
+            // (e.g. items in inventory, or critters mid-map-transition) would
+            // crash hexDistance with a TypeError.  Return 0 (out of earshot) when
+            // either position is missing so combat/AI scripts can continue safely.
+            if (!a.position || !b.position) {
+                warn(`obj_can_hear_obj: one or both objects lack a position`, undefined, this)
+                return 0
+            }
             return hexDistance(a.position, b.position) <= 12 ? 1 : 0
         }
         critter_mod_skill(obj: Obj, skill: number, amount: number) {
@@ -2392,8 +2400,15 @@ export module Scripting {
         }
         set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, rotation: number) {
             log('set_exit_grids', arguments)
-            for (var i = 0; i < gameObjects!.length; i++) {
-                var obj = gameObjects![i]
+            // BLK-084: Guard against null gameObjects — called before a map is loaded
+            // (e.g. in startup scripts or test environments) gameObjects is null and the
+            // non-null assertion would crash.  Skip silently when there are no objects.
+            if (!gameObjects) {
+                warn('set_exit_grids: gameObjects is null — skipping', undefined, this)
+                return
+            }
+            for (var i = 0; i < gameObjects.length; i++) {
+                var obj = gameObjects[i]
                 if (obj.type === 'misc' && obj.extra && obj.extra.exitMapID !== undefined) {
                     obj.extra.exitMapID = mapID
                     obj.extra.startingPosition = tileNum
@@ -2457,6 +2472,11 @@ export module Scripting {
             // available (e.g. scripts run at startup), fall back to returning 1 so that
             // scripts that use this as a guard condition can still run.
             if (globalState.player) {
+                // BLK-083: Guard against a null player.position — can happen when the
+                // player object exists but has not yet been placed on the map (e.g.
+                // during initial script execution before map_enter_p_proc completes).
+                // Fall back to always-visible (1) so scripts proceed safely.
+                if (!globalState.player.position) return 1
                 const tilePos = fromTileNum(tile)
                 const dist = hexDistance(globalState.player.position, tilePos)
                 return dist <= 14 ? 1 : 0
@@ -2671,7 +2691,11 @@ export module Scripting {
             globalState.floatMessages.push({
                 msg: msg,
                 obj: this.self_obj as Obj,
-                startTime: window.performance.now(),
+                // BLK-082: Use performance.now() with a typeof guard rather than
+                // window.performance.now() directly — the window global is not
+                // available in Node.js test environments and would throw a ReferenceError.
+                // This matches the pattern already used by get_uptime().
+                startTime: typeof performance !== 'undefined' ? performance.now() : 0,
                 color: color,
             })
         }
@@ -5146,6 +5170,80 @@ export module Scripting {
         // Browser build: always returns 2 (maximum) — no violence-level control implemented.
         get_violence_level_sfall(): number {
             return 2
+        }
+
+        // ---------------------------------------------------------------------------
+        // Phase 69 — sfall extended opcodes 0x8248–0x824F
+        // ---------------------------------------------------------------------------
+
+        // sfall 0x8248 — get_map_limits_sfall(which):
+        // Return map dimension in tiles.  which=0 → width, which=1 → height.
+        // Fallout 2 maps are always 200×200 tiles.
+        get_map_limits_sfall(which: number): number {
+            // 0 = width, 1 = height — both are 200 in the Fallout 2 tile grid.
+            return 200
+        }
+
+        // sfall 0x8249 — obj_is_valid_sfall(obj):
+        // Return 1 if `obj` is a valid game object, 0 otherwise.
+        // Scripts use this to defend against stale/deleted object references before
+        // calling procedures that would crash on a non-object argument.
+        obj_is_valid_sfall(obj: any): number {
+            return isGameObject(obj) ? 1 : 0
+        }
+
+        // sfall 0x824A — get_string_length_sfall(str):
+        // Return the length of a string.  Returns 0 for non-string arguments.
+        get_string_length_sfall(str: any): number {
+            if (typeof str !== 'string') return 0
+            return str.length
+        }
+
+        // sfall 0x824B — get_char_code_sfall(str, pos):
+        // Return the character code (UTF-16 code unit) of `str` at zero-based index
+        // `pos`.  Returns -1 when `str` is not a string or `pos` is out of range.
+        get_char_code_sfall(str: any, pos: number): number {
+            if (typeof str !== 'string') return -1
+            if (pos < 0 || pos >= str.length) return -1
+            return str.charCodeAt(pos)
+        }
+
+        // sfall 0x824C — string_contains_sfall(haystack, needle):
+        // Return 1 if `haystack` contains `needle` (case-sensitive), 0 otherwise.
+        // Returns 0 for non-string inputs.
+        string_contains_sfall(haystack: any, needle: any): number {
+            if (typeof haystack !== 'string' || typeof needle !== 'string') return 0
+            return haystack.includes(needle) ? 1 : 0
+        }
+
+        // sfall 0x824D — string_index_of_sfall(haystack, needle):
+        // Return the first zero-based index of `needle` in `haystack`, or -1 if not
+        // found.  Returns -1 for non-string inputs.
+        string_index_of_sfall(haystack: any, needle: any): number {
+            if (typeof haystack !== 'string' || typeof needle !== 'string') return -1
+            return haystack.indexOf(needle)
+        }
+
+        // sfall 0x824E — get_object_script_id_sfall(obj):
+        // Return the integer script SID attached to an object, or -1 when the object
+        // has no script.  Used by scripts that want to verify or compare script
+        // attachments before calling scripted procedures.
+        get_object_script_id_sfall(obj: any): number {
+            if (!isGameObject(obj)) return -1
+            const script = (obj as Obj)._script
+            if (!script) return -1
+            // sid is the numeric script identifier loaded from the map data.
+            const sid: number | undefined = (script as any).sid ?? (script as any)._sid
+            return typeof sid === 'number' ? sid : -1
+        }
+
+        // sfall 0x824F — get_script_field_sfall(field):
+        // Read a named field from the current script execution context.  In the
+        // browser build the full set of engine-internal script fields is not exposed;
+        // returns 0 for all field queries so calling scripts do not crash.
+        get_script_field_sfall(field: any): number {
+            log('get_script_field_sfall: field=' + field + ' — returning 0', arguments)
+            return 0
         }
 
         _serialize(): SerializedScript {

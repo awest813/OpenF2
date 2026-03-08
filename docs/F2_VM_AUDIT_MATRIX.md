@@ -77,3 +77,43 @@ Next available sfall opcode: **0x81BE**
 | `get_party_count_sfall` (0x823F) | opcode | implemented | P2 | Returns current party size (gParty.members length). |
 
 Next available sfall opcode: **0x8240**
+
+## Phase 68 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `objCanSeeObj null-gMap guard` (BLK-076) | procedure | implemented | P0 | Guard against null gMap + null positions in objCanSeeObj; returns true (unobstructed) when gMap is null. |
+| `explosion null-gMap guard` (BLK-077) | procedure | implemented | P0 | Guard against null gMap in explosion(); emits warning and returns early. |
+| `load_map null-gMap guard` (BLK-078) | procedure | implemented | P0 | Guard against null gMap in load_map(); emits warning and returns early. |
+| `create_object_sid null-gMap guard` (BLK-079) | procedure | implemented | P1 | Guard against null gMap in create_object_sid(); emits warning and returns null. |
+| `save null gMap.name guard` (BLK-080) | procedure | implemented | P1 | save() log now uses gMap?.name ?? "(none)" to avoid TypeError when gMap is null. |
+| `Obj.fromPID_ null pro guard` (BLK-081) | procedure | implemented | P0 | Guard against null pro in Obj.fromPID_(); obj.flags defaults to 0; pro-dependent init skipped. |
+| `get_critter_damage_type_sfall` (0x8240) | opcode | implemented | P2 | Returns default melee damage type (0=normal … 6=explosion). |
+| `set_critter_damage_type_sfall` (0x8241) | opcode | implemented | P2 | Sets default melee damage type (clamped 0–6). |
+| `get_combat_free_move_sfall` (0x8242) | opcode | partial | P3 | Returns 0; no free-move tracking. |
+| `set_combat_free_move_sfall` (0x8243) | opcode | partial | P3 | No-op; free-move not tracked. |
+| `get_base_stat_sfall` (0x8244) | opcode | implemented | P1 | Returns base SPECIAL/derived stat for any critter. |
+| `set_base_stat_sfall` (0x8245) | opcode | implemented | P1 | Sets base SPECIAL/derived stat for a critter via modifyBase(). |
+| `get_game_difficulty_sfall` (0x8246) | opcode | partial | P3 | Always returns 1 (normal); no difficulty system. |
+| `get_violence_level_sfall` (0x8247) | opcode | partial | P3 | Always returns 2 (maximum); no violence-level system. |
+
+Next available sfall opcode: **0x8248**
+
+## Phase 69 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `float_msg safe performance guard` (BLK-082) | procedure | implemented | P1 | float_msg() now uses typeof-guarded performance.now() instead of window.performance.now(); fixes crash in Node.js. |
+| `tile_is_visible null position guard` (BLK-083) | procedure | implemented | P1 | Guard against null player.position in tile_is_visible(); returns 1 (visible) when player.position is null. |
+| `set_exit_grids null gameObjects guard` (BLK-084) | procedure | implemented | P1 | Guard against null gameObjects in set_exit_grids(); emits warning and returns early. |
+| `obj_can_hear_obj null position guard` (BLK-085) | procedure | implemented | P1 | Guard against null positions in obj_can_hear_obj(); returns 0 when either position is null. |
+| `get_map_limits_sfall` (0x8248) | opcode | implemented | P2 | Returns 200 for map width/height (Fallout 2 maps are always 200×200). |
+| `obj_is_valid_sfall` (0x8249) | opcode | implemented | P2 | Returns 1 if argument is a valid game object, 0 otherwise. |
+| `get_string_length_sfall` (0x824A) | opcode | implemented | P2 | Returns length of a string (0 for non-strings). |
+| `get_char_code_sfall` (0x824B) | opcode | implemented | P2 | Returns char code at position in string (-1 for out-of-range). |
+| `string_contains_sfall` (0x824C) | opcode | implemented | P2 | Returns 1 if haystack contains needle (case-sensitive). |
+| `string_index_of_sfall` (0x824D) | opcode | implemented | P2 | Returns first index of needle in haystack, or -1. |
+| `get_object_script_id_sfall` (0x824E) | opcode | implemented | P2 | Returns numeric script SID for object, or -1 when no script is attached. |
+| `get_script_field_sfall` (0x824F) | opcode | partial | P3 | Returns 0 for all fields; engine-internal script context fields not exposed. |
+
+Next available sfall opcode: **0x8250**
