@@ -5728,6 +5728,172 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // BLK-100
+    {
+        id: 'blk_100_play_sfx_null_audio_engine',
+        kind: 'procedure',
+        description:
+            'BLK-100: play_sfx() — added null audioEngine guard.  globalState.audioEngine ' +
+            'is null during test environments and before the browser audio subsystem is ' +
+            'initialized.  Without the guard, any script that calls play_sfx() throws a ' +
+            'TypeError, crashing map-enter sound effects and ambient audio cues.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-101
+    {
+        id: 'blk_101_walkto_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-101: walkTo() null position guard.  object.ts walkTo() accessed ' +
+            'this.position.x unconditionally.  Critters in inventory or cleared mid-map- ' +
+            'transition have position=null; the access threw a TypeError, crashing any ' +
+            'movement command issued to an unplaced critter.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-102
+    {
+        id: 'blk_102_walkto_window_performance',
+        kind: 'procedure',
+        description:
+            'BLK-102: walkTo() window.performance.now() crash in non-browser context.  ' +
+            'object.ts walkTo() used window.performance.now() directly.  In Node.js test ' +
+            'environments window is not defined; the call threw a ReferenceError.  Now ' +
+            'uses the same safe typeof-guard pattern as float_msg() (BLK-082).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-103
+    {
+        id: 'blk_103_map_audio_engine_null',
+        kind: 'procedure',
+        description:
+            'BLK-103: map.ts loadMap() audioEngine null guard.  globalState.audioEngine ' +
+            'is null in test environments and before the browser audio subsystem is set ' +
+            'up.  stopAll() and playMusic() were called unconditionally, throwing a ' +
+            'TypeError that aborted map loading entirely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-104
+    {
+        id: 'blk_104_reg_anim_obj_move_to_tile_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-104: reg_anim_obj_move_to_tile() null position guard.  The function ' +
+            'checked that the critter has a walkTo method but did not guard against a ' +
+            'null position before calling walkTo().  walkTo() accesses this.position.x ' +
+            'immediately, so unplaced critters crashed with a TypeError.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8268 — get_critter_ap_sfall
+    {
+        id: 'sfall_get_critter_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x8268: get_critter_ap_sfall(obj) — return current combat AP for a critter. ' +
+            'In combat returns AP.combat; outside combat returns the max AP stat value.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8269 — set_critter_ap_sfall
+    {
+        id: 'sfall_set_critter_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x8269: set_critter_ap_sfall(obj, ap) — set current combat AP for a critter. ' +
+            'No-op when AP.combat is not initialized (out-of-combat critters).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x826A — get_object_flags_sfall
+    {
+        id: 'sfall_get_object_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x826A: get_object_flags_sfall(obj) — return the Fallout 2 flags bitmask. ' +
+            'Reads obj.flags (the proto-sourced flags field stored on the Obj).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x826B — set_object_flags_sfall
+    {
+        id: 'sfall_set_object_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x826B: set_object_flags_sfall(obj, flags) — write the flags bitmask. ' +
+            'Stores on obj.flags so subsequent get_object_flags_sfall reads are consistent.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x826C — critter_is_dead_sfall
+    {
+        id: 'sfall_critter_is_dead',
+        kind: 'opcode',
+        description:
+            'sfall 0x826C: critter_is_dead_sfall(obj) — 1 if the given critter is dead, 0 otherwise. ' +
+            'Non-critters always return 0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x826D — get_obj_light_level_sfall
+    {
+        id: 'sfall_get_obj_light_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x826D: get_obj_light_level_sfall(obj) — return object light emission level (0–65536). ' +
+            'Reads obj.lightLevel; defaults to 0 (no emission).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x826E — set_obj_light_level_sfall
+    {
+        id: 'sfall_set_obj_light_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x826E: set_obj_light_level_sfall(obj, level) — set object light emission level (0–65536). ' +
+            'Clamps to [0, 65536]; stored on obj.lightLevel.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x826F — get_elevation_sfall
+    {
+        id: 'sfall_get_elevation',
+        kind: 'opcode',
+        description:
+            'sfall 0x826F: get_elevation_sfall() — return the current map elevation (0–2). ' +
+            'Equivalent to native elevation() but exposed via the sfall opcode table.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

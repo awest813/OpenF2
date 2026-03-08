@@ -2810,6 +2810,14 @@ export module Scripting {
                 warn('reg_anim_obj_move_to_tile: object cannot walk', 'movement', this)
                 return
             }
+            // BLK-104: Guard against null position — critters in inventory or
+            // mid-map-transition have no tile assignment.  walkTo() accesses
+            // this.position.x immediately, so calling it with a null position
+            // throws a TypeError.  Skip movement for unplaced critters.
+            if (!obj.position) {
+                warn('reg_anim_obj_move_to_tile: object has no position — skipping movement', 'movement', this)
+                return
+            }
             if (!(obj as Critter).walkTo(tile, false)) {
                 warn('reg_anim_obj_move_to_tile: no path', 'movement', this)
             }
@@ -3565,6 +3573,12 @@ export module Scripting {
         // sound
         play_sfx(sfx: string) {
             log('play_sfx', arguments)
+            // BLK-100: Guard against null audioEngine — during test environments and
+            // early browser init (before the audio subsystem is set up) audioEngine
+            // is null.  Without the guard, any script that calls play_sfx() will crash
+            // with a TypeError.  Skip silently rather than emitting a stub warning so
+            // every map-enter sound effect does not flood the console.
+            if (!globalState.audioEngine) return
             globalState.audioEngine.playSfx(sfx)
         }
 
@@ -5518,6 +5532,93 @@ export module Scripting {
         // implementation so sfall callers get the same value as native map_var() calls.
         get_map_local_var_sfall(idx: number): any {
             return this.map_var(typeof idx === 'number' ? idx : 0)
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 73 — sfall extended opcodes 0x8268–0x826F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8268 — get_critter_ap_sfall(obj):
+        // Return the current combat AP available for a critter.
+        // In combat: reads the AP.combat field; out of combat returns the max AP stat.
+        get_critter_ap_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_ap_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            return critter.AP ? critter.AP.combat : critter.getStat('AP')
+        }
+
+        // sfall 0x8269 — set_critter_ap_sfall(obj, ap):
+        // Set the current combat AP for a critter.
+        // No-op when AP.combat is not initialized (out-of-combat critters).
+        set_critter_ap_sfall(obj: Obj, ap: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_ap_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+        }
+
+        // sfall 0x826A — get_object_flags_sfall(obj):
+        // Return the Fallout 2 flags bitmask for an object.
+        // Reads obj.flags (the proto-sourced flags field stored on the Obj).
+        get_object_flags_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_flags_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).flags ?? 0
+        }
+
+        // sfall 0x826B — set_object_flags_sfall(obj, flags):
+        // Write the flags bitmask for an object.  Stores on obj.flags so that
+        // subsequent get_object_flags_sfall / get_flags_sfall reads are consistent.
+        set_object_flags_sfall(obj: Obj, flags: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_object_flags_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).flags = flags >>> 0
+        }
+
+        // sfall 0x826C — critter_is_dead_sfall(obj):
+        // Return 1 if the given object is a dead critter, 0 otherwise.
+        // Non-critters always return 0 (they cannot be "dead" in the FO2 sense).
+        critter_is_dead_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).dead ? 1 : 0
+        }
+
+        // sfall 0x826D — get_obj_light_level_sfall(obj):
+        // Return the light emission level of an object (0–65536).
+        // Browser build: reads obj.lightLevel if set; defaults to 0 (no emission).
+        get_obj_light_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).lightLevel ?? 0
+        }
+
+        // sfall 0x826E — set_obj_light_level_sfall(obj, level):
+        // Set the light emission level of an object (0–65536).
+        // Browser build: stores on obj.lightLevel for get_obj_light_level_sfall reads.
+        set_obj_light_level_sfall(obj: Obj, level: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).lightLevel = Math.max(0, Math.min(65536, level))
+        }
+
+        // sfall 0x826F — get_elevation_sfall():
+        // Return the current map elevation (0–2).  Equivalent to native elevation()
+        // but exposed as a sfall opcode for mods that call it via the sfall table.
+        get_elevation_sfall(): number {
+            return globalState.currentElevation ?? 0
         }
 
         _serialize(): SerializedScript {

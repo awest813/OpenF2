@@ -1493,6 +1493,10 @@ export class Critter extends Obj {
 
     walkTo(target: Point, running?: boolean, callback?: () => void, maxLength?: number, path?: any): boolean {
         // pathfind and set walking to target
+        // BLK-101: Guard against null position — critters in inventory or mid-map-
+        // transition have position=null.  Accessing this.position.x would throw a
+        // TypeError.  Return false (no movement) rather than crashing.
+        if (!this.position) return false
         if (this.position.x === target.x && this.position.y === target.y) {
             // can't walk to the same tile
             return false
@@ -1525,7 +1529,10 @@ export class Critter extends Obj {
         this.art = this.getAnimation(this.anim)
         this.animCallback = callback || (() => this.clearAnim())
         this.frame = 0
-        this.lastFrameTime = window.performance.now()
+        // BLK-102: Use a safe performance.now() fallback — window.performance is not
+        // available in Node.js test environments.  The same pattern is used by
+        // float_msg() (BLK-082) and get_uptime().
+        this.lastFrameTime = typeof performance !== 'undefined' ? performance.now() : 0
         this.shift = { x: 0, y: 0 }
         const dir = directionOfDelta(this.position.x, this.position.y, path[1][0], path[1][1])
         if (dir == null) {
