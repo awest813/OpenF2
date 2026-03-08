@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 18
+export const SAVE_VERSION = 19
 
 export interface SaveGame {
     id?: number
@@ -256,6 +256,23 @@ export interface SaveGame {
      */
     carFuel?: number
 
+    /**
+     * Player injury flags bitmask (added in v19 / BLK-075).
+     *
+     * Encodes which limbs are crippled and whether the player is blinded:
+     *   bit 0 (0x01): crippledLeftLeg
+     *   bit 1 (0x02): crippledRightLeg
+     *   bit 2 (0x04): crippledLeftArm
+     *   bit 3 (0x08): crippledRightArm
+     *   bit 4 (0x10): blinded
+     *
+     * Without this, reloading a save clears all injury states and the player
+     * can bypass permanent penalties imposed by critical hits.
+     *
+     * Defaults to 0 (no injuries) for saves that predate v19.
+     */
+    playerInjuryFlags?: number
+
     player: {
         position: Point
         orientation: number
@@ -418,6 +435,15 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.carFuel === undefined) save.carFuel = 0
             save.version = 18
             // falls through
+        case 18:
+            // v18 → v19: add player injury flags (BLK-075).
+            // Old saves default to 0 (no injuries) so all limbs are healthy
+            // after migration.  Players who were crippled before must be
+            // re-injured by gameplay; this is safe because pre-v19 builds did
+            // not persist injury state at all.
+            if (save.playerInjuryFlags === undefined) save.playerInjuryFlags = 0
+            save.version = 19
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -486,6 +512,14 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
         save.carFuel = 0
     } else {
         save.carFuel = Math.max(0, Math.min(80000, Math.floor(save.carFuel)))
+    }
+    // Normalize playerInjuryFlags (BLK-075): must be a non-negative integer bitmask.
+    // Valid bits: 0x01=crippledLeftLeg, 0x02=crippledRightLeg, 0x04=crippledLeftArm,
+    //             0x08=crippledRightArm, 0x10=blinded.  Mask to 0x1F.
+    if (typeof save.playerInjuryFlags !== 'number' || !Number.isInteger(save.playerInjuryFlags)) {
+        save.playerInjuryFlags = 0
+    } else {
+        save.playerInjuryFlags = (save.playerInjuryFlags >>> 0) & 0x1f
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

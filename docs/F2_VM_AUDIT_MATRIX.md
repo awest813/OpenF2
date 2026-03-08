@@ -59,3 +59,21 @@ Legend:
 | `get_critter_hostile_to_dude` (0x81BD) | opcode | implemented | P2 | Returns hostile flag vs player. |
 
 Next available sfall opcode: **0x81BE**
+
+## Phase 67 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `move_to_null_gmap` (BLK-073) | procedure | implemented | P0 | Guard against null gMap in elevation-change branch of move_to(); prevents crash during map transitions. |
+| `rm_timer_event_null_obj` (BLK-074) | procedure | implemented | P1 | Guard against null obj in rm_timer_event(); prevents crash when scripts cancel timers on destroyed objects. |
+| `player_injury_flags` (BLK-075) | procedure | implemented | P1 | Player crippled-limb and blindness flags persisted in save schema v19; prevents injury state reset on load. |
+| `get_critter_radiation_sfall` (0x8238) | opcode | implemented | P2 | Alias of get_radiation(); returns critter radiation level. |
+| `set_critter_radiation_sfall` (0x8239) | opcode | implemented | P2 | Set critter radiation to absolute value clamped [0,1000]. |
+| `get_critter_poison_sfall` (0x823A) | opcode | implemented | P2 | Alias of get_poison(); returns critter poison level. |
+| `set_critter_poison_sfall` (0x823B) | opcode | implemented | P2 | Set critter poison to absolute value clamped [0,1000]. |
+| `critter_in_party_sfall` (0x823C) | opcode | implemented | P2 | Returns 1 if critter is in player party (gParty.members). |
+| `get_critter_proto_flags_sfall` (0x823D) | opcode | partial | P3 | Returns obj.flags bitmask; partial — no full proto-flag table. |
+| `set_critter_proto_flags_sfall` (0x823E) | opcode | partial | P3 | Stores flags on obj for subsequent reads; partial. |
+| `get_party_count_sfall` (0x823F) | opcode | implemented | P2 | Returns current party size (gParty.members length). |
+
+Next available sfall opcode: **0x8240**

@@ -2486,9 +2486,13 @@ export module Scripting {
             }
             if (elevation !== globalState.currentElevation) {
                 info('move_to: moving to elevation ' + elevation)
-
-                if (obj instanceof Critter && obj.isPlayer) globalState.gMap.changeElevation(elevation, true)
-                else {
+                // BLK-073: Guard against null gMap — can occur when scripts call
+                // move_to during map transitions or before a map is loaded.
+                if (!globalState.gMap) {
+                    warn('move_to: gMap is null — cannot change elevation; placing at tile only', undefined, this)
+                } else if (obj instanceof Critter && obj.isPlayer) {
+                    globalState.gMap.changeElevation(elevation, true)
+                } else {
                     globalState.gMap.removeObject(obj)
                     globalState.gMap.addObject(obj, elevation)
                 }
@@ -2814,6 +2818,13 @@ export module Scripting {
         }
         rm_timer_event(obj: Obj) {
             log('rm_timer_event', arguments)
+            // BLK-074: Guard against null obj — scripts sometimes call rm_timer_event
+            // with 0/null when clearing events on an invalid reference.  Previously
+            // the unconditional obj.pid access caused an uncaught TypeError.
+            if (!obj) {
+                warn('rm_timer_event: null obj — no-op', undefined, this)
+                return
+            }
             info('rm_timer_event: ' + obj + ', ' + obj.pid)
             for (var i = 0; i < timeEventList.length; i++) {
                 const timedEvent = timeEventList[i]
@@ -4894,6 +4905,107 @@ export module Scripting {
                 total += Math.floor(w / 10) * amt
             }
             return total
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 67 — sfall extended opcodes 0x8238–0x823F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8238 — get_critter_radiation_sfall(obj):
+        // Return the critter's current radiation level.  Alias of get_radiation().
+        get_critter_radiation_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_radiation_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats.getBase('Radiation Level') ?? 0
+        }
+
+        // sfall 0x8239 — set_critter_radiation_sfall(obj, val):
+        // Set the critter's radiation level to the given absolute value.
+        // Unlike radiation_add/radiation_dec which adjust relatively, this sets
+        // it directly.  Clamps to [0, 1000].
+        set_critter_radiation_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_radiation_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const clamped = Math.max(0, Math.min(1000, Math.floor(val)))
+            const critter = obj as Critter
+            const current = critter.stats.getBase('Radiation Level') ?? 0
+            critter.stats.modifyBase('Radiation Level', clamped - current)
+        }
+
+        // sfall 0x823A — get_critter_poison_sfall(obj):
+        // Return the critter's current poison level.  Alias of get_poison().
+        get_critter_poison_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_poison_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats.getBase('Poison Level') ?? 0
+        }
+
+        // sfall 0x823B — set_critter_poison_sfall(obj, val):
+        // Set the critter's poison level to the given absolute value.
+        // Unlike poison() which adjusts relatively, this sets it directly.
+        // Clamps to [0, 1000].
+        set_critter_poison_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_poison_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const clamped = Math.max(0, Math.min(1000, Math.floor(val)))
+            const critter = obj as Critter
+            const current = critter.stats.getBase('Poison Level') ?? 0
+            critter.stats.modifyBase('Poison Level', clamped - current)
+        }
+
+        // sfall 0x823C — critter_in_party_sfall(obj):
+        // Return 1 if the given critter is currently in the player's party,
+        // 0 otherwise.  Checks globalState.gParty membership.
+        critter_in_party_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('critter_in_party_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            const party = globalState.gParty
+            if (!party) return 0
+            const members = (party as any).members
+            if (!Array.isArray(members)) return 0
+            return members.some((m: any) => m === obj || m?.pid === (obj as any).pid) ? 1 : 0
+        }
+
+        // sfall 0x823D — get_critter_proto_flags_sfall(obj):
+        // Return the proto flags bitmask for a critter.  Reads obj.flags if
+        // present; falls back to 0 (partial — no full proto-flag table).
+        get_critter_proto_flags_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_critter_proto_flags_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).flags ?? 0
+        }
+
+        // sfall 0x823E — set_critter_proto_flags_sfall(obj, flags):
+        // Set proto flags on a critter object.  Partial — stores flags on obj
+        // for subsequent get_critter_proto_flags_sfall / get_flags_sfall reads.
+        set_critter_proto_flags_sfall(obj: Obj, flags: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_critter_proto_flags_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).flags = flags >>> 0
+        }
+
+        // sfall 0x823F — get_party_count_sfall():
+        // Return the current number of critters in the player's party (not
+        // counting the player).  Returns 0 when no party exists.
+        get_party_count_sfall(): number {
+            const party = globalState.gParty
+            if (!party) return 0
+            const members = (party as any).members
+            return Array.isArray(members) ? members.length : 0
         }
 
         _serialize(): SerializedScript {

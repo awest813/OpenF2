@@ -373,11 +373,11 @@ describe('Phase 49-J — drop_obj removes item from critter inventory', () => {
 // ===========================================================================
 
 describe('Phase 49-K — save schema v12: playerPcFlags migration', () => {
-    it('SAVE_VERSION is 18', () => {
-        expect(SAVE_VERSION).toBe(18)
+    it('SAVE_VERSION was 18 (now superseded to 19)', () => {
+        expect(SAVE_VERSION).toBe(19)
     })
 
-    it('v11 → v12 (towards v18) migration adds playerPcFlags defaulting to 0', () => {
+    it('v11 → v12 (towards current SAVE_VERSION) migration adds playerPcFlags defaulting to 0', () => {
         const raw = {
             version: 11,
             name: 'test',
@@ -390,7 +390,7 @@ describe('Phase 49-K — save schema v12: playerPcFlags migration', () => {
             sfallGlobals: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(18)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.playerPcFlags).toBe(0)
     })
 
