@@ -246,10 +246,10 @@ describe('Phase 39-H — anim() negative code logs silently', () => {
 // ===========================================================================
 
 describe('Phase 39-I — get_ini_setting opcode (0x8198)', () => {
-    it('checklist entry get_ini_setting is present and partial', () => {
+    it('checklist entry get_ini_setting is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'get_ini_setting')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
         expect(entry?.kind).toBe('opcode')
         expect(entry?.impact).toBe('medium')
     })

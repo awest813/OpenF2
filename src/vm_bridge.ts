@@ -1001,6 +1001,34 @@ export module ScriptVMBridge {
 
        // 0x8227 — get_map_enter_position_sfall(type): return map-entry position.
        ,0x8227: bridged("get_map_enter_position_sfall", 1) // get_map_enter_position(type) → -1
+
+       // -----------------------------------------------------------------------
+       // Phase 65 — sfall extended opcodes 0x8228–0x822F
+       // -----------------------------------------------------------------------
+
+       // 0x8228 — get_critter_name_sfall(obj): return critter display name.
+       ,0x8228: bridged("get_critter_name_sfall", 1) // get_critter_name(obj) → name
+
+       // 0x8229 — get_car_fuel_amount_sfall(): return car fuel level.
+       ,0x8229: bridged("get_car_fuel_amount_sfall", 0) // get_car_fuel() → fuel
+
+       // 0x822A — set_car_fuel_amount_sfall(amount): set car fuel level.
+       ,0x822A: bridged("set_car_fuel_amount_sfall", 1, false) // set_car_fuel(amount)
+
+       // 0x822B — get_critter_ai_packet_sfall(obj): return AI packet index.
+       ,0x822B: bridged("get_critter_ai_packet_sfall", 1) // get_critter_ai_packet(obj) → id
+
+       // 0x822C — set_critter_ai_packet_sfall(obj, id): set AI packet index.
+       ,0x822C: bridged("set_critter_ai_packet_sfall", 2, false) // set_critter_ai_packet(obj, id)
+
+       // 0x822D — obj_under_cursor_sfall(): return object under cursor (stub 0).
+       ,0x822D: bridged("obj_under_cursor_sfall", 0) // obj_under_cursor() → 0
+
+       // 0x822E — get_attack_weapon_sfall(obj, attackType): return weapon for attack type.
+       ,0x822E: bridged("get_attack_weapon_sfall", 2) // get_attack_weapon(obj, type) → obj|0
+
+       // 0x822F — get_tile_pid_at_sfall(tileNum, elevation): return PID at tile.
+       ,0x822F: bridged("get_tile_pid_at_sfall", 2) // get_tile_pid_at(tile, elev) → pid
     }
     Object.assign(opMap, bridgeOpMap)
 

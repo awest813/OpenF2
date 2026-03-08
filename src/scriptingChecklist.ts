@@ -1548,10 +1548,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'get_ini_setting',
         kind: 'opcode',
         description:
-            'sfall 0x8198: get_ini_setting(key) → integer INI value.  Partial: the ' +
-            'browser build has no INI file layer; always returns 0.  Prevents ' +
-            'unknown-opcode crashes in sfall/modded scripts that read INI options.',
-        status: 'partial',
+            'sfall 0x8198: get_ini_setting(key) → integer INI value.  ' +
+            'BLK-064 (Phase 62): now returns sensible defaults for ~20 known FO2 ' +
+            'config keys (case-insensitive). Unknown keys return 0.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -4580,6 +4580,88 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x8227: get_map_enter_position_sfall(type) — return map entry ' +
             'position value.  Browser build: returns -1.',
         status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // ---------------------------------------------------------------------------
+    // Phase 65 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'sfall_get_critter_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x8228: get_critter_name_sfall(obj) — return critter display name. ' +
+            'Alias of get_critter_name().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_car_fuel_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x8229: get_car_fuel_amount_sfall() — return current car fuel level. ' +
+            'Reads from globalState.carFuel (defaults to 0).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_car_fuel_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x822A: set_car_fuel_amount_sfall(amount) — set car fuel level (clamped to 0–80000).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_ai_packet',
+        kind: 'opcode',
+        description:
+            'sfall 0x822B: get_critter_ai_packet_sfall(obj) — return AI packet index. ' +
+            'Reads from critter.aiPacket or proto.extra.aiPacket.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_ai_packet',
+        kind: 'opcode',
+        description:
+            'sfall 0x822C: set_critter_ai_packet_sfall(obj, id) — set AI packet index on critter.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_obj_under_cursor',
+        kind: 'opcode',
+        description:
+            'sfall 0x822D: obj_under_cursor_sfall() — return object under cursor. ' +
+            'Browser build: returns 0.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_attack_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x822E: get_attack_weapon_sfall(obj, attackType) — return weapon for attack type. ' +
+            'type=0=rightHand, type=1=leftHand.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_tile_pid_at',
+        kind: 'opcode',
+        description:
+            'sfall 0x822F: get_tile_pid_at_sfall(tileNum, elevation) — return PID of first object at tile.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

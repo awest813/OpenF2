@@ -3497,6 +3497,7 @@ export module Scripting {
         // engine-appropriate defaults prevents scripts from treating absent settings
         // as explicitly disabled (0) when the actual FO2 default is non-zero.
         get_ini_setting(key: string): number {
+            log('get_ini_setting', arguments)
             const normalized = key.toLowerCase()
             if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, normalized)) {
                 return INI_SETTING_DEFAULTS[normalized]
@@ -4700,6 +4701,87 @@ export module Scripting {
         // Browser build: returns -1 (no saved map-entry position).
         get_map_enter_position_sfall(type: number): number {
             return -1
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 65 — sfall extended opcodes 0x8228–0x822F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8228 — get_critter_name_sfall(obj):
+        // Return the display name of a critter.  Alias of get_critter_name().
+        get_critter_name_sfall(obj: Obj): string {
+            if (!isGameObject(obj)) return ''
+            return (obj as any).name ?? ''
+        }
+
+        // sfall 0x8229 — get_car_fuel_amount_sfall():
+        // Return the current fuel level of the player's car (Highwayman).
+        // Car fuel is stored in globalState; defaults to 0 (no car yet).
+        get_car_fuel_amount_sfall(): number {
+            return (globalState as any).carFuel ?? 0
+        }
+
+        // sfall 0x822A — set_car_fuel_amount_sfall(amount):
+        // Set the current fuel level of the player's car.
+        // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
+        set_car_fuel_amount_sfall(amount: number): void {
+            ;(globalState as any).carFuel = Math.max(0, Math.min(80000, amount))
+        }
+
+        // sfall 0x822B — get_critter_ai_packet_sfall(obj):
+        // Return the AI packet index for a critter.
+        // Reads from critter.aiPacket or proto.extra.aiPacket.
+        get_critter_ai_packet_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return -1
+            return (obj as any).aiPacket ?? (obj as any).pro?.extra?.aiPacket ?? 0
+        }
+
+        // sfall 0x822C — set_critter_ai_packet_sfall(obj, packetId):
+        // Set the AI packet index for a critter.
+        // Used by scripts to switch NPC behaviour patterns dynamically.
+        set_critter_ai_packet_sfall(obj: Obj, packetId: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_ai_packet_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).aiPacket = packetId
+        }
+
+        // sfall 0x822D — obj_under_cursor_sfall():
+        // Return the game object currently under the mouse cursor.
+        // Browser build: returns 0 (no native cursor-to-tile tracking).
+        obj_under_cursor_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x822E — get_attack_weapon_sfall(obj, attackType):
+        // Return the weapon used by a critter for a given attack type.
+        // attackType: 0=rightHand (primary), 1=leftHand (secondary).
+        // Returns 0 when no weapon is equipped or the attack type is out of range.
+        get_attack_weapon_sfall(obj: Obj, attackType: number): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            const critter = obj as Critter
+            if (attackType === 0) return (critter as any).rightHand ?? 0
+            if (attackType === 1) return (critter as any).leftHand ?? 0
+            return 0
+        }
+
+        // sfall 0x822F — get_tile_pid_at_sfall(tileNum, elevation):
+        // Return the PID of the scenery object on a tile at the given elevation.
+        // Returns 0 when no scenery is found (simplified; does not iterate all objects).
+        get_tile_pid_at_sfall(tileNum: number, elevation: number): number {
+            if (!globalState.gMap) return 0
+            const tilePos = fromTileNum(tileNum)
+            if (!tilePos) return 0
+            const objects = globalState.gMap.getObjects ? globalState.gMap.getObjects(elevation) : []
+            for (const obj of objects) {
+                if (obj.position &&
+                    obj.position.x === tilePos.x &&
+                    obj.position.y === tilePos.y) {
+                    return (obj as any).pid ?? 0
+                }
+            }
+            return 0
         }
 
         _serialize(): SerializedScript {
