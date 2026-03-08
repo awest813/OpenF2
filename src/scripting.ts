@@ -5352,6 +5352,95 @@ export module Scripting {
             return -1
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 71 — sfall extended opcodes 0x8258–0x825F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8258 — get_critter_hurt_state_sfall(obj):
+        // Return the Fallout 2 critter-state bitmask (dead/stunned/knockedDown/
+        // crippled/fleeing) for the given critter.  Mirrors the critter_state()
+        // opcode (0x8101) but exposed as a sfall-namespaced call so scripts that
+        // query it via the sfall dispatch table still get a value.
+        get_critter_hurt_state_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            var state = 0
+            if ((obj as any).dead === true) state |= 0x01
+            if ((obj as any).knockedOut === true) state |= 0x02
+            if ((obj as any).knockedDown === true) state |= 0x04
+            const hasCrippledLimb =
+                (obj as any).crippledLeftLeg ||
+                (obj as any).crippledRightLeg ||
+                (obj as any).crippledLeftArm ||
+                (obj as any).crippledRightArm
+            if (hasCrippledLimb) state |= 0x08
+            if ((obj as any).isFleeing === true) state |= 0x10
+            return state
+        }
+
+        // sfall 0x8259 — set_critter_hurt_state_sfall(obj, state):
+        // Write the Fallout 2 critter-state bitmask.  Each bit maps to a boolean
+        // property on the Critter object (same mapping as critter_state above).
+        // Bit 0 (dead) is intentionally ignored — use kill_critter for that.
+        set_critter_hurt_state_sfall(obj: Obj, state: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') return
+            ;(obj as any).knockedOut = !!(state & 0x02)
+            ;(obj as any).knockedDown = !!(state & 0x04)
+            const crippled = !!(state & 0x08)
+            ;(obj as any).crippledLeftLeg = crippled
+            ;(obj as any).crippledRightLeg = crippled
+            ;(obj as any).crippledLeftArm = crippled
+            ;(obj as any).crippledRightArm = crippled
+            ;(obj as any).isFleeing = !!(state & 0x10)
+        }
+
+        // sfall 0x825A — get_critter_is_fleeing_sfall(obj):
+        // Return 1 if the critter is currently fleeing combat, 0 otherwise.
+        // Convenience wrapper around the isFleeing property.
+        get_critter_is_fleeing_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).isFleeing ? 1 : 0
+        }
+
+        // sfall 0x825B — set_critter_is_fleeing_sfall(obj, flag):
+        // Set or clear the fleeing state on the given critter.
+        set_critter_is_fleeing_sfall(obj: Obj, flag: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') return
+            ;(obj as any).isFleeing = flag !== 0
+        }
+
+        // sfall 0x825C — get_tile_blocked_sfall(tileNum, elev):
+        // Return 1 if any blocking object occupies the given tile on the given
+        // elevation, 0 otherwise.  Uses the map object list; returns 0 when the
+        // map is not loaded.
+        get_tile_blocked_sfall(tileNum: number, _elev: number): number {
+            if (!globalState.gMap) return 0
+            const pos = fromTileNum(tileNum)
+            const objs = globalState.gMap.objectsAtPosition(pos)
+            return objs.some((o) => o.blocks()) ? 1 : 0
+        }
+
+        // sfall 0x825D — get_critter_hit_pts_sfall(obj):
+        // Return the critter's current maximum HP (Max HP stat).  Returns 0 for
+        // non-critters or null objects.
+        get_critter_hit_pts_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).getStat('Max HP')
+        }
+
+        // sfall 0x825E — critter_add_trait_sfall(obj, traitType, trait, amount):
+        // Modify a trait/perk value on a critter.  Browser build: no-op (trait
+        // modification requires deeper engine integration not yet implemented).
+        critter_add_trait_sfall(_obj: Obj, _traitType: number, _trait: number, _amount: number): void {
+            // no-op
+        }
+
+        // sfall 0x825F — get_num_new_obj_sfall():
+        // Return the count of game objects created by script since the last map
+        // load.  Browser build: returns 0 (no per-session object creation counter).
+        get_num_new_obj_sfall(): number {
+            return 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }

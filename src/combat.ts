@@ -219,7 +219,10 @@ export class Combat {
         // 8 if weapon has scope_range perk
         var minDistance = 0
         var perception = obj.getStat('PER')
-        var distance = hexDistance(obj.position, target.position)
+        // BLK-093: Guard against null positions — attacker or target may lack a tile
+        // assignment (e.g. objects in inventory during scripted combat events).
+        // Return 0 (no distance penalty) instead of crashing on hexDistance.
+        var distance = (obj.position && target.position) ? hexDistance(obj.position, target.position) : 0
         if (distance < minDistance)
             distance += minDistance // yes supposedly += not =, this means 7 grid distance is the worst
         else {
@@ -607,12 +610,22 @@ export class Combat {
         // are we in firing distance?
         if (distance > fireDistance) {
             this.log('[AI CREEPS]')
+            // BLK-094: Guard against null target.position — target may not yet have a
+            // tile assignment during scripted combat.  Skip the creep attempt entirely.
+            if (!target.position) {
+                console.warn('[combat] doAITurn: target has no position — skipping creep')
+                return this.nextTurn()
+            }
             var neighbors = hexNeighbors(target.position)
             var maxDistance = Math.min(AP.getAvailableMoveAP(), distance - fireDistance)
             this.maybeTaunt(obj, 'move', messageRoll)
 
             // Prefer neighbors nearest to our current position so movement is less erratic.
-            neighbors.sort((a, b) => hexDistance(obj.position, a) - hexDistance(obj.position, b))
+            // BLK-095: Guard against null obj.position in sort comparator.
+            neighbors.sort((a, b) => {
+                if (!obj.position) return 0
+                return hexDistance(obj.position, a) - hexDistance(obj.position, b)
+            })
 
             var didCreep = false
             for (var i = 0; i < neighbors.length; i++) {

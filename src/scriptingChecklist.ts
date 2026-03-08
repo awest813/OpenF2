@@ -5404,6 +5404,174 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 71 entries
+    // -------------------------------------------------------------------------
+
+    // BLK-091 — objectsAtPosition null-position guard (map.ts)
+    {
+        id: 'blk_091_objects_at_position_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-091: objectsAtPosition() in map.ts now skips objects with null/undefined ' +
+            'positions instead of crashing on obj.position.x.  Objects in inventory or ' +
+            'mid-transition may have no tile assignment.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-092 — recalcPath null-position guard (map.ts)
+    {
+        id: 'blk_092_recalc_path_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-092: recalcPath() in map.ts now skips objects with null positions when ' +
+            'building the pathfinding matrix.  Prevents TypeError crash on every movement ' +
+            'attempt when any map object lacks a tile assignment.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-093 — getHitDistanceModifier null-position guard (combat.ts)
+    {
+        id: 'blk_093_hit_distance_modifier_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-093: getHitDistanceModifier() in combat.ts now falls back to distance=0 ' +
+            'when either obj.position or target.position is null.  Prevents crash during ' +
+            'hit-chance calculations when combatants lack a tile assignment.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-094 — doAITurn hexNeighbors null-position guard (combat.ts)
+    {
+        id: 'blk_094_do_ai_turn_hex_neighbors_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-094: doAITurn() in combat.ts now returns nextTurn() early when ' +
+            'target.position is null before calling hexNeighbors().  Prevents crash during ' +
+            'AI creep logic when a target critter has no tile.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-095 — doAITurn hexDistance sort null-position guard (combat.ts)
+    {
+        id: 'blk_095_do_ai_turn_sort_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-095: doAITurn() hexNeighbors sort comparator now returns 0 instead of ' +
+            'crashing when obj.position is null.  Guards the second null-position gap in ' +
+            'the AI creep block.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x8258 — get_critter_hurt_state_sfall
+    {
+        id: 'sfall_get_critter_hurt_state',
+        kind: 'opcode',
+        description:
+            'sfall 0x8258: get_critter_hurt_state_sfall(obj) — return the critter-state ' +
+            'bitmask (dead/stunned/knockedDown/crippled/fleeing).  Mirrors critter_state() ' +
+            'for scripts that query via the sfall dispatch table.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8259 — set_critter_hurt_state_sfall
+    {
+        id: 'sfall_set_critter_hurt_state',
+        kind: 'opcode',
+        description:
+            'sfall 0x8259: set_critter_hurt_state_sfall(obj, state) — write the critter ' +
+            'state bitmask.  Bit 0 (dead) is ignored; use kill_critter() instead.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x825A — get_critter_is_fleeing_sfall
+    {
+        id: 'sfall_get_critter_is_fleeing',
+        kind: 'opcode',
+        description:
+            'sfall 0x825A: get_critter_is_fleeing_sfall(obj) — return 1 if critter is ' +
+            'fleeing combat, 0 otherwise.  Reads the isFleeing property.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x825B — set_critter_is_fleeing_sfall
+    {
+        id: 'sfall_set_critter_is_fleeing',
+        kind: 'opcode',
+        description:
+            'sfall 0x825B: set_critter_is_fleeing_sfall(obj, flag) — set or clear the ' +
+            'fleeing combat state on a critter.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x825C — get_tile_blocked_sfall
+    {
+        id: 'sfall_get_tile_blocked',
+        kind: 'opcode',
+        description:
+            'sfall 0x825C: get_tile_blocked_sfall(tileNum, elev) — return 1 if any ' +
+            'blocking object occupies the given tile, 0 otherwise.  Returns 0 when ' +
+            'the map is not loaded.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x825D — get_critter_hit_pts_sfall
+    {
+        id: 'sfall_get_critter_hit_pts',
+        kind: 'opcode',
+        description:
+            'sfall 0x825D: get_critter_hit_pts_sfall(obj) — return maximum HP (Max HP ' +
+            'stat) for the given critter.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x825E — critter_add_trait_sfall
+    {
+        id: 'sfall_critter_add_trait',
+        kind: 'opcode',
+        description:
+            'sfall 0x825E: critter_add_trait_sfall(obj, traitType, trait, amount) — ' +
+            'modify a trait/perk value on a critter.  Browser build: no-op (requires ' +
+            'deeper engine integration).',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x825F — get_num_new_obj_sfall
+    {
+        id: 'sfall_get_num_new_obj',
+        kind: 'opcode',
+        description:
+            'sfall 0x825F: get_num_new_obj_sfall() — return count of game objects created ' +
+            'by script since last map load.  Browser build: returns 0 (no counter).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

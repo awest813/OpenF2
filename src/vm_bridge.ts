@@ -1169,6 +1169,34 @@ export module ScriptVMBridge {
 
        // 0x8257 — get_map_script_idx_sfall(): return current map script index or -1.
        ,0x8257: bridged("get_map_script_idx_sfall", 0) // get_map_script_idx() → -1
+
+       // -----------------------------------------------------------------------
+       // Phase 71 — sfall extended opcodes 0x8258–0x825F
+       // -----------------------------------------------------------------------
+
+       // 0x8258 — get_critter_hurt_state_sfall(obj): return critter-state bitmask.
+       ,0x8258: bridged("get_critter_hurt_state_sfall", 1) // get_critter_hurt_state(obj) → bitmask
+
+       // 0x8259 — set_critter_hurt_state_sfall(obj, state): write critter-state bitmask.
+       ,0x8259: bridged("set_critter_hurt_state_sfall", 2, false) // set_critter_hurt_state(obj, state)
+
+       // 0x825A — get_critter_is_fleeing_sfall(obj): return 1 if critter is fleeing.
+       ,0x825A: bridged("get_critter_is_fleeing_sfall", 1) // get_critter_is_fleeing(obj) → 0|1
+
+       // 0x825B — set_critter_is_fleeing_sfall(obj, flag): set or clear fleeing state.
+       ,0x825B: bridged("set_critter_is_fleeing_sfall", 2, false) // set_critter_is_fleeing(obj, flag)
+
+       // 0x825C — get_tile_blocked_sfall(tileNum, elev): 1 if tile has blocking obj.
+       ,0x825C: bridged("get_tile_blocked_sfall", 2) // get_tile_blocked(tile, elev) → 0|1
+
+       // 0x825D — get_critter_hit_pts_sfall(obj): return Max HP for critter.
+       ,0x825D: bridged("get_critter_hit_pts_sfall", 1) // get_critter_hit_pts(obj) → max_hp
+
+       // 0x825E — critter_add_trait_sfall(obj, traitType, trait, amount): no-op.
+       ,0x825E: bridged("critter_add_trait_sfall", 4, false) // critter_add_trait(obj, tt, t, amt)
+
+       // 0x825F — get_num_new_obj_sfall(): return count of scripted objects created.
+       ,0x825F: bridged("get_num_new_obj_sfall", 0) // get_num_new_obj() → 0
     }
     Object.assign(opMap, bridgeOpMap)
 
