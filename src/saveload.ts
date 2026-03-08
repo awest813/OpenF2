@@ -381,9 +381,12 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     }
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
+    // BLK-080: Guard against null gMap in the log message — save() can be called
+    // from tests or edge cases where no map has been loaded yet.
+    const currentMapName = globalState.gMap?.name ?? '(none)'
     console.log(
         `[SaveLoad] Saving ${1 + dirtyMapNames.length} maps (current: ${
-            globalState.gMap.name
+            currentMapName
         } plus dirty maps: ${dirtyMapNames.join(', ')})`
     )
 

@@ -483,6 +483,12 @@ export module Scripting {
     function objCanSeeObj(obj: Critter, target: Obj): boolean {
         // Is target within obj's perception, or is it a non-critter object (without perception)?
         if (target.type !== 'critter' || isWithinPerception(obj, target as Critter)) {
+            // BLK-076: Guard against null gMap (during map transitions or before a map
+            // is loaded) and null/missing positions on either critter.  When the map or
+            // positions are unavailable we conservatively treat the line-of-sight check
+            // as unobstructed (return true) so scripts that call can_see_obj / is_within_perception
+            // don't crash and still get a usable result.
+            if (!globalState.gMap || !obj.position || !target.position) return true
             // Then, is anything blocking obj from drawing a straight line to target?
             const hit = globalState.gMap.hexLinecast(obj.position, target.position)
             return !hit
@@ -2163,6 +2169,14 @@ export module Scripting {
                 return
             }*/
 
+            // BLK-079: Guard against null gMap — can happen when scripts run during
+            // map transitions or before the first map is fully loaded.  Skip the
+            // addObject call so the VM doesn't crash; return null to signal failure.
+            if (!globalState.gMap) {
+                warn('create_object_sid: gMap is null — cannot place object on map', undefined, this)
+                return null
+            }
+
             // add it to the map
             globalState.gMap.addObject(obj, elev)
 
@@ -2765,6 +2779,14 @@ export module Scripting {
 
         explosion(tile: number, elevation: number, damage: number) {
             log('explosion', arguments)
+
+            // BLK-077: Guard against null gMap — explosion() can be called from
+            // scripts during map transitions or before the first map loads.
+            // Without the guard, addObject/removeObject would throw a TypeError.
+            if (!globalState.gMap) {
+                warn('explosion: gMap is null — skipping explosion at tile ' + tile, undefined, this)
+                return
+            }
 
             // Make a transient object so we can explode at the tile.
             var explosives = createObjectWithPID(makePID(0 /* items */, 85 /* Plastic Explosives */), -1)
@@ -3441,6 +3463,13 @@ export module Scripting {
         load_map(map: number | string, startLocation: number) {
             log('load_map', arguments)
             info('load_map: ' + map)
+            // BLK-078: Guard against null gMap — can occur when load_map() is called
+            // from a context where no map has been initialized yet (e.g. startup scripts
+            // or test harnesses).  Without the guard, loadMap/loadMapByID would throw.
+            if (!globalState.gMap) {
+                warn('load_map: gMap is null — cannot load map ' + map, undefined, this)
+                return
+            }
             if (typeof map === 'string') globalState.gMap.loadMap(map.split('.')[0].toLowerCase())
             else globalState.gMap.loadMapByID(map)
         }
@@ -5006,6 +5035,117 @@ export module Scripting {
             if (!party) return 0
             const members = (party as any).members
             return Array.isArray(members) ? members.length : 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 68 — sfall extended opcodes 0x8240–0x8247
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8240 — get_critter_damage_type_sfall(obj):
+        // Return the default melee damage type for a critter.
+        // Fallout 2 damage types: 0=normal, 1=laser, 2=fire, 3=plasma, 4=electrical,
+        // 5=EMP, 6=explosion.  Browser build returns 0 (normal) for all critters;
+        // full per-critter damage-type tracking is not modelled.
+        get_critter_damage_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_damage_type_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).damageType ?? 0
+        }
+
+        // sfall 0x8241 — set_critter_damage_type_sfall(obj, type):
+        // Set the default melee damage type for a critter.
+        // Stores the value on the object for subsequent reads.
+        set_critter_damage_type_sfall(obj: Obj, type: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_damage_type_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).damageType = Math.max(0, Math.min(6, Math.floor(type)))
+        }
+
+        // sfall 0x8242 — get_combat_free_move_sfall():
+        // Return the number of free tile-moves available this combat turn
+        // (the "free move" AP bonus from some perks/traits).
+        // Browser build: returns 0 (no free-move tracking).
+        get_combat_free_move_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x8243 — set_combat_free_move_sfall(obj, tiles):
+        // Set the number of free tile-moves available to a critter this turn.
+        // Browser build: no-op (free-move is not tracked per critter).
+        set_combat_free_move_sfall(obj: Obj, tiles: number): void {
+            log('set_combat_free_move_sfall', arguments)
+        }
+
+        // sfall 0x8244 — get_base_stat_sfall(obj, stat_id):
+        // Return the base (unmodified) value of a SPECIAL stat for any critter.
+        // Uses the same stat-name mapping as get_critter_stat_sfall but reads the
+        // base value instead of the derived value.  Returns 0 for unknown stats
+        // or non-critters.
+        get_base_stat_sfall(obj: Obj, stat_id: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const statNames: Record<number, string> = {
+                0: 'STR', 1: 'PER', 2: 'END', 3: 'CHA', 4: 'INT', 5: 'AGI', 6: 'LUK',
+                7: 'Max HP', 8: 'AP', 9: 'AC', 10: 'Melee', 11: 'Carry',
+                12: 'Sequence', 13: 'Healing Rate', 14: 'Critical Chance', 15: 'Better Criticals',
+                16: 'DT Normal', 17: 'DT Laser', 18: 'DT Fire', 19: 'DT Plasma',
+                20: 'DT Electrical', 21: 'DT EMP', 22: 'DT Explosive',
+                23: 'DR Normal', 24: 'DR Laser', 25: 'DR Fire', 26: 'DR Plasma',
+                27: 'DR Electrical', 28: 'DR EMP', 29: 'DR Explosive',
+                30: 'DR Radiation', 31: 'DR Poison',
+            }
+            const name = statNames[stat_id]
+            if (!name) {
+                log('get_base_stat_sfall: unknown stat id ' + stat_id + ' — returning 0', arguments)
+                return 0
+            }
+            return typeof critter.stats?.getBase === 'function' ? (critter.stats.getBase(name) ?? 0) : 0
+        }
+
+        // sfall 0x8245 — set_base_stat_sfall(obj, stat_id, value):
+        // Set the base (unmodified) value of a SPECIAL stat on a critter.
+        // Uses the same stat-name mapping as get_base_stat_sfall.
+        set_base_stat_sfall(obj: Obj, stat_id: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            const statNames: Record<number, string> = {
+                0: 'STR', 1: 'PER', 2: 'END', 3: 'CHA', 4: 'INT', 5: 'AGI', 6: 'LUK',
+                7: 'Max HP', 8: 'AP', 9: 'AC', 10: 'Melee', 11: 'Carry',
+                12: 'Sequence', 13: 'Healing Rate', 14: 'Critical Chance',
+            }
+            const name = statNames[stat_id]
+            if (!name) {
+                warn('set_base_stat_sfall: unknown stat id ' + stat_id + ' — ignoring', undefined, this)
+                return
+            }
+            if (typeof critter.stats?.modifyBase === 'function') {
+                const current = typeof critter.stats?.getBase === 'function' ? (critter.stats.getBase(name) ?? 0) : 0
+                critter.stats.modifyBase(name, Math.floor(value) - current)
+            }
+        }
+
+        // sfall 0x8246 — get_game_difficulty_sfall():
+        // Return the current game difficulty setting.
+        // 0=easy, 1=normal, 2=hard.  Browser build: always returns 1 (normal).
+        get_game_difficulty_sfall(): number {
+            return 1
+        }
+
+        // sfall 0x8247 — get_violence_level_sfall():
+        // Return the current violence level setting (0=minimal, 1=normal, 2=maximum blood).
+        // Browser build: always returns 2 (maximum) — no violence-level control implemented.
+        get_violence_level_sfall(): number {
+            return 2
         }
 
         _serialize(): SerializedScript {
