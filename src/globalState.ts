@@ -84,6 +84,7 @@ export default {
 
     ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
     gameUIDisabled: false, // True when scripts have disabled UI interaction
+    carFuel: 0, // car fuel level (sfall get/set_car_fuel_amount); persisted in save v18+
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
     mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
@@ -155,6 +156,13 @@ export default {
     ambientLightLevel: number
     /** True when scripts have temporarily disabled the game UI. */
     gameUIDisabled: boolean
+
+    /**
+     * Car fuel level managed by sfall get/set_car_fuel_amount opcodes (0x8229/0x822A).
+     * Initialized to 0; set by scripts (e.g. game_start or worldmap scripts).
+     * Persisted in save schema v18+ so the car remains fueled after reloading.
+     */
+    carFuel: number
 
     /**
      * Per-kill-type kill counts for the player session.

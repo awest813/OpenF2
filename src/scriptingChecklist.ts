@@ -4665,6 +4665,115 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 66 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'car_fuel_persistence',
+        kind: 'procedure',
+        description:
+            'BLK-071: carFuel saved and loaded via save schema v18. ' +
+            'car fuel level is now persisted across save/load cycles so the ' +
+            'Highwayman remains fueled after reloading. Previously, fuel reset to ' +
+            '0 on every load, making the vehicle useless for subsequent sessions.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'tile_contains_pid_obj_null_gmap',
+        kind: 'procedure',
+        description:
+            'BLK-072: tile_contains_pid_obj() null guard for globalState.gMap. ' +
+            'Previously dereferenced gMap unconditionally, causing a crash when ' +
+            'scripts called it during map transitions or before a map was loaded. ' +
+            'Now returns 0 safely when gMap is null.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_object_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x8230: get_object_name_sfall(obj) — return display name of any ' +
+            'game object (critter, item, scenery, …). Alias of obj_name() for all types.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_gender',
+        kind: 'opcode',
+        description:
+            'sfall 0x8231: get_critter_gender_sfall(obj) — return critter gender ' +
+            '(0=male, 1=female). Reads from critter.gender; defaults to 0 (male).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_combat_round',
+        kind: 'opcode',
+        description:
+            'sfall 0x8232: get_combat_round_sfall() — return current combat round number. ' +
+            'Returns 0 when not in combat.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_action_points',
+        kind: 'opcode',
+        description:
+            'sfall 0x8233: get_critter_action_points_sfall(obj) — return critter current AP. ' +
+            'Returns combat AP in combat; max AP (5 + AGI/2) outside combat.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_action_points',
+        kind: 'opcode',
+        description:
+            'sfall 0x8234: set_critter_action_points_sfall(obj, ap) — set critter AP. ' +
+            'Alias of set_critter_combat_ap; no-op outside combat.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_max_ap',
+        kind: 'opcode',
+        description:
+            'sfall 0x8235: get_critter_max_ap_sfall(obj) — return critter max AP per turn. ' +
+            'Formula: 5 + floor(AGI / 2).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_carry_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x8236: get_critter_carry_weight_sfall(obj) — return carry weight capacity. ' +
+            'Formula: 25 + ST * 25 (pounds).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_current_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x8237: get_critter_current_weight_sfall(obj) — return total weight ' +
+            'currently carried by a critter in pounds (sums inventory item weights).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

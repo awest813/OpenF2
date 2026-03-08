@@ -2419,6 +2419,12 @@ export module Scripting {
         }
         tile_contains_pid_obj(tile: number, elevation: number, pid: number): any {
             log('tile_contains_pid_obj', arguments, 'tiles')
+            // BLK-072: Guard against null gMap — can occur when scripts run during
+            // map transitions or in early-init before a map has been loaded.
+            if (!globalState.gMap) {
+                warn('tile_contains_pid_obj: gMap is null — returning 0', undefined, this)
+                return 0
+            }
             var pos = fromTileNum(tile)
             var objects = globalState.gMap.getObjects(elevation)
             for (var i = 0; i < objects.length; i++) {
@@ -4716,16 +4722,16 @@ export module Scripting {
 
         // sfall 0x8229 — get_car_fuel_amount_sfall():
         // Return the current fuel level of the player's car (Highwayman).
-        // Car fuel is stored in globalState; defaults to 0 (no car yet).
+        // Car fuel is stored in globalState.carFuel (BLK-071: persisted in save v18+).
         get_car_fuel_amount_sfall(): number {
-            return (globalState as any).carFuel ?? 0
+            return globalState.carFuel ?? 0
         }
 
         // sfall 0x822A — set_car_fuel_amount_sfall(amount):
         // Set the current fuel level of the player's car.
         // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
         set_car_fuel_amount_sfall(amount: number): void {
-            ;(globalState as any).carFuel = Math.max(0, Math.min(80000, amount))
+            globalState.carFuel = Math.max(0, Math.min(80000, amount))
         }
 
         // sfall 0x822B — get_critter_ai_packet_sfall(obj):
@@ -4782,6 +4788,112 @@ export module Scripting {
                 }
             }
             return 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 66 — sfall extended opcodes 0x8230–0x8237
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8230 — get_object_name_sfall(obj):
+        // Return the display name of any game object (critter, item, scenery, …).
+        // Falls through to the vanilla obj_name / critter name path.
+        // Returns '' when obj is not a valid game object or has no name.
+        get_object_name_sfall(obj: Obj): string {
+            if (!isGameObject(obj)) return ''
+            return (obj as any).name ?? ''
+        }
+
+        // sfall 0x8231 — get_critter_gender_sfall(obj):
+        // Return the gender of a critter (0 = male, 1 = female).
+        // Uses the critter's .gender property when available; defaults to 0 (male).
+        get_critter_gender_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_gender_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const gender: string | undefined = (obj as any).gender
+            return gender === 'female' ? 1 : 0
+        }
+
+        // sfall 0x8232 — get_combat_round_sfall():
+        // Return the current combat round number (1-based).
+        // Returns 0 when not in combat.
+        get_combat_round_sfall(): number {
+            if (!globalState.inCombat || !globalState.combat) return 0
+            return (globalState.combat as any).round ?? 0
+        }
+
+        // sfall 0x8233 — get_critter_action_points_sfall(obj):
+        // Return a critter's current action points during combat (alias of
+        // get_critter_combat_ap, but also works when not in combat by returning the
+        // critter's maximum AP instead of 0).
+        get_critter_action_points_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_action_points_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            if (globalState.inCombat && critter.AP) return critter.AP.combat
+            // Outside combat return max AP derived from Agility.
+            const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
+            return Math.max(1, 5 + Math.floor(agi / 2))
+        }
+
+        // sfall 0x8234 — set_critter_action_points_sfall(obj, ap):
+        // Set a critter's current action points (alias of set_critter_combat_ap).
+        // No-op outside of combat.
+        set_critter_action_points_sfall(obj: Obj, ap: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_action_points_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+        }
+
+        // sfall 0x8235 — get_critter_max_ap_sfall(obj):
+        // Return a critter's maximum action points per turn.
+        // Derived from Agility: max_ap = 5 + floor(AGI / 2).
+        get_critter_max_ap_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_max_ap_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
+            return Math.max(1, 5 + Math.floor(agi / 2))
+        }
+
+        // sfall 0x8236 — get_critter_carry_weight_sfall(obj):
+        // Return a critter's carry-weight capacity in pounds.
+        // Derived from Strength: carry_weight = 25 + ST * 25.
+        get_critter_carry_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_carry_weight_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const str = typeof critter.getStat === 'function' ? (critter.getStat('STR') ?? 5) : 5
+            return 25 + str * 25
+        }
+
+        // sfall 0x8237 — get_critter_current_weight_sfall(obj):
+        // Return the total weight currently carried by a critter in pounds.
+        // Derived from proto extra.weight (tenths of a pound → pounds).
+        get_critter_current_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_current_weight_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            if (!Array.isArray(critter.inventory)) return 0
+            let total = 0
+            for (const item of critter.inventory) {
+                const w: number = (item as any).pro?.extra?.weight ?? 0
+                const amt: number = (item as any).amount ?? 1
+                total += Math.floor(w / 10) * amt
+            }
+            return total
         }
 
         _serialize(): SerializedScript {
