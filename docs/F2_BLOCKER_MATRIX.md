@@ -147,3 +147,13 @@ Before moving a blocker to `CLOSED`, confirm:
 - [ ] Regression test added/updated and passing
 - [ ] Region checklist status updated in `docs/F2_CRITICAL_PATH.md`
 - [ ] Any related VM checklist status updated (when applicable)
+
+| BLK-105 | HIGH | Scripting/Time | `src/scripting.ts` | `game_time_advance` | Non-finite ticks (NaN/Infinity) corrupted `globalState.gameTickTime`, breaking all time-based events. | Pass NaN or Infinity as ticks argument to `game_time_advance()`. | Guard with `isFinite()` and return early. No time corruption. | `src/phase74.test.ts` | @engine | CLOSED | Added `isFinite()` guard; logs warning and returns early. |
+
+| BLK-106 | HIGH | Scripting/XP | `src/scripting.ts` | `give_exp_points` | Non-finite XP (NaN/Infinity) corrupted `player.xp`, permanently preventing level-up (NaN >= threshold is always false). | Pass NaN as xp to `give_exp_points()`. | Guard with `isFinite()` and return early. XP unchanged. | `src/phase74.test.ts` | @engine | CLOSED | Added `isFinite()` guard; logs warning and returns early. |
+
+| BLK-107 | HIGH | Scripting/Dialogue | `src/scripting.ts` | `gsay_option` | Null/non-function target caused `target.bind(this)` to throw a TypeError, aborting the entire dialogue session. | Pass 0 or a non-callable as the target argument to `gsay_option()`. | Substitute a no-op handler; dialogue option still appears in UI. | `src/phase74.test.ts` | @engine | CLOSED | Added `typeof target !== 'function'` guard; substitutes no-op. |
+
+| BLK-108 | HIGH | Scripting/Map | `src/scripting.ts` | `critter_attempt_placement` | Delegated to `move_to()` without null-checking gMap; `gMap.changeElevation()` threw TypeError during map transitions. | Call `critter_attempt_placement()` while `globalState.gMap` is null. | Return -1 (placement failure) when gMap is null. | `src/phase74.test.ts` | @engine | CLOSED | Added null gMap check before calling `move_to()`; returns -1. |
+
+| BLK-109 | MEDIUM | Scripting/Timers | `src/scripting.ts` | `add_timer_event` | Zero or negative ticks caused events to fire on the very next `game_time_advance()` call, producing re-entrant callbacks. | Call `add_timer_event()` with ticks <= 0. | Clamp ticks to minimum of 1. | `src/phase74.test.ts` | @engine | CLOSED | Sets ticks = 1 when ticks is <= 0, non-finite, or non-number. |

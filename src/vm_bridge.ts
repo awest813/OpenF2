@@ -1253,6 +1253,34 @@ export module ScriptVMBridge {
 
        // 0x826F — get_elevation_sfall(): return current map elevation (0–2).
        ,0x826F: bridged("get_elevation_sfall", 0) // get_elevation() → 0|1|2
+
+       // -----------------------------------------------------------------------
+       // Phase 74 — sfall extended opcodes 0x8270–0x8277
+       // -----------------------------------------------------------------------
+
+       // 0x8270 — get_tile_at_object_sfall(obj): tile number of obj or -1
+       ,0x8270: bridged("get_tile_at_object_sfall", 1) // get_tile_at_object(obj) → tile|-1
+
+       // 0x8271 — critter_get_flee_state_sfall(obj): 1 if fleeing, 0 otherwise
+       ,0x8271: bridged("critter_get_flee_state_sfall", 1) // critter_get_flee_state(obj) → 0|1
+
+       // 0x8272 — critter_set_flee_state_sfall(obj, fleeing): set flee flag
+       ,0x8272: bridged("critter_set_flee_state_sfall", 2, false) // critter_set_flee_state(obj, val)
+
+       // 0x8273 — get_combat_difficulty_sfall(): 0=easy, 1=normal, 2=hard
+       ,0x8273: bridged("get_combat_difficulty_sfall", 0) // get_combat_difficulty() → 1
+
+       // 0x8274 — get_object_proto_sfall(obj): return proto data or 0
+       ,0x8274: bridged("get_object_proto_sfall", 1) // get_object_proto(obj) → 0
+
+       // 0x8275 — get_critter_hit_chance_sfall(attacker, target): hit chance 0–100
+       ,0x8275: bridged("get_critter_hit_chance_sfall", 2) // get_critter_hit_chance(a, t) → 0..100
+
+       // 0x8276 — get_tile_distance_sfall(tile1, tile2): hex distance
+       ,0x8276: bridged("get_tile_distance_sfall", 2) // get_tile_distance(t1, t2) → dist
+
+       // 0x8277 — get_tile_in_direction_sfall(tile, dir, count): tile alias
+       ,0x8277: bridged("get_tile_in_direction_sfall", 3) // get_tile_in_direction(t, d, n) → tile
     }
     Object.assign(opMap, bridgeOpMap)
 

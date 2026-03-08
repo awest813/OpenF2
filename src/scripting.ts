@@ -1110,6 +1110,13 @@ export module Scripting {
         give_exp_points(xp: number) {
             const player = globalState.player
             if (!player) return
+            // BLK-106: Guard against non-finite XP — NaN or Infinity would corrupt
+            // player.xp, causing the level-up while-loop comparison to always be
+            // false (NaN >= anything is false) so the player could never level up.
+            if (typeof xp !== 'number' || !isFinite(xp)) {
+                warn('give_exp_points: non-finite XP (' + xp + ') — no-op', undefined, this)
+                return
+            }
             player.xp += xp
             uiLog('You gain ' + xp + ' experience points.')
             // Check for level-up: level N is reached at N*(N+1)/2 * 1000 total XP.
@@ -1610,6 +1617,15 @@ export module Scripting {
             // Fallout 2 returns -1 when placement fails; we mirror that here so
             // calling scripts can detect and handle the failure gracefully.
             if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) return -1
+            // BLK-108: Guard against null gMap — critter_attempt_placement delegates
+            // to move_to(), which calls gMap.changeElevation() without checking gMap.
+            // During map transitions or in test environments this crash is silent and
+            // hard to diagnose.  Return -1 (placement failure) so calling scripts can
+            // handle it gracefully rather than receiving an uncaught TypeError.
+            if (!globalState.gMap) {
+                warn('critter_attempt_placement: gMap is null — returning -1', undefined, this)
+                return -1
+            }
             // Place the critter at tileNum; move_to handles finding a nearby tile if
             // the exact position is occupied.
             return this.move_to(obj, tileNum, elevation)
@@ -2648,7 +2664,16 @@ export module Scripting {
                 return
             }
             info('DIALOGUE OPTION: ' + msg, 'dialogue')
-            dialogueOptionProcs.push(target.bind(this))
+            // BLK-107: Guard against null/non-function target — scripts occasionally
+            // pass 0 or a non-callable as the target when the option has no handler.
+            // target.bind(this) would throw a TypeError and abort the dialogue.
+            // Wrap the no-op in a safe function so the option still appears in the UI.
+            if (typeof target !== 'function') {
+                warn('gsay_option: target is not a function (' + target + ') — using no-op', undefined, this)
+                dialogueOptionProcs.push(() => {})
+            } else {
+                dialogueOptionProcs.push(target.bind(this))
+            }
             uiAddDialogueOption(msg, dialogueOptionProcs.length - 1)
         }
         giq_option(iqTest: number, msgList: number, msgID: string | number, target: any, reaction: number) {
@@ -2875,6 +2900,14 @@ export module Scripting {
                 warn('add_timer_event: not a scriptable object: ' + obj)
                 return
             }
+            // BLK-109: Guard against non-positive or non-finite ticks — zero, negative,
+            // NaN, or Infinity ticks would fire the event on the very next tick-advance
+            // (or never), potentially causing re-entrant callbacks and confusing time-sorted
+            // event queues.  Clamp to a minimum of 1 tick so events always fire in the future.
+            if (typeof ticks !== 'number' || !isFinite(ticks) || ticks <= 0) {
+                warn('add_timer_event: non-positive ticks (' + ticks + ') — clamping to 1', undefined, this)
+                ticks = 1
+            }
             info('timer event added in ' + ticks + ' ticks (userdata ' + userdata + ')', 'timer')
             // trigger timedEvent in `ticks` game ticks
             timeEventList.push({
@@ -2919,6 +2952,14 @@ export module Scripting {
         }
         game_time_advance(ticks: number) {
             log('game_time_advance', arguments)
+            // BLK-105: Guard against non-finite ticks — NaN or Infinity would corrupt
+            // globalState.gameTickTime, breaking every subsequent time-based check
+            // (timed events, drug timers, in-game clock).  Clamp to a safe no-op
+            // when the value is not a finite number.
+            if (typeof ticks !== 'number' || !isFinite(ticks)) {
+                warn('game_time_advance: non-finite ticks (' + ticks + ') — no-op', undefined, this)
+                return
+            }
             info('advancing time ' + ticks + ' ticks ' + '(' + ticks / 10 + ' seconds)')
             globalState.gameTickTime += ticks
         }
@@ -5619,6 +5660,82 @@ export module Scripting {
         // but exposed as a sfall opcode for mods that call it via the sfall table.
         get_elevation_sfall(): number {
             return globalState.currentElevation ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 74 — sfall extended opcodes 0x8270–0x8277
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8270 — get_tile_at_object_sfall(obj):
+        // Return the tile number (tileNum) of the object's current map position.
+        // Returns -1 when the object has no position (e.g. is in inventory or is
+        // being destroyed) so callers can detect and handle the unplaced state.
+        get_tile_at_object_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_tile_at_object_sfall: not a game object: ' + obj, undefined, this)
+                return -1
+            }
+            if ((obj as any).position == null) return -1
+            return toTileNum((obj as any).position)
+        }
+
+        // sfall 0x8271 — critter_get_flee_state_sfall(obj):
+        // Return 1 if the critter is currently fleeing, 0 otherwise.
+        // Alias of the isFleeing flag used by critter_state().
+        critter_get_flee_state_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).isFleeing === true ? 1 : 0
+        }
+
+        // sfall 0x8272 — critter_set_flee_state_sfall(obj, fleeing):
+        // Set the critter's fleeing flag.  1 = fleeing, 0 = not fleeing.
+        critter_set_flee_state_sfall(obj: Obj, fleeing: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_set_flee_state_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).isFleeing = fleeing !== 0
+        }
+
+        // sfall 0x8273 is an alias of get_combat_difficulty_sfall() (0x81EC) —
+        // see the vm_bridge.ts registration; no new method body is needed here.
+
+        // sfall 0x8274 — get_object_proto_sfall(obj):
+        // Return the proto data object for obj.  Browser build: returns 0 (stub) —
+        // the full in-memory proto table is not yet accessible from the script VM.
+        get_object_proto_sfall(_obj: Obj): number {
+            return 0
+        }
+
+        // sfall 0x8275 — get_critter_hit_chance_sfall(attacker, target):
+        // Return the computed hit chance (0–100) for attacker against target.
+        // Browser build: partial — delegates to getHitChance when combat module
+        // is available; returns 0 if not in combat or combat is not initialized.
+        get_critter_hit_chance_sfall(attacker: Obj, target: Obj): number {
+            if (!isGameObject(attacker) || !isGameObject(target)) return 0
+            if (!globalState.combat) return 0
+            try {
+                return (globalState.combat as any).getHitChance?.(attacker as Critter, target as Critter) ?? 0
+            } catch (_e) {
+                return 0
+            }
+        }
+
+        // sfall 0x8276 — get_tile_distance_sfall(tile1, tile2):
+        // Return the hex distance between two tile numbers.
+        // Fully implemented: converts both tiles via fromTileNum and calls hexDistance.
+        get_tile_distance_sfall(tile1: number, tile2: number): number {
+            const pos1 = fromTileNum(tile1)
+            const pos2 = fromTileNum(tile2)
+            if (!pos1 || !pos2) return 0
+            return hexDistance(pos1, pos2)
+        }
+
+        // sfall 0x8277 — get_tile_in_direction_sfall(tile, dir, count):
+        // Return the tile count steps in direction dir from tile.
+        // Alias of tile_num_in_direction().
+        get_tile_in_direction_sfall(tile: number, dir: number, count: number): number {
+            return this.tile_num_in_direction(tile, dir, count)
         }
 
         _serialize(): SerializedScript {
