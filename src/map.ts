@@ -477,10 +477,16 @@ export class GameMap {
         globalState.loadingAssetsTotal-- // we should know all of the assets we need by now
 
         // clear audio and use the map music
+        // BLK-103: Guard against null audioEngine — during test environments and
+        // early browser init the audio subsystem has not been created yet.
+        // Calling stopAll() / playMusic() on null throws a TypeError that would
+        // abort map loading entirely.  Skip audio setup silently when unavailable.
         const curMapInfo = getCurrentMapInfo()
-        globalState.audioEngine.stopAll()
-        if (curMapInfo && curMapInfo.music) {
-            globalState.audioEngine.playMusic(curMapInfo.music)
+        if (globalState.audioEngine) {
+            globalState.audioEngine.stopAll()
+            if (curMapInfo && curMapInfo.music) {
+                globalState.audioEngine.playMusic(curMapInfo.music)
+            }
         }
 
         Events.emit('loadMapPost')

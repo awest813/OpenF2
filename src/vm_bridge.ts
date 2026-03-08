@@ -1225,6 +1225,34 @@ export module ScriptVMBridge {
 
        // 0x8267 — get_map_local_var_sfall(idx): return map local variable by index.
        ,0x8267: bridged("get_map_local_var_sfall", 1) // get_map_local_var(idx) → value
+
+       // -----------------------------------------------------------------------
+       // Phase 73 — sfall extended opcodes 0x8268–0x826F
+       // -----------------------------------------------------------------------
+
+       // 0x8268 — get_critter_ap_sfall(obj): current combat AP or max AP stat.
+       ,0x8268: bridged("get_critter_ap_sfall", 1) // get_critter_ap(obj) → ap
+
+       // 0x8269 — set_critter_ap_sfall(obj, ap): set current combat AP.
+       ,0x8269: bridged("set_critter_ap_sfall", 2, false) // set_critter_ap(obj, ap)
+
+       // 0x826A — get_object_flags_sfall(obj): return Fallout 2 flags bitmask.
+       ,0x826A: bridged("get_object_flags_sfall", 1) // get_object_flags(obj) → flags
+
+       // 0x826B — set_object_flags_sfall(obj, flags): write flags bitmask.
+       ,0x826B: bridged("set_object_flags_sfall", 2, false) // set_object_flags(obj, flags)
+
+       // 0x826C — critter_is_dead_sfall(obj): 1 if critter is dead, 0 otherwise.
+       ,0x826C: bridged("critter_is_dead_sfall", 1) // critter_is_dead(obj) → 0|1
+
+       // 0x826D — get_obj_light_level_sfall(obj): return object light emission level (0–65536).
+       ,0x826D: bridged("get_obj_light_level_sfall", 1) // get_obj_light_level(obj) → 0..65536
+
+       // 0x826E — set_obj_light_level_sfall(obj, level): set object light emission level.
+       ,0x826E: bridged("set_obj_light_level_sfall", 2, false) // set_obj_light_level(obj, level)
+
+       // 0x826F — get_elevation_sfall(): return current map elevation (0–2).
+       ,0x826F: bridged("get_elevation_sfall", 0) // get_elevation() → 0|1|2
     }
     Object.assign(opMap, bridgeOpMap)
 
