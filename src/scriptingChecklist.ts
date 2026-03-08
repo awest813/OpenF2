@@ -5572,6 +5572,162 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 72 entries
+    // -----------------------------------------------------------------------
+
+    // BLK-096
+    {
+        id: 'blk_096_metarule3_105_null_position',
+        kind: 'metarule',
+        description:
+            'BLK-096: metarule3(105) METARULE3_OBJ_CAN_HEAR_OBJ — added null-position guard ' +
+            'before hexDistance() call.  Objects in inventory or mid-map-transition have no ' +
+            'position; without this guard the call crashes with a TypeError.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-097
+    {
+        id: 'blk_097_metarule3_110_null_position',
+        kind: 'metarule',
+        description:
+            'BLK-097: metarule3(110) METARULE3_CRITTER_TILE — added null-position guard before ' +
+            'toTileNum() call.  Critters without a placed position (inventory, transitions) ' +
+            'would crash; now returns -1 instead.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-098
+    {
+        id: 'blk_098_get_critter_stat_null_object',
+        kind: 'procedure',
+        description:
+            'BLK-098: get_critter_stat() — added isGameObject guard before stat lookup. ' +
+            'Scripts holding stale or null critter references (e.g. after critter death) ' +
+            'pass 0 as obj; without this guard obj.getStat() throws a TypeError.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-099
+    {
+        id: 'blk_099_party_add_remove_null_gparty',
+        kind: 'procedure',
+        description:
+            'BLK-099: party_add() / party_remove() — added null gParty guard.  During early ' +
+            'init, map transitions, or test runs globalState.gParty may be null; calling ' +
+            'addPartyMember / removePartyMember on null crashes the runtime.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8260 — get_critter_weapon (second alias)
+    {
+        id: 'sfall_opcode_8260_critter_weapon_alias',
+        kind: 'opcode',
+        description:
+            'sfall 0x8260: second opcode alias for get_critter_weapon(obj, slot). ' +
+            'Returns the weapon equipped in slot 0 (right/primary) or 1 (left/secondary). ' +
+            'Implementation shared with the Phase-52 opcode 0x81BE.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8261 — set_critter_weapon_sfall
+    {
+        id: 'sfall_set_critter_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x8261: set_critter_weapon_sfall(obj, slot, weapon) — equip a weapon in the ' +
+            'given slot.  Browser build: partial — writes the slot directly without triggering ' +
+            'equip animations.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8262 — get_object_type_sfall (second alias)
+    {
+        id: 'sfall_opcode_8262_object_type_alias',
+        kind: 'opcode',
+        description:
+            'sfall 0x8262: second opcode alias for get_object_type_sfall(obj). ' +
+            'Returns object-type index: 0=item, 1=critter, 2=scenery, 3=wall. ' +
+            'Implementation shared with the Phase-58 opcode 0x81F6.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+
+    // sfall 0x8263 — get_critter_team (second alias)
+    {
+        id: 'sfall_opcode_8263_critter_team_alias',
+        kind: 'opcode',
+        description:
+            'sfall 0x8263: second opcode alias for get_critter_team(critter). ' +
+            'Returns the AI team number.  Implementation shared with Phase-52 opcode 0x81C4.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8264 — set_critter_team (second alias)
+    {
+        id: 'sfall_opcode_8264_set_critter_team_alias',
+        kind: 'opcode',
+        description:
+            'sfall 0x8264: second opcode alias for set_critter_team(critter, team). ' +
+            'Sets the AI team number.  Implementation shared with Phase-52 opcode 0x81C5.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8265 — get_ambient_light_sfall
+    {
+        id: 'sfall_get_ambient_light',
+        kind: 'opcode',
+        description:
+            'sfall 0x8265: get_ambient_light_sfall() — return ambient light level (0–65536). ' +
+            'Browser build: reads globalState.ambientLightLevel; defaults to 65536 (full).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8266 — set_ambient_light_sfall
+    {
+        id: 'sfall_set_ambient_light',
+        kind: 'opcode',
+        description:
+            'sfall 0x8266: set_ambient_light_sfall(level) — set ambient light level (0–65536). ' +
+            'Browser build: stores the value in globalState.ambientLightLevel for script reads; ' +
+            'full dynamic-lighting update not yet wired.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8267 — get_map_local_var_sfall
+    {
+        id: 'sfall_get_map_local_var',
+        kind: 'opcode',
+        description:
+            'sfall 0x8267: get_map_local_var_sfall(idx) — return a map-local variable by index. ' +
+            'Delegates to map_var() so results are consistent with native map_var() calls.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
