@@ -499,6 +499,36 @@ export module Scripting {
         _script: Script
     }
 
+    // BLK-064: Fallout 2 engine-appropriate defaults for well-known INI config keys.
+    // Keys are stored in lower-case for O(1) case-insensitive lookup.
+    // Scripts that call get_ini_setting() receive these defaults when the browser
+    // build cannot read the actual INI files, preventing settings from appearing
+    // falsely disabled (0) when the FO2 engine default is non-zero.
+    const INI_SETTING_DEFAULTS: Readonly<Record<string, number>> = {
+        'main.speedinterfacecounteranims': 1,
+        'main.fps': 60,
+        'main.brightmaps': 0,
+        'main.singlecore': 1,
+        'main.subtitles': 0,
+        'main.languagefilter': 0,
+        'main.running': 1,
+        'sound.sound': 1,
+        'sound.music': 1,
+        'sound.speech': 1,
+        'sound.sfxvolume': 117,
+        'sound.musicvolume': 117,
+        'sound.speechvolume': 117,
+        'preferences.game_difficulty': 1,
+        'preferences.combat_difficulty': 1,
+        'preferences.violence_level': 3,
+        'preferences.target_highlight': 2,
+        'preferences.combat_looks': 0,
+        'preferences.item_highlight': 1,
+        'preferences.combat_messages': 1,
+        'preferences.combat_taunts': 1,
+        'preferences.running_burning_guy': 1,
+    }
+
     export class Script {
         // Stuff we hacked in
         _didOverride = false // Did the procedure call override the default action?
@@ -1391,6 +1421,20 @@ export module Scripting {
                 return 0
             }
 
+            // BLK-066: Also check equipped slots (leftHand, rightHand, equippedArmor).
+            // In Fallout 2, equipped items are removed from the inventory array and placed
+            // in dedicated slots, so a simple inventory scan would miss them.  Scripts
+            // commonly use obj_carrying_pid_obj() to detect whether an NPC has a specific
+            // weapon equipped before giving them ammo or initiating trade.
+            const equipped = [
+                (obj as any).leftHand,
+                (obj as any).rightHand,
+                (obj as any).equippedArmor,
+            ]
+            for (const slot of equipped) {
+                if (slot && slot.pid === pid) return slot
+            }
+
             for (var i = 0; i < obj.inventory.length; i++) {
                 if (obj.inventory[i].pid === pid) return obj.inventory[i]
             }
@@ -1524,6 +1568,10 @@ export module Scripting {
             }
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
+            // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
+            // Fallout 2 returns -1 when placement fails; we mirror that here so
+            // calling scripts can detect and handle the failure gracefully.
+            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) return -1
             // Place the critter at tileNum; move_to handles finding a nearby tile if
             // the exact position is occupied.
             return this.move_to(obj, tileNum, elevation)
@@ -2320,6 +2368,12 @@ export module Scripting {
         destroy_object(obj: Obj) {
             // destroy object from world
             log('destroy_object', arguments)
+            // BLK-069: Guard against null gMap and null obj to prevent crashes when
+            // scripts destroy objects during map transitions or test runs.
+            if (!globalState.gMap || !obj) {
+                warn('destroy_object: gMap or obj is null — skipping', undefined, this)
+                return
+            }
             globalState.gMap.destroyObject(obj)
         }
         set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, rotation: number) {
@@ -3423,6 +3477,9 @@ export module Scripting {
         // party
         party_member_obj(pid: number) {
             log('party_member_obj', arguments, 'party')
+            // BLK-067: Guard against null gParty to prevent crash during early init
+            // or when tests run without a full game-state setup.
+            if (!globalState.gParty) return 0
             return globalState.gParty.getPartyMemberByPID(pid) || 0
         }
         party_add(obj: Critter) {
@@ -3435,9 +3492,16 @@ export module Scripting {
         }
 
         // sfall extended opcode — read an INI setting by key string (0x8198).
-        // Partial: the browser build has no INI file layer; always returns 0.
+        // BLK-064: Returns sensible Fallout 2 defaults for well-known config keys.
+        // Full INI file access is not available in the browser build; returning
+        // engine-appropriate defaults prevents scripts from treating absent settings
+        // as explicitly disabled (0) when the actual FO2 default is non-zero.
         get_ini_setting(key: string): number {
             log('get_ini_setting', arguments)
+            const normalized = key.toLowerCase()
+            if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, normalized)) {
+                return INI_SETTING_DEFAULTS[normalized]
+            }
             return 0
         }
 
@@ -4396,6 +4460,330 @@ export module Scripting {
             return (globalState.gMap as any)?.mapObj?.scriptID ?? 0
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 62 — sfall extended opcodes 0x8210–0x8217
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8210 — critter_is_fleeing_sfall(obj):
+        // Return 1 if the critter is currently fleeing (low-HP flight behaviour),
+        // else 0.  Reads the isFleeing flag set by the AI flee code path.
+        critter_is_fleeing_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_is_fleeing_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).isFleeing ? 1 : 0
+        }
+
+        // sfall 0x8211 — get_perk_name_sfall(perkId):
+        // Return the localised display name of a perk by its numeric ID.
+        // Browser build: perk name table is not loaded; returns empty string.
+        get_perk_name_sfall(perkId: number): string {
+            return ''
+        }
+
+        // sfall 0x8212 — get_critter_perk_sfall(critter, perkId):
+        // Return the rank of a perk possessed by a critter (0 if not possessed).
+        // Reads from critter.perkRanks which is updated by critter_add_trait PERK calls.
+        get_critter_perk_sfall(obj: Obj, perkId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_perk_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).perkRanks?.[perkId] ?? 0
+        }
+
+        // sfall 0x8213 — obj_is_open_sfall(obj):
+        // Return 1 if the object (door/container) is currently in the open state,
+        // else 0.  Reads the open flag on the object.
+        obj_is_open_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('obj_is_open_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).open === true ? 1 : 0
+        }
+
+        // sfall 0x8214 — get_world_map_x_sfall():
+        // Return the player's current world-map tile x-coordinate.
+        // Returns -1 when the player is not on the world map (inside a local map).
+        get_world_map_x_sfall(): number {
+            return globalState.worldPosition?.x ?? -1
+        }
+
+        // sfall 0x8215 — get_world_map_y_sfall():
+        // Return the player's current world-map tile y-coordinate.
+        // Returns -1 when the player is not on the world map.
+        get_world_map_y_sfall(): number {
+            return globalState.worldPosition?.y ?? -1
+        }
+
+        // sfall 0x8216 — set_world_map_pos_sfall(x, y):
+        // Update the player's stored world-map position.
+        // Used by travel and teleport scripts to reposition the player.
+        // Only takes effect when the player is already on the world map.
+        set_world_map_pos_sfall(x: number, y: number): void {
+            if (globalState.worldPosition !== undefined) {
+                globalState.worldPosition = { x, y }
+            }
+        }
+
+        // sfall 0x8217 — get_object_weight_sfall(obj):
+        // Return the weight of an object in pounds from its prototype data.
+        // Returns 0 for non-item objects or when prototype data is unavailable.
+        get_object_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_object_weight_sfall: not a game object: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).pro?.extra?.weight ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 63 — sfall extended opcodes 0x8218–0x821F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8218 — get_year_sfall():
+        // Return the current in-game year (2241 at game start).
+        // Derived from gameTickTime: 10 ticks = 1 second; 1 year = 365 * 86400 seconds.
+        get_year_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            return 2241 + Math.floor(totalSecs / (365 * 86400))
+        }
+
+        // sfall 0x8219 — get_month_sfall():
+        // Return the current in-game month (1–12).
+        // Uses a 30-day month approximation (Fallout 2 uses 365-day years, 30-day months).
+        get_month_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            return Math.floor(dayOfYear / 30) + 1
+        }
+
+        // sfall 0x821A — get_day_sfall():
+        // Return the current in-game day of the month (1–30, approximate).
+        get_day_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            return (dayOfYear % 30) + 1
+        }
+
+        // sfall 0x821B — get_time_sfall():
+        // Return the current in-game time in minutes since midnight (0–1439).
+        // This matches Fallout 2's time() script opcode which returns HHMM as number.
+        get_time_sfall(): number {
+            const totalSecs = globalState.gameTickTime / 10
+            const secsToday = Math.floor(totalSecs) % 86400
+            const hour = Math.floor(secsToday / 3600)
+            const minute = Math.floor((secsToday % 3600) / 60)
+            return hour * 100 + minute
+        }
+
+        // sfall 0x821C — get_critter_kill_type_sfall(obj):
+        // Return the kill-type constant for a critter (used for XP and kill counts).
+        // 0=men, 1=women, 2=children, 3=super mutants, …
+        // Alias of the Phase-58 opcode 0x81F4; reads from pro.extra.killType.
+        // Note: this method is already defined in Phase 58 at 0x81F4; the 0x821C
+        // opcode entry in vm_bridge.ts is a second binding to the same function.
+
+        // sfall 0x821D — get_npc_pids_sfall():
+        // Return an array of PIDs of active party member NPCs.
+        // Browser build: returns 0 (not implemented; party tracking is minimal).
+        get_npc_pids_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x821E — get_proto_num_sfall(obj):
+        // Return the prototype number (PID) of an object.
+        // Alias of obj_pid() exposed under the sfall opcode convention.
+        get_proto_num_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).pid ?? 0
+        }
+
+        // sfall 0x821F — mark_area_known_sfall(areaID, markState):
+        // Mark or unmark a world-map location as known.
+        // markState: 0 = hide, 1 = reveal.
+        // Delegates to globalState.markAreaKnown if registered by the world-map system.
+        mark_area_known_sfall(areaID: number, markState: number): void {
+            if (typeof globalState.markAreaKnown === 'function') {
+                globalState.markAreaKnown(areaID, markState)
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 64 — sfall extended opcodes 0x8220–0x8227
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8220 — get_cursor_mode_sfall():
+        // Return the current cursor mode index.
+        // Browser build: no cursor mode state; returns 0 (default/action cursor).
+        get_cursor_mode_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x8221 — set_cursor_mode_sfall(mode):
+        // Set the current cursor mode.
+        // Browser build: no-op; cursor mode is handled by the HTML/CSS layer.
+        set_cursor_mode_sfall(mode: number): void {
+            // no-op in browser build
+        }
+
+        // sfall 0x8222 — set_flags_sfall(obj, flags):
+        // Set the extended flags word on an object.
+        // BLK-070: Companion to get_flags_sfall() (Phase 61 0x8207); allows scripts
+        // to persistently modify object flags (used by combat AI and item-state scripts).
+        // Writes directly to obj.flags to match get_flags_sfall's read location.
+        set_flags_sfall(obj: Obj, flags: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_flags_sfall: not a game object: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).flags = flags
+        }
+
+        // sfall 0x8223 — critter_skill_level_sfall(obj, skillId):
+        // Return the effective (modified) skill value for a critter.
+        // Reads the skill via getSkill which applies tag-bonuses and SPECIAL modifiers.
+        critter_skill_level_sfall(obj: Obj, skillId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('critter_skill_level_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const skillName = skillNumToName[skillId]
+            if (!skillName) {
+                warn('critter_skill_level_sfall: unknown skill id ' + skillId, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getSkill(skillName) ?? 0
+        }
+
+        // sfall 0x8224 — get_active_weapon_sfall(obj):
+        // Return the object currently wielded in the critter's active hand.
+        // Returns 0 when no weapon is equipped.
+        get_active_weapon_sfall(obj: Obj): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_active_weapon_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const activeHand = (critter as any).activeHand ?? 0
+            const weapon = activeHand === 1
+                ? ((critter as any).leftHand ?? (critter as any).rightHand)
+                : ((critter as any).rightHand ?? (critter as any).leftHand)
+            return weapon ?? 0
+        }
+
+        // sfall 0x8225 — get_inven_ap_cost_sfall(obj, item):
+        // Return the AP cost to use an item from inventory on a target.
+        // Browser build: returns 0 (AP costs are handled by the UI/combat layer).
+        get_inven_ap_cost_sfall(obj: Obj, item: Obj): number {
+            return 0
+        }
+
+        // sfall 0x8226 — obj_can_see_tile_sfall(obj, tileNum):
+        // Return 1 if the critter can see the given tile (LOS check).
+        // Browser build: returns 1 when distance is ≤ perception×5 (simplified LOS).
+        obj_can_see_tile_sfall(obj: Obj, tileNum: number): number {
+            if (!isGameObject(obj) || !obj.position) return 0
+            const dest = fromTileNum(tileNum)
+            if (!dest) return 0
+            const dist = hexDistance(obj.position, dest)
+            const per = isGameObject(obj) && obj.type === 'critter'
+                ? (obj as Critter).getStat('PER')
+                : 5
+            return dist <= per * 5 ? 1 : 0
+        }
+
+        // sfall 0x8227 — get_map_enter_position_sfall(type):
+        // Return a map-entry position value.
+        // type=0: tile, type=1: elevation, type=2: rotation
+        // Browser build: returns -1 (no saved map-entry position).
+        get_map_enter_position_sfall(type: number): number {
+            return -1
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 65 — sfall extended opcodes 0x8228–0x822F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8228 — get_critter_name_sfall(obj):
+        // Return the display name of a critter.  Alias of get_critter_name().
+        get_critter_name_sfall(obj: Obj): string {
+            if (!isGameObject(obj)) return ''
+            return (obj as any).name ?? ''
+        }
+
+        // sfall 0x8229 — get_car_fuel_amount_sfall():
+        // Return the current fuel level of the player's car (Highwayman).
+        // Car fuel is stored in globalState; defaults to 0 (no car yet).
+        get_car_fuel_amount_sfall(): number {
+            return (globalState as any).carFuel ?? 0
+        }
+
+        // sfall 0x822A — set_car_fuel_amount_sfall(amount):
+        // Set the current fuel level of the player's car.
+        // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
+        set_car_fuel_amount_sfall(amount: number): void {
+            ;(globalState as any).carFuel = Math.max(0, Math.min(80000, amount))
+        }
+
+        // sfall 0x822B — get_critter_ai_packet_sfall(obj):
+        // Return the AI packet index for a critter.
+        // Reads from critter.aiPacket or proto.extra.aiPacket.
+        get_critter_ai_packet_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return -1
+            return (obj as any).aiPacket ?? (obj as any).pro?.extra?.aiPacket ?? 0
+        }
+
+        // sfall 0x822C — set_critter_ai_packet_sfall(obj, packetId):
+        // Set the AI packet index for a critter.
+        // Used by scripts to switch NPC behaviour patterns dynamically.
+        set_critter_ai_packet_sfall(obj: Obj, packetId: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_ai_packet_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).aiPacket = packetId
+        }
+
+        // sfall 0x822D — obj_under_cursor_sfall():
+        // Return the game object currently under the mouse cursor.
+        // Browser build: returns 0 (no native cursor-to-tile tracking).
+        obj_under_cursor_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x822E — get_attack_weapon_sfall(obj, attackType):
+        // Return the weapon used by a critter for a given attack type.
+        // attackType: 0=rightHand (primary), 1=leftHand (secondary).
+        // Returns 0 when no weapon is equipped or the attack type is out of range.
+        get_attack_weapon_sfall(obj: Obj, attackType: number): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            const critter = obj as Critter
+            if (attackType === 0) return (critter as any).rightHand ?? 0
+            if (attackType === 1) return (critter as any).leftHand ?? 0
+            return 0
+        }
+
+        // sfall 0x822F — get_tile_pid_at_sfall(tileNum, elevation):
+        // Return the PID of the scenery object on a tile at the given elevation.
+        // Returns 0 when no scenery is found (simplified; does not iterate all objects).
+        get_tile_pid_at_sfall(tileNum: number, elevation: number): number {
+            if (!globalState.gMap) return 0
+            const tilePos = fromTileNum(tileNum)
+            if (!tilePos) return 0
+            const objects = globalState.gMap.getObjects ? globalState.gMap.getObjects(elevation) : []
+            for (const obj of objects) {
+                if (obj.position &&
+                    obj.position.x === tilePos.x &&
+                    obj.position.y === tilePos.y) {
+                    return (obj as any).pid ?? 0
+                }
+            }
+            return 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -4717,8 +5105,6 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
 
-        // TODO: script_overrides
-
         // hack so that the procedure is allowed to finish before
         // we actually terminate combat
         var doTerminate: any = false // did combat_p_proc terminate combat?
@@ -4734,7 +5120,11 @@ export module Scripting {
             Script.prototype.terminate_combat.call(obj._script) // call original
         }
 
-        return doTerminate
+        // BLK-068: Return true when either terminate_combat was requested OR when
+        // script_overrides() was called by combat_p_proc.  In Fallout 2, calling
+        // script_overrides() inside combat_p_proc tells the engine to skip the
+        // default AI combat processing for this critter's turn.
+        return doTerminate || obj._script._didOverride
     }
 
     export function updateMap(mapScript: Script, objects: Obj[], elevation: number) {

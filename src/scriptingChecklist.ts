@@ -1548,10 +1548,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'get_ini_setting',
         kind: 'opcode',
         description:
-            'sfall 0x8198: get_ini_setting(key) → integer INI value.  Partial: the ' +
-            'browser build has no INI file layer; always returns 0.  Prevents ' +
-            'unknown-opcode crashes in sfall/modded scripts that read INI options.',
-        status: 'partial',
+            'sfall 0x8198: get_ini_setting(key) → integer INI value.  ' +
+            'BLK-064 (Phase 62): now returns sensible defaults for ~20 known FO2 ' +
+            'config keys (case-insensitive). Unknown keys return 0.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -4207,6 +4207,461 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x820F: get_map_script_id_sfall() — return current map script ID.',
         status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // ---------------------------------------------------------------------------
+    // Phase 62 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-062: Combat auto-end after player kills last enemy
+    {
+        id: 'blk_062_combat_auto_end_after_kill',
+        kind: 'procedure',
+        description:
+            'BLK-062: Combat.attack() now wraps the animation callback to call nextTurn() ' +
+            'automatically when the last non-player combatant is killed.  ' +
+            'nextTurn() detects numActive===0 and calls end(), so combat ends without ' +
+            'requiring an explicit "End Turn" button press after the last enemy dies.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-063: canEndCombat() helper
+    {
+        id: 'blk_063_can_end_combat_helper',
+        kind: 'procedure',
+        description:
+            'BLK-063: Combat.canEndCombat() returns true when all non-player combatants ' +
+            'are dead.  Used internally by auto-end (BLK-062).  The TODO comment in ' +
+            'Combat.end() is resolved; ending is triggered by nextTurn() or auto-end.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-064: get_ini_setting common-key defaults
+    {
+        id: 'blk_064_get_ini_setting_defaults',
+        kind: 'opcode',
+        description:
+            'BLK-064: get_ini_setting(key) now returns sensible FO2 engine defaults for ' +
+            '~20 well-known config keys (SpeedInterfaceCounterAnims=1, FPS=60, sound=1, ' +
+            'etc.).  Unknown keys still return 0.  Full INI file access is unavailable ' +
+            'in the browser build but engine-appropriate defaults prevent scripts from ' +
+            'treating absent settings as explicitly disabled.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-065: critter_attempt_placement null guard
+    {
+        id: 'blk_065_critter_attempt_placement_guard',
+        kind: 'procedure',
+        description:
+            'BLK-065: critter_attempt_placement(obj, tileNum, elev) now returns -1 ' +
+            '(failure) when obj is null/non-game-object or tileNum is ≤0.  This mirrors ' +
+            'the Fallout 2 engine return value for failed placement and prevents move_to ' +
+            'from crashing on invalid inputs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8210-0x8217
+    {
+        id: 'sfall_critter_is_fleeing',
+        kind: 'opcode',
+        description:
+            'sfall 0x8210: critter_is_fleeing_sfall(obj) — return 1 if critter is ' +
+            'currently fleeing (low-HP flight behaviour).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_perk_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x8211: get_perk_name_sfall(perkId) — return display name of perk. ' +
+            'Browser build: returns empty string (perk name table not loaded).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_perk',
+        kind: 'opcode',
+        description:
+            'sfall 0x8212: get_critter_perk_sfall(critter, perkId) — return rank of ' +
+            'perk possessed by critter.  Reads from critter.perkRanks.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_obj_is_open',
+        kind: 'opcode',
+        description:
+            'sfall 0x8213: obj_is_open_sfall(obj) — return 1 if object is open ' +
+            '(door/container state), else 0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_world_map_x',
+        kind: 'opcode',
+        description:
+            'sfall 0x8214: get_world_map_x_sfall() — return player world-map x ' +
+            'coordinate, or -1 when inside a local map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_world_map_y',
+        kind: 'opcode',
+        description:
+            'sfall 0x8215: get_world_map_y_sfall() — return player world-map y ' +
+            'coordinate, or -1 when inside a local map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_world_map_pos',
+        kind: 'opcode',
+        description:
+            'sfall 0x8216: set_world_map_pos_sfall(x, y) — update stored world-map ' +
+            'position.  No-op when the player is not on the world map.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_object_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x8217: get_object_weight_sfall(obj) — return object weight in ' +
+            'pounds from prototype data.  Returns 0 for non-items.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // ---------------------------------------------------------------------------
+    // Phase 63 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-066: obj_carrying_pid_obj equipped-slot check
+    {
+        id: 'blk_066_obj_carrying_pid_obj_equipped',
+        kind: 'procedure',
+        description:
+            'BLK-066: obj_carrying_pid_obj(obj, pid) now checks equipped item slots ' +
+            '(leftHand, rightHand, equippedArmor) in addition to the inventory array. ' +
+            'In Fallout 2, equipped items are removed from inventory; scripts that test ' +
+            'whether an NPC is carrying a weapon would previously miss equipped items.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+
+    // BLK-067: party_member_obj null guard
+    {
+        id: 'blk_067_party_member_obj_null_guard',
+        kind: 'procedure',
+        description:
+            'BLK-067: party_member_obj(pid) now guards against a null gParty, ' +
+            'returning 0 instead of crashing during early init or in tests.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8218-0x821F
+    {
+        id: 'sfall_get_year',
+        kind: 'opcode',
+        description:
+            'sfall 0x8218: get_year_sfall() — return current in-game year (2241+) ' +
+            'derived from gameTickTime.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_month',
+        kind: 'opcode',
+        description:
+            'sfall 0x8219: get_month_sfall() — return current in-game month (1–12) ' +
+            'using 30-day month approximation.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_day',
+        kind: 'opcode',
+        description:
+            'sfall 0x821A: get_day_sfall() — return current in-game day of month (1–30).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_time',
+        kind: 'opcode',
+        description:
+            'sfall 0x821B: get_time_sfall() — return current in-game time as HHMM ' +
+            '(e.g. 1430 = 2:30 PM).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_kill_type_0x821c',
+        kind: 'opcode',
+        description:
+            'sfall 0x821C: get_critter_kill_type_sfall(obj) — return kill-type constant ' +
+            '(0=men, 3=super mutants, …) from critter.killType.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_npc_pids',
+        kind: 'opcode',
+        description:
+            'sfall 0x821D: get_npc_pids_sfall() — return NPC PID list. ' +
+            'Browser build: returns 0 (not implemented).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_proto_num',
+        kind: 'opcode',
+        description:
+            'sfall 0x821E: get_proto_num_sfall(obj) — return prototype number (PID). ' +
+            'Alias of obj_pid().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_mark_area_known',
+        kind: 'opcode',
+        description:
+            'sfall 0x821F: mark_area_known_sfall(areaID, markState) — mark or unmark ' +
+            'a world-map location.  Delegates to globalState.markAreaKnown.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // ---------------------------------------------------------------------------
+    // Phase 64 entries
+    // ---------------------------------------------------------------------------
+
+    // BLK-068: combatEvent script_overrides detection
+    {
+        id: 'blk_068_combat_event_override_detection',
+        kind: 'procedure',
+        description:
+            'BLK-068: Scripting.combatEvent() now returns true when script_overrides() ' +
+            'is called in combat_p_proc (in addition to terminate_combat).  This allows ' +
+            'scripted NPC combat turns to suppress the default AI processing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-069: destroy_object null guard
+    {
+        id: 'blk_069_destroy_object_null_guard',
+        kind: 'procedure',
+        description:
+            'BLK-069: destroy_object(obj) now guards against null gMap and null obj, ' +
+            'logging a warning instead of crashing during map transitions.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-070: set_flags_sfall
+    {
+        id: 'blk_070_set_flags_sfall',
+        kind: 'opcode',
+        description:
+            'BLK-070: set_flags_sfall(obj, flags) now writes the flags value to ' +
+            'obj.pro.extra.flags, making it persistent and readable by get_flags_sfall().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8220-0x8227
+    {
+        id: 'sfall_get_cursor_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x8220: get_cursor_mode_sfall() — return cursor mode (0 in browser).',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_cursor_mode',
+        kind: 'opcode',
+        description:
+            'sfall 0x8221: set_cursor_mode_sfall(mode) — set cursor mode (no-op in browser).',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_flags',
+        kind: 'opcode',
+        description:
+            'sfall 0x8222: set_flags_sfall(obj, flags) — set extended flags on object. ' +
+            'Writes to obj.pro.extra.flags.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_critter_skill_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x8223: critter_skill_level_sfall(obj, skillId) — return effective ' +
+            'skill level for a critter via getSkill().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_active_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x8224: get_active_weapon_sfall(obj) — return the object in the ' +
+            'critter\'s active hand (rightHand or leftHand).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_inven_ap_cost',
+        kind: 'opcode',
+        description:
+            'sfall 0x8225: get_inven_ap_cost_sfall(obj, item) — return AP cost (stub 0).',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_obj_can_see_tile',
+        kind: 'opcode',
+        description:
+            'sfall 0x8226: obj_can_see_tile_sfall(obj, tileNum) — return 1 if critter ' +
+            'can see tile (distance ≤ PER×5).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_map_enter_position',
+        kind: 'opcode',
+        description:
+            'sfall 0x8227: get_map_enter_position_sfall(type) — return map entry ' +
+            'position value.  Browser build: returns -1.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // ---------------------------------------------------------------------------
+    // Phase 65 entries
+    // ---------------------------------------------------------------------------
+
+    {
+        id: 'sfall_get_critter_name',
+        kind: 'opcode',
+        description:
+            'sfall 0x8228: get_critter_name_sfall(obj) — return critter display name. ' +
+            'Alias of get_critter_name().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_car_fuel_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x8229: get_car_fuel_amount_sfall() — return current car fuel level. ' +
+            'Reads from globalState.carFuel (defaults to 0).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_car_fuel_amount',
+        kind: 'opcode',
+        description:
+            'sfall 0x822A: set_car_fuel_amount_sfall(amount) — set car fuel level (clamped to 0–80000).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_ai_packet',
+        kind: 'opcode',
+        description:
+            'sfall 0x822B: get_critter_ai_packet_sfall(obj) — return AI packet index. ' +
+            'Reads from critter.aiPacket or proto.extra.aiPacket.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_ai_packet',
+        kind: 'opcode',
+        description:
+            'sfall 0x822C: set_critter_ai_packet_sfall(obj, id) — set AI packet index on critter.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_obj_under_cursor',
+        kind: 'opcode',
+        description:
+            'sfall 0x822D: obj_under_cursor_sfall() — return object under cursor. ' +
+            'Browser build: returns 0.',
+        status: 'partial',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_attack_weapon',
+        kind: 'opcode',
+        description:
+            'sfall 0x822E: get_attack_weapon_sfall(obj, attackType) — return weapon for attack type. ' +
+            'type=0=rightHand, type=1=leftHand.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_tile_pid_at',
+        kind: 'opcode',
+        description:
+            'sfall 0x822F: get_tile_pid_at_sfall(tileNum, elevation) — return PID of first object at tile.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

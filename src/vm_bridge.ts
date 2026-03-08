@@ -917,6 +917,118 @@ export module ScriptVMBridge {
 
        // 0x820F — get_map_script_id_sfall(): return current map script ID.
        ,0x820F: bridged("get_map_script_id_sfall", 0) // get_map_script_id() → sid
+
+       // -----------------------------------------------------------------------
+       // Phase 62 — sfall extended opcodes 0x8210–0x8217
+       // -----------------------------------------------------------------------
+
+       // 0x8210 — critter_is_fleeing_sfall(obj): return 1 if critter is fleeing.
+       ,0x8210: bridged("critter_is_fleeing_sfall", 1) // critter_is_fleeing(obj) → 0|1
+
+       // 0x8211 — get_perk_name_sfall(perkId): return perk display name string.
+       ,0x8211: bridged("get_perk_name_sfall", 1) // get_perk_name(perkId) → string
+
+       // 0x8212 — get_critter_perk_sfall(critter, perkId): return perk rank.
+       ,0x8212: bridged("get_critter_perk_sfall", 2) // get_critter_perk(obj, id) → rank
+
+       // 0x8213 — obj_is_open_sfall(obj): return 1 if object is open.
+       ,0x8213: bridged("obj_is_open_sfall", 1) // obj_is_open(obj) → 0|1
+
+       // 0x8214 — get_world_map_x_sfall(): return worldmap x position.
+       ,0x8214: bridged("get_world_map_x_sfall", 0) // get_world_map_x() → x
+
+       // 0x8215 — get_world_map_y_sfall(): return worldmap y position.
+       ,0x8215: bridged("get_world_map_y_sfall", 0) // get_world_map_y() → y
+
+       // 0x8216 — set_world_map_pos_sfall(x, y): set worldmap position.
+       ,0x8216: bridged("set_world_map_pos_sfall", 2, false) // set_world_map_pos(x, y)
+
+       // 0x8217 — get_object_weight_sfall(obj): return object weight in pounds.
+       ,0x8217: bridged("get_object_weight_sfall", 1) // get_object_weight(obj) → pounds
+
+       // -----------------------------------------------------------------------
+       // Phase 63 — sfall extended opcodes 0x8218–0x821F
+       // -----------------------------------------------------------------------
+
+       // 0x8218 — get_year_sfall(): return current in-game year.
+       ,0x8218: bridged("get_year_sfall", 0) // get_year() → year (2241+)
+
+       // 0x8219 — get_month_sfall(): return current in-game month (1–12).
+       ,0x8219: bridged("get_month_sfall", 0) // get_month() → month
+
+       // 0x821A — get_day_sfall(): return current in-game day of month.
+       ,0x821A: bridged("get_day_sfall", 0) // get_day() → day
+
+       // 0x821B — get_time_sfall(): return current in-game time (HHMM).
+       ,0x821B: bridged("get_time_sfall", 0) // get_time() → HHMM
+
+       // 0x821C — get_critter_kill_type_sfall(obj): return kill-type constant.
+       ,0x821C: bridged("get_critter_kill_type_sfall", 1) // get_critter_kill_type(obj) → type
+
+       // 0x821D — get_npc_pids_sfall(): return NPC PID list (stub → 0).
+       ,0x821D: bridged("get_npc_pids_sfall", 0) // get_npc_pids() → 0
+
+       // 0x821E — get_proto_num_sfall(obj): return prototype number (PID).
+       ,0x821E: bridged("get_proto_num_sfall", 1) // get_proto_num(obj) → pid
+
+       // 0x821F — mark_area_known_sfall(areaID, markState): mark world-map area.
+       ,0x821F: bridged("mark_area_known_sfall", 2, false) // mark_area_known(areaID, state)
+
+       // -----------------------------------------------------------------------
+       // Phase 64 — sfall extended opcodes 0x8220–0x8227
+       // -----------------------------------------------------------------------
+
+       // 0x8220 — get_cursor_mode_sfall(): return current cursor mode.
+       ,0x8220: bridged("get_cursor_mode_sfall", 0) // get_cursor_mode() → 0
+
+       // 0x8221 — set_cursor_mode_sfall(mode): set cursor mode (no-op).
+       ,0x8221: bridged("set_cursor_mode_sfall", 1, false) // set_cursor_mode(mode)
+
+       // 0x8222 — set_flags_sfall(obj, flags): set extended flags on object.
+       ,0x8222: bridged("set_flags_sfall", 2, false) // set_flags(obj, flags)
+
+       // 0x8223 — critter_skill_level_sfall(obj, skillId): return skill level.
+       ,0x8223: bridged("critter_skill_level_sfall", 2) // critter_skill_level(obj, id) → level
+
+       // 0x8224 — get_active_weapon_sfall(obj): return active weapon object.
+       ,0x8224: bridged("get_active_weapon_sfall", 1) // get_active_weapon(obj) → obj|0
+
+       // 0x8225 — get_inven_ap_cost_sfall(obj, item): return AP cost (stub 0).
+       ,0x8225: bridged("get_inven_ap_cost_sfall", 2) // get_inven_ap_cost(obj, item) → 0
+
+       // 0x8226 — obj_can_see_tile_sfall(obj, tileNum): LOS check to tile.
+       ,0x8226: bridged("obj_can_see_tile_sfall", 2) // obj_can_see_tile(obj, tile) → 0|1
+
+       // 0x8227 — get_map_enter_position_sfall(type): return map-entry position.
+       ,0x8227: bridged("get_map_enter_position_sfall", 1) // get_map_enter_position(type) → -1
+
+       // -----------------------------------------------------------------------
+       // Phase 65 — sfall extended opcodes 0x8228–0x822F
+       // -----------------------------------------------------------------------
+
+       // 0x8228 — get_critter_name_sfall(obj): return critter display name.
+       ,0x8228: bridged("get_critter_name_sfall", 1) // get_critter_name(obj) → name
+
+       // 0x8229 — get_car_fuel_amount_sfall(): return car fuel level.
+       ,0x8229: bridged("get_car_fuel_amount_sfall", 0) // get_car_fuel() → fuel
+
+       // 0x822A — set_car_fuel_amount_sfall(amount): set car fuel level.
+       ,0x822A: bridged("set_car_fuel_amount_sfall", 1, false) // set_car_fuel(amount)
+
+       // 0x822B — get_critter_ai_packet_sfall(obj): return AI packet index.
+       ,0x822B: bridged("get_critter_ai_packet_sfall", 1) // get_critter_ai_packet(obj) → id
+
+       // 0x822C — set_critter_ai_packet_sfall(obj, id): set AI packet index.
+       ,0x822C: bridged("set_critter_ai_packet_sfall", 2, false) // set_critter_ai_packet(obj, id)
+
+       // 0x822D — obj_under_cursor_sfall(): return object under cursor (stub 0).
+       ,0x822D: bridged("obj_under_cursor_sfall", 0) // obj_under_cursor() → 0
+
+       // 0x822E — get_attack_weapon_sfall(obj, attackType): return weapon for attack type.
+       ,0x822E: bridged("get_attack_weapon_sfall", 2) // get_attack_weapon(obj, type) → obj|0
+
+       // 0x822F — get_tile_pid_at_sfall(tileNum, elevation): return PID at tile.
+       ,0x822F: bridged("get_tile_pid_at_sfall", 2) // get_tile_pid_at(tile, elev) → pid
     }
     Object.assign(opMap, bridgeOpMap)
 
