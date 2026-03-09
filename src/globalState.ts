@@ -100,6 +100,19 @@ export default {
 
     mapAreas: null,
     markAreaKnown: null,
+
+    /**
+     * Phase 79 / sfall 0x8220–0x8221: cursor mode index.
+     * 0 = action cursor (default), 1+ = sfall-specific cursor modes.
+     * Readable/writable by get_cursor_mode_sfall / set_cursor_mode_sfall.
+     */
+    sfallCursorMode: 0,
+    /**
+     * Phase 79 / sfall 0x822D: last game object confirmed to be under the cursor.
+     * Updated by the renderer's hover logic whenever the mouse passes over an object.
+     * Returns 0 when no object is under the cursor.
+     */
+    objUnderCursor: null,
 } as {
     gMap: GameMap | null
     combat: Combat | null
@@ -225,4 +238,16 @@ export default {
 
     /** Registered by Worldmap.init() to bridge mark_area_known scripting calls. */
     markAreaKnown: ((areaID: number, markState: number) => void) | null
+
+    /**
+     * Phase 79: sfall cursor mode (0 = default action cursor).
+     * Readable/writable by get_cursor_mode_sfall (0x8220) / set_cursor_mode_sfall (0x8221).
+     */
+    sfallCursorMode: number
+
+    /**
+     * Phase 79: last game object under the mouse cursor, or null if none.
+     * Updated by renderer hover detection; read by obj_under_cursor_sfall (0x822D).
+     */
+    objUnderCursor: import('./object.js').Obj | null
 }

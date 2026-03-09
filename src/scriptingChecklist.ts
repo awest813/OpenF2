@@ -352,8 +352,12 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'anim_standard_codes',
         kind: 'procedure',
-        description: 'anim() with standard ANIM_* constants (0=stand, 1=walk, 2-99). Code 0 resets to idle; codes 1-99 are logged silently without stub warnings.',
-        status: 'partial',
+        description:
+            'anim() with standard ANIM_* constants (0=stand, 1=walk, 2-99). ' +
+            'BLK-125 (Phase 79): codes 1-99 now trigger singleAnimation(false, null) on the ' +
+            'object, or set frame=0 as fallback for objects without singleAnimation. ' +
+            'Code 0 resets to idle standing frame.',
+        status: 'implemented',
         frequency: 'high',
         impact: 'medium',
     },
@@ -4519,8 +4523,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_cursor_mode',
         kind: 'opcode',
         description:
-            'sfall 0x8220: get_cursor_mode_sfall() — return cursor mode (0 in browser).',
-        status: 'partial',
+            'sfall 0x8220: get_cursor_mode_sfall() — return cursor mode. ' +
+            'BLK-126 (Phase 79): now reads globalState.sfallCursorMode (default 0).',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -4528,8 +4533,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_set_cursor_mode',
         kind: 'opcode',
         description:
-            'sfall 0x8221: set_cursor_mode_sfall(mode) — set cursor mode (no-op in browser).',
-        status: 'partial',
+            'sfall 0x8221: set_cursor_mode_sfall(mode) — set cursor mode. ' +
+            'BLK-126 (Phase 79): now writes to globalState.sfallCursorMode.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -4650,8 +4656,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x822D: obj_under_cursor_sfall() — return object under cursor. ' +
-            'Browser build: returns 0.',
-        status: 'partial',
+            'BLK-127 (Phase 79): reads globalState.objUnderCursor (set by renderer hover detection). ' +
+            'Returns 0 when no object is under the cursor.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },

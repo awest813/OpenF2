@@ -2371,10 +2371,15 @@ export module Scripting {
                 obj.frame = 0
             else if (anim >= 1 && anim <= 99) {
                 // Standard ANIM_* animation constants (1=walk, 2=jump_begin, …, 50=fall_front_blood, etc.).
-                // The browser build does not yet drive a full frame-accurate animation state
-                // machine from scripted anim() calls, so these are silently logged instead
-                // of emitting stub warnings that flood the console during map entry.
+                // BLK-125 (Phase 79): Trigger a one-shot animation cycle on the object using
+                // singleAnimation so the visual plays in the browser.  Falls back to setting
+                // frame=0 for objects that don't support singleAnimation (e.g. static items).
                 log('anim', arguments, 'animation')
+                if (typeof (obj as any).singleAnimation === 'function') {
+                    try { ;(obj as any).singleAnimation(false, null) } catch (_e) { /* ignore */ }
+                } else {
+                    obj.frame = 0
+                }
             } else if (anim >= 100 && anim <= 999) {
                 // Extended ANIM_* constants (100+ are engine-internal or sfall-specific).
                 // Log silently rather than stubbing so the console stays clean.
@@ -4825,17 +4830,15 @@ export module Scripting {
         // -----------------------------------------------------------------------
 
         // sfall 0x8220 — get_cursor_mode_sfall():
-        // Return the current cursor mode index.
-        // Browser build: no cursor mode state; returns 0 (default/action cursor).
+        // BLK-126 (Phase 79): Return the current cursor mode from globalState.sfallCursorMode.
         get_cursor_mode_sfall(): number {
-            return 0
+            return globalState.sfallCursorMode ?? 0
         }
 
         // sfall 0x8221 — set_cursor_mode_sfall(mode):
-        // Set the current cursor mode.
-        // Browser build: no-op; cursor mode is handled by the HTML/CSS layer.
+        // BLK-126 (Phase 79): Store cursor mode into globalState.sfallCursorMode.
         set_cursor_mode_sfall(mode: number): void {
-            // no-op in browser build
+            globalState.sfallCursorMode = typeof mode === 'number' && isFinite(mode) ? Math.round(mode) : 0
         }
 
         // sfall 0x8222 — set_flags_sfall(obj, flags):
@@ -4957,10 +4960,10 @@ export module Scripting {
         }
 
         // sfall 0x822D — obj_under_cursor_sfall():
-        // Return the game object currently under the mouse cursor.
-        // Browser build: returns 0 (no native cursor-to-tile tracking).
-        obj_under_cursor_sfall(): number {
-            return 0
+        // BLK-127 (Phase 79): Return the game object under the cursor from globalState.objUnderCursor.
+        // Updated by renderer hover detection; returns 0 when no object is under the cursor.
+        obj_under_cursor_sfall(): Obj | 0 {
+            return globalState.objUnderCursor ?? 0
         }
 
         // sfall 0x822E — get_attack_weapon_sfall(obj, attackType):

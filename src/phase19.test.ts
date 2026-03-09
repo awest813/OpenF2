@@ -380,7 +380,7 @@ describe('Phase 19-F — checklist entries for Phase 19 features', () => {
     it('has an entry for anim_standard_codes', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'anim_standard_codes')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry!.status)
     })
 
     it('has an entry for inven_cmds_nav marked implemented', () => {
