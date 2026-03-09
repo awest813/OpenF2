@@ -463,14 +463,20 @@ heart.keydown = (k: string) => {
         }
 
         for (let i = 0; i < globalState.combat!.combatants.length; i++) {
+            // BLK-112: Guard against null position — combatants may lose their tile
+            // assignment during a scripted move or map transition mid-combat.
+            // Without this check, the .x access would throw a TypeError and freeze
+            // the combat loop for the remainder of the turn.
+            const combatant = globalState.combat.combatants[i]
             if (
-                globalState.combat.combatants[i].position.x === mouseHex.x &&
-                globalState.combat.combatants[i].position.y === mouseHex.y &&
-                !globalState.combat.combatants[i].dead
+                combatant.position &&
+                combatant.position.x === mouseHex.x &&
+                combatant.position.y === mouseHex.y &&
+                !combatant.dead
             ) {
                 globalState.player.AP.subtractCombatAP(4)
                 console.log('Attacking...')
-                globalState.combat.attack(globalState.player, globalState.combat.combatants[i])
+                globalState.combat.attack(globalState.player, combatant)
                 break
             }
         }

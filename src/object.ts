@@ -505,7 +505,9 @@ export class Obj {
         if (!this.anim) {
             return
         }
-        const time = window.performance.now()
+        // BLK-110: Use a safe performance.now() fallback — window.performance is not
+        // available in Node.js test environments (same pattern as BLK-082/BLK-102).
+        const time = typeof performance !== 'undefined' ? performance.now() : 0
         let fps = globalState.imageInfo[this.art].fps
         if (fps === 0) {
             fps = 10
@@ -571,7 +573,8 @@ export class Obj {
         } else {
             this.frame = 0
         }
-        this.lastFrameTime = window.performance.now()
+        // BLK-110: Safe performance.now() fallback for non-browser environments.
+        this.lastFrameTime = typeof performance !== 'undefined' ? performance.now() : 0
         this.anim = reversed ? 'reverse' : 'single'
         this.animCallback =
             callback ||
@@ -762,9 +765,15 @@ export class Obj {
         const explosionRadius = Math.min(8, Math.max(2, Math.floor(maxDmg / 10)))
         const damage = Math.floor((minDmg + maxDmg) / 2) // Average damage at center
         
+        // BLK-115: Guard against null position — this.position may be null for
+        // objects in inventory or mid-map-transition.  Skip the explosion rather
+        // than crashing with a TypeError on this.position.x.
+        if (!this.position) {
+            console.warn('explode: source object has no position — skipping explosion')
+            return
+        }
         const explosion = createObjectWithPID(makePID(5 /* misc */, 14 /* Explosion */), -1)
-        explosion.position.x = this.position.x
-        explosion.position.y = this.position.y
+        explosion.position = { x: this.position.x, y: this.position.y }
         ;(<any>this).dmgType = 'Explosive' // Explosive damage type
 
         lazyLoadImage(explosion.art, () => {
@@ -824,6 +833,13 @@ export class Obj {
             return
         }
 
+        // BLK-114: Guard against null position on the source critter — objects in
+        // inventory or mid-transition have no tile assignment; skip the move rather
+        // than crashing on source.position.x.
+        if (!source.position) {
+            console.warn('dropObject: source has no position — cannot place dropped item')
+            return
+        }
         globalState.gMap.addObject(this) // add to objects
         const idx = globalState.gMap.getObjects().length - 1 // our new index
         this.move({ x: source.position.x, y: source.position.y }, idx)
@@ -850,7 +866,11 @@ export class Obj {
             invArt: this.invArt,
             frame: this.frame,
             amount: this.amount,
-            position: { x: this.position.x, y: this.position.y },
+            // BLK-113: Guard against null position — objects in inventory or
+            // mid-map-transition have no tile assignment.  Fall back to {x:0,y:0}
+            // so the serialization doesn't crash; the deserialized object will be
+            // repositioned when it is placed back on the map.
+            position: this.position ? { x: this.position.x, y: this.position.y } : { x: 0, y: 0 },
             inventory: this.inventory.map((obj) => obj.serialize()),
             lightRadius: this.lightRadius,
             lightIntensity: this.lightIntensity,
@@ -1181,7 +1201,8 @@ export class Critter extends Obj {
     }
 
     updateStaticAnim(): void {
-        const time = window.performance.now()
+        // BLK-110: Safe performance.now() fallback for non-browser environments.
+        const time = typeof performance !== 'undefined' ? performance.now() : 0
         const fps = 8 // todo: get FPS from image info
 
         if (time - this.lastFrameTime >= 1000 / fps) {
@@ -1205,7 +1226,8 @@ export class Critter extends Obj {
             return this.updateStaticAnim()
         }
 
-        const time = window.performance.now()
+        // BLK-110: Safe performance.now() fallback for non-browser environments.
+        const time = typeof performance !== 'undefined' ? performance.now() : 0
         const fps = globalState.imageInfo[this.art].fps
         const targetScreen = hexToScreen(this.path.target.x, this.path.target.y)
 
@@ -1256,6 +1278,13 @@ export class Critter extends Obj {
                 // set orientation towards new path hex
                 pos = this.path.path[this.path.index]
                 if (pos) {
+                    // BLK-116: Guard against null position — move() clears position on
+                    // some objects (e.g. mid-transition critters).  If position is now
+                    // null we cannot compute orientation; stop the animation gracefully.
+                    if (!this.position) {
+                        this.clearAnim()
+                        return
+                    }
                     const dir = directionOfDelta(this.position.x, this.position.y, pos[0], pos[1])
                     if (dir == null) {
                         console.warn('walk anim: directionOfDelta returned null — stopping animation')
@@ -1460,7 +1489,8 @@ export class Critter extends Obj {
     staticAnimation(anim: string, callback?: () => void, waitForLoad = true): void {
         this.art = this.getAnimation(anim)
         this.frame = 0
-        this.lastFrameTime = window.performance.now()
+        // BLK-110: Safe performance.now() fallback for non-browser environments.
+        this.lastFrameTime = typeof performance !== 'undefined' ? performance.now() : 0
 
         if (waitForLoad) {
             lazyLoadImage(this.art, () => {

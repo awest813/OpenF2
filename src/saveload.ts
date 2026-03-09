@@ -41,6 +41,10 @@ function applyLoadedMapAreaStates(mapAreaStates: Record<number, boolean> | undef
  * save fields are added (e.g. BLK-034 through BLK-047).
  */
 function applyExtraSaveState(save: SaveGame): void {
+    // BLK-111: Mark this map entry as a save-load so game_loaded() returns 1.
+    // The flag is cleared by Scripting.clearMapLoadedFromSave() after the
+    // map_enter_p_proc has run (so subsequent enterMap calls see it as fresh).
+    globalState.mapLoadedFromSave = true
     // Restore script global variables (GVAR_*) so quest flags and
     // world state set before the save are fully intact on resume.
     if (save.scriptGlobalVars) {

@@ -508,21 +508,31 @@ export module ScriptVMBridge {
        ,0x81AF: function() { globalState.playerPerksOwed = Math.max(0, this.pop() | 0) } // set_perk_owed(n)
 
        // 0x81B0 — get_last_target(obj): return the last critter targeted in combat
-       // by obj.  Returns 0 when no combat target is available.
-       ,0x81B0: function() { this.pop(); this.push(0) } // get_last_target(obj) → 0
+       // by obj.  BLK-117: now reads the per-critter lastCombatTarget property set
+       // during combat.attack(); returns 0 when no target has been recorded.
+       ,0x81B0: function() {
+           const obj = this.pop()
+           const target = (obj !== null && obj !== 0 && typeof obj === 'object') ? (obj as any).lastCombatTarget ?? 0 : 0
+           this.push(target)
+       } // get_last_target(obj) → last target or 0
 
        // 0x81B1 — get_last_attacker(obj): return the last critter that attacked obj.
-       // Returns 0 when no attacker is recorded.
-       ,0x81B1: function() { this.pop(); this.push(0) } // get_last_attacker(obj) → 0
+       // BLK-117: now reads the per-critter lastCombatAttacker property set by
+       // combat.attack(); returns 0 when no attacker has been recorded.
+       ,0x81B1: function() {
+           const obj = this.pop()
+           const attacker = (obj !== null && obj !== 0 && typeof obj === 'object') ? (obj as any).lastCombatAttacker ?? 0 : 0
+           this.push(attacker)
+       } // get_last_attacker(obj) → last attacker or 0
 
        // 0x81B2 — art_cache_flush(): flush the internal art/animation cache.
        // No-op in browser build (no separate art cache to manage).
        ,0x81B2: function() {} // art_cache_flush() — no-op
 
-       // 0x81B3 — game_loaded(): returns 1 if the game was freshly loaded (i.e.
-       // the current map entry is from a save-load, not a first-time visit).
-       // Browser build returns 0 (treated as first-time visit always).
-       ,0x81B3: function() { this.push(0) } // game_loaded() → 0 (first-time entry)
+       // 0x81B3 — game_loaded(): returns 1 if the current map was entered via a
+       // save/load rather than a first-time visit.  BLK-111: now reads the real
+       // globalState.mapLoadedFromSave flag set by the save/load system.
+       ,0x81B3: function() { this.push(globalState.mapLoadedFromSave ? 1 : 0) } // game_loaded() → real flag
 
        // 0x81B4 — set_weapon_knockback(obj, dist, chance): set weapon knockback
        // parameters for an object.  No-op in browser build (no knockback model).
@@ -674,8 +684,33 @@ export module ScriptVMBridge {
        ,0x81D6: function() { this.pop(); this.pop() } // obj_add_script(obj, sid) — no-op
 
        // 0x81D7 — obj_run_proc(obj, proc_name): run a named procedure on an object.
-       // Browser build: partial no-op (cannot dynamically invoke named procs).
-       ,0x81D7: function() { this.pop(); this.pop() } // obj_run_proc(obj, proc) — no-op
+       // BLK-120: now attempts to call the named procedure on obj._script.  The proc
+       // argument may be a string name or a procedure function reference.  If the
+       // procedure doesn't exist on the object's script, silently no-ops.
+       ,0x81D7: function(this: GameScriptVM) {
+           const proc = this.pop()  // procedure name or function ref
+           const obj  = this.pop()  // target game object
+           if (!obj || typeof obj !== 'object') return // null/invalid object — no-op
+           const script = (obj as any)._script
+           if (!script) return // no script attached — no-op
+           // Resolve to a callable: string → method name, function → direct call
+           let fn: Function | null = null
+           if (typeof proc === 'string' && typeof script[proc] === 'function') {
+               fn = script[proc].bind(script)
+           } else if (typeof proc === 'function') {
+               fn = proc.bind(script)
+           }
+           if (!fn) return // procedure not found — silent no-op
+           try {
+               // Set self_obj so the called procedure sees the correct object context.
+               const prevSelf = script.self_obj
+               script.self_obj = obj
+               fn()
+               script.self_obj = prevSelf
+           } catch (e) {
+               console.warn('[obj_run_proc] procedure threw: ' + e)
+           }
+       } // obj_run_proc(obj, proc) — implemented (BLK-120)
 
        // -----------------------------------------------------------------------
        // Phase 55 — sfall extended opcodes 0x81D8–0x81DF
@@ -1281,6 +1316,89 @@ export module ScriptVMBridge {
 
        // 0x8277 — get_tile_in_direction_sfall(tile, dir, count): tile alias
        ,0x8277: bridged("get_tile_in_direction_sfall", 3) // get_tile_in_direction(t, d, n) → tile
+
+       // -----------------------------------------------------------------------
+       // Phase 75 — sfall extended opcodes 0x8278–0x827F
+       // -----------------------------------------------------------------------
+
+       // 0x8278 — get_critter_knockout_sfall(obj): 1 if critter is knocked out, 0 otherwise.
+       ,0x8278: bridged("get_critter_knockout_sfall", 1) // get_critter_knockout(obj) → 0|1
+
+       // 0x8279 — get_critter_knockdown_sfall(obj): 1 if critter is knocked down, 0 otherwise.
+       ,0x8279: bridged("get_critter_knockdown_sfall", 1) // get_critter_knockdown(obj) → 0|1
+
+       // 0x827A — get_critter_crippled_legs_sfall(obj): bitmask, bit0=left, bit1=right
+       ,0x827A: bridged("get_critter_crippled_legs_sfall", 1) // get_critter_crippled_legs(obj) → mask
+
+       // 0x827B — get_critter_crippled_arms_sfall(obj): bitmask, bit0=left, bit1=right
+       ,0x827B: bridged("get_critter_crippled_arms_sfall", 1) // get_critter_crippled_arms(obj) → mask
+
+       // 0x827C — get_critter_dead_sfall(obj): 1 if critter is dead, 0 otherwise.
+       ,0x827C: bridged("get_critter_dead_sfall", 1) // get_critter_dead(obj) → 0|1
+
+       // 0x827D — get_map_loaded_sfall(): 1 if map was loaded from save (alias of game_loaded).
+       ,0x827D: bridged("get_map_loaded_sfall", 0) // get_map_loaded() → 0|1
+
+       // 0x827E — get_critter_poison_level_sfall(obj): current poison level.
+       ,0x827E: bridged("get_critter_poison_level_sfall", 1) // get_critter_poison_level(obj) → int
+
+       // 0x827F — get_critter_radiation_level_sfall(obj): current radiation level.
+       ,0x827F: bridged("get_critter_radiation_level_sfall", 1) // get_critter_radiation_level(obj) → int
+
+       // -----------------------------------------------------------------------
+       // Phase 76 — sfall extended opcodes 0x8280–0x8287
+       // -----------------------------------------------------------------------
+
+       // 0x8280 — get_last_target_sfall(obj): alias for get_last_target (BLK-117).
+       ,0x8280: bridged("get_last_target_sfall", 1) // get_last_target_sfall(obj) → last target or 0
+
+       // 0x8281 — get_last_attacker_sfall(obj): alias for get_last_attacker (BLK-117).
+       ,0x8281: bridged("get_last_attacker_sfall", 1) // get_last_attacker_sfall(obj) → last attacker or 0
+
+       // 0x8282 — get_critter_level_sfall(obj): return the critter's level (1-based).
+       ,0x8282: bridged("get_critter_level_sfall", 1) // get_critter_level(obj) → level
+
+       // 0x8283 — get_critter_current_xp_sfall(obj): return the critter's current (accumulated) XP.
+       ,0x8283: bridged("get_critter_current_xp_sfall", 1) // get_critter_current_xp(obj) → xp
+
+       // 0x8284 — set_critter_level_sfall(obj, level): set critter level.
+       ,0x8284: bridged("set_critter_level_sfall", 2, false) // set_critter_level(obj, level) — partial
+
+       // 0x8285 — get_critter_base_stat_sfall(obj, stat): return base stat before modifiers.
+       ,0x8285: bridged("get_critter_base_stat_sfall", 2) // get_critter_base_stat(obj, stat) → value
+
+       // 0x8286 — set_critter_base_stat_sfall(obj, stat, value): set base stat.
+       ,0x8286: bridged("set_critter_base_stat_sfall", 3, false) // set_critter_base_stat(obj, stat, val)
+
+       // 0x8287 — get_obj_weight_sfall(obj): return object weight in lbs.
+       ,0x8287: bridged("get_obj_weight_sfall", 1) // get_obj_weight(obj) → weight
+
+       // Phase 77 — sfall extended opcodes 0x8288–0x828F
+       // -----------------------------------------------------------------------
+
+       // 0x8288 — get_critter_flags_sfall(obj): critter flags bitmask.
+       ,0x8288: bridged("get_critter_flags_sfall", 1) // get_critter_flags(obj) → flags
+
+       // 0x8289 — set_critter_flags_sfall(obj, flags): set critter flags bulk.
+       ,0x8289: bridged("set_critter_flags_sfall", 2, false) // set_critter_flags(obj, flags)
+
+       // 0x828A — get_critter_worn_armor_sfall(obj): equipped armor or 0.
+       ,0x828A: bridged("get_critter_worn_armor_sfall", 1) // get_critter_worn_armor(obj) → armor|0
+
+       // 0x828B — get_critter_weapon_sfall(obj, hand): weapon by hand (0=right, 1=left) or 0.
+       ,0x828B: bridged("get_critter_weapon_sfall", 2) // get_critter_weapon(obj, hand) → weapon|0
+
+       // 0x828C — get_tile_x_sfall(tile): x hex coord of tile number.
+       ,0x828C: bridged("get_tile_x_sfall", 1) // get_tile_x(tile) → x
+
+       // 0x828D — get_tile_y_sfall(tile): y hex coord of tile number.
+       ,0x828D: bridged("get_tile_y_sfall", 1) // get_tile_y(tile) → y
+
+       // 0x828E — tile_from_coords_sfall(x, y): tile number from hex coords.
+       ,0x828E: bridged("tile_from_coords_sfall", 2) // tile_from_coords(x, y) → tile
+
+       // 0x828F — get_critter_max_hp_sfall(obj): max HP of critter.
+       ,0x828F: bridged("get_critter_max_hp_sfall", 1) // get_critter_max_hp(obj) → maxHP
     }
     Object.assign(opMap, bridgeOpMap)
 

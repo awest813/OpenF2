@@ -384,10 +384,10 @@ describe('Phase 14-F — reg_anim_func de-stubbed', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('checklist entry for reg_anim_func is partial', () => {
+    it('checklist entry for reg_anim_func is partial or implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'reg_anim_func')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry!.status)
     })
 })
 
@@ -411,10 +411,10 @@ describe('Phase 14-G — reg_anim_animate de-stubbed', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('checklist entry for reg_anim_animate is partial', () => {
+    it('checklist entry for reg_anim_animate is partial or implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'reg_anim_animate')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry!.status)
     })
 })
 

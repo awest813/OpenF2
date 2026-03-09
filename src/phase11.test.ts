@@ -40,7 +40,7 @@ describe('Phase 1 — scripting stub checklist', () => {
     it('every entry has the required fields', () => {
         for (const entry of SCRIPTING_STUB_CHECKLIST) {
             expect(entry.id).toBeTruthy()
-            expect(['opcode', 'procedure', 'metarule']).toContain(entry.kind)
+            expect(['opcode', 'procedure', 'metarule', 'bug']).toContain(entry.kind)
             expect(entry.description.length).toBeGreaterThan(0)
             expect(['stub', 'partial', 'implemented']).toContain(entry.status)
             expect(['high', 'medium', 'low']).toContain(entry.frequency)

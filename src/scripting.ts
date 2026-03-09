@@ -180,6 +180,34 @@ export module Scripting {
         fn: () => void
     }
 
+    // BLK-123 (Phase 78) — sfall hook-script argument buffer.
+    // When a hook script is invoked, its arguments are stored here.
+    // get_sfall_arg() retrieves the next arg in sequence; set_sfall_return() stores
+    // the return value; get_sfall_args_count() reports how many were provided.
+    // This is a module-level buffer reset on each hook invocation.
+    const _sfallHookArgs: any[] = []
+    let _sfallHookArgCursor = 0
+    let _sfallHookReturnVal: number = 0
+
+    /**
+     * Push arguments into the sfall hook arg buffer before invoking a hook script.
+     * Called by the vm_bridge hook dispatcher.
+     */
+    export function sfallSetHookArgs(args: any[]): void {
+        _sfallHookArgs.length = 0
+        _sfallHookArgs.push(...args)
+        _sfallHookArgCursor = 0
+        _sfallHookReturnVal = 0
+    }
+
+    /**
+     * Return the value stored by the last set_sfall_return() call.
+     * Called by the vm_bridge hook dispatcher after hook script execution.
+     */
+    export function sfallGetHookReturn(): number {
+        return _sfallHookReturnVal
+    }
+
     var statMap: { [stat: number]: string } = {
         // SPECIAL primaries (0–6)
         0: 'STR',
@@ -2343,10 +2371,15 @@ export module Scripting {
                 obj.frame = 0
             else if (anim >= 1 && anim <= 99) {
                 // Standard ANIM_* animation constants (1=walk, 2=jump_begin, …, 50=fall_front_blood, etc.).
-                // The browser build does not yet drive a full frame-accurate animation state
-                // machine from scripted anim() calls, so these are silently logged instead
-                // of emitting stub warnings that flood the console during map entry.
+                // BLK-125 (Phase 79): Trigger a one-shot animation cycle on the object using
+                // singleAnimation so the visual plays in the browser.  Falls back to setting
+                // frame=0 for objects that don't support singleAnimation (e.g. static items).
                 log('anim', arguments, 'animation')
+                if (typeof (obj as any).singleAnimation === 'function') {
+                    try { ;(obj as any).singleAnimation(false, null) } catch (_e) { /* ignore */ }
+                } else {
+                    obj.frame = 0
+                }
             } else if (anim >= 100 && anim <= 999) {
                 // Extended ANIM_* constants (100+ are engine-internal or sfall-specific).
                 // Log silently rather than stubbing so the console stays clean.
@@ -2768,7 +2801,9 @@ export module Scripting {
             }
         }
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
+            // BLK-121: Trigger a single non-looping animation cycle on obj.
             log('reg_anim_animate', arguments, 'animation')
+            this.reg_anim_animate_once(obj, anim, delay)
         }
         reg_anim_animate_forever(obj: Obj, anim: number) {
             log('reg_anim_animate_forever', arguments, 'animation')
@@ -2882,15 +2917,14 @@ export module Scripting {
         }
 
         gfade_out(time: number) {
-            // Screen fade-out over `time` game ticks.  In the browser build we
-            // don't implement an actual fading effect yet, but we must not stub
-            // this procedure — it is called frequently during map transitions
-            // and cut-scenes, and the stub warning floods the console.
+            // BLK-122: Screen fade-out — apply CSS opacity transition on the canvas.
             log('gfade_out', arguments)
+            this.gfade_out_css(time)
         }
         gfade_in(time: number) {
-            // Screen fade-in over `time` game ticks.  Same note as gfade_out.
+            // BLK-122: Screen fade-in — restore CSS opacity on the canvas.
             log('gfade_in', arguments)
+            this.gfade_in_css(time)
         }
 
         // timing
@@ -3675,13 +3709,17 @@ export module Scripting {
         // sfall hook-script opcode — set the return value for a hook script (0x819A).
         // No-op in the browser build; hook scripts are not implemented.
         set_sfall_return(val: number): void {
-            log('set_sfall_return', arguments)
+            // BLK-123 (Phase 78): Store value in the module-level hook return buffer.
+            _sfallHookReturnVal = typeof val === 'number' ? val : 0
         }
 
-        // sfall hook-script opcode — get a hook-script argument by index (0x819B).
-        // Partial: returns 0; hook scripts are not implemented in the browser build.
+        // sfall hook-script opcode — get the next hook-script argument (0x819B).
+        // BLK-123 (Phase 78): Now reads from the module-level hook arg buffer in order.
         get_sfall_arg(): number {
-            log('get_sfall_arg', arguments)
+            if (_sfallHookArgCursor < _sfallHookArgs.length) {
+                const v = _sfallHookArgs[_sfallHookArgCursor++]
+                return typeof v === 'number' ? v : 0
+            }
             return 0
         }
 
@@ -3956,25 +3994,25 @@ export module Scripting {
         }
 
         // sfall 0x81C0 — get_sfall_args_count():
-        // Returns the number of arguments passed to the currently executing hook script.
-        // The browser build does not implement hook scripts; always returns 0.
+        // BLK-123 (Phase 78): Returns the number of args in the sfall hook arg buffer.
         get_sfall_args_count(): number {
-            return 0
+            return _sfallHookArgs.length
         }
 
         // sfall 0x81C1 — get_sfall_arg_at(idx):
-        // Returns the hook-script argument at the given zero-based index.
-        // The browser build does not implement hook scripts; always returns 0.
+        // BLK-123 (Phase 78): Returns the hook-script arg at the given zero-based index.
         get_sfall_arg_at(idx: number): number {
-            log('get_sfall_arg_at', arguments)
-            return 0
+            if (typeof idx !== 'number' || idx < 0 || idx >= _sfallHookArgs.length) return 0
+            const v = _sfallHookArgs[idx]
+            return typeof v === 'number' ? v : 0
         }
 
         // sfall 0x81C2 — set_sfall_arg(idx, val):
-        // Writes a value back into the hook-script argument at the given index.
-        // No-op in the browser build (no hook script argument buffer).
+        // BLK-123 (Phase 78): Writes a value back into the hook-script arg buffer at idx.
         set_sfall_arg(idx: number, val: number): void {
-            log('set_sfall_arg', arguments)
+            if (typeof idx === 'number' && idx >= 0 && idx < _sfallHookArgs.length) {
+                _sfallHookArgs[idx] = typeof val === 'number' ? val : 0
+            }
         }
 
         // sfall 0x81C3 — get_object_lighting(obj):
@@ -4054,15 +4092,29 @@ export module Scripting {
             }
         }
 
-        // Phase 54 — sfall 0x81D0 — get_game_mode_sfall():
+        // Phase 54 / Phase 78 — sfall 0x81D0 — get_game_mode_sfall():
         // Returns a bitmask indicating the current game mode.
-        // Bit 0 (0x01) = normal map mode, bit 1 (0x02) = combat mode,
-        // bit 2 (0x04) = dialogue mode, bit 3 (0x08) = barter mode,
-        // bit 4 (0x10) = inventory/menu mode, bit 5 (0x20) = world-map mode.
+        // Bit 0 (0x01) = normal map mode (always set when on a map)
+        // Bit 1 (0x02) = combat mode
+        // Bit 2 (0x04) = dialogue mode
+        // Bit 3 (0x08) = barter mode
+        // Bit 4 (0x10) = inventory/menu mode
+        // Bit 5 (0x20) = world-map mode
+        // BLK-123 (Phase 78): Now reads globalState.uiMode to set dialogue/barter/inventory/worldmap bits.
         get_game_mode_sfall(): number {
-            let mode = 0x01 // normal mode by default
-            if (globalState.inCombat) mode |= 0x02
-            // Additional mode flags could be set based on UIMode if needed.
+            let mode = 0
+            const ui = globalState.uiMode ?? 0
+            // import UIMode values numerically (avoid circular import): 1=dialogue, 2=barter, 4=inventory, 5=worldMap
+            if (ui === 5 /* worldMap */) {
+                mode |= 0x20 // world-map mode — no normal-map bit
+            } else {
+                mode |= 0x01 // on a normal map
+                if (globalState.inCombat) mode |= 0x02
+                if (ui === 1 /* dialogue */) mode |= 0x04
+                if (ui === 2 /* barter   */) mode |= 0x08
+                if (ui === 4 /* inventory*/) mode |= 0x10
+            }
+            if (mode === 0) mode = 0x01 // fallback: normal mode
             return mode
         }
 
@@ -4393,16 +4445,15 @@ export module Scripting {
         }
 
         // sfall 0x81FC — get_script_return_val_sfall():
-        // Return the last value set by set_sfall_return().
-        // Partial: returns the stored sfall return value (0 if unset).
+        // BLK-123 (Phase 78): Return the hook return value from the module-level buffer.
         get_script_return_val_sfall(): number {
-            return (this as any)._sfallReturnVal ?? 0
+            return _sfallHookReturnVal
         }
 
         // sfall 0x81FD — set_script_return_val_sfall(val):
-        // Store a script return value (alias of set_sfall_return for symmetry).
+        // BLK-123 (Phase 78): Alias of set_sfall_return — store into module-level buffer.
         set_script_return_val_sfall(val: number): void {
-            ;(this as any)._sfallReturnVal = typeof val === 'number' ? val : 0
+            _sfallHookReturnVal = typeof val === 'number' ? val : 0
         }
 
         // sfall 0x81FE — get_active_map_id_sfall():
@@ -4779,17 +4830,15 @@ export module Scripting {
         // -----------------------------------------------------------------------
 
         // sfall 0x8220 — get_cursor_mode_sfall():
-        // Return the current cursor mode index.
-        // Browser build: no cursor mode state; returns 0 (default/action cursor).
+        // BLK-126 (Phase 79): Return the current cursor mode from globalState.sfallCursorMode.
         get_cursor_mode_sfall(): number {
-            return 0
+            return globalState.sfallCursorMode ?? 0
         }
 
         // sfall 0x8221 — set_cursor_mode_sfall(mode):
-        // Set the current cursor mode.
-        // Browser build: no-op; cursor mode is handled by the HTML/CSS layer.
+        // BLK-126 (Phase 79): Store cursor mode into globalState.sfallCursorMode.
         set_cursor_mode_sfall(mode: number): void {
-            // no-op in browser build
+            globalState.sfallCursorMode = typeof mode === 'number' && isFinite(mode) ? Math.round(mode) : 0
         }
 
         // sfall 0x8222 — set_flags_sfall(obj, flags):
@@ -4911,10 +4960,10 @@ export module Scripting {
         }
 
         // sfall 0x822D — obj_under_cursor_sfall():
-        // Return the game object currently under the mouse cursor.
-        // Browser build: returns 0 (no native cursor-to-tile tracking).
-        obj_under_cursor_sfall(): number {
-            return 0
+        // BLK-127 (Phase 79): Return the game object under the cursor from globalState.objUnderCursor.
+        // Updated by renderer hover detection; returns 0 when no object is under the cursor.
+        obj_under_cursor_sfall(): Obj | 0 {
+            return globalState.objUnderCursor ?? 0
         }
 
         // sfall 0x822E — get_attack_weapon_sfall(obj, attackType):
@@ -5738,6 +5787,270 @@ export module Scripting {
             return this.tile_num_in_direction(tile, dir, count)
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 75 — sfall extended opcodes 0x8278–0x827F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8278 — get_critter_knockout_sfall(obj):
+        // Returns 1 if the critter is currently knocked out (unconscious), 0 otherwise.
+        get_critter_knockout_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).knockedOut ? 1 : 0
+        }
+
+        // sfall 0x8279 — get_critter_knockdown_sfall(obj):
+        // Returns 1 if the critter is currently knocked down (prone), 0 otherwise.
+        get_critter_knockdown_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).knockedDown ? 1 : 0
+        }
+
+        // sfall 0x827A — get_critter_crippled_legs_sfall(obj):
+        // Returns a bitmask: bit 0 (0x01) = left leg crippled, bit 1 (0x02) = right leg.
+        get_critter_crippled_legs_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            let mask = 0
+            if ((obj as any).crippledLeftLeg)  mask |= 0x01
+            if ((obj as any).crippledRightLeg) mask |= 0x02
+            return mask
+        }
+
+        // sfall 0x827B — get_critter_crippled_arms_sfall(obj):
+        // Returns a bitmask: bit 0 (0x01) = left arm crippled, bit 1 (0x02) = right arm.
+        get_critter_crippled_arms_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            let mask = 0
+            if ((obj as any).crippledLeftArm)  mask |= 0x01
+            if ((obj as any).crippledRightArm) mask |= 0x02
+            return mask
+        }
+
+        // sfall 0x827C — get_critter_dead_sfall(obj):
+        // Returns 1 if the critter is dead, 0 otherwise.  Safe for non-critter objects.
+        get_critter_dead_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).dead ? 1 : 0
+        }
+
+        // sfall 0x827D — get_map_loaded_sfall():
+        // Returns 1 if the current map was entered via a save/load (alias of game_loaded).
+        // BLK-111: reads the real globalState.mapLoadedFromSave flag.
+        get_map_loaded_sfall(): number {
+            return globalState.mapLoadedFromSave ? 1 : 0
+        }
+
+        // sfall 0x827E — get_critter_poison_level_sfall(obj):
+        // Returns the current poison level of the critter (same as get_poison).
+        get_critter_poison_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).stats?.getBase('Poison Level') ?? 0
+        }
+
+        // sfall 0x827F — get_critter_radiation_level_sfall(obj):
+        // Returns the current radiation level of the critter (same as get_radiation).
+        get_critter_radiation_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).stats?.getBase('Radiation Level') ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 76 — sfall extended opcodes 0x8280–0x8287
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8280 — get_last_target_sfall(obj): BLK-117
+        // Returns the last combat target of the given critter, or 0 if unset.
+        get_last_target_sfall(obj: Obj): Obj | 0 {
+            if (!obj || typeof obj !== 'object') return 0
+            return (obj as any).lastCombatTarget ?? 0
+        }
+
+        // sfall 0x8281 — get_last_attacker_sfall(obj): BLK-117
+        // Returns the last combat attacker of the given critter, or 0 if unset.
+        get_last_attacker_sfall(obj: Obj): Obj | 0 {
+            if (!obj || typeof obj !== 'object') return 0
+            return (obj as any).lastCombatAttacker ?? 0
+        }
+
+        // sfall 0x8282 — get_critter_level_sfall(obj):
+        // Returns the critter's current level.  For the player, reads player.level;
+        // for NPCs, returns 1 (partial — NPC level tracking is not yet implemented).
+        get_critter_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            // Player has a real level property; NPCs default to 1.
+            return (obj as any).level ?? 1
+        }
+
+        // sfall 0x8283 — get_critter_current_xp_sfall(obj):
+        // Returns the critter's current accumulated XP.  For the player, reads
+        // player.xp; for NPCs, returns 0 (no XP tracking for non-player critters).
+        // NOTE: distinct from get_critter_xp_sfall (0x81F0) which reads proto XPValue.
+        get_critter_current_xp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).xp ?? 0
+        }
+
+        // sfall 0x8284 — set_critter_level_sfall(obj, level):
+        // Set the critter's level.  Browser build: partial — sets the level property
+        // directly on the critter object; no stat recalculation is performed.
+        set_critter_level_sfall(obj: Obj, level: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_level_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof level !== 'number' || !isFinite(level) || level < 1) {
+                warn('set_critter_level_sfall: invalid level ' + level + ' — no-op', undefined, this)
+                return
+            }
+            ;(obj as any).level = Math.floor(level)
+        }
+
+        // sfall 0x8285 — get_critter_base_stat_sfall(obj, stat):
+        // Returns the critter's base stat value (before modifiers/bonuses).
+        // Mirrors critter_get_stat_sfall (0x8182) but reads the base, not derived.
+        get_critter_base_stat_sfall(obj: Obj, stat: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('get_critter_base_stat_sfall: unknown stat ' + stat + ' — returning 0', undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats?.getBase(statName) ?? 0
+        }
+
+        // sfall 0x8286 — set_critter_base_stat_sfall(obj, stat, value):
+        // Set the critter's base stat value directly.  Mirrors set_critter_stat.
+        set_critter_base_stat_sfall(obj: Obj, stat: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('set_critter_base_stat_sfall: unknown stat ' + stat + ' — no-op', undefined, this)
+                return
+            }
+            if (typeof value !== 'number' || !isFinite(value)) {
+                warn('set_critter_base_stat_sfall: non-finite value ' + value + ' — no-op', undefined, this)
+                return
+            }
+            ;(obj as Critter).stats?.setBase(statName, Math.round(value))
+        }
+
+        // sfall 0x8287 — get_obj_weight_sfall(obj):
+        // Return the object's weight in lbs from its proto data.  Returns 0 for
+        // non-game-objects or when no weight data is available.
+        get_obj_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).pro?.extra?.weight ?? (obj as any).weight ?? 0
+        }
+
+        // Phase 77 — sfall extended opcodes 0x8288–0x828F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8288 — get_critter_flags_sfall(obj):
+        // Returns the engine-level critter flags bitmask.  Alias of get_critter_flags().
+        get_critter_flags_sfall(obj: Obj): number {
+            return this.get_critter_flags(obj)
+        }
+
+        // sfall 0x8289 — set_critter_flags_sfall(obj, flags):
+        // Sets the engine-level critter flags in bulk.  Alias of set_critter_flags().
+        set_critter_flags_sfall(obj: Obj, flags: number): void {
+            this.set_critter_flags(obj, flags)
+        }
+
+        // sfall 0x828A — get_critter_worn_armor_sfall(obj):
+        // Returns the armor item currently equipped by the critter, or 0 if none.
+        get_critter_worn_armor_sfall(obj: Obj): Obj | 0 {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).equippedArmor ?? 0
+        }
+
+        // sfall 0x828B — get_critter_weapon_sfall(obj, hand):
+        // Returns the weapon in the given hand (0 = right, 1 = left), or 0 if empty.
+        get_critter_weapon_sfall(obj: Obj, hand: number): Obj | 0 {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (hand === 1) return (obj as any).leftHand ?? 0
+            return (obj as any).rightHand ?? 0
+        }
+
+        // sfall 0x828C — get_tile_x_sfall(tile):
+        // Returns the x hex coordinate of a tile number.
+        get_tile_x_sfall(tile: number): number {
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            return fromTileNum(tile).x
+        }
+
+        // sfall 0x828D — get_tile_y_sfall(tile):
+        // Returns the y hex coordinate of a tile number.
+        get_tile_y_sfall(tile: number): number {
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            return fromTileNum(tile).y
+        }
+
+        // sfall 0x828E — tile_from_coords_sfall(x, y):
+        // Returns the tile number for the given (x, y) hex coordinates.
+        tile_from_coords_sfall(x: number, y: number): number {
+            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) return 0
+            return toTileNum({ x: Math.round(x), y: Math.round(y) })
+        }
+
+        // sfall 0x828F — get_critter_max_hp_sfall(obj):
+        // Returns the maximum HP of a critter from its stats or proto data.
+        // Returns 0 for non-critters.
+        get_critter_max_hp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            // Player and critters expose max HP via getStat('Max HP')
+            if (typeof (obj as any).getStat === 'function') {
+                const hp = (obj as any).getStat('Max HP')
+                if (typeof hp === 'number' && isFinite(hp)) return hp
+            }
+            // Fallback: proto extra data
+            return (obj as any).pro?.extra?.maxHP ?? (obj as any).maxHP ?? 0
+        }
+
+        // BLK-121 — reg_anim_animate improvement:
+        // Trigger a single animation cycle on the object (replaces pure log no-op).
+        reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
+            if (!isGameObject(obj)) {
+                warn('reg_anim_animate_once: not a game object', 'animation', this)
+                return
+            }
+            // anim 0 = idle/stand animation; trigger it as a single non-looping cycle
+            if (typeof (obj as any).singleAnimation === 'function') {
+                try {
+                    ;(obj as any).singleAnimation(false, null)
+                } catch (e) {
+                    warn('reg_anim_animate_once: singleAnimation threw: ' + e, 'animation', this)
+                }
+            }
+        }
+
+        // BLK-122 — gfade_out real CSS implementation:
+        // Fade the game canvas to black using a CSS transition.  Safe in Node.js.
+        gfade_out_css(_time: number): void {
+            if (typeof document === 'undefined') return
+            const cnv = document.getElementById('cnv')
+            if (cnv) {
+                cnv.style.transition = 'opacity 0.5s ease-in-out'
+                cnv.style.opacity = '0'
+            }
+        }
+
+        // BLK-122 — gfade_in real CSS implementation:
+        // Restore the game canvas from a previous fade-out.  Safe in Node.js.
+        gfade_in_css(_time: number): void {
+            if (typeof document === 'undefined') return
+            const cnv = document.getElementById('cnv')
+            if (cnv) {
+                cnv.style.transition = 'opacity 0.5s ease-in-out'
+                cnv.style.opacity = '1'
+            }
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -6164,6 +6477,11 @@ export module Scripting {
             flushUnsupportedVMOperations(mapScript)
         }
 
+        // BLK-111: Clear the save-load flag after map_enter_p_proc has run.
+        // Scripts that call game_loaded() inside map_enter_p_proc see 1 (loaded
+        // from save); subsequent critter_p_proc calls see 0 (normal run).
+        globalState.mapLoadedFromSave = false
+
         if (overrideStartPos) {
             const r = overrideStartPos
             overrideStartPos = null
@@ -6172,7 +6490,7 @@ export module Scripting {
 
         // XXX: caller should do this for all objects, which is better?
         /*for(var i = 0; i < gameObjects.length; i++) {
-            objectEnterMap(gameObjects[i], elevation, mapID)			
+            objectEnterMap(gameObjects[i], elevation, mapID)
         }*/
 
         return null
