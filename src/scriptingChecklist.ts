@@ -7013,6 +7013,166 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 84 — New Reno full-playability hardening, sfall 0x82B0–0x82B7
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_145_critter_heal_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-145: critter_heal() called Math.min(amount, maxHP - currentHP) without ' +
+            'checking that amount is a finite number.  New Reno boxing scripts compute ' +
+            'heal quantities from stat formulas; when a formula error produces NaN or ' +
+            'Infinity, Math.min() propagates NaN into modifyBase(\'HP\', NaN), silently ' +
+            'corrupting the fighter\'s HP stat.  Now checks ' +
+            'typeof amount !== \'number\' || !isFinite(amount) before proceeding and ' +
+            'warns + returns without modifying HP when the guard fires.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_146_add_mult_objs_non_positive_count',
+        kind: 'bug',
+        description:
+            'BLK-146: add_mult_objs_to_inven() passed any count to addInventoryItem() ' +
+            'including 0 or negative values.  New Reno reward scripts (Wright/Bishop ' +
+            'family quests) sometimes compute reward quantities dynamically; when the ' +
+            'result is 0 or negative, calling addInventoryItem with a non-positive count ' +
+            'can produce zero-quantity stack entries or assertion failures in inventory ' +
+            'paths.  Now rejects non-positive or non-finite counts with a warning and ' +
+            'returns early so no corrupted entries are created.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_147_set_local_var_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-147: set_local_var() stored any numeric value including NaN and ' +
+            'Infinity into the script\'s lvars table without validation.  New Reno ' +
+            'scripts that use local variables for combat math (damage offsets, timer ' +
+            'durations) can produce non-finite values from arithmetic errors; these ' +
+            'then propagate through subsequent local_var() reads into stat mutations ' +
+            'and HP calculations.  Now mirrors BLK-129 (set_global_var): clamps ' +
+            'non-finite numbers to 0 and emits a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_148_critter_dmg_negative_clamp',
+        kind: 'bug',
+        description:
+            'BLK-148: critter_dmg() applied negative damage values to critters when ' +
+            'New Reno boxing scripts computed net damage as (attack − defense) and ' +
+            'the defender\'s DR/DT absorbed all damage.  Fallout 2 treats negative ' +
+            'net damage as 0 (no healing through the damage pipeline); passing a ' +
+            'negative value to critterDamage() reduces HP below its intended floor. ' +
+            'Now clamps any finite negative damage to 0 before delegating.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x82B0 — get_inven_count_sfall
+    {
+        id: 'sfall_get_inven_count_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B0: get_inven_count_sfall(critter) → number of distinct item stacks. ' +
+            'Returns obj.inventory.length; 0 for non-critters or empty inventory. ' +
+            'Used by New Reno merchant and reward scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B1 — get_critter_base_ap_sfall
+    {
+        id: 'sfall_get_critter_base_ap_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B1: get_critter_base_ap_sfall(obj) → base AP before modifiers. ' +
+            'Reads stats.getBase(\'Max AP\'); falls back to 5 + ceil(AGI/2). ' +
+            'Used by New Reno boxing scripts to track unmodified AP.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B2 — get_critter_inventory_weight_sfall
+    {
+        id: 'sfall_get_critter_inventory_weight_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B2: get_critter_inventory_weight_sfall(obj) → current carried weight in lbs. ' +
+            'Sums item.weight * item.amount for each inventory entry (runtime weight field). ' +
+            'Used by New Reno shop/barter scripts for encumbrance checks.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B3 — get_critter_carry_limit_sfall
+    {
+        id: 'sfall_get_critter_carry_limit_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B3: get_critter_carry_limit_sfall(obj) → max carry weight in lbs. ' +
+            'Reads getStat(\'Carry Weight\'); falls back to 25 + STR×25. ' +
+            'Used by New Reno shop scripts to check if the player can carry loot.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B4 — get_obj_script_name_sfall
+    {
+        id: 'sfall_get_obj_script_name_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B4: get_obj_script_name_sfall(obj) → script name string or 0. ' +
+            'Browser build: always returns 0 (no SID→name registry at runtime). ' +
+            'Scripts probing script names for branching safely receive 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B5 — get_critter_knockout_state_sfall
+    {
+        id: 'sfall_get_critter_knockout_state_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B5: get_critter_knockout_state_sfall(obj) → 1 if knocked out, 0 otherwise. ' +
+            'Reads critter.knockedOut; returns 0 for non-critters or when not set. ' +
+            'Used by New Reno boxing scripts to determine whether a fighter is down.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B6 — set_critter_knockout_state_sfall
+    {
+        id: 'sfall_set_critter_knockout_state_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B6: set_critter_knockout_state_sfall(obj, state) — set knocked-out flag. ' +
+            'Writes critter.knockedOut. No-op for non-critters. ' +
+            'Does not trigger animation change in the browser build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B7 — get_combat_turn_sfall
+    {
+        id: 'sfall_get_combat_turn_84',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B7: get_combat_turn_sfall() → current combat turn number (1-based) or 0. ' +
+            'Returns 0 when not in combat. Reads globalState.combatTurn when available. ' +
+            'Used by New Reno encounter scripts that grant bonuses on specific turns.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
