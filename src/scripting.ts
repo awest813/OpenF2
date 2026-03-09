@@ -672,12 +672,23 @@ export module Scripting {
             log('set_global_var', arguments, 'gvars')
         }
         set_local_var(lvar: number, value: any) {
+            // BLK-147: Guard against non-finite numeric values — parallel to BLK-129
+            // for global vars.  New Reno scripts that use local variables for combat
+            // math (damage calculations, timer offsets) can produce NaN or Infinity
+            // from arithmetic errors.  Storing these corrupts subsequent local_var()
+            // reads and can cascade into stat mutations.  Clamp to 0 and warn.
+            if (typeof value === 'number' && !isFinite(value)) {
+                warn('set_local_var: non-finite value (' + value + ') for lvar ' + lvar + ' — clamping to 0', 'lvars')
+                value = 0
+            }
+            if (!this.lvars) this.lvars = {}
             this.lvars[lvar] = value
             info('set_local_var: ' + lvar + ' = ' + value + ' [' + this.scriptName + ']', 'lvars')
             log('set_local_var', arguments, 'lvars')
         }
         local_var(lvar: number) {
             log('local_var', arguments, 'lvars')
+            if (!this.lvars) this.lvars = {}
             if (this.lvars[lvar] === undefined) {
                 warn('local_var: setting default value (0) for LVAR ' + lvar, 'lvars')
                 this.lvars[lvar] = 0
@@ -1497,6 +1508,16 @@ export module Scripting {
                 warn('add_mult_objs_to_inven: object has no inventory!')
                 return
             }
+            // BLK-146: Guard against non-positive counts — New Reno reward scripts
+            // sometimes compute item quantities dynamically; when the result is 0 or
+            // negative (e.g. a condition yields count=0), calling addInventoryItem with
+            // a non-positive value does nothing useful but can trigger assertion failures
+            // or leave corrupted zero-quantity stack entries in some inventory paths.
+            // Reject early with a warning so the issue is traceable.
+            if (typeof count !== 'number' || !isFinite(count) || count <= 0) {
+                warn('add_mult_objs_to_inven: non-positive count (' + count + ') — no-op', undefined, this)
+                return
+            }
 
             //info("add_mult_objs_to_inven: " + count + " counts of " + item.toString(), "inventory")
             log('add_mult_objs_to_inven: ' + count + ' × ' + (item as any)?.art, arguments, 'inventory')
@@ -1836,11 +1857,30 @@ export module Scripting {
                 warn('critter_dmg: non-finite damage (' + damage + ') — no-op', undefined, this)
                 return
             }
+            // BLK-148: Clamp negative damage values to 0 — New Reno boxing scripts
+            // compute net damage as (attack - defense) which can be negative when the
+            // defender's DR/DT absorbs all damage.  Fallout 2 treats negative damage
+            // as 0 (no healing from the damage pipeline); critterDamage() with a
+            // negative value would reduce HP below intended floor.
+            if (damage < 0) {
+                damage = 0
+            }
+            // Zero damage — nothing to apply; skip critterDamage() to avoid side-effects.
+            if (damage === 0) return
             critterDamage(obj, damage, this.self_obj as Critter, true, true, damageType)
         }
         critter_heal(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('critter_heal: not a critter: ' + obj, undefined, this)
+                return
+            }
+            // BLK-145: Guard against non-finite heal amounts — New Reno boxing scripts
+            // compute healing quantities from formulas that can produce NaN or Infinity
+            // (e.g. division by zero when a fighter's stats are 0).  Passing a non-finite
+            // value to Math.min() propagates NaN into modifyBase('HP', NaN), silently
+            // corrupting the critter's HP stat.  Reject and warn instead.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('critter_heal: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
             const critter = obj as Critter
@@ -6485,6 +6525,111 @@ export module Scripting {
             if (typeof critter.invalidate === 'function') {
                 try { critter.invalidate() } catch (_) { /* ignore renderer errors */ }
             }
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 84 — sfall extended opcodes 0x82B0–0x82B7
+        // New Reno utility: inventory count, AP, carry weight, script metadata,
+        // knockout state, and combat turn tracking.
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82B0 — get_inven_count_sfall(critter):
+        // Return the number of distinct item stacks in the critter's inventory.
+        // Returns the array length of obj.inventory; 0 for non-critters or empty.
+        // Used by New Reno merchant and reward scripts that need to know how many
+        // item types the player is carrying before deciding what to offer/sell.
+        get_inven_count_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).inventory?.length ?? 0
+        }
+
+        // sfall 0x82B1 — get_critter_base_ap_sfall(obj):
+        // Return the critter's base Action Points before any modifiers (drugs,
+        // equipment, temporary effects).  Reads stats.getBase('Max AP') when
+        // available; falls back to the Fallout 2 formula (5 + ceil(Agility/2)).
+        // Used by New Reno boxing scripts that track the fighter's unmodified AP.
+        get_critter_base_ap_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.getBase === 'function') {
+                const base = critter.stats.getBase('Max AP')
+                if (typeof base === 'number' && isFinite(base)) return base
+            }
+            const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
+            return 5 + Math.ceil(agi / 2)
+        }
+
+        // sfall 0x82B2 — get_critter_inventory_weight_sfall(obj):
+        // Return the total weight currently carried by the critter in lbs.
+        // Sums item.weight * item.amount for each inventory entry (using the
+        // runtime weight field rather than proto extra.weight/10 used by 0x8237).
+        // Returns 0 for non-critters or when inventory is empty.
+        // Used by New Reno shop/barter scripts that check encumbrance.
+        get_critter_inventory_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            const inv: any[] = (obj as any).inventory ?? []
+            let total = 0
+            for (const entry of inv) {
+                const w = (entry.weight ?? 0)
+                const a = typeof entry.amount === 'number' ? entry.amount : 1
+                total += w * a
+            }
+            return total
+        }
+
+        // sfall 0x82B3 — get_critter_carry_limit_sfall(obj):
+        // Return the critter's maximum carry weight in lbs.
+        // Reads getStat('Carry Weight') first; falls back to Fallout 2 formula
+        // (25 + STR*25) when the stat is unavailable or zero.
+        // Used by New Reno shop scripts to check whether the player can carry loot.
+        get_critter_carry_limit_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            const critter = obj as any
+            if (typeof critter.getStat === 'function') {
+                const cw = critter.getStat('Carry Weight')
+                if (typeof cw === 'number' && isFinite(cw) && cw > 0) return cw
+            }
+            const str = typeof critter.getStat === 'function' ? (critter.getStat('STR') ?? 5) : 5
+            return 25 + str * 25
+        }
+
+        // sfall 0x82B4 — get_obj_script_name_sfall(obj):
+        // Return the script name string for an object, or 0 if none.
+        // Browser build returns 0 — no SID→name registry is available at runtime.
+        // Scripts that probe script names for branching always get 0, which is a
+        // safe no-script sentinel in vanilla Fallout 2.
+        get_obj_script_name_sfall(_obj: Obj): number {
+            return 0
+        }
+
+        // sfall 0x82B5 — get_critter_knockout_state_sfall(obj):
+        // Return 1 if the critter is currently knocked out, 0 otherwise.
+        // Reads critter.knockedOut; returns 0 for non-critters or when not set.
+        // Used by New Reno boxing scripts to determine whether a fighter is down.
+        get_critter_knockout_state_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).knockedOut ? 1 : 0
+        }
+
+        // sfall 0x82B6 — set_critter_knockout_state_sfall(obj, state):
+        // Set or clear the knocked-out flag for a critter.
+        // Writes critter.knockedOut (truthy → knocked out, falsy → standing).
+        // No-op for non-critters.  Does not trigger an animation change in the
+        // browser build (full engine integration would be required for that).
+        set_critter_knockout_state_sfall(obj: Obj, state: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') return
+            ;(obj as any).knockedOut = state ? true : false
+        }
+
+        // sfall 0x82B7 — get_combat_turn_sfall():
+        // Return the current combat turn number (1-based) when in combat,
+        // or 0 when not in combat.
+        // Used by New Reno encounter scripts that grant bonuses on specific turns.
+        get_combat_turn_sfall(): number {
+            if (!globalState.inCombat) return 0
+            return typeof (globalState as any).combatTurn === 'number'
+                ? Math.max(0, (globalState as any).combatTurn)
+                : 0
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {

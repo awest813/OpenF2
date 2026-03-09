@@ -1509,6 +1509,32 @@ export module ScriptVMBridge {
 
        // 0x82AF — set_critter_outline_color_sfall(obj, color): set outline colour.
        ,0x82AF: bridged("set_critter_outline_color_sfall", 2, false) // set_critter_outline_color(obj, color)
+
+       // Phase 84 — sfall extended opcodes 0x82B0–0x82B7
+
+       // 0x82B0 — get_inven_count_sfall(critter): number of distinct inventory stacks.
+       ,0x82B0: bridged("get_inven_count_sfall", 1) // get_inven_count(critter) → count
+
+       // 0x82B1 — get_critter_base_ap_sfall(obj): base AP before modifiers.
+       ,0x82B1: bridged("get_critter_base_ap_sfall", 1) // get_critter_base_ap(obj) → baseAP
+
+       // 0x82B2 — get_critter_inventory_weight_sfall(obj): current carried weight in lbs.
+       ,0x82B2: bridged("get_critter_inventory_weight_sfall", 1) // get_critter_inventory_weight(obj) → lbs
+
+       // 0x82B3 — get_critter_carry_limit_sfall(obj): max carry weight in lbs.
+       ,0x82B3: bridged("get_critter_carry_limit_sfall", 1) // get_critter_carry_limit(obj) → lbs
+
+       // 0x82B4 — get_obj_script_name_sfall(obj): script name or 0.
+       ,0x82B4: bridged("get_obj_script_name_sfall", 1) // get_obj_script_name(obj) → name|0
+
+       // 0x82B5 — get_critter_knockout_state_sfall(obj): 1 if knocked out, 0 otherwise.
+       ,0x82B5: bridged("get_critter_knockout_state_sfall", 1) // get_critter_knockout_state(obj) → 0|1
+
+       // 0x82B6 — set_critter_knockout_state_sfall(obj, state): set knocked-out flag.
+       ,0x82B6: bridged("set_critter_knockout_state_sfall", 2, false) // set_critter_knockout_state(obj, state)
+
+       // 0x82B7 — get_combat_turn_sfall(): current combat turn number or 0.
+       ,0x82B7: bridged("get_combat_turn_sfall", 0) // get_combat_turn() → turn|0
     }
     Object.assign(opMap, bridgeOpMap)
 
