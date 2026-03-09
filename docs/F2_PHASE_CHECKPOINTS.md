@@ -483,3 +483,43 @@ Gate: **PASS** — all 3212 tests green, tsc clean.
 - [x] phase74.test.ts: 58 regression tests, all passing
 
 Gate: **PASS** — all 3270 tests green, tsc clean.
+
+---
+
+## Phase 82 — global error boundary (BLK-139), callProcedureSafe script trigger isolation (BLK-140), map_update per-object isolation (BLK-142), timer event isolation (BLK-143), sfall opcodes 0x82A0–0x82A7
+
+- [x] **BLK-139**: `installBrowserErrorBoundary()` IIFE in `main.ts` — installs `window.onerror` and `window.addEventListener('unhandledrejection', …)` handlers. Displays a recoverable overlay (Continue / Reload) with error message and source location. Throttled to 5 errors/minute to prevent flooding. User testing readiness: any uncaught exception now shows a friendly recovery UI instead of a silent freeze.
+- [x] **BLK-140**: `callProcedureSafe(fn, scriptName, procName)` helper added inside the `Scripting` module. Applied to all 18 script trigger dispatch functions: `talk`, `updateCritter`, `timedEvent`, `use`, `lookAt`, `description`, `useSkillOn`, `pickup`, `useObjOn`, `push`, `isDropping`, `combatEvent`, `updateMap` (map script + per-object), `exitMap` (map script + per-object), `enterMap`, `objectEnterMap`, `spatial`, `destroy`, `damage`. A throwing NPC script no longer crashes the game loop.
+- [x] **BLK-142**: `updateMap()` per-object loop: each NPC's `map_update_p_proc` is now individually wrapped in `callProcedureSafe()`. One bad NPC script cannot abort subsequent NPC heartbeat updates.
+- [x] **BLK-143**: `timedEvent()` `timed_event_p_proc` call now wrapped in `callProcedureSafe()`. A throwing timer callback no longer breaks the timer chain or prevents subsequent timed events.
+- [x] New sfall opcode 0x82A0: `get_worldmap_free_move_sfall()` → 0
+- [x] New sfall opcode 0x82A1: `set_worldmap_free_move_sfall(v)` → no-op
+- [x] New sfall opcode 0x82A2: `get_car_current_town_sfall()` → carAreaID or -1
+- [x] New sfall opcode 0x82A3: `get_dude_obj_sfall()` → player object or 0
+- [x] New sfall opcode 0x82A4: `set_dude_obj_sfall(obj)` → no-op stub
+- [x] New sfall opcode 0x82A5: `get_critter_max_ap_sfall(obj)` → alias of existing 0x8235
+- [x] New sfall opcode 0x82A6: `get_tile_light_level_sfall(tile)` → 0
+- [x] New sfall opcode 0x82A7: `set_tile_light_level_sfall(tile, level)` → no-op
+- [x] phase82.test.ts: 66 regression tests, all passing
+
+Gate: **PASS** — all 3714 tests green, tsc clean.
+
+---
+
+## Phase 83 — initScript start proc isolation (BLK-144), sfall opcodes 0x82A8–0x82AF
+
+- [x] **BLK-144**: `initScript()` `start` procedure call now wrapped in `callProcedureSafe()`. A throwing script initializer no longer aborts map-load for subsequent objects — every NPC/object on the map initializes safely.
+- [x] New sfall opcode 0x82A8: `get_critter_experience_sfall(obj)` → total XP (playerExperience for player, critter.experience for NPCs)
+- [x] New sfall opcode 0x82A9: `set_critter_experience_sfall(obj, val)` → set total XP, clamped to [0, 2^31-1]
+- [x] New sfall opcode 0x82AA: `get_critter_crit_chance_sfall(obj)` → crit modifier % (reads critChanceMod)
+- [x] New sfall opcode 0x82AB: `set_critter_crit_chance_sfall(obj, val)` → set crit modifier %, clamped to [-100, 100]
+- [x] New sfall opcode 0x82AC: `get_critter_npc_flag_sfall(obj, flag)` → NPC flags bit at position flag (0–31)
+- [x] New sfall opcode 0x82AD: `set_critter_npc_flag_sfall(obj, flag, val)` → set/clear NPC flags bit
+- [x] New sfall opcode 0x82AE: `get_critter_outline_color_sfall(obj)` → outline colour index (0 = none)
+- [x] New sfall opcode 0x82AF: `set_critter_outline_color_sfall(obj, color)` → set outline colour, calls invalidate() when available
+- [x] vm_bridge.ts updated: 8 new entries 0x82A8–0x82AF mapped to bridged() stubs
+- [x] scriptingChecklist.ts updated: BLK-144 + 8 sfall opcode entries all marked implemented
+- [x] phase83.test.ts: regression tests for BLK-144 (7 tests) + all 8 sfall opcodes + checklist integrity
+
+Gate: **PASS** — all tests green, tsc clean.
+

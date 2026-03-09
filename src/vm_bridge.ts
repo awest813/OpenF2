@@ -1455,6 +1455,60 @@ export module ScriptVMBridge {
 
        // 0x829F — get_distance_sfall(obj1, obj2): hex distance between two objects.
        ,0x829F: bridged("get_distance_sfall", 2) // get_distance(obj1, obj2) → dist|-1
+
+       // -----------------------------------------------------------------------
+       // Phase 82 — sfall extended opcodes 0x82A0–0x82A7
+       // -----------------------------------------------------------------------
+
+       // 0x82A0 — get_worldmap_free_move_sfall(): 0 (feature not implemented).
+       ,0x82A0: bridged("get_worldmap_free_move_sfall", 0) // get_worldmap_free_move() → 0
+
+       // 0x82A1 — set_worldmap_free_move_sfall(v): no-op.
+       ,0x82A1: bridged("set_worldmap_free_move_sfall", 1, false) // set_worldmap_free_move(v)
+
+       // 0x82A2 — get_car_current_town_sfall(): car area ID or -1.
+       ,0x82A2: bridged("get_car_current_town_sfall", 0) // get_car_current_town() → areaID|-1
+
+       // 0x82A3 — get_dude_obj_sfall(): player object or 0.
+       ,0x82A3: bridged("get_dude_obj_sfall", 0) // get_dude_obj() → player|0
+
+       // 0x82A4 — set_dude_obj_sfall(obj): no-op stub.
+       ,0x82A4: bridged("set_dude_obj_sfall", 1, false) // set_dude_obj(obj)
+
+       // 0x82A5 — get_critter_max_ap_sfall(obj): max AP from stats.
+       ,0x82A5: bridged("get_critter_max_ap_sfall", 1) // get_critter_max_ap(obj) → maxAP
+
+       // 0x82A6 — get_tile_light_level_sfall(tile): 0 (no per-tile light readback).
+       ,0x82A6: bridged("get_tile_light_level_sfall", 1) // get_tile_light_level(tile) → 0
+
+       // 0x82A7 — set_tile_light_level_sfall(tile, level): no-op.
+       ,0x82A7: bridged("set_tile_light_level_sfall", 2, false) // set_tile_light_level(tile, level)
+
+       // Phase 83 — sfall extended opcodes 0x82A8–0x82AF
+
+       // 0x82A8 — get_critter_experience_sfall(obj): total XP for a critter.
+       ,0x82A8: bridged("get_critter_experience_sfall", 1) // get_critter_experience(obj) → xp
+
+       // 0x82A9 — set_critter_experience_sfall(obj, val): set total XP.
+       ,0x82A9: bridged("set_critter_experience_sfall", 2, false) // set_critter_experience(obj, val)
+
+       // 0x82AA — get_critter_crit_chance_sfall(obj): crit modifier %.
+       ,0x82AA: bridged("get_critter_crit_chance_sfall", 1) // get_critter_crit_chance(obj) → %
+
+       // 0x82AB — set_critter_crit_chance_sfall(obj, val): set crit modifier %.
+       ,0x82AB: bridged("set_critter_crit_chance_sfall", 2, false) // set_critter_crit_chance(obj, val)
+
+       // 0x82AC — get_critter_npc_flag_sfall(obj, flag): get NPC flags bit.
+       ,0x82AC: bridged("get_critter_npc_flag_sfall", 2) // get_critter_npc_flag(obj, flag) → 0|1
+
+       // 0x82AD — set_critter_npc_flag_sfall(obj, flag, val): set NPC flags bit.
+       ,0x82AD: bridged("set_critter_npc_flag_sfall", 3, false) // set_critter_npc_flag(obj, flag, val)
+
+       // 0x82AE — get_critter_outline_color_sfall(obj): outline colour index.
+       ,0x82AE: bridged("get_critter_outline_color_sfall", 1) // get_critter_outline_color(obj) → color
+
+       // 0x82AF — set_critter_outline_color_sfall(obj, color): set outline colour.
+       ,0x82AF: bridged("set_critter_outline_color_sfall", 2, false) // set_critter_outline_color(obj, color)
     }
     Object.assign(opMap, bridgeOpMap)
 

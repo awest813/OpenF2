@@ -6764,6 +6764,255 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'high',
         impact: 'high',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 82 — Script-trigger try-catch, global error boundary, sfall 0x82A0–0x82A7
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_139_global_error_boundary',
+        kind: 'bug',
+        description:
+            'BLK-139: Global browser error boundary installed in main.ts. ' +
+            'window.onerror and unhandledrejection handlers now intercept uncaught exceptions ' +
+            'and display a recoverable overlay with Continue / Reload options instead of ' +
+            'silently freezing the game. Throttled to 5 errors/minute to prevent flooding.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_140_script_trigger_try_catch',
+        kind: 'bug',
+        description:
+            'BLK-140: callProcedureSafe() helper added to Scripting module. ' +
+            'All 15 script trigger dispatch functions (talk_p_proc, critter_p_proc, ' +
+            'map_update_p_proc, map_enter_p_proc, map_exit_p_proc, timed_event_p_proc, ' +
+            'use_p_proc, look_at_p_proc, description_p_proc, use_skill_on_p_proc, ' +
+            'pickup_p_proc, use_obj_on_p_proc, push_p_proc, is_dropping_p_proc, ' +
+            'combat_p_proc, spatial_p_proc, destroy_p_proc, damage_p_proc) now use it. ' +
+            'A throwing NPC script no longer crashes the game loop.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_141_map_update_per_object_isolation',
+        kind: 'bug',
+        description:
+            'BLK-142: updateMap() per-object map_update_p_proc calls now wrapped ' +
+            'individually in callProcedureSafe(). One bad NPC script no longer aborts ' +
+            'the entire map update loop, preventing all other NPCs from running.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_143_timer_event_isolation',
+        kind: 'bug',
+        description:
+            'BLK-143: timedEvent() timed_event_p_proc call now wrapped in callProcedureSafe(). ' +
+            'A throwing timer callback no longer corrupts the timer event chain or stops ' +
+            'subsequent timer events from firing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x82A0 — get_worldmap_free_move_sfall
+    {
+        id: 'sfall_get_worldmap_free_move_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A0: get_worldmap_free_move_sfall() → 0. ' +
+            'Returns 1 if world-map free movement is enabled. Browser build always returns 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A1 — set_worldmap_free_move_sfall
+    {
+        id: 'sfall_set_worldmap_free_move_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A1: set_worldmap_free_move_sfall(v) — no-op in browser build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A2 — get_car_current_town_sfall
+    {
+        id: 'sfall_get_car_current_town_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A2: get_car_current_town_sfall() → areaID or -1. ' +
+            'Reads globalState.carAreaID; returns -1 when the car has not been placed.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A3 — get_dude_obj_sfall
+    {
+        id: 'sfall_get_dude_obj_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A3: get_dude_obj_sfall() → player object or 0. ' +
+            'Equivalent to the built-in dude_obj variable. Returns globalState.player.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    // sfall 0x82A4 — set_dude_obj_sfall
+    {
+        id: 'sfall_set_dude_obj_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A4: set_dude_obj_sfall(obj) — no-op stub. ' +
+            'Player-object substitution is not supported in the browser build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A5 — get_critter_max_ap_sfall
+    {
+        id: 'sfall_get_critter_max_ap_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A5: get_critter_max_ap_sfall(obj) → max AP. ' +
+            'Returns the critter\'s maximum AP from getStat("Max AP"), falling back ' +
+            'to the Fallout 2 formula (5 + ceil(Agility/2)) when the stat is unavailable.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A6 — get_tile_light_level_sfall
+    {
+        id: 'sfall_get_tile_light_level_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A6: get_tile_light_level_sfall(tile) → 0. ' +
+            'Per-tile light readback not wired to renderer. Always returns 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A7 — set_tile_light_level_sfall
+    {
+        id: 'sfall_set_tile_light_level_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A7: set_tile_light_level_sfall(tile, level) — no-op in browser build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // -------------------------------------------------------------------------
+    // Phase 83 — initScript start proc isolation, sfall 0x82A8–0x82AF
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_144_init_script_start_isolation',
+        kind: 'bug',
+        description:
+            'BLK-144: initScript() start procedure call now wrapped in callProcedureSafe(). ' +
+            'A throwing script initializer (start proc) no longer crashes the map-load loop. ' +
+            'Every object on the map can initialize safely even if one script is broken.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x82A8 — get_critter_experience_sfall
+    {
+        id: 'sfall_get_critter_experience_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A8: get_critter_experience_sfall(obj) → total XP. ' +
+            'For the player returns globalState.playerExperience; for NPCs reads critter.experience. ' +
+            'Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A9 — set_critter_experience_sfall
+    {
+        id: 'sfall_set_critter_experience_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A9: set_critter_experience_sfall(obj, val) — set total XP for a critter. ' +
+            'Clamped to [0, 2^31-1]. No-op for non-critters or non-finite values.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AA — get_critter_crit_chance_sfall
+    {
+        id: 'sfall_get_critter_crit_chance_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AA: get_critter_crit_chance_sfall(obj) → crit modifier %. ' +
+            'Reads critter.critChanceMod; returns 0 when absent. Signed integer.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AB — set_critter_crit_chance_sfall
+    {
+        id: 'sfall_set_critter_crit_chance_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AB: set_critter_crit_chance_sfall(obj, val) — set crit modifier %. ' +
+            'Clamped to [-100, 100]. No-op for non-critters or non-finite values.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AC — get_critter_npc_flag_sfall
+    {
+        id: 'sfall_get_critter_npc_flag_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AC: get_critter_npc_flag_sfall(obj, flag) → 0|1. ' +
+            'Returns the value of NPC flags bit at position flag (0–31). ' +
+            'Reads from critter.npcFlags bitfield.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AD — set_critter_npc_flag_sfall
+    {
+        id: 'sfall_set_critter_npc_flag_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AD: set_critter_npc_flag_sfall(obj, flag, val) — set NPC flags bit. ' +
+            'Writes to critter.npcFlags at bit position flag. Truthy val sets, falsy clears.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AE — get_critter_outline_color_sfall
+    {
+        id: 'sfall_get_critter_outline_color_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AE: get_critter_outline_color_sfall(obj) → colour index. ' +
+            'Returns the highlight/outline colour for a critter. 0 = no outline. ' +
+            'Reads critter.sfallOutlineColor.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AF — set_critter_outline_color_sfall
+    {
+        id: 'sfall_set_critter_outline_color_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AF: set_critter_outline_color_sfall(obj, color) — set outline colour. ' +
+            'Writes critter.sfallOutlineColor and calls obj.invalidate() when available. ' +
+            '0 removes the outline.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
