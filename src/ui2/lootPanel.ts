@@ -128,8 +128,10 @@ export class LootPanel extends UIPanel {
         items: LootItem[],
         side: 'player' | 'container',
     ): void {
+        const maxVisible = Math.floor((COL_H - 8) / ITEM_ROW_H)
         strokeRect(ctx, x, y, COL_W, COL_H, FALLOUT_DARK_GRAY, 1)
-        for (let i = 0; i < items.length && i * ITEM_ROW_H < COL_H - 4; i++) {
+        const visibleCount = Math.min(items.length, maxVisible)
+        for (let i = 0; i < visibleCount; i++) {
             const item = items[i]
             const iy = y + 4 + i * ITEM_ROW_H
             const isSelected = this._selectedSide === side && this._selectedIndex === i
@@ -140,6 +142,13 @@ export class LootPanel extends UIPanel {
             ctx.fillStyle = cssColor(FALLOUT_GREEN)
             const label = item.name.length > MAX_ITEM_NAME_LEN ? item.name.slice(0, MAX_ITEM_NAME_LEN) : item.name
             ctx.fillText(`${label} x${item.amount}`, x + 4, iy + 11)
+        }
+        // Overflow indicator: show how many items are hidden below the fold.
+        if (items.length > maxVisible) {
+            const hiddenCount = items.length - maxVisible
+            ctx.font = '8px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_AMBER)
+            ctx.fillText(`+${hiddenCount} more`, x + 4, y + COL_H - 4)
         }
     }
 

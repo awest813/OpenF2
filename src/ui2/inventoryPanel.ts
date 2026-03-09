@@ -238,7 +238,21 @@ export class InventoryPanel extends UIPanel {
                     EventBus.emit('inventory:useItem', { index: this._selectedIndex })
                     // Keep selection clamped to the list so multiple uses in sequence work without re-selecting.
                     this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
+                    // Re-clamp scroll offset in case USE caused the item list to shrink.
+                    this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, Math.max(0, this.items.length - MAX_ROWS)))
                 }
+            }
+            return true
+        }
+        // Delete key drops the selected item (keyboard alternative to clicking DROP).
+        // NOTE: mirrors mouse-click DROP which also splices items immediately after emitting
+        // the event, keeping panel state consistent regardless of engine acknowledgement.
+        if (key === 'Delete') {
+            if (this._selectedIndex >= 0 && this._selectedIndex < this.items.length) {
+                EventBus.emit('inventory:dropItem', { index: this._selectedIndex })
+                this.items.splice(this._selectedIndex, 1)
+                this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
+                this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, Math.max(0, this.items.length - MAX_ROWS)))
             }
             return true
         }

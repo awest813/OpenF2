@@ -136,12 +136,13 @@ export class BarterPanel extends UIPanel {
         ctx.fillStyle = cssColor(FALLOUT_AMBER)
         ctx.fillText(`THEIR: $${merchantVal}`, RIGHT_INV_X, btnY - 4)
 
-        // Offer-refused feedback banner.
+        // Offer-refused feedback banner — rendered one line above the value labels
+        // so it does not overlap them.
         if (this._offerRefused) {
             ctx.font = '10px monospace'
             ctx.fillStyle = cssColor(FALLOUT_RED)
             ctx.textAlign = 'center'
-            ctx.fillText('OFFER REFUSED — add more to your table', width / 2, btnY - 4)
+            ctx.fillText('OFFER REFUSED — add more to your table', width / 2, btnY - 18)
             ctx.textAlign = 'left'
         }
 
