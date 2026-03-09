@@ -1210,6 +1210,13 @@ export module Scripting {
                 warn('set_critter_stat: unknown stat number: ' + stat, undefined, this)
                 return -1
             }
+            // BLK-133: Guard against non-finite amount values — NaN or Infinity
+            // passed by a script arithmetic error would silently corrupt the stat
+            // store.  Clamp to 0 and warn so the issue is traceable.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('set_critter_stat: non-finite amount (' + amount + ') — clamping to 0', undefined, this)
+                amount = 0
+            }
             ;(obj as Critter).stats.setBase(statName, amount)
             return 0
         }
@@ -1375,6 +1382,12 @@ export module Scripting {
             const MONEY_PID = 41
             if (!isGameObject(obj)) {
                 warn('item_caps_adjust: not a game object', undefined, this)
+                return
+            }
+            // BLK-134: Guard against non-finite amount values — NaN or Infinity would
+            // corrupt the caps item's amount field silently.  Return early and warn.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('item_caps_adjust: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
             for (let i = obj.inventory.length - 1; i >= 0; i--) {
@@ -2598,6 +2611,9 @@ export module Scripting {
             // BLK-037: use getObjects(elevation) so that objects on a non-current
             // floor are correctly found (previously returned 0 whenever the elevation
             // did not match the current floor, even when the target floor existed).
+            // BLK-135: Guard against invalid tile numbers — negative values or NaN
+            // produce meaningless coordinates from fromTileNum().  Return 0 early.
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
             var pos = fromTileNum(tile)
             var objs = (globalState.gMap?.getObjects(elevation)) ?? []
             for (var i = 0; i < objs.length; i++) {
@@ -2618,6 +2634,13 @@ export module Scripting {
         move_to(obj: Obj, tileNum: number, elevation: number) {
             if (!isGameObject(obj)) {
                 warn('move_to: not a game object: ' + obj)
+                return
+            }
+            // BLK-136: Guard against non-finite tileNum — NaN/Infinity passed by a
+            // script arithmetic error would set obj.position to {x: NaN, y: NaN},
+            // breaking all subsequent position checks.  Skip and warn instead.
+            if (typeof tileNum !== 'number' || !isFinite(tileNum) || tileNum < 0) {
+                warn('move_to: invalid tileNum (' + tileNum + ') — no-op', undefined, this)
                 return
             }
             if (elevation !== globalState.currentElevation) {
@@ -3439,6 +3462,14 @@ export module Scripting {
         get_critter_skill(obj: Obj, skill: number): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('get_critter_skill: not a critter: ' + obj)
+                return 0
+            }
+            // BLK-137: Guard against non-number skill argument — scripts occasionally
+            // pass null, undefined, or a string for the skill parameter when a lookup
+            // table entry is missing.  The skillNumToName indexing silently returns
+            // undefined for non-integers; we warn explicitly so the issue is traceable.
+            if (typeof skill !== 'number' || !Number.isFinite(skill)) {
+                warn('get_critter_skill: non-number skill (' + skill + ') — returning 0', undefined, this)
                 return 0
             }
             const skillName = skillNumToName[skill]
@@ -6139,8 +6170,116 @@ export module Scripting {
             return globalState.currentElevation ?? 0
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 81 — sfall extended opcodes 0x8298–0x829F
+        // -----------------------------------------------------------------------
 
-        // Trigger a single animation cycle on the object (replaces pure log no-op).
+        // sfall 0x8298 — get_critter_stat_sfall2(obj, stat):
+        // Safe alias of get_critter_stat that applies an additional null guard for
+        // the obj parameter.  New Reno scripts call this frequently on objects that
+        // may be 0 (FO2 null convention); the base get_critter_stat already handles
+        // that, but this exposes the same path as a dedicated sfall opcode.
+        get_critter_stat_sfall2(obj: Obj, stat: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return this.get_critter_stat(obj as Critter, stat)
+        }
+
+        // sfall 0x8299 — set_critter_extra_stat_sfall(obj, stat, val):
+        // Set a temporary extra-stat modifier on a critter.  Stores the value in a
+        // critter.extraStats dictionary for retrieval by get_critter_extra_stat_sfall.
+        // Used by New Reno boss scripts that buff/debuff NPCs dynamically.
+        set_critter_extra_stat_sfall(obj: Obj, stat: number, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_extra_stat_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof val !== 'number' || !isFinite(val)) {
+                warn('set_critter_extra_stat_sfall: non-finite val (' + val + ') — clamping to 0', undefined, this)
+                val = 0
+            }
+            const critter = obj as any
+            if (!critter.extraStats) critter.extraStats = {}
+            critter.extraStats[stat] = val
+        }
+
+        // sfall 0x829A — get_active_hand_sfall():
+        // Return the player's currently active weapon hand: 0 = primary (leftHand),
+        // 1 = secondary (rightHand).  Alias of active_hand(); exposed as a dedicated
+        // sfall opcode for weapon-swapping combat scripts.
+        get_active_hand_sfall(): number {
+            return (globalState.player as any)?.activeHand ?? 0
+        }
+
+        // sfall 0x829B — set_active_hand_sfall(hand):
+        // Switch the player's active weapon hand: 0 = primary, 1 = secondary.
+        // Clamps out-of-range values to the valid set {0, 1}.
+        set_active_hand_sfall(hand: number): void {
+            if (!globalState.player) return
+            ;(globalState.player as any).activeHand = (hand === 1) ? 1 : 0
+        }
+
+        // sfall 0x829C — get_item_type_sfall(item):
+        // Return the numeric item-type index of an item object:
+        //   0=drug, 1=container, 2=armor, 3=weapon, 4=ammo, 5=misc, 6=key
+        // Returns -1 for non-item objects.
+        // Distinct from get_item_subtype_sfall (0x8252) in that it returns -1 for
+        // non-items rather than a subtype enum — some sfall scripts test for -1 to
+        // detect non-item objects.
+        get_item_type_sfall(item: Obj): number {
+            if (!isGameObject(item) || item.type !== 'item') return -1
+            const subtypeMap: Record<string, number> = {
+                drug: 0,
+                container: 1,
+                armor: 2,
+                weapon: 3,
+                ammo: 4,
+                misc: 5,
+                key: 6,
+            }
+            const sub = (item as any).subtype as string
+            if (typeof sub === 'string' && sub in subtypeMap) return subtypeMap[sub]
+            return -1
+        }
+
+        // sfall 0x829D — get_critter_perk_level_sfall(obj, perkId):
+        // Return the rank of a specific perk for a critter.
+        // Reads from critter.perkRanks (same source as get_critter_perk_sfall / 0x8212).
+        // Used by New Reno prize/reward scripts that check perk prerequisites.
+        get_critter_perk_level_sfall(obj: Obj, perkId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_perk_level_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).perkRanks?.[perkId] ?? 0
+        }
+
+        // sfall 0x829E — set_critter_perk_sfall(obj, perkId, level):
+        // Set a specific perk rank on a critter.
+        // For player critters this writes to player.perkRanks; for NPCs it writes to
+        // critter.perkRanks.  Negative levels are clamped to 0 (remove perk).
+        set_critter_perk_sfall(obj: Obj, perkId: number, level: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_perk_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof level !== 'number' || !isFinite(level)) {
+                warn('set_critter_perk_sfall: non-finite level (' + level + ') — clamping to 0', undefined, this)
+                level = 0
+            }
+            const critter = obj as Critter
+            if (!critter.perkRanks) (critter as any).perkRanks = {}
+            critter.perkRanks[perkId] = Math.max(0, Math.round(level))
+        }
+
+        // sfall 0x829F — get_distance_sfall(obj1, obj2):
+        // Return the hex grid distance between two game objects.
+        // Returns -1 when either object has no position (e.g. in inventory) or is
+        // not a valid game object.  Uses the same hexDistance() path as normal LOS.
+        get_distance_sfall(obj1: Obj, obj2: Obj): number {
+            if (!isGameObject(obj1) || !obj1.position) return -1
+            if (!isGameObject(obj2) || !obj2.position) return -1
+            return hexDistance(obj1.position, obj2.position)
+        }
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
             if (!isGameObject(obj)) {
                 warn('reg_anim_animate_once: not a game object', 'animation', this)

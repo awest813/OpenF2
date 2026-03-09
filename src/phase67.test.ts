@@ -108,8 +108,8 @@ describe('Phase 67-B — BLK-074: rm_timer_event null-obj guard', () => {
 // ===========================================================================
 
 describe('Phase 67-C — BLK-075: player injury flags save schema v19', () => {
-    it('SAVE_VERSION is 19', () => {
-        expect(SAVE_VERSION).toBe(19)
+    it('SAVE_VERSION is now 20 (superseded from 19)', () => {
+        expect(SAVE_VERSION).toBe(20)
     })
 
     it('migrates a v18 save to v19 and sets playerInjuryFlags = 0', () => {
@@ -137,11 +137,11 @@ describe('Phase 67-C — BLK-075: player injury flags save schema v19', () => {
             savedMaps: {},
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(19)
+        expect(save.version).toBe(20)
         expect(save.playerInjuryFlags).toBe(0)
     })
 
-    it('migrates a v1 save all the way to v19 with playerInjuryFlags = 0', () => {
+    it('migrates a v1 save all the way to v20 with playerInjuryFlags = 0', () => {
         const raw: any = {
             version: 1,
             currentMap: 'artemple',
@@ -151,7 +151,7 @@ describe('Phase 67-C — BLK-075: player injury flags save schema v19', () => {
             savedMaps: {},
         }
         const save = migrateSave(raw)
-        expect(save.version).toBe(19)
+        expect(save.version).toBe(20)
         expect(save.playerInjuryFlags).toBe(0)
     })
 

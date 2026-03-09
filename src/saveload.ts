@@ -144,6 +144,27 @@ function applyExtraSaveState(save: SaveGame): void {
         p.crippledRightArm = !!(flags & 0x08)
         p.blinded = !!(flags & 0x10)
     }
+    // BLK-138: Restore player current HP so a save made at low HP loads at the
+    // correct HP rather than being re-derived from base stats (which gives full HP).
+    if (globalState.player && typeof save.playerCurrentHp === 'number' && save.playerCurrentHp >= 0) {
+        globalState.player.stats.setBase('HP', save.playerCurrentHp)
+    }
+    // BLK-138: Restore party member current HP so injured companions load at the
+    // correct reduced HP.  Keyed by critter name.
+    if (save.partyMembersHp && globalState.gParty &&
+        typeof globalState.gParty.getPartyMembers === 'function') {
+        for (const member of globalState.gParty.getPartyMembers()) {
+            const name: string | undefined = member?.name
+            if (name && typeof save.partyMembersHp[name] === 'number') {
+                const hp = save.partyMembersHp[name]
+                if (typeof (member as any).stats?.setBase === 'function') {
+                    (member as any).stats.setBase('HP', hp)
+                } else if (typeof (member as any).HP === 'number') {
+                    (member as any).HP = hp
+                }
+            }
+        }
+    }
 }
 
 // Saving and loading support
@@ -382,6 +403,37 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         if (p.crippledRightArm) injuryFlags |= 0x08
         if (p.blinded) injuryFlags |= 0x10
         save.playerInjuryFlags = injuryFlags
+    }
+
+    // BLK-138: Snapshot player current HP so a save made at low HP loads at
+    // the correct HP rather than being re-derived from base stats (full HP).
+    if (globalState.player) {
+        const currentHP = typeof globalState.player.getStat === 'function'
+            ? globalState.player.getStat('HP')
+            : (globalState.player as any).HP
+        if (typeof currentHP === 'number' && isFinite(currentHP) && currentHP >= 0) {
+            save.playerCurrentHp = Math.round(currentHP)
+        }
+    }
+
+    // BLK-138: Snapshot current HP for each named party member so injured
+    // companions load at the correct reduced HP after save/load.
+    if (globalState.gParty && typeof globalState.gParty.getPartyMembers === 'function') {
+        const members = globalState.gParty.getPartyMembers()
+        if (members.length > 0) {
+            const partyMembersHp: Record<string, number> = {}
+            for (const member of members) {
+                const name: string | undefined = member?.name
+                if (!name) continue
+                const hp = typeof (member as any).getStat === 'function'
+                    ? (member as any).getStat('HP')
+                    : (member as any).HP
+                if (typeof hp === 'number' && isFinite(hp) && hp >= 0) {
+                    partyMembersHp[name] = Math.round(hp)
+                }
+            }
+            save.partyMembersHp = partyMembersHp
+        }
     }
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)

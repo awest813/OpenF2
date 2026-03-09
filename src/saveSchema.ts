@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 19
+export const SAVE_VERSION = 20
 
 export interface SaveGame {
     id?: number
@@ -273,6 +273,30 @@ export interface SaveGame {
      */
     playerInjuryFlags?: number
 
+    /**
+     * Player's current HP at the time of the save (added in v20 / BLK-138).
+     *
+     * `playerBaseStats` stores the player's stat store, but current HP is
+     * volatile — it changes every fight.  An explicit `playerCurrentHp`
+     * snapshot ensures that a save made mid-dungeon at low HP still loads at
+     * the correct low HP rather than re-deriving from base stats (which would
+     * give the player full HP back).
+     *
+     * Undefined means "derive from base stats" (pre-v20 behaviour).
+     */
+    playerCurrentHp?: number
+
+    /**
+     * Current HP for each named party member (added in v20 / BLK-138).
+     *
+     * Keyed by the critter's `name` property.  Stores the current HP so
+     * that party members who were injured before a save load at the correct
+     * reduced HP rather than at full HP (which was the pre-v20 behaviour).
+     *
+     * Defaults to {} (use critter proto defaults) when absent.
+     */
+    partyMembersHp?: Record<string, number>
+
     player: {
         position: Point
         orientation: number
@@ -444,6 +468,16 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.playerInjuryFlags === undefined) save.playerInjuryFlags = 0
             save.version = 19
             // falls through
+        case 19:
+            // v19 → v20: add playerCurrentHp and partyMembersHp (BLK-138).
+            // playerCurrentHp: undefined means "derive from base stats" — old
+            // saves will load at full HP (same as pre-v20 behaviour).
+            // partyMembersHp: default to empty record so no override is applied.
+            if (save.partyMembersHp === undefined) save.partyMembersHp = {}
+            // playerCurrentHp is intentionally left undefined when absent (not
+            // set here) — the load path treats undefined as "use stat default".
+            save.version = 20
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -521,6 +555,20 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     } else {
         save.playerInjuryFlags = (save.playerInjuryFlags >>> 0) & 0x1f
     }
+    // Normalize playerCurrentHp (BLK-138): must be a positive finite integer or
+    // undefined.  Non-finite, negative, or non-integer values are discarded so the
+    // load path falls back to the base-stats derivation safely.
+    if (save.playerCurrentHp !== undefined) {
+        if (typeof save.playerCurrentHp !== 'number' || !Number.isFinite(save.playerCurrentHp) ||
+            save.playerCurrentHp < 0) {
+            save.playerCurrentHp = undefined
+        } else {
+            save.playerCurrentHp = Math.round(save.playerCurrentHp)
+        }
+    }
+    // Normalize partyMembersHp (BLK-138): must be a string→number record with
+    // non-negative integer values.  Invalid entries are silently dropped.
+    save.partyMembersHp = sanitizeStringNumericRecord(save.partyMembersHp)
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {
