@@ -180,6 +180,34 @@ export module Scripting {
         fn: () => void
     }
 
+    // BLK-123 (Phase 78) — sfall hook-script argument buffer.
+    // When a hook script is invoked, its arguments are stored here.
+    // get_sfall_arg() retrieves the next arg in sequence; set_sfall_return() stores
+    // the return value; get_sfall_args_count() reports how many were provided.
+    // This is a module-level buffer reset on each hook invocation.
+    const _sfallHookArgs: any[] = []
+    let _sfallHookArgCursor = 0
+    let _sfallHookReturnVal: number = 0
+
+    /**
+     * Push arguments into the sfall hook arg buffer before invoking a hook script.
+     * Called by the vm_bridge hook dispatcher.
+     */
+    export function sfallSetHookArgs(args: any[]): void {
+        _sfallHookArgs.length = 0
+        _sfallHookArgs.push(...args)
+        _sfallHookArgCursor = 0
+        _sfallHookReturnVal = 0
+    }
+
+    /**
+     * Return the value stored by the last set_sfall_return() call.
+     * Called by the vm_bridge hook dispatcher after hook script execution.
+     */
+    export function sfallGetHookReturn(): number {
+        return _sfallHookReturnVal
+    }
+
     var statMap: { [stat: number]: string } = {
         // SPECIAL primaries (0–6)
         0: 'STR',
@@ -3676,13 +3704,17 @@ export module Scripting {
         // sfall hook-script opcode — set the return value for a hook script (0x819A).
         // No-op in the browser build; hook scripts are not implemented.
         set_sfall_return(val: number): void {
-            log('set_sfall_return', arguments)
+            // BLK-123 (Phase 78): Store value in the module-level hook return buffer.
+            _sfallHookReturnVal = typeof val === 'number' ? val : 0
         }
 
-        // sfall hook-script opcode — get a hook-script argument by index (0x819B).
-        // Partial: returns 0; hook scripts are not implemented in the browser build.
+        // sfall hook-script opcode — get the next hook-script argument (0x819B).
+        // BLK-123 (Phase 78): Now reads from the module-level hook arg buffer in order.
         get_sfall_arg(): number {
-            log('get_sfall_arg', arguments)
+            if (_sfallHookArgCursor < _sfallHookArgs.length) {
+                const v = _sfallHookArgs[_sfallHookArgCursor++]
+                return typeof v === 'number' ? v : 0
+            }
             return 0
         }
 
@@ -3957,25 +3989,25 @@ export module Scripting {
         }
 
         // sfall 0x81C0 — get_sfall_args_count():
-        // Returns the number of arguments passed to the currently executing hook script.
-        // The browser build does not implement hook scripts; always returns 0.
+        // BLK-123 (Phase 78): Returns the number of args in the sfall hook arg buffer.
         get_sfall_args_count(): number {
-            return 0
+            return _sfallHookArgs.length
         }
 
         // sfall 0x81C1 — get_sfall_arg_at(idx):
-        // Returns the hook-script argument at the given zero-based index.
-        // The browser build does not implement hook scripts; always returns 0.
+        // BLK-123 (Phase 78): Returns the hook-script arg at the given zero-based index.
         get_sfall_arg_at(idx: number): number {
-            log('get_sfall_arg_at', arguments)
-            return 0
+            if (typeof idx !== 'number' || idx < 0 || idx >= _sfallHookArgs.length) return 0
+            const v = _sfallHookArgs[idx]
+            return typeof v === 'number' ? v : 0
         }
 
         // sfall 0x81C2 — set_sfall_arg(idx, val):
-        // Writes a value back into the hook-script argument at the given index.
-        // No-op in the browser build (no hook script argument buffer).
+        // BLK-123 (Phase 78): Writes a value back into the hook-script arg buffer at idx.
         set_sfall_arg(idx: number, val: number): void {
-            log('set_sfall_arg', arguments)
+            if (typeof idx === 'number' && idx >= 0 && idx < _sfallHookArgs.length) {
+                _sfallHookArgs[idx] = typeof val === 'number' ? val : 0
+            }
         }
 
         // sfall 0x81C3 — get_object_lighting(obj):
@@ -4055,15 +4087,29 @@ export module Scripting {
             }
         }
 
-        // Phase 54 — sfall 0x81D0 — get_game_mode_sfall():
+        // Phase 54 / Phase 78 — sfall 0x81D0 — get_game_mode_sfall():
         // Returns a bitmask indicating the current game mode.
-        // Bit 0 (0x01) = normal map mode, bit 1 (0x02) = combat mode,
-        // bit 2 (0x04) = dialogue mode, bit 3 (0x08) = barter mode,
-        // bit 4 (0x10) = inventory/menu mode, bit 5 (0x20) = world-map mode.
+        // Bit 0 (0x01) = normal map mode (always set when on a map)
+        // Bit 1 (0x02) = combat mode
+        // Bit 2 (0x04) = dialogue mode
+        // Bit 3 (0x08) = barter mode
+        // Bit 4 (0x10) = inventory/menu mode
+        // Bit 5 (0x20) = world-map mode
+        // BLK-123 (Phase 78): Now reads globalState.uiMode to set dialogue/barter/inventory/worldmap bits.
         get_game_mode_sfall(): number {
-            let mode = 0x01 // normal mode by default
-            if (globalState.inCombat) mode |= 0x02
-            // Additional mode flags could be set based on UIMode if needed.
+            let mode = 0
+            const ui = globalState.uiMode ?? 0
+            // import UIMode values numerically (avoid circular import): 1=dialogue, 2=barter, 4=inventory, 5=worldMap
+            if (ui === 5 /* worldMap */) {
+                mode |= 0x20 // world-map mode — no normal-map bit
+            } else {
+                mode |= 0x01 // on a normal map
+                if (globalState.inCombat) mode |= 0x02
+                if (ui === 1 /* dialogue */) mode |= 0x04
+                if (ui === 2 /* barter   */) mode |= 0x08
+                if (ui === 4 /* inventory*/) mode |= 0x10
+            }
+            if (mode === 0) mode = 0x01 // fallback: normal mode
             return mode
         }
 
@@ -4394,16 +4440,15 @@ export module Scripting {
         }
 
         // sfall 0x81FC — get_script_return_val_sfall():
-        // Return the last value set by set_sfall_return().
-        // Partial: returns the stored sfall return value (0 if unset).
+        // BLK-123 (Phase 78): Return the hook return value from the module-level buffer.
         get_script_return_val_sfall(): number {
-            return (this as any)._sfallReturnVal ?? 0
+            return _sfallHookReturnVal
         }
 
         // sfall 0x81FD — set_script_return_val_sfall(val):
-        // Store a script return value (alias of set_sfall_return for symmetry).
+        // BLK-123 (Phase 78): Alias of set_sfall_return — store into module-level buffer.
         set_script_return_val_sfall(val: number): void {
-            ;(this as any)._sfallReturnVal = typeof val === 'number' ? val : 0
+            _sfallHookReturnVal = typeof val === 'number' ? val : 0
         }
 
         // sfall 0x81FE — get_active_map_id_sfall():

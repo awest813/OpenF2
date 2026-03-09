@@ -301,14 +301,14 @@ describe('Phase 16-F — checklist reflects de-stubbed procedures', () => {
         expect(entry?.status).toBe('implemented')
     })
 
-    it('gfade_out is listed as partial in the checklist', () => {
+    it('gfade_out is listed as partial or implemented in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'gfade_out')
-        expect(entry?.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry?.status)
     })
 
-    it('gfade_in is listed as partial in the checklist', () => {
+    it('gfade_in is listed as partial or implemented in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'gfade_in')
-        expect(entry?.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry?.status)
     })
 
     it('play_gmovie is listed as partial in the checklist', () => {

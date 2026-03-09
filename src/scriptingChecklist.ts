@@ -108,8 +108,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'reg_anim_animate',
         kind: 'procedure',
-        description: 'Play a one-shot scripted animation on an object. Used extensively for NPC reactions and environmental effects.',
-        status: 'partial',
+        description:
+            'Play a one-shot scripted animation on an object. Used extensively for NPC reactions and environmental effects. ' +
+            'BLK-121: now calls singleAnimation(false, null) on the target object to trigger a real non-looping animation cycle.',
+        status: 'implemented',
         frequency: 'high',
         impact: 'medium',
     },
@@ -120,7 +122,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'Register a function callback in the animation queue (ANIM_BEGIN/ANIM_COMPLETE signals). ' +
             'ANIM_COMPLETE (signal=2) callbacks are now called immediately since the browser build ' +
             'has no async animation queue, preventing script continuation logic from being blocked.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'high',
         impact: 'medium',
     },
@@ -534,16 +536,22 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'gfade_out',
         kind: 'procedure',
-        description: 'gfade_out(time): screen fade-out over `time` game ticks. Logged but not visually implemented (no FMV/fade pipeline yet).',
-        status: 'partial',
+        description:
+            'gfade_out(time): screen fade-out over time game ticks. ' +
+            'BLK-122: now applies a CSS opacity:0 transition on #cnv in browser environments; ' +
+            'safe no-op in Node.js (typeof document === "undefined" guard).',
+        status: 'implemented',
         frequency: 'high',
         impact: 'low',
     },
     {
         id: 'gfade_in',
         kind: 'procedure',
-        description: 'gfade_in(time): screen fade-in over `time` game ticks. Logged but not visually implemented.',
-        status: 'partial',
+        description:
+            'gfade_in(time): screen fade-in over time game ticks. ' +
+            'BLK-122: now applies a CSS opacity:1 transition on #cnv in browser environments; ' +
+            'safe no-op in Node.js (typeof document === "undefined" guard).',
+        status: 'implemented',
         frequency: 'high',
         impact: 'low',
     },
@@ -1570,10 +1578,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'set_sfall_return',
         kind: 'opcode',
         description:
-            'sfall 0x819A: set_sfall_return(val) — set hook-script return value.  ' +
-            'No-op: hook scripts are not implemented in the browser build.  Prevents ' +
-            'unknown-opcode crashes in sfall hook scripts.',
-        status: 'partial',
+            'sfall 0x819A: set_sfall_return(val) — set hook-script return value. ' +
+            'BLK-123 (Phase 78): now stores into the module-level _sfallHookReturnVal ' +
+            'buffer shared by get_script_return_val_sfall (0x81FC).',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -1581,10 +1589,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'get_sfall_arg',
         kind: 'opcode',
         description:
-            'sfall 0x819B: get_sfall_arg() → hook-script argument value.  ' +
-            'Partial: returns 0; hook scripts are not implemented.  Prevents ' +
-            'unknown-opcode crashes in sfall hook scripts.',
-        status: 'partial',
+            'sfall 0x819B: get_sfall_arg() → hook-script argument value. ' +
+            'BLK-123 (Phase 78): now reads sequentially from the module-level _sfallHookArgs ' +
+            'buffer populated by sfallSetHookArgs(). Returns 0 when buffer is exhausted.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -2673,7 +2681,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'halts in NPC dialogue scripts. Now implemented as a safe no-op that pops its ' +
             'single argument. The browser build does not track a per-dialogue reaction score; ' +
             'accepting the call keeps VM stack balanced and dialogue scripts running.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -3367,9 +3375,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81D0: get_game_mode() → bitmask of current game mode. ' +
-            'Browser build: bit 0 = always set (normal), bit 1 = combat mode ' +
-            '(inCombat flag).  Scripts use this to skip combat-only logic when not in combat.',
-        status: 'partial',
+            'BLK-124 (Phase 78): now reads globalState.uiMode to set dialogue (0x04), ' +
+            'barter (0x08), inventory (0x10), and world-map (0x20) bits in addition to ' +
+            'the existing combat (0x02) and normal-map (0x01) bits.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },

@@ -385,10 +385,10 @@ describe('Phase 48-J — take_karma opcode (0x8143) subtracts from GVAR_PLAYER_R
 // ===========================================================================
 
 describe('Phase 48-K — dialogue_reaction (0x814D) no-op safe', () => {
-    it('checklist entry dialogue_reaction_opcode is present and partial', () => {
+    it('checklist entry dialogue_reaction_opcode is present', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'dialogue_reaction_opcode')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(['partial', 'implemented']).toContain(entry?.status)
     })
 })
 
