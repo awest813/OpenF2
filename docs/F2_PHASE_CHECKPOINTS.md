@@ -538,3 +538,26 @@ Gate: **PASS** — all tests green, tsc clean.
 - [x] phase85.test.ts: 26 regression tests for all fixes above
 
 Gate: **PASS** — all 3910 tests green, tsc clean.
+
+---
+
+## Phase 86 — New Reno full-playability hardening: TRAIT_SKILL support, skill guards, sfall 0x82B8–0x82BF
+
+- [x] **BLK-156**: `critter_add_trait(traitType=3)` TRAIT_SKILL implemented — New Reno boxing scripts call `critter_add_trait(boxer, TRAIT_SKILL, SKILL_UNARMED, bonus)` to temporarily boost the Unarmed skill for fights. Previously fell through to the "unknown traitType" no-op, leaving fighters at their base stats. Now adjusts `obj.skills.baseSkills[skillName]` by `amount` (signed); non-finite amounts are clamped to 0.
+- [x] **BLK-157**: `has_trait(traitType=3)` TRAIT_SKILL implemented — Scripts reading back accumulated skill trait values via `has_trait(TRAIT_SKILL, obj, skillId)` previously always got 0. Now returns `skills.getBase(skillName)`, so scripts can verify boosts were applied before branching.
+- [x] **BLK-158**: `critter_add_trait_sfall()` (0x825E) no longer a no-op — Now delegates to `critter_add_trait()`, so New Reno scripts that call the sfall opcode variant receive the same TRAIT_PERK / TRAIT_OBJECT / TRAIT_CHAR / TRAIT_SKILL handling as vanilla opcode calls.
+- [x] **BLK-159**: `set_critter_skill_points()` non-finite value guard — Mirrors BLK-129: non-finite values (NaN, Infinity) are clamped to 0 with a warning instead of being stored, preventing SkillSet corruption in New Reno quest reward scripts.
+- [x] **BLK-160**: `critter_mod_skill()` non-finite amount guard — NaN/Infinity amounts are treated as 0 with a warning, preventing SkillSet corruption when New Reno combat damage formulas produce non-finite results.
+- [x] `critter_add_trait()` TRAIT_PERK (traitType=0): auto-initialize `perkRanks` when missing — prevents `TypeError: Cannot set properties of undefined` on critters that lack a `perkRanks` record (exposed by BLK-158 fix).
+- [x] New sfall opcode 0x82B8: `get_critter_trait_typed_sfall(obj, traitType, trait)` → trait/perk/skill value (delegates to `has_trait`; accepts all traitTypes unlike 0x8208)
+- [x] New sfall opcode 0x82B9: `critter_mod_skill_sfall(obj, skillId, amount)` → signed delta to base skill (alias of `critter_mod_skill`)
+- [x] New sfall opcode 0x82BA: `get_npc_stat_sfall(obj, stat)` → effective stat (alias of `get_critter_stat`)
+- [x] New sfall opcode 0x82BB: `set_npc_stat_sfall(obj, stat, val)` → set NPC base stat (alias of `set_critter_stat`)
+- [x] New sfall opcode 0x82BC: `get_obj_name_sfall(obj)` → display name string or 0
+- [x] New sfall opcode 0x82BD: `get_critter_ai_num_sfall(obj)` → `aiNum` field or -1 for non-critters
+- [x] New sfall opcode 0x82BE: `get_num_critters_on_tile_sfall(tile)` → 0 (stub; no per-tile critter index)
+- [x] New sfall opcode 0x82BF: `get_critter_combat_data_sfall(obj)` → 0 (stub; no combat-session data structure)
+- [x] phase86.test.ts: 54 regression tests for all BLK items, sfall opcodes, and checklist integrity
+- [x] phase14.test.ts: stub count upper bound updated to ≤ 17
+
+Gate: **PASS** — all 3964 tests green, tsc clean.

@@ -7173,6 +7173,181 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // Phase 86 — New Reno full-playability hardening, sfall 0x82B8–0x82BF
+    // BLK-156: critter_add_trait TRAIT_SKILL (traitType=3)
+    {
+        id: 'blk_156_critter_add_trait_skill',
+        kind: 'procedure',
+        description:
+            'BLK-156: critter_add_trait(obj, TRAIT_SKILL=3, skillId, amount) not implemented. ' +
+            'New Reno boxing scripts call critter_add_trait(boxer, TRAIT_SKILL, SKILL_UNARMED, ' +
+            'bonus) to grant a temporary unarmed skill boost before a fight, and then ' +
+            'critter_add_trait(boxer, TRAIT_SKILL, SKILL_UNARMED, -bonus) to undo it. ' +
+            'Previously fell through to the "unknown traitType" no-op, leaving fighters at ' +
+            'their unmodified skill levels and causing fight-scripting logic to behave ' +
+            'incorrectly. Now adjusts obj.skills.baseSkills[skillName] by amount (signed), ' +
+            'mirroring how critter_mod_skill works. Non-finite amounts are clamped to 0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-157: has_trait TRAIT_SKILL (traitType=3)
+    {
+        id: 'blk_157_has_trait_skill',
+        kind: 'procedure',
+        description:
+            'BLK-157: has_trait(TRAIT_SKILL=3, obj, skillId) not implemented. ' +
+            'New Reno scripts read back accumulated skill trait values via ' +
+            'has_trait(TRAIT_SKILL, obj, SKILL_UNARMED) to verify that the boost was ' +
+            'applied. Previously always returned 0, causing scripts to skip conditional ' +
+            'branches that depend on the skill-boost state. Now returns the critter\'s ' +
+            'current base skill value via skills.getBase(skillName).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // BLK-158: critter_add_trait_sfall was a no-op
+    {
+        id: 'blk_158_critter_add_trait_sfall_noop',
+        kind: 'procedure',
+        description:
+            'BLK-158: critter_add_trait_sfall() (sfall 0x825E) was a no-op, silently ' +
+            'discarding all arguments. New Reno scripts that use the sfall opcode path ' +
+            '(rather than the vanilla opcode path) to grant or revoke trait/perk/skill ' +
+            'values received no effect at all. Now delegates to critter_add_trait() so ' +
+            'all traitType handlers (PERK, OBJECT, CHAR, SKILL) are exercised.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-159: set_critter_skill_points non-finite value guard
+    {
+        id: 'blk_159_set_critter_skill_points_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-159: set_critter_skill_points() stored non-finite values (NaN, Infinity) ' +
+            'into the critter\'s SkillSet without validation. New Reno quest reward scripts ' +
+            'compute skill values from combat math that can produce NaN; storing it corrupts ' +
+            'the SkillSet so every subsequent skill read on the critter returns NaN. Now ' +
+            'mirrors BLK-129: clamps non-finite values to 0 and emits a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-160: critter_mod_skill non-finite amount guard
+    {
+        id: 'blk_160_critter_mod_skill_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-160: critter_mod_skill() applied non-finite amount values (NaN, Infinity) ' +
+            'to the critter\'s base skill. New Reno combat scripts compute skill deltas from ' +
+            'damage formulas that may produce NaN when defense fully absorbs an attack. ' +
+            'Adding NaN to any base skill value produces NaN, corrupting all future skill ' +
+            'reads for the critter. Now clamps non-finite amounts to 0 and warns.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // sfall 0x82B8 — get_critter_trait_typed_sfall
+    {
+        id: 'sfall_get_critter_trait_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B8: get_critter_trait_typed_sfall(obj, traitType, trait) → trait value. ' +
+            'Companion accessor for critter_add_trait_sfall (0x825E). Accepts all traitTypes: ' +
+            'TRAIT_PERK=0, TRAIT_OBJECT=1, TRAIT_CHAR=2, TRAIT_SKILL=3. ' +
+            'Distinct from 0x8208 (get_critter_trait_sfall) which only handles TRAIT_CHAR. ' +
+            'Used by New Reno boxing scripts to verify that skill boosts were applied.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82B9 — critter_mod_skill_sfall
+    {
+        id: 'sfall_critter_mod_skill_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82B9: critter_mod_skill_sfall(obj, skillId, amount) → new skill value. ' +
+            'Adds a signed amount to a critter\'s base skill. Alias of critter_mod_skill. ' +
+            'Used by New Reno scripts that prefer the sfall opcode calling convention.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BA — get_npc_stat_sfall
+    {
+        id: 'sfall_get_npc_stat_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BA: get_npc_stat_sfall(obj, stat) → effective stat value. ' +
+            'Alias of get_critter_stat. Used by New Reno family-quest scripts that ' +
+            'probe NPC stats via the sfall extended opcode range.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BB — set_npc_stat_sfall
+    {
+        id: 'sfall_set_npc_stat_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BB: set_npc_stat_sfall(obj, stat, val) — set NPC base stat. ' +
+            'Alias of set_critter_stat. Used by New Reno scripts that adjust NPC stats ' +
+            'via the sfall extended opcode range.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BC — get_obj_name_sfall
+    {
+        id: 'sfall_get_obj_name_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BC: get_obj_name_sfall(obj) → display name string or 0. ' +
+            'Returns 0 for invalid objects. Used by New Reno merchant and faction ' +
+            'scripts to identify objects by their display name.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BD — get_critter_ai_num_sfall
+    {
+        id: 'sfall_get_critter_ai_packet_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BD: get_critter_ai_num_sfall(obj) → aiNum or -1. ' +
+            'Returns the aiNum field (set by critter_add_trait OBJECT_AI_PACKET) for a critter. ' +
+            'Distinct from 0x822B (get_critter_ai_packet_sfall) which reads the aiPacket proto field. ' +
+            'Used by New Reno encounter scripts to branch on combatant AI behaviour.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BE — get_num_critters_on_tile_sfall
+    {
+        id: 'sfall_get_num_critters_on_tile_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BE: get_num_critters_on_tile_sfall(tile) → 0. ' +
+            'Browser build: no per-tile critter index; always returns 0. ' +
+            'New Reno crowd-management scripts use this to gate NPC spawning.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82BF — get_critter_combat_data_sfall
+    {
+        id: 'sfall_get_critter_combat_data_86',
+        kind: 'opcode',
+        description:
+            'sfall 0x82BF: get_critter_combat_data_sfall(obj) → 0 (stub). ' +
+            'Browser build: no combat-session data structure; returns 0 so that ' +
+            'New Reno combat scripts fall through to safe defaults.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

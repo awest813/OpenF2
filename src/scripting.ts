@@ -1334,6 +1334,21 @@ export module Scripting {
                 return (obj as Critter).charTraits.has(trait) ? 1 : 0
             }
 
+            if (traitType === 3) {
+                // BLK-157: TRAIT_SKILL — return the critter's current base skill value for
+                // the given skill ID.  New Reno boxing scripts call has_trait(TRAIT_SKILL, obj,
+                // SKILL_UNARMED) to read back the accumulated trait-skill value that was set via
+                // critter_add_trait(TRAIT_SKILL, …).  Without this handler the result was
+                // always 0, causing fight-setup logic to skip all skill adjustments.
+                if (obj.type !== 'critter') return 0
+                const skillName = skillNumToName[trait]
+                if (!skillName) {
+                    log('has_trait(TRAIT_SKILL,' + trait + '): unknown skill id — returning 0', arguments)
+                    return 0
+                }
+                return (obj as Critter).skills.getBase(skillName)
+            }
+
             // Unknown traitType — return 0 silently rather than stubbing so that
             // scripts probing unusual trait categories do not produce console noise.
             log('has_trait: unknown traitType ' + traitType + ' — returning 0', arguments)
@@ -1351,7 +1366,10 @@ export module Scripting {
             }
 
             if (traitType === 0) {
-                // TRAIT_PERK — set the perk rank for this perk ID
+                // TRAIT_PERK — set the perk rank for this perk ID.
+                // Guard: some mock objects and edge-case NPCs lack a perkRanks record;
+                // initialise it on demand so no TypeError is thrown.
+                if (!(obj as Critter).perkRanks) (obj as Critter).perkRanks = {}
                 ;(obj as Critter).perkRanks[trait] = Math.max(0, amount)
                 return
             }
@@ -1405,6 +1423,25 @@ export module Scripting {
                 } else {
                     ;(obj as Critter).charTraits.delete(trait)
                 }
+                return
+            }
+
+            if (traitType === 3) {
+                // BLK-156: TRAIT_SKILL — adjust the critter's base skill value by amount.
+                // New Reno boxing scripts call critter_add_trait(boxer, TRAIT_SKILL,
+                // SKILL_UNARMED, +bonus) before a fight and critter_add_trait(boxer,
+                // TRAIT_SKILL, SKILL_UNARMED, -bonus) afterward to undo the boost.
+                // Without this handler the skill boost was silently discarded, leaving
+                // every boxer at their unmodified stats and breaking fight scripting.
+                // Non-finite amounts are treated as 0 (parallel to BLK-160).
+                const skillName = skillNumToName[trait]
+                if (!skillName) {
+                    log('critter_add_trait(TRAIT_SKILL,' + trait + '): unknown skill id — no-op', arguments)
+                    return
+                }
+                const safeAmount = Number.isFinite(amount) ? amount : 0
+                const critter = obj as Critter
+                critter.skills.setBase(skillName, critter.skills.getBase(skillName) + safeAmount)
                 return
             }
 
@@ -1618,6 +1655,15 @@ export module Scripting {
             if (!skillName) {
                 warn('critter_mod_skill: unknown skill number: ' + skill, undefined, this)
                 return 0
+            }
+            // BLK-160: Guard against non-finite amount — New Reno combat scripts compute
+            // skill deltas from damage arithmetic; a NaN/Infinity amount would silently
+            // corrupt the SkillSet base value, causing get_critter_skill to return NaN
+            // for all subsequent skill reads on this critter.  Treat non-finite as 0
+            // (no change) and warn so the underlying script bug is visible in logs.
+            if (!Number.isFinite(amount)) {
+                warn('critter_mod_skill: non-finite amount (' + amount + ') — treating as 0', undefined, this)
+                amount = 0
             }
             const critter = obj as Critter
             critter.skills.setBase(skillName, critter.skills.getBase(skillName) + amount)
@@ -3561,6 +3607,16 @@ export module Scripting {
             if (!skillName) {
                 warn('set_critter_skill_points: unknown skill number: ' + skill)
                 return
+            }
+            // BLK-159: Guard against non-finite value — New Reno quest reward scripts
+            // sometimes compute skill values from combat math (damage offsets, level
+            // formulas) that may produce NaN or Infinity.  Storing a non-finite value
+            // corrupts the SkillSet and causes every subsequent skill read on this
+            // critter to return NaN.  Mirror the guard from BLK-129 (set_global_var):
+            // clamp non-finite values to 0 and emit a warning.
+            if (!Number.isFinite(value)) {
+                warn('set_critter_skill_points: non-finite value (' + value + ') — clamping to 0')
+                value = 0
             }
             ;(obj as Critter).skills.setBase(skillName, value)
         }
@@ -5702,10 +5758,13 @@ export module Scripting {
         }
 
         // sfall 0x825E — critter_add_trait_sfall(obj, traitType, trait, amount):
-        // Modify a trait/perk value on a critter.  Browser build: no-op (trait
-        // modification requires deeper engine integration not yet implemented).
-        critter_add_trait_sfall(_obj: Obj, _traitType: number, _trait: number, _amount: number): void {
-            // no-op
+        // Modify a trait/perk/skill value on a critter.
+        // BLK-158: Previously a no-op; now delegates to critter_add_trait() so that
+        // sfall-scripted calls receive the same TRAIT_PERK/TRAIT_OBJECT/TRAIT_SKILL/
+        // TRAIT_CHAR handling as vanilla opcode calls.  Fixes New Reno scripts that
+        // use the sfall variant to grant temporary boxing skill boosts.
+        critter_add_trait_sfall(obj: Obj, traitType: number, trait: number, amount: number): void {
+            this.critter_add_trait(obj, traitType, trait, amount)
         }
 
         // sfall 0x825F — get_num_new_obj_sfall():
@@ -6630,6 +6689,78 @@ export module Scripting {
             return typeof (globalState as any).combatTurn === 'number'
                 ? Math.max(0, (globalState as any).combatTurn)
                 : 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 86 — sfall extended opcodes 0x82B8–0x82BF
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82B8 — get_critter_trait_typed_sfall(obj, traitType, trait):
+        // Read back a trait/perk/skill value from a critter by traitType.
+        // Unlike the pre-existing get_critter_trait_sfall (0x8208, TRAIT_CHAR-only),
+        // this variant accepts all traitTypes: TRAIT_PERK=0, TRAIT_OBJECT=1,
+        // TRAIT_CHAR=2, TRAIT_SKILL=3.  Delegates to has_trait().
+        // Used by New Reno boxing scripts to verify skill boosts were applied.
+        get_critter_trait_typed_sfall(obj: Obj, traitType: number, trait: number): number {
+            return this.has_trait(traitType, obj, trait)
+        }
+
+        // sfall 0x82B9 — critter_mod_skill_sfall(obj, skillId, amount):
+        // Add amount to a critter's base skill value (signed delta).
+        // Alias of critter_mod_skill — provides the sfall calling convention.
+        // Used by New Reno scripts that prefer the sfall opcode path.
+        critter_mod_skill_sfall(obj: Obj, skillId: number, amount: number): number {
+            return this.critter_mod_skill(obj, skillId, amount) as number
+        }
+
+        // sfall 0x82BA — get_npc_stat_sfall(obj, stat):
+        // Return the effective stat value of an NPC critter.
+        // Alias of get_critter_stat — used by New Reno family-quest scripts that
+        // probe NPC stats via the sfall extended opcode range.
+        get_npc_stat_sfall(obj: Obj, stat: number): number {
+            return this.get_critter_stat(obj as Critter, stat) as number
+        }
+
+        // sfall 0x82BB — set_npc_stat_sfall(obj, stat, val):
+        // Set the base stat of an NPC critter.
+        // Alias of set_critter_stat — used by New Reno scripts that need to
+        // adjust NPC stats via the sfall extended opcode range.
+        set_npc_stat_sfall(obj: Obj, stat: number, val: number): void {
+            this.set_critter_stat(obj, stat, val)
+        }
+
+        // sfall 0x82BC — get_obj_name_sfall(obj):
+        // Return the display name of an object as a string, or 0 for invalid objects.
+        // Used by New Reno merchant and faction scripts to identify objects by name.
+        get_obj_name_sfall(obj: Obj): string | number {
+            if (!isGameObject(obj)) return 0
+            return this.obj_name(obj) ?? 0
+        }
+
+        // sfall 0x82BD — get_critter_ai_num_sfall(obj):
+        // Return the aiNum (AI packet number) of a critter, or -1 for non-critters.
+        // Distinct from the pre-existing get_critter_ai_packet_sfall (0x822B) which
+        // reads aiPacket; this reads aiNum (the same field set by OBJECT_AI_PACKET).
+        // Used by New Reno encounter scripts to branch on combatant AI behaviour.
+        get_critter_ai_num_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return -1
+            return (obj as Critter).aiNum
+        }
+
+        // sfall 0x82BE — get_num_critters_on_tile_sfall(tile):
+        // Return the number of critters currently standing on a given tile.
+        // Browser build: returns 0 (no per-tile critter index).
+        // New Reno crowd-management scripts use this to gate NPC spawning.
+        get_num_critters_on_tile_sfall(_tile: number): number {
+            return 0
+        }
+
+        // sfall 0x82BF — get_critter_combat_data_sfall(obj):
+        // Return combat-session data for a critter (browser stub → 0).
+        // New Reno combat scripts query this for extended AI state; returning 0
+        // causes them to fall through to safe defaults.
+        get_critter_combat_data_sfall(_obj: Obj): number {
+            return 0
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {

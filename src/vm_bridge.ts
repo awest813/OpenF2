@@ -1535,6 +1535,32 @@ export module ScriptVMBridge {
 
        // 0x82B7 — get_combat_turn_sfall(): current combat turn number or 0.
        ,0x82B7: bridged("get_combat_turn_sfall", 0) // get_combat_turn() → turn|0
+
+       // Phase 86 — sfall extended opcodes 0x82B8–0x82BF
+
+       // 0x82B8 — get_critter_trait_typed_sfall(obj, traitType, trait): read trait/perk/skill value.
+       ,0x82B8: bridged("get_critter_trait_typed_sfall", 3) // get_critter_trait_typed(obj, traitType, trait) → value
+
+       // 0x82B9 — critter_mod_skill_sfall(obj, skillId, amount): add signed delta to base skill.
+       ,0x82B9: bridged("critter_mod_skill_sfall", 3) // critter_mod_skill(obj, skillId, amount) → newValue
+
+       // 0x82BA — get_npc_stat_sfall(obj, stat): effective stat for an NPC (alias of get_critter_stat).
+       ,0x82BA: bridged("get_npc_stat_sfall", 2) // get_npc_stat(obj, stat) → value
+
+       // 0x82BB — set_npc_stat_sfall(obj, stat, val): set NPC base stat.
+       ,0x82BB: bridged("set_npc_stat_sfall", 3, false) // set_npc_stat(obj, stat, val)
+
+       // 0x82BC — get_obj_name_sfall(obj): display name of object or 0.
+       ,0x82BC: bridged("get_obj_name_sfall", 1) // get_obj_name(obj) → name|0
+
+       // 0x82BD — get_critter_ai_num_sfall(obj): aiNum for critter or -1.
+       ,0x82BD: bridged("get_critter_ai_num_sfall", 1) // get_critter_ai_num(obj) → aiNum|-1
+
+       // 0x82BE — get_num_critters_on_tile_sfall(tile): count of critters on tile (→ 0).
+       ,0x82BE: bridged("get_num_critters_on_tile_sfall", 1) // get_num_critters_on_tile(tile) → 0
+
+       // 0x82BF — get_critter_combat_data_sfall(obj): combat-session data stub (→ 0).
+       ,0x82BF: bridged("get_critter_combat_data_sfall", 1) // get_critter_combat_data(obj) → 0
     }
     Object.assign(opMap, bridgeOpMap)
 

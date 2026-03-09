@@ -495,6 +495,7 @@ describe('Phase 14-I — checklist accuracy for new procedure types', () => {
         // Phase 56 added 1 additional stub (sfall_set_critter_attack_mode).
         // Phase 57 added 2 additional stubs (sfall_set_object_cost_sfall, sfall_set_tile_fid).
         // Phase 71 added 1 additional stub (sfall_critter_add_trait).
-        expect(summary.stub).toBeLessThanOrEqual(15)
+        // Phase 86 added 2 additional stubs (get_num_critters_on_tile, get_critter_combat_data).
+        expect(summary.stub).toBeLessThanOrEqual(17)
     })
 })
