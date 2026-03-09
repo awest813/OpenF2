@@ -146,8 +146,15 @@ export class SaveLoadPanel extends UIPanel {
             this.hide()
             return true
         }
+        // Number keys 1–SLOT_COUNT for direct slot selection.
+        const digit = parseInt(key)
+        if (!isNaN(digit) && digit >= 1 && digit <= SLOT_COUNT) {
+            this.selectedSlot = digit - 1
+            return true
+        }
         if (key === 'ArrowDown') {
-            this.selectedSlot = Math.min(this.selectedSlot + 1, SLOT_COUNT - 1)
+            // When nothing is selected (-1), ArrowDown picks the first slot.
+            this.selectedSlot = this.selectedSlot < 0 ? 0 : Math.min(this.selectedSlot + 1, SLOT_COUNT - 1)
             return true
         }
         if (key === 'ArrowUp') {

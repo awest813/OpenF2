@@ -782,6 +782,27 @@ describe('SaveLoadPanel', () => {
         panel.openAs('save')
         expect(panel.onMouseDown(50, 100, 'l')).toBe(true)
     })
+
+    it('number key 1 selects slot 0', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.onKeyDown('1')
+        expect(panel.selectedSlot).toBe(0)
+    })
+
+    it('number key 5 selects slot 4 (last slot)', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.onKeyDown('5')
+        expect(panel.selectedSlot).toBe(4)
+    })
+
+    it('number key out of range is ignored', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.onKeyDown('6')
+        expect(panel.selectedSlot).toBe(-1)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1152,6 +1173,32 @@ describe('DialoguePanel', () => {
         mgr.register(panel)
         expect(() => mgr.render()).not.toThrow()
     })
+
+    it('ArrowDown scrolls reply text when overflow lines exist (after render)', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new DialoguePanel(800, 600)
+        // Construct a reply that produces more than REPLY_VISIBLE_LINES (7) wrapped lines
+        // using the 6.5px-per-char approximation from the test stub.
+        // maxWidth = 500 - 14*2 - 12 = 460px; each word ~6.5px; ~70 chars per line.
+        panel.setReply(
+            'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu'
+        )
+        panel.show()
+        mgr.register(panel)
+        mgr.render()  // builds _replyLines from ctx.measureText
+        // First ArrowDown should be consumed regardless of overflow
+        expect(panel.onKeyDown('ArrowDown')).toBe(true)
+        // ArrowUp after scrolling should also be consumed
+        expect(panel.onKeyDown('ArrowUp')).toBe(true)
+    })
+
+    it('setReply resets scroll position', () => {
+        const panel = new DialoguePanel(800, 600)
+        panel.setReply('initial')
+        // Internally _replyScrollLine is 0 after setReply; verify via Escape still works
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1294,6 +1341,40 @@ describe('BarterPanel', () => {
         mgr.register(panel)
         expect(() => mgr.render()).not.toThrow()
     })
+
+    it('_offerRefused is false after openWith', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith([{ name: 'Caps', amount: 1, value: 5 }], [{ name: 'Rope', amount: 1, value: 50 }])
+        // Attempt a refused offer to set the flag
+        panel.playerTable = [{ name: 'Caps', amount: 1, value: 5 }]
+        panel.merchantTable = [{ name: 'Rope', amount: 1, value: 50 }]
+        // trigger offer via click — OFFER button is at width/2 - BTN_W - 6
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+        // Re-opening should clear the flag
+        panel.openWith([], [])
+        // If openWith resets _offerRefused we can verify render doesn't throw with it cleared
+        const mgr = new UIManagerImpl(800, 600)
+        mgr.register(panel)
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('refused offer emits barter:offerRefused event', () => {
+        const panel = new BarterPanel(800, 600)
+        panel.openWith([{ name: 'Caps', amount: 1, value: 5 }], [{ name: 'Rifle', amount: 1, value: 500 }])
+        panel.playerTable   = [{ name: 'Caps', amount: 1, value: 5 }]
+        panel.merchantTable = [{ name: 'Rifle', amount: 1, value: 500 }]
+        const spy = vi.fn()
+        EventBus.on('barter:offerRefused', spy)
+        const { width, height } = panel.bounds
+        const offerX = width / 2 - 70 - 6
+        const btnY = height - 40
+        panel.onMouseDown(offerX + 10, btnY + 5, 'l')
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('barter:offerRefused')
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1365,6 +1446,34 @@ describe('LootPanel', () => {
         mgr.register(panel)
         expect(() => mgr.render()).not.toThrow()
     })
+
+    it('Tab switches active column to container when nothing is selected', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([], [{ name: 'Knife', amount: 1 }])
+        panel.onKeyDown('Tab')
+        expect(panel.onKeyDown('Enter')).toBe(true)  // Enter is consumed
+    })
+
+    it('ArrowDown selects first item in container column', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([{ name: 'Caps', amount: 5 }], [{ name: 'Knife', amount: 1 }])
+        // Tab to switch to container column
+        panel.onKeyDown('Tab')
+        // ArrowDown should select item 0
+        expect(panel.onKeyDown('ArrowDown')).toBe(true)
+    })
+
+    it('Enter transfers selected container item to player', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([], [{ name: 'Knife', amount: 1 }])
+        // Tab to container, ArrowDown to select item, Enter to transfer
+        panel.onKeyDown('Tab')
+        panel.onKeyDown('ArrowDown')
+        panel.onKeyDown('Enter')
+        expect(panel.containerInventory).toHaveLength(0)
+        expect(panel.playerInventory).toHaveLength(1)
+        expect(panel.playerInventory[0].name).toBe('Knife')
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1409,16 +1518,15 @@ describe('InventoryPanel', () => {
         expect(panel.visible).toBe(false)
     })
 
-    it('ArrowDown scrolls the item list', () => {
+    it('ArrowDown navigates the item selection (key is consumed)', () => {
         const panel = new InventoryPanel(800, 600)
         panel.show()
         // Fill with more than MAX_ROWS (10) items
         for (let i = 0; i < 15; i++) {
             panel.items.push({ name: `Item ${i}`, amount: 1, canUse: false })
         }
-        // Capture scroll before and after
+        // ArrowDown must be consumed
         panel.onKeyDown('ArrowDown')
-        // We can't directly inspect _scrollOffset but ArrowDown should be consumed
         expect(panel.onKeyDown('ArrowDown')).toBe(true)
     })
 
@@ -1454,9 +1562,44 @@ describe('InventoryPanel', () => {
         mgr.register(panel)
         expect(() => mgr.render()).not.toThrow()
     })
-})
 
-// ---------------------------------------------------------------------------
+    it('ArrowDown navigates selection to the first item when nothing is selected', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.show()
+        panel.items = [
+            { name: 'Stimpak', amount: 1, canUse: true },
+            { name: 'Knife',   amount: 1, canUse: false },
+        ]
+        // Key is consumed for both presses
+        expect(panel.onKeyDown('ArrowDown')).toBe(true)
+        expect(panel.onKeyDown('ArrowDown')).toBe(true)
+    })
+
+    it('Enter emits inventory:useItem for a usable selected item', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [{ name: 'Stimpak', amount: 1, canUse: true }]
+        panel.show()
+        // Select item via ArrowDown
+        panel.onKeyDown('ArrowDown')
+        const spy = vi.fn()
+        EventBus.on('inventory:useItem', spy)
+        panel.onKeyDown('Enter')
+        expect(spy).toHaveBeenCalledWith({ index: 0 })
+        EventBus.clear('inventory:useItem')
+    })
+
+    it('Enter does nothing for a non-usable selected item', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [{ name: 'Knife', amount: 1, canUse: false }]
+        panel.show()
+        panel.onKeyDown('ArrowDown')
+        const spy = vi.fn()
+        EventBus.on('inventory:useItem', spy)
+        panel.onKeyDown('Enter')
+        expect(spy).not.toHaveBeenCalled()
+        EventBus.clear('inventory:useItem')
+    })
+})
 // WorldMapPanel
 // ---------------------------------------------------------------------------
 

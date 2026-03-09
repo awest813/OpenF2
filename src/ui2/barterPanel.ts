@@ -75,6 +75,8 @@ export class BarterPanel extends UIPanel {
     merchantTable: BarterItem[] = []
 
     private _selected: SelectedItem | null = null
+    /** True while the most recent offer attempt was refused (cleared on next successful offer or openWith). */
+    private _offerRefused = false
 
     constructor(screenWidth: number, screenHeight: number) {
         super('barter', {
@@ -93,6 +95,7 @@ export class BarterPanel extends UIPanel {
         this.playerTable = []
         this.merchantTable = []
         this._selected = null
+        this._offerRefused = false
         this.show()
     }
 
@@ -132,6 +135,15 @@ export class BarterPanel extends UIPanel {
         ctx.fillText(`YOUR: $${playerVal}`, LEFT_INV_X, btnY - 4)
         ctx.fillStyle = cssColor(FALLOUT_AMBER)
         ctx.fillText(`THEIR: $${merchantVal}`, RIGHT_INV_X, btnY - 4)
+
+        // Offer-refused feedback banner.
+        if (this._offerRefused) {
+            ctx.font = '10px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_RED)
+            ctx.textAlign = 'center'
+            ctx.fillText('OFFER REFUSED — add more to your table', width / 2, btnY - 4)
+            ctx.textAlign = 'left'
+        }
 
         // OFFER button
         const offerX = width / 2 - BTN_W - 6
@@ -268,6 +280,7 @@ export class BarterPanel extends UIPanel {
         const playerVal   = totalValue(this.playerTable)
         const merchantVal = totalValue(this.merchantTable)
         if (playerVal >= merchantVal) {
+            this._offerRefused = false
             // Commit the exchange in-panel so repeated barter rounds keep
             // accurate ownership state without requiring an immediate panel
             // rebuild from external event consumers.
@@ -282,6 +295,7 @@ export class BarterPanel extends UIPanel {
             this.merchantTable = []
             this._selected = null
         } else {
+            this._offerRefused = true
             EventBus.emit('barter:offerRefused', { playerVal, merchantVal })
         }
     }

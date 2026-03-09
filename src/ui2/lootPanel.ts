@@ -211,6 +211,42 @@ export class LootPanel extends UIPanel {
             this._close()
             return true
         }
+        // Tab switches the active column (container → player or player → container).
+        if (key === 'Tab') {
+            if (this._selectedSide === 'container') {
+                this._selectedSide  = 'player'
+                this._selectedIndex = this.playerInventory.length > 0 ? 0 : -1
+            } else {
+                this._selectedSide  = 'container'
+                this._selectedIndex = this.containerInventory.length > 0 ? 0 : -1
+            }
+            return true
+        }
+        // Arrow keys navigate within the focused column.
+        if (key === 'ArrowDown' || key === 'ArrowUp') {
+            const side = this._selectedSide ?? 'container'
+            const items = side === 'player' ? this.playerInventory : this.containerInventory
+            if (items.length === 0) return true
+            const delta = key === 'ArrowDown' ? 1 : -1
+            const next  = this._selectedIndex < 0
+                ? (delta > 0 ? 0 : items.length - 1)
+                : Math.max(0, Math.min(items.length - 1, this._selectedIndex + delta))
+            this._selectedSide  = side
+            this._selectedIndex = next
+            return true
+        }
+        // Enter transfers the selected item to the other column.
+        if (key === 'Enter') {
+            if (this._selectedSide && this._selectedIndex >= 0) {
+                const dest: 'player' | 'container' = this._selectedSide === 'player' ? 'container' : 'player'
+                this._moveItem(this._selectedSide, this._selectedIndex, dest)
+                // Keep selection within the (now shorter) source list.
+                const remaining = this._selectedSide === 'player' ? this.playerInventory : this.containerInventory
+                this._selectedIndex = Math.min(this._selectedIndex, remaining.length - 1)
+                if (this._selectedIndex < 0) this._selectedSide = null
+            }
+            return true
+        }
         return false
     }
 

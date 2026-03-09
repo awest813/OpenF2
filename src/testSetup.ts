@@ -28,6 +28,8 @@ if (typeof OffscreenCanvas === 'undefined') {
             fillText: () => {},
             strokeRect: () => {},
             drawImage: () => {},
+            // Approximate monospace text measurement for test environments.
+            measureText: (text: string) => ({ width: text.length * 6.5 }),
             fillStyle: '',
             strokeStyle: '',
             lineWidth: 1,
