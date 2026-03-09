@@ -1372,6 +1372,33 @@ export module ScriptVMBridge {
 
        // 0x8287 — get_obj_weight_sfall(obj): return object weight in lbs.
        ,0x8287: bridged("get_obj_weight_sfall", 1) // get_obj_weight(obj) → weight
+
+       // Phase 77 — sfall extended opcodes 0x8288–0x828F
+       // -----------------------------------------------------------------------
+
+       // 0x8288 — get_critter_flags_sfall(obj): critter flags bitmask.
+       ,0x8288: bridged("get_critter_flags_sfall", 1) // get_critter_flags(obj) → flags
+
+       // 0x8289 — set_critter_flags_sfall(obj, flags): set critter flags bulk.
+       ,0x8289: bridged("set_critter_flags_sfall", 2, false) // set_critter_flags(obj, flags)
+
+       // 0x828A — get_critter_worn_armor_sfall(obj): equipped armor or 0.
+       ,0x828A: bridged("get_critter_worn_armor_sfall", 1) // get_critter_worn_armor(obj) → armor|0
+
+       // 0x828B — get_critter_weapon_sfall(obj, hand): weapon by hand (0=right, 1=left) or 0.
+       ,0x828B: bridged("get_critter_weapon_sfall", 2) // get_critter_weapon(obj, hand) → weapon|0
+
+       // 0x828C — get_tile_x_sfall(tile): x hex coord of tile number.
+       ,0x828C: bridged("get_tile_x_sfall", 1) // get_tile_x(tile) → x
+
+       // 0x828D — get_tile_y_sfall(tile): y hex coord of tile number.
+       ,0x828D: bridged("get_tile_y_sfall", 1) // get_tile_y(tile) → y
+
+       // 0x828E — tile_from_coords_sfall(x, y): tile number from hex coords.
+       ,0x828E: bridged("tile_from_coords_sfall", 2) // tile_from_coords(x, y) → tile
+
+       // 0x828F — get_critter_max_hp_sfall(obj): max HP of critter.
+       ,0x828F: bridged("get_critter_max_hp_sfall", 1) // get_critter_max_hp(obj) → maxHP
     }
     Object.assign(opMap, bridgeOpMap)
 

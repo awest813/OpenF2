@@ -2768,7 +2768,9 @@ export module Scripting {
             }
         }
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
+            // BLK-121: Trigger a single non-looping animation cycle on obj.
             log('reg_anim_animate', arguments, 'animation')
+            this.reg_anim_animate_once(obj, anim, delay)
         }
         reg_anim_animate_forever(obj: Obj, anim: number) {
             log('reg_anim_animate_forever', arguments, 'animation')
@@ -2882,15 +2884,14 @@ export module Scripting {
         }
 
         gfade_out(time: number) {
-            // Screen fade-out over `time` game ticks.  In the browser build we
-            // don't implement an actual fading effect yet, but we must not stub
-            // this procedure — it is called frequently during map transitions
-            // and cut-scenes, and the stub warning floods the console.
+            // BLK-122: Screen fade-out — apply CSS opacity transition on the canvas.
             log('gfade_out', arguments)
+            this.gfade_out_css(time)
         }
         gfade_in(time: number) {
-            // Screen fade-in over `time` game ticks.  Same note as gfade_out.
+            // BLK-122: Screen fade-in — restore CSS opacity on the canvas.
             log('gfade_in', arguments)
+            this.gfade_in_css(time)
         }
 
         // timing
@@ -5896,6 +5897,110 @@ export module Scripting {
         get_obj_weight_sfall(obj: Obj): number {
             if (!isGameObject(obj)) return 0
             return (obj as any).pro?.extra?.weight ?? (obj as any).weight ?? 0
+        }
+
+        // Phase 77 — sfall extended opcodes 0x8288–0x828F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8288 — get_critter_flags_sfall(obj):
+        // Returns the engine-level critter flags bitmask.  Alias of get_critter_flags().
+        get_critter_flags_sfall(obj: Obj): number {
+            return this.get_critter_flags(obj)
+        }
+
+        // sfall 0x8289 — set_critter_flags_sfall(obj, flags):
+        // Sets the engine-level critter flags in bulk.  Alias of set_critter_flags().
+        set_critter_flags_sfall(obj: Obj, flags: number): void {
+            this.set_critter_flags(obj, flags)
+        }
+
+        // sfall 0x828A — get_critter_worn_armor_sfall(obj):
+        // Returns the armor item currently equipped by the critter, or 0 if none.
+        get_critter_worn_armor_sfall(obj: Obj): Obj | 0 {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).equippedArmor ?? 0
+        }
+
+        // sfall 0x828B — get_critter_weapon_sfall(obj, hand):
+        // Returns the weapon in the given hand (0 = right, 1 = left), or 0 if empty.
+        get_critter_weapon_sfall(obj: Obj, hand: number): Obj | 0 {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (hand === 1) return (obj as any).leftHand ?? 0
+            return (obj as any).rightHand ?? 0
+        }
+
+        // sfall 0x828C — get_tile_x_sfall(tile):
+        // Returns the x hex coordinate of a tile number.
+        get_tile_x_sfall(tile: number): number {
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            return fromTileNum(tile).x
+        }
+
+        // sfall 0x828D — get_tile_y_sfall(tile):
+        // Returns the y hex coordinate of a tile number.
+        get_tile_y_sfall(tile: number): number {
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            return fromTileNum(tile).y
+        }
+
+        // sfall 0x828E — tile_from_coords_sfall(x, y):
+        // Returns the tile number for the given (x, y) hex coordinates.
+        tile_from_coords_sfall(x: number, y: number): number {
+            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) return 0
+            return toTileNum({ x: Math.round(x), y: Math.round(y) })
+        }
+
+        // sfall 0x828F — get_critter_max_hp_sfall(obj):
+        // Returns the maximum HP of a critter from its stats or proto data.
+        // Returns 0 for non-critters.
+        get_critter_max_hp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            // Player and critters expose max HP via getStat('Max HP')
+            if (typeof (obj as any).getStat === 'function') {
+                const hp = (obj as any).getStat('Max HP')
+                if (typeof hp === 'number' && isFinite(hp)) return hp
+            }
+            // Fallback: proto extra data
+            return (obj as any).pro?.extra?.maxHP ?? (obj as any).maxHP ?? 0
+        }
+
+        // BLK-121 — reg_anim_animate improvement:
+        // Trigger a single animation cycle on the object (replaces pure log no-op).
+        reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
+            if (!isGameObject(obj)) {
+                warn('reg_anim_animate_once: not a game object', 'animation', this)
+                return
+            }
+            // anim 0 = idle/stand animation; trigger it as a single non-looping cycle
+            if (typeof (obj as any).singleAnimation === 'function') {
+                try {
+                    ;(obj as any).singleAnimation(false, null)
+                } catch (e) {
+                    warn('reg_anim_animate_once: singleAnimation threw: ' + e, 'animation', this)
+                }
+            }
+        }
+
+        // BLK-122 — gfade_out real CSS implementation:
+        // Fade the game canvas to black using a CSS transition.  Safe in Node.js.
+        gfade_out_css(_time: number): void {
+            if (typeof document === 'undefined') return
+            const cnv = document.getElementById('cnv')
+            if (cnv) {
+                cnv.style.transition = 'opacity 0.5s ease-in-out'
+                cnv.style.opacity = '0'
+            }
+        }
+
+        // BLK-122 — gfade_in real CSS implementation:
+        // Restore the game canvas from a previous fade-out.  Safe in Node.js.
+        gfade_in_css(_time: number): void {
+            if (typeof document === 'undefined') return
+            const cnv = document.getElementById('cnv')
+            if (cnv) {
+                cnv.style.transition = 'opacity 0.5s ease-in-out'
+                cnv.style.opacity = '1'
+            }
         }
 
         _serialize(): SerializedScript {

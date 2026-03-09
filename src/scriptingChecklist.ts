@@ -6339,6 +6339,111 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    // -----------------------------------------------------------------------
+    // Phase 77 entries
+    // -----------------------------------------------------------------------
+    {
+        id: 'BLK-121',
+        kind: 'bug',
+        description:
+            'BLK-121: reg_anim_animate() was a pure log no-op, preventing critter animations from ' +
+            'playing during scripted sequences.  Now calls reg_anim_animate_once() which invokes ' +
+            'singleAnimation(false, null) on the target object.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'BLK-122',
+        kind: 'bug',
+        description:
+            'BLK-122: gfade_out() and gfade_in() were pure log no-ops, leaving the screen visible ' +
+            'during cut-scene transitions.  Now apply a CSS opacity transition on #cnv in browser ' +
+            'environments; safe no-op in Node.js (typeof document === "undefined").',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_flags_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x8288: get_critter_flags_sfall(obj) — returns the critter flags bitmask. ' +
+            'Alias of the existing get_critter_flags() method.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_flags_sfall',
+        kind: 'opcode',
+        description:
+            'sfall 0x8289: set_critter_flags_sfall(obj, flags) — sets the critter flags bitmask. ' +
+            'Alias of the existing set_critter_flags() method.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_worn_armor',
+        kind: 'opcode',
+        description:
+            'sfall 0x828A: get_critter_worn_armor_sfall(obj) — returns the armor item currently ' +
+            'equipped by the critter, or 0 if none. Reads equippedArmor property.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_weapon_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x828B: get_critter_weapon_sfall(obj, hand) — returns the weapon in the given ' +
+            'hand (0=right, 1=left), or 0 if empty. Reads rightHand/leftHand properties.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_tile_x',
+        kind: 'opcode',
+        description:
+            'sfall 0x828C: get_tile_x_sfall(tile) — returns the x hex coordinate of the given ' +
+            'tile number using fromTileNum(tile).x.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_tile_y',
+        kind: 'opcode',
+        description:
+            'sfall 0x828D: get_tile_y_sfall(tile) — returns the y hex coordinate of the given ' +
+            'tile number using fromTileNum(tile).y.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_tile_from_coords',
+        kind: 'opcode',
+        description:
+            'sfall 0x828E: tile_from_coords_sfall(x, y) — returns the tile number for the given ' +
+            '(x, y) hex coordinates using toTileNum({x, y}).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_max_hp_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x828F: get_critter_max_hp_sfall(obj) — returns the max HP of a critter by ' +
+            'reading getStat("Max HP"), or from proto data as fallback.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
