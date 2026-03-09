@@ -22,10 +22,11 @@ import { EventBus } from '../eventBus.js'
 const PANEL_WIDTH  = 500
 const PANEL_HEIGHT = 320
 const REPLY_HEIGHT = 120
+const REPLY_LINE_H = 14
+const REPLY_CONTENT_TOP = 42     // y of the first reply text line
+const REPLY_VISIBLE_LINES = Math.floor((REPLY_HEIGHT - (REPLY_CONTENT_TOP - 26)) / REPLY_LINE_H)  // = 7
 const OPTION_ROW_H = 26
 const PADDING      = 14
-/** Approximate pixel width of one character at 11px monospace (used for line-wrap). */
-const AVG_CHAR_WIDTH_PX = 6.5
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +44,13 @@ export interface DialogueOption {
 export class DialoguePanel extends UIPanel {
     private _reply = ''
     private _options: DialogueOption[] = []
+    /** Current top line shown in the reply box (0 = start of text). */
+    private _replyScrollLine = 0
+    /**
+     * Wrapped lines built from `_reply` during the most recent `render()` call.
+     * Used by `onKeyDown` to enforce scroll bounds without re-measuring.
+     */
+    private _replyLines: string[] = []
 
     constructor(screenWidth: number, screenHeight: number) {
         super('dialogue', {
@@ -58,6 +66,8 @@ export class DialoguePanel extends UIPanel {
     setReply(text: string): void {
         this._reply = text
         this._options = []
+        this._replyScrollLine = 0
+        this._replyLines = []
     }
 
     /** Append a player-response option. */
@@ -83,7 +93,36 @@ export class DialoguePanel extends UIPanel {
         strokeRect(ctx, PADDING, 26, width - PADDING * 2, REPLY_HEIGHT, FALLOUT_DARK_GRAY, 1)
         ctx.font = '11px monospace'
         ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        wrapText(ctx, this._reply, PADDING + 6, 42, width - PADDING * 2 - 12, 14)
+
+        // Build wrapped lines using ctx.measureText for accurate wrapping.
+        const replyMaxW = width - PADDING * 2 - 12
+        this._replyLines = buildLines(ctx, this._reply, replyMaxW)
+
+        // Clamp scroll offset in case text changed since last keypress.
+        this._replyScrollLine = Math.max(0, Math.min(
+            this._replyScrollLine,
+            Math.max(0, this._replyLines.length - REPLY_VISIBLE_LINES),
+        ))
+
+        const visibleLines = this._replyLines.slice(
+            this._replyScrollLine,
+            this._replyScrollLine + REPLY_VISIBLE_LINES,
+        )
+        for (let i = 0; i < visibleLines.length; i++) {
+            ctx.fillText(visibleLines[i], PADDING + 6, REPLY_CONTENT_TOP + i * REPLY_LINE_H)
+        }
+
+        // Scroll indicator arrows when reply text overflows the box.
+        if (this._replyScrollLine > 0) {
+            ctx.font = '9px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillText('▲', width - PADDING - 10, REPLY_CONTENT_TOP)
+        }
+        if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
+            ctx.font = '9px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillText('▼', width - PADDING - 10, REPLY_CONTENT_TOP + (REPLY_VISIBLE_LINES - 1) * REPLY_LINE_H)
+        }
 
         // Divider — draw as a thin stroke rect (1px height)
         ctx.strokeStyle = cssColor(FALLOUT_DARK_GRAY)
@@ -122,10 +161,21 @@ export class DialoguePanel extends UIPanel {
     }
 
     override onKeyDown(key: string): boolean {
-        // Number keys 1-9 select options directly
+        // Number keys 1-9 select options directly.
         const digit = parseInt(key)
         if (!isNaN(digit) && digit >= 1 && digit <= this._options.length) {
             EventBus.emit('dialogue:optionSelected', { optionID: this._options[digit - 1].optionID })
+            return true
+        }
+        // Arrow keys scroll the reply text.
+        if (key === 'ArrowUp') {
+            if (this._replyScrollLine > 0) this._replyScrollLine--
+            return true
+        }
+        if (key === 'ArrowDown') {
+            if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
+                this._replyScrollLine++
+            }
             return true
         }
         if (key === 'Escape') {
@@ -165,31 +215,26 @@ function strokeRect(
 }
 
 /**
- * Draw text wrapped within `maxWidth` pixels.
- * Each line is placed `lineH` pixels below the previous one.
+ * Split `text` into wrapped lines that each fit within `maxWidth` pixels.
+ * Uses `ctx.measureText` for accurate glyph-width measurement.
  */
-function wrapText(
+function buildLines(
     ctx: OffscreenCanvasRenderingContext2D,
     text: string,
-    x: number, y: number,
     maxWidth: number,
-    lineH: number,
-): void {
+): string[] {
     const words = text.split(' ')
+    const lines: string[] = []
     let line = ''
-    let cy = y
     for (const word of words) {
         const test = line ? line + ' ' + word : word
-        // Approximate width: 6.5px per char at 11px monospace
-        if (test.length * AVG_CHAR_WIDTH_PX > maxWidth && line) {
-            ctx.fillText(line, x, cy)
+        if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line)
             line = word
-            cy += lineH
         } else {
             line = test
         }
     }
-    if (line) {
-        ctx.fillText(line, x, cy)
-    }
+    if (line) lines.push(line)
+    return lines
 }

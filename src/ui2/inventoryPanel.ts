@@ -209,14 +209,36 @@ export class InventoryPanel extends UIPanel {
             return true
         }
         if (key === 'ArrowDown') {
-            if (this._scrollOffset + MAX_ROWS < this.items.length) {
-                this._scrollOffset++
+            if (this.items.length === 0) return true
+            // Move selection down; initialise to first item when nothing is selected.
+            const next = this._selectedIndex < 0 ? 0 : Math.min(this._selectedIndex + 1, this.items.length - 1)
+            this._selectedIndex = next
+            // Auto-scroll so the selected item stays visible.
+            if (this._selectedIndex >= this._scrollOffset + MAX_ROWS) {
+                this._scrollOffset = this._selectedIndex - MAX_ROWS + 1
             }
             return true
         }
         if (key === 'ArrowUp') {
-            if (this._scrollOffset > 0) {
-                this._scrollOffset--
+            if (this.items.length === 0) return true
+            if (this._selectedIndex < 0) return true
+            const next = Math.max(this._selectedIndex - 1, 0)
+            this._selectedIndex = next
+            // Auto-scroll so the selected item stays visible.
+            if (this._selectedIndex < this._scrollOffset) {
+                this._scrollOffset = this._selectedIndex
+            }
+            return true
+        }
+        // Enter triggers the primary action on the selected item (USE if available).
+        if (key === 'Enter') {
+            if (this._selectedIndex >= 0 && this._selectedIndex < this.items.length) {
+                const item = this.items[this._selectedIndex]
+                if (item.canUse) {
+                    EventBus.emit('inventory:useItem', { index: this._selectedIndex })
+                    // Keep selection clamped to the list so multiple uses in sequence work without re-selecting.
+                    this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
+                }
             }
             return true
         }

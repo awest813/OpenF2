@@ -71,6 +71,8 @@ export class GamePanel extends UIPanel {
         const currentAP = EntityManager.get<'combat'>(this.playerEntityId, 'combat')?.combatAP ?? maxAP
         drawLabel(ctx, 'AP', 140, 14, FALLOUT_DARK_GRAY)
         drawAPBar(ctx, 140, 22, currentAP, maxAP)
+        // Numeric AP value below the bar so players know the exact count.
+        drawValue(ctx, `${currentAP}/${maxAP}`, 140, 50, FALLOUT_AMBER)
 
         // --- Equipped weapon ---
         const weaponPid = inv?.equippedWeaponPrimary
