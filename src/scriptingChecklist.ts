@@ -6454,11 +6454,162 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_critter_max_hp_82',
         kind: 'opcode',
         description:
-            'sfall 0x828F: get_critter_max_hp_sfall(obj) — returns the max HP of a critter by ' +
+            'sfall 0x828F: get_critter_max_hp_sfall_82(obj) — returns the max HP of a critter by ' +
             'reading getStat("Max HP"), or from proto data as fallback.  Returns 0 for non-critters.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
+    },
+
+    // -----------------------------------------------------------------------
+    // Phase 80 entries
+    // -----------------------------------------------------------------------
+    {
+        id: 'blk_128_obj_name_null_guard',
+        kind: 'bug',
+        description:
+            'BLK-128: obj_name() returned obj.name without checking whether obj is a valid ' +
+            'game object.  When a Fallout 2 script passes 0 (the FO2 null-reference convention) ' +
+            'or a destroyed object handle, the property access threw a TypeError that crashed ' +
+            'the script VM.  Now guards with isGameObject() and returns an empty string for ' +
+            'invalid objects, matching the vanilla engine behaviour.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'blk_129_set_global_var_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-129: set_global_var() accepted NaN and Infinity values unchecked.  Storing ' +
+            'NaN in globalVars corrupted the karma reputation sync (GVAR 0) and caused ' +
+            'downstream global_var() reads to return NaN, silently breaking quest-state checks. ' +
+            'Now clamps any non-finite number to 0 and emits a warning so scripts with bad ' +
+            'arithmetic are traceable.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_130_critter_dmg_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-130: critter_dmg() did not check whether the damage argument was a finite ' +
+            'number.  NaN or Infinity passed through to critterDamage() silently corrupted ' +
+            'HP stats.  Now skips the damage call for non-finite values and emits a warning ' +
+            'so scripts with broken damage formulas are caught at the source.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_131_float_msg_null_array',
+        kind: 'bug',
+        description:
+            'BLK-131: float_msg() called globalState.floatMessages.push() without verifying ' +
+            'that the array exists.  In environments where globalState is partially reset ' +
+            '(e.g. custom test harnesses or future save-state rollbacks), floatMessages ' +
+            'could be undefined, causing an uncaught TypeError.  Now checks ' +
+            'Array.isArray(globalState.floatMessages) before pushing and skips with a warning ' +
+            'if the array is absent.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_132_load_message_file_try_catch',
+        kind: 'bug',
+        description:
+            'BLK-132: loadMessageFile() called getFileText() without a try-catch.  If the ' +
+            '.msg file does not exist (network 404 or missing asset), getFileText() throws and ' +
+            'the script VM crashes — killing the current map session.  New Reno sub-areas that ' +
+            'lack localised dialogue files are common.  Now wraps the getFileText() call in ' +
+            'try-catch and falls back to an empty message table, so missing files degrade ' +
+            'gracefully instead of crashing.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_set_critter_current_hp_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8290: set_critter_current_hp_sfall(obj, hp) — sets the current HP of a ' +
+            'critter to hp, clamped to [0, maxHP].  Non-finite values are rejected.  Used by ' +
+            'New Reno and other mid-game scripts that directly manage NPC health.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_local_var_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8291: get_local_var_sfall(idx) — returns the local script variable at ' +
+            'the given index.  Equivalent to local_var() exposed as a dedicated opcode.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_local_var_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8292: set_local_var_sfall(idx, val) — sets the local script variable at ' +
+            'the given index to val.  Equivalent to set_local_var() exposed as a dedicated opcode.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_game_time_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8293: get_game_time_sfall() — returns the current game time in ticks. ' +
+            'Alias of the vanilla game_time() procedure exposed as a dedicated sfall opcode.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_area_known',
+        kind: 'opcode',
+        description:
+            'sfall 0x8294: get_area_known_sfall(areaID) — returns 1 if the world-map area ' +
+            'with the given ID is known to the player, 0 otherwise.  Reads globalState.mapAreas.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_kill_counter',
+        kind: 'opcode',
+        description:
+            'sfall 0x8295: get_kill_counter_sfall(critterType) — returns the kill count for ' +
+            'the given critter type.  Browser build: returns 0 (per-type kill tracking not implemented).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_add_kill_counter',
+        kind: 'opcode',
+        description:
+            'sfall 0x8296: add_kill_counter_sfall(critterType, count) — adds count to the kill ' +
+            'counter for the given critter type.  Browser build: no-op.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_player_elevation',
+        kind: 'opcode',
+        description:
+            'sfall 0x8297: get_player_elevation_sfall() — returns the player\'s current elevation ' +
+            '(0–2).  Alias of get_elevation_sfall(); exposed as a dedicated opcode for clarity.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
     },
 ])
 

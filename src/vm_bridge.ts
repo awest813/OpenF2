@@ -1397,8 +1397,36 @@ export module ScriptVMBridge {
        // 0x828E — tile_from_coords_sfall(x, y): tile number from hex coords.
        ,0x828E: bridged("tile_from_coords_sfall", 2) // tile_from_coords(x, y) → tile
 
-       // 0x828F — get_critter_max_hp_sfall(obj): max HP of critter.
-       ,0x828F: bridged("get_critter_max_hp_sfall", 1) // get_critter_max_hp(obj) → maxHP
+       // 0x828F — get_critter_max_hp_sfall_82(obj): max HP of critter (with proto fallback).
+       ,0x828F: bridged("get_critter_max_hp_sfall_82", 1) // get_critter_max_hp(obj) → maxHP
+
+       // -----------------------------------------------------------------------
+       // Phase 80 — sfall extended opcodes 0x8290–0x8297
+       // -----------------------------------------------------------------------
+
+       // 0x8290 — set_critter_current_hp_sfall(obj, hp): set current HP, clamped.
+       ,0x8290: bridged("set_critter_current_hp_sfall", 2, false) // set_critter_current_hp(obj, hp)
+
+       // 0x8291 — get_local_var_sfall(idx): return local script variable.
+       ,0x8291: bridged("get_local_var_sfall", 1) // get_local_var(idx) → value
+
+       // 0x8292 — set_local_var_sfall(idx, val): set local script variable.
+       ,0x8292: bridged("set_local_var_sfall", 2, false) // set_local_var(idx, val)
+
+       // 0x8293 — get_game_time_sfall(): return current game time in ticks.
+       ,0x8293: bridged("get_game_time_sfall", 0) // get_game_time() → ticks
+
+       // 0x8294 — get_area_known_sfall(areaID): 1 if area is known, 0 otherwise.
+       ,0x8294: bridged("get_area_known_sfall", 1) // get_area_known(areaID) → 0|1
+
+       // 0x8295 — get_kill_counter_sfall(critterType): kill count for type.
+       ,0x8295: bridged("get_kill_counter_sfall", 1) // get_kill_counter(type) → 0
+
+       // 0x8296 — add_kill_counter_sfall(critterType, count): add to kill counter.
+       ,0x8296: bridged("add_kill_counter_sfall", 2, false) // add_kill_counter(type, count)
+
+       // 0x8297 — get_player_elevation_sfall(): player's current elevation (0–2).
+       ,0x8297: bridged("get_player_elevation_sfall", 0) // get_player_elevation() → 0|1|2
     }
     Object.assign(opMap, bridgeOpMap)
 
