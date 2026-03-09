@@ -85,6 +85,8 @@ export default {
     ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
     gameUIDisabled: false, // True when scripts have disabled UI interaction
     carFuel: 0, // car fuel level (sfall get/set_car_fuel_amount); persisted in save v18+
+    /** BLK-111: true when the current map was entered via a save/load, false on first visit. */
+    mapLoadedFromSave: false,
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
     mapVars: {}, // per-map script variable store ({ scriptName: { varIndex: value } })
     mapAreaStates: {}, // world-map discovery overrides ({ areaID: discovered })
@@ -163,6 +165,16 @@ export default {
      * Persisted in save schema v18+ so the car remains fueled after reloading.
      */
     carFuel: number
+
+    /**
+     * BLK-111: Set to true by the save/load system whenever the current map entry
+     * resulted from loading a saved game rather than entering a map for the first time.
+     *
+     * Read by `game_loaded()` (sfall 0x81B3) so map scripts can distinguish between
+     * first-visit initialization (place objects, etc.) and save-resume paths.
+     * Reset to false after the map's map_enter_p_proc has run.
+     */
+    mapLoadedFromSave: boolean
 
     /**
      * Per-kill-type kill counts for the player session.

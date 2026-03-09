@@ -25,7 +25,7 @@ export type StubImpact = 'blocker' | 'high' | 'medium' | 'low'
 
 export interface StubEntry {
     id: string
-    kind: 'opcode' | 'procedure' | 'metarule'
+    kind: 'opcode' | 'procedure' | 'metarule' | 'bug'
     description: string
     status: StubStatus
     frequency: StubFrequency
@@ -6063,6 +6063,281 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
+    },
+
+    // -------------------------------------------------------------------------
+    // Phase 75 — null guards BLK-110..116 + game_loaded flag + sfall 0x8278–0x827F
+    // -------------------------------------------------------------------------
+
+    {
+        id: 'blk_110_window_performance_now_object',
+        kind: 'procedure',
+        description:
+            'BLK-110: window.performance.now() called directly in object.ts animation methods ' +
+            '(updateAnim, singleAnimation, updateStaticAnim, staticAnimation) — crashes in ' +
+            'Node.js test environments and non-standard browser contexts.  Fixed by using ' +
+            'typeof performance !== "undefined" ? performance.now() : 0 in all 5 locations.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_111_game_loaded_flag',
+        kind: 'procedure',
+        description:
+            'BLK-111: game_loaded() (sfall 0x81B3) always returned 0 — map scripts could not ' +
+            'distinguish first-time map entry from save/load resume.  Fixed by adding ' +
+            'globalState.mapLoadedFromSave flag, set to true by applyExtraSaveState() on load ' +
+            'and cleared after map_enter_p_proc completes in enterMap().  get_map_loaded_sfall ' +
+            '(0x827D) is a new alias that reads the same flag.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_112_combat_combatant_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-112: main.ts combat mouse-click loop accessed combatants[i].position.x without ' +
+            'a null guard.  Combatants may lose their tile assignment during a scripted move or ' +
+            'map transition mid-combat, causing a TypeError that freezes the combat UI.  Fixed ' +
+            'by checking combatant.position before accessing .x / .y.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_113_serialize_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-113: Obj.serialize() accessed this.position.x unconditionally — objects in ' +
+            'inventory or mid-map-transition have position=null, so serialising them crashed ' +
+            'with a TypeError.  Fixed by falling back to {x:0,y:0} when position is null.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_114_drop_source_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-114: Obj.drop() called this.move({x:source.position.x,y:source.position.y}) ' +
+            'without checking source.position first.  When the source critter had no position ' +
+            '(inventory or transition) this crashed with TypeError.  Fixed by returning early ' +
+            'when source.position is null.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_115_explode_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-115: Obj.explode() read explosion.position.x (on the result of createObjectWithPID) ' +
+            'and this.position.x without null guards.  Objects in inventory or mid-transition ' +
+            'have no position, causing a TypeError.  Fixed by returning early when this.position ' +
+            'is null and assigning position as an object rather than modifying .x/.y directly.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_116_walk_anim_null_position',
+        kind: 'procedure',
+        description:
+            'BLK-116: Critter.updateAnim() called directionOfDelta(this.position.x, ...) after ' +
+            'this.move() without re-checking whether position is still non-null.  In edge cases ' +
+            'move() can null out the position (transition); added a guard that calls clearAnim() ' +
+            'and returns instead of crashing.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_knockout',
+        kind: 'opcode',
+        description:
+            'sfall 0x8278: get_critter_knockout_sfall(obj) — returns 1 if the critter is ' +
+            'knocked out (unconscious), 0 otherwise.  Reads the knockedOut flag.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_knockdown',
+        kind: 'opcode',
+        description:
+            'sfall 0x8279: get_critter_knockdown_sfall(obj) — returns 1 if the critter is ' +
+            'knocked down (prone), 0 otherwise.  Reads the knockedDown flag.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_crippled_legs',
+        kind: 'opcode',
+        description:
+            'sfall 0x827A: get_critter_crippled_legs_sfall(obj) — bitmask of crippled legs: ' +
+            'bit 0 = left leg, bit 1 = right leg.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_crippled_arms',
+        kind: 'opcode',
+        description:
+            'sfall 0x827B: get_critter_crippled_arms_sfall(obj) — bitmask of crippled arms: ' +
+            'bit 0 = left arm, bit 1 = right arm.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_dead',
+        kind: 'opcode',
+        description:
+            'sfall 0x827C: get_critter_dead_sfall(obj) — returns 1 if the critter is dead, ' +
+            '0 otherwise.  Safe for non-critter objects.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_map_loaded',
+        kind: 'opcode',
+        description:
+            'sfall 0x827D: get_map_loaded_sfall() — returns 1 if the current map was entered ' +
+            'via save/load (alias of game_loaded / BLK-111 flag).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_poison_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x827E: get_critter_poison_level_sfall(obj) — current poison level of the ' +
+            'critter.  Alias of get_poison(); returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_radiation_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x827F: get_critter_radiation_level_sfall(obj) — current radiation level of ' +
+            'the critter.  Alias of get_radiation(); returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // -----------------------------------------------------------------------
+    // Phase 76 entries
+    // -----------------------------------------------------------------------
+    {
+        id: 'BLK-117',
+        kind: 'bug',
+        description:
+            'BLK-117: get_last_target / get_last_attacker (sfall 0x81B0/0x81B1) always returned 0. ' +
+            'Fixed by tracking lastCombatTarget/lastCombatAttacker properties on critters in combat.attack(), ' +
+            'and reading those properties in vm_bridge.ts.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'BLK-118',
+        kind: 'bug',
+        description:
+            'BLK-118: renderer.ts objectRenderInfo() and objectBoundingBox() would crash with ' +
+            '"Cannot read properties of null (reading x)" when an object had a null position ' +
+            '(e.g. item in inventory or mid-map-transition). Added early null guard: if (!obj.position) return null.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    {
+        id: 'BLK-119',
+        kind: 'bug',
+        description:
+            'BLK-119: map.ts recalcPath() used window.performance.now() directly, crashing in Node.js ' +
+            'test environments. Replaced with typeof performance !== "undefined" ? performance.now() : 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'BLK-120',
+        kind: 'bug',
+        description:
+            'BLK-120: obj_run_proc (sfall 0x81D7) was a no-op stub. Implemented real dispatch: ' +
+            'pops proc name and target object, looks up the named procedure on the object\'s _script, ' +
+            'temporarily sets self_obj to the target, calls the procedure, then restores self_obj.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'sfall_get_critter_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x8282: get_critter_level_sfall(obj) — returns the critter\'s current level. ' +
+            'For the player returns real level; for NPCs returns 1 (or stored level property).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_xp_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8283: get_critter_xp_sfall(obj) — returns the critter\'s current XP. ' +
+            'For the player returns real XP; for NPCs returns 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_critter_level',
+        kind: 'opcode',
+        description:
+            'sfall 0x8284: set_critter_level_sfall(obj, level) — sets the critter\'s level property. ' +
+            'Used by scripts that dynamically scale NPC difficulty.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_critter_base_stat_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8285: get_critter_base_stat_sfall(obj, stat) — returns the base (unmodified) ' +
+            'value of a SPECIAL stat for a critter.  Reads from obj.stats[stat] or 5 as default.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_base_stat_82',
+        kind: 'opcode',
+        description:
+            'sfall 0x8286: set_critter_base_stat_sfall(obj, stat, value) — sets the base value of a ' +
+            'SPECIAL stat for a critter.  Initialises obj.stats if not present.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_obj_weight',
+        kind: 'opcode',
+        description:
+            'sfall 0x8287: get_obj_weight_sfall(obj) — returns the weight of an object in pounds. ' +
+            'Reads from proto data; returns 0 for objects without proto weight.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
     },
 ])
 

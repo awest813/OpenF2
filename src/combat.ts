@@ -402,6 +402,11 @@ export class Combat {
             if (hex !== null) obj.orientation = hex.direction
         }
 
+        // BLK-117: Track last target and last attacker per critter so that
+        // get_last_target() / get_last_attacker() sfall opcodes return real values.
+        ;(obj as any).lastCombatTarget = target
+        ;(target as any).lastCombatAttacker = obj
+
         // Calculate hit and damage synchronously before starting the animation so
         // that we can wrap the callback if the last enemy was just killed (BLK-062).
         var who = obj.isPlayer ? 'You' : obj.name

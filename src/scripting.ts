@@ -5738,6 +5738,166 @@ export module Scripting {
             return this.tile_num_in_direction(tile, dir, count)
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 75 — sfall extended opcodes 0x8278–0x827F
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8278 — get_critter_knockout_sfall(obj):
+        // Returns 1 if the critter is currently knocked out (unconscious), 0 otherwise.
+        get_critter_knockout_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).knockedOut ? 1 : 0
+        }
+
+        // sfall 0x8279 — get_critter_knockdown_sfall(obj):
+        // Returns 1 if the critter is currently knocked down (prone), 0 otherwise.
+        get_critter_knockdown_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).knockedDown ? 1 : 0
+        }
+
+        // sfall 0x827A — get_critter_crippled_legs_sfall(obj):
+        // Returns a bitmask: bit 0 (0x01) = left leg crippled, bit 1 (0x02) = right leg.
+        get_critter_crippled_legs_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            let mask = 0
+            if ((obj as any).crippledLeftLeg)  mask |= 0x01
+            if ((obj as any).crippledRightLeg) mask |= 0x02
+            return mask
+        }
+
+        // sfall 0x827B — get_critter_crippled_arms_sfall(obj):
+        // Returns a bitmask: bit 0 (0x01) = left arm crippled, bit 1 (0x02) = right arm.
+        get_critter_crippled_arms_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            let mask = 0
+            if ((obj as any).crippledLeftArm)  mask |= 0x01
+            if ((obj as any).crippledRightArm) mask |= 0x02
+            return mask
+        }
+
+        // sfall 0x827C — get_critter_dead_sfall(obj):
+        // Returns 1 if the critter is dead, 0 otherwise.  Safe for non-critter objects.
+        get_critter_dead_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).dead ? 1 : 0
+        }
+
+        // sfall 0x827D — get_map_loaded_sfall():
+        // Returns 1 if the current map was entered via a save/load (alias of game_loaded).
+        // BLK-111: reads the real globalState.mapLoadedFromSave flag.
+        get_map_loaded_sfall(): number {
+            return globalState.mapLoadedFromSave ? 1 : 0
+        }
+
+        // sfall 0x827E — get_critter_poison_level_sfall(obj):
+        // Returns the current poison level of the critter (same as get_poison).
+        get_critter_poison_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).stats?.getBase('Poison Level') ?? 0
+        }
+
+        // sfall 0x827F — get_critter_radiation_level_sfall(obj):
+        // Returns the current radiation level of the critter (same as get_radiation).
+        get_critter_radiation_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as Critter).stats?.getBase('Radiation Level') ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 76 — sfall extended opcodes 0x8280–0x8287
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8280 — get_last_target_sfall(obj): BLK-117
+        // Returns the last combat target of the given critter, or 0 if unset.
+        get_last_target_sfall(obj: Obj): Obj | 0 {
+            if (!obj || typeof obj !== 'object') return 0
+            return (obj as any).lastCombatTarget ?? 0
+        }
+
+        // sfall 0x8281 — get_last_attacker_sfall(obj): BLK-117
+        // Returns the last combat attacker of the given critter, or 0 if unset.
+        get_last_attacker_sfall(obj: Obj): Obj | 0 {
+            if (!obj || typeof obj !== 'object') return 0
+            return (obj as any).lastCombatAttacker ?? 0
+        }
+
+        // sfall 0x8282 — get_critter_level_sfall(obj):
+        // Returns the critter's current level.  For the player, reads player.level;
+        // for NPCs, returns 1 (partial — NPC level tracking is not yet implemented).
+        get_critter_level_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            // Player has a real level property; NPCs default to 1.
+            return (obj as any).level ?? 1
+        }
+
+        // sfall 0x8283 — get_critter_current_xp_sfall(obj):
+        // Returns the critter's current accumulated XP.  For the player, reads
+        // player.xp; for NPCs, returns 0 (no XP tracking for non-player critters).
+        // NOTE: distinct from get_critter_xp_sfall (0x81F0) which reads proto XPValue.
+        get_critter_current_xp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            return (obj as any).xp ?? 0
+        }
+
+        // sfall 0x8284 — set_critter_level_sfall(obj, level):
+        // Set the critter's level.  Browser build: partial — sets the level property
+        // directly on the critter object; no stat recalculation is performed.
+        set_critter_level_sfall(obj: Obj, level: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_level_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof level !== 'number' || !isFinite(level) || level < 1) {
+                warn('set_critter_level_sfall: invalid level ' + level + ' — no-op', undefined, this)
+                return
+            }
+            ;(obj as any).level = Math.floor(level)
+        }
+
+        // sfall 0x8285 — get_critter_base_stat_sfall(obj, stat):
+        // Returns the critter's base stat value (before modifiers/bonuses).
+        // Mirrors critter_get_stat_sfall (0x8182) but reads the base, not derived.
+        get_critter_base_stat_sfall(obj: Obj, stat: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('get_critter_base_stat_sfall: unknown stat ' + stat + ' — returning 0', undefined, this)
+                return 0
+            }
+            return (obj as Critter).stats?.getBase(statName) ?? 0
+        }
+
+        // sfall 0x8286 — set_critter_base_stat_sfall(obj, stat, value):
+        // Set the critter's base stat value directly.  Mirrors set_critter_stat.
+        set_critter_base_stat_sfall(obj: Obj, stat: number, value: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const statName = statMap[stat]
+            if (!statName) {
+                warn('set_critter_base_stat_sfall: unknown stat ' + stat + ' — no-op', undefined, this)
+                return
+            }
+            if (typeof value !== 'number' || !isFinite(value)) {
+                warn('set_critter_base_stat_sfall: non-finite value ' + value + ' — no-op', undefined, this)
+                return
+            }
+            ;(obj as Critter).stats?.setBase(statName, Math.round(value))
+        }
+
+        // sfall 0x8287 — get_obj_weight_sfall(obj):
+        // Return the object's weight in lbs from its proto data.  Returns 0 for
+        // non-game-objects or when no weight data is available.
+        get_obj_weight_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) return 0
+            return (obj as any).pro?.extra?.weight ?? (obj as any).weight ?? 0
+        }
+
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }
         }
@@ -6164,6 +6324,11 @@ export module Scripting {
             flushUnsupportedVMOperations(mapScript)
         }
 
+        // BLK-111: Clear the save-load flag after map_enter_p_proc has run.
+        // Scripts that call game_loaded() inside map_enter_p_proc see 1 (loaded
+        // from save); subsequent critter_p_proc calls see 0 (normal run).
+        globalState.mapLoadedFromSave = false
+
         if (overrideStartPos) {
             const r = overrideStartPos
             overrideStartPos = null
@@ -6172,7 +6337,7 @@ export module Scripting {
 
         // XXX: caller should do this for all objects, which is better?
         /*for(var i = 0; i < gameObjects.length; i++) {
-            objectEnterMap(gameObjects[i], elevation, mapID)			
+            objectEnterMap(gameObjects[i], elevation, mapID)
         }*/
 
         return null

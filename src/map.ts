@@ -530,7 +530,8 @@ export class GameMap {
     }
 
     recalcPath(start: Point, goal: Point, isGoalBlocking?: boolean) {
-        const t0 = performance.now()
+        // BLK-119: Safe performance.now() fallback for non-browser environments.
+        const t0 = typeof performance !== 'undefined' ? performance.now() : 0
 
         this.ensurePathMatrix()
         const matrix = this.pathMatrix
@@ -554,7 +555,8 @@ export class GameMap {
         const grid = new PF.Grid(HEX_GRID_SIZE, HEX_GRID_SIZE, matrix)
         const path = this.pathFinder.findPath(start.x, start.y, goal.x, goal.y, grid)
 
-        const elapsed = performance.now() - t0
+        // BLK-119: Same safe fallback for the elapsed-time measurement.
+        const elapsed = (typeof performance !== 'undefined' ? performance.now() : 0) - t0
         this.pathfindingTelemetry.totalCalls++
         this.pathfindingTelemetry.totalTimeMs += elapsed
         this.pathfindingTelemetry.lastSolveTimeMs = elapsed
