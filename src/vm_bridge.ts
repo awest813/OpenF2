@@ -1427,6 +1427,34 @@ export module ScriptVMBridge {
 
        // 0x8297 — get_player_elevation_sfall(): player's current elevation (0–2).
        ,0x8297: bridged("get_player_elevation_sfall", 0) // get_player_elevation() → 0|1|2
+
+       // -----------------------------------------------------------------------
+       // Phase 81 — sfall extended opcodes 0x8298–0x829F
+       // -----------------------------------------------------------------------
+
+       // 0x8298 — get_critter_stat_sfall2(obj, stat): safe alias of get_critter_stat.
+       ,0x8298: bridged("get_critter_stat_sfall2", 2) // get_critter_stat_sfall2(obj, stat) → value
+
+       // 0x8299 — set_critter_extra_stat_sfall(obj, stat, val): set extra stat modifier.
+       ,0x8299: bridged("set_critter_extra_stat_sfall", 3, false) // set_critter_extra_stat(obj, stat, val)
+
+       // 0x829A — get_active_hand_sfall(): active weapon hand (0=primary, 1=secondary).
+       ,0x829A: bridged("get_active_hand_sfall", 0) // get_active_hand() → 0|1
+
+       // 0x829B — set_active_hand_sfall(hand): switch active weapon hand.
+       ,0x829B: bridged("set_active_hand_sfall", 1, false) // set_active_hand(hand)
+
+       // 0x829C — get_item_type_sfall(item): numeric item type (-1 for non-items).
+       ,0x829C: bridged("get_item_type_sfall", 1) // get_item_type(item) → -1..6
+
+       // 0x829D — get_critter_perk_level_sfall(obj, perkId): perk rank for critter.
+       ,0x829D: bridged("get_critter_perk_level_sfall", 2) // get_critter_perk_level(obj, perk) → rank
+
+       // 0x829E — set_critter_perk_sfall(obj, perkId, level): set critter perk rank.
+       ,0x829E: bridged("set_critter_perk_sfall", 3, false) // set_critter_perk(obj, perk, level)
+
+       // 0x829F — get_distance_sfall(obj1, obj2): hex distance between two objects.
+       ,0x829F: bridged("get_distance_sfall", 2) // get_distance(obj1, obj2) → dist|-1
     }
     Object.assign(opMap, bridgeOpMap)
 

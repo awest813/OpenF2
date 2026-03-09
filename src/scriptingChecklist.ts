@@ -6611,6 +6611,159 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'low',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 81 — BLK-133–BLK-137 null guards
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_133_set_critter_stat_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-133: set_critter_stat() non-finite amount guard — NaN or Infinity passed by a script ' +
+            'arithmetic error would silently corrupt the stat store.  Clamped to 0 with a warning.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_134_item_caps_adjust_non_finite',
+        kind: 'bug',
+        description:
+            'BLK-134: item_caps_adjust() non-finite amount guard — NaN or Infinity passed as the cap ' +
+            'adjustment amount corrupts the caps item amount field silently.  Returns early with warning.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_135_tile_contains_obj_pid_invalid_tile',
+        kind: 'bug',
+        description:
+            'BLK-135: tile_contains_obj_pid() invalid tile number guard — negative or non-finite tile ' +
+            'numbers produce meaningless coordinates from fromTileNum().  Returns 0 early.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'blk_136_move_to_invalid_tile',
+        kind: 'bug',
+        description:
+            'BLK-136: move_to() non-finite tileNum guard — NaN/Infinity or negative tile numbers would ' +
+            'set obj.position to NaN, breaking all subsequent position checks.  Returns early.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'blk_137_get_critter_skill_non_number',
+        kind: 'bug',
+        description:
+            'BLK-137: get_critter_skill() non-number skill argument guard — null, undefined, or a ' +
+            'non-finite number passed as skill causes a silent undefined lookup.  Returns 0 with warning.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // -------------------------------------------------------------------------
+    // Phase 81 — sfall opcodes 0x8298–0x829F
+    // -------------------------------------------------------------------------
+    {
+        id: 'sfall_get_critter_stat_sfall2',
+        kind: 'opcode',
+        description:
+            'sfall 0x8298: get_critter_stat_sfall2(obj, stat) — safe alias of get_critter_stat with ' +
+            'an additional null guard for the obj parameter.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_extra_stat',
+        kind: 'opcode',
+        description:
+            'sfall 0x8299: set_critter_extra_stat_sfall(obj, stat, val) — set a temporary extra-stat ' +
+            'modifier on a critter.  Stored in critter.extraStats dictionary.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_active_hand_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829A: get_active_hand_sfall() — return the player\'s currently active weapon hand ' +
+            '(0=primary, 1=secondary).  Alias of active_hand(); exposed as a dedicated sfall opcode.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_set_active_hand_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829B: set_active_hand_sfall(hand) — switch the player\'s active weapon hand ' +
+            '(0=primary, 1=secondary).  Out-of-range values are clamped to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_item_type_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829C: get_item_type_sfall(item) — return the numeric item-type index ' +
+            '(0=drug, 1=container, 2=armor, 3=weapon, 4=ammo, 5=misc, 6=key).  Returns -1 for non-items.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'low',
+    },
+    {
+        id: 'sfall_get_critter_perk_level_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829D: get_critter_perk_level_sfall(obj, perkId) — return the rank of a specific ' +
+            'perk for a critter.  Reads from critter.perkRanks.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_set_critter_perk_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829E: set_critter_perk_sfall(obj, perkId, level) — set a specific perk rank on ' +
+            'a critter.  Negative levels are clamped to 0 (remove perk).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    {
+        id: 'sfall_get_distance_81',
+        kind: 'opcode',
+        description:
+            'sfall 0x829F: get_distance_sfall(obj1, obj2) — return the hex grid distance between two ' +
+            'game objects.  Returns -1 when either object has no position.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+
+    // -------------------------------------------------------------------------
+    // Phase 81 — BLK-138: save schema v20 HP persistence
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_138_save_schema_v20_hp_persistence',
+        kind: 'bug',
+        description:
+            'BLK-138: Save schema v19→v20 — adds playerCurrentHp and partyMembersHp fields. ' +
+            'Without these, reloading a save after taking damage restores the player and party ' +
+            'to full HP instead of the HP at the time of save.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
 ])
 
 // ---------------------------------------------------------------------------
