@@ -622,6 +622,16 @@ export module Scripting {
         // Actual scripting engine API implementations
 
         set_global_var(gvar: number, value: any) {
+            // BLK-129: Guard against non-finite numeric values — scripts that perform
+            // integer division by zero or accumulate arithmetic errors can produce NaN
+            // or Infinity and pass them directly into set_global_var.  Storing NaN in
+            // globalVars corrupts downstream reads (global_var()) and the reputation
+            // karma sync.  Clamp any non-finite number to 0 so the game state stays
+            // in a consistent condition rather than silently poisoning the save.
+            if (typeof value === 'number' && !isFinite(value)) {
+                warn('set_global_var: non-finite value (' + value + ') for gvar ' + gvar + ' — clamping to 0', 'gvars')
+                value = 0
+            }
             globalVars[gvar] = value
             // GVAR_0 = GVAR_PLAYER_REPUTATION is Fallout 2's canonical karma store.
             // Sync the reputation system so getKarma() and the UI stay consistent.
@@ -1775,6 +1785,14 @@ export module Scripting {
                 warn('critter_dmg: not game object: ' + obj)
                 return
             }
+            // BLK-130: Guard against non-finite damage values — division-by-zero in a
+            // damage formula or a script arithmetic error can produce NaN/Infinity.
+            // Passing these to critterDamage() corrupts HP stats silently; skip the
+            // call instead and emit a warning so the issue is traceable.
+            if (typeof damage !== 'number' || !isFinite(damage)) {
+                warn('critter_dmg: non-finite damage (' + damage + ') — no-op', undefined, this)
+                return
+            }
             critterDamage(obj, damage, this.self_obj as Critter, true, true, damageType)
         }
         critter_heal(obj: Obj, amount: number) {
@@ -2259,7 +2277,18 @@ export module Scripting {
             return obj
         }
         obj_name(obj: Obj) {
-            return obj.name
+            // BLK-128: Guard against null/falsy obj — Fallout 2 scripts often pass 0
+            // (the FO2 null-object convention) to obj_name() when resolving NPC names
+            // in dialogue/combat context.  Without this guard the member access on 0
+            // throws a TypeError that crashes the script VM.
+            if (!isGameObject(obj)) {
+                warn('obj_name: not a game object — returning empty string', undefined, this)
+                return ''
+            }
+            // Return the name property, or '' for null/undefined.
+            // An empty string is a valid (intentionally blank) name so we do not
+            // substitute a placeholder — callers can check for '' explicitly.
+            return (obj as any).name ?? ''
         }
         // set_name(obj, name) — set the display name of an object or critter (opcode 0x80A8).
         // Used by character-creation scripts to set the player's name and by NPC
@@ -2770,6 +2799,14 @@ export module Scripting {
             }
             var color = colorMap[type]
             if (type === -2 /* FLOAT_MSG_WARNING */ || type === -1 /* FLOAT_MSG_SEQUENTIAL */) color = colorMap[9]
+            // BLK-131: Guard against missing floatMessages array — globalState is
+            // initialised with floatMessages:[] but a custom init path or a partial
+            // reset could leave it undefined.  Array spread access on undefined
+            // would throw; skip the push and emit a warning instead.
+            if (!Array.isArray(globalState.floatMessages)) {
+                warn('float_msg: globalState.floatMessages is not an array — skipping', undefined, this)
+                return
+            }
             globalState.floatMessages.push({
                 msg: msg,
                 obj: this.self_obj as Obj,
@@ -4394,12 +4431,19 @@ export module Scripting {
         // Return the maximum HP (stat ceiling) for a critter.
         // Equivalent to get_critter_stat(obj, 6) (STAT_max_hp = 6).
         // Returns 0 for non-critters.
+        // NOTE: The more complete 0x828F alias (get_critter_max_hp_sfall_82) also
+        // checks proto extra data; this implementation is the canonical definition.
         get_critter_max_hp_sfall(obj: Obj): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('get_critter_max_hp_sfall: not a critter: ' + obj, undefined, this)
                 return 0
             }
-            return (obj as Critter).getStat('Max HP') ?? 0
+            // Also check getStat safely and fall back to proto / direct property.
+            if (typeof (obj as any).getStat === 'function') {
+                const hp = (obj as any).getStat('Max HP')
+                if (typeof hp === 'number' && isFinite(hp)) return hp
+            }
+            return (obj as any).pro?.extra?.maxHP ?? (obj as any).maxHP ?? 0
         }
 
         // sfall 0x81F9 — set_critter_max_hp_sfall(obj, hp):
@@ -5998,21 +6042,104 @@ export module Scripting {
             return toTileNum({ x: Math.round(x), y: Math.round(y) })
         }
 
-        // sfall 0x828F — get_critter_max_hp_sfall(obj):
+        // sfall 0x828F — get_critter_max_hp_sfall_82(obj):
         // Returns the maximum HP of a critter from its stats or proto data.
-        // Returns 0 for non-critters.
-        get_critter_max_hp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
-            // Player and critters expose max HP via getStat('Max HP')
-            if (typeof (obj as any).getStat === 'function') {
-                const hp = (obj as any).getStat('Max HP')
-                if (typeof hp === 'number' && isFinite(hp)) return hp
-            }
-            // Fallback: proto extra data
-            return (obj as any).pro?.extra?.maxHP ?? (obj as any).maxHP ?? 0
+        // Returns 0 for non-critters.  Delegates to the canonical
+        // get_critter_max_hp_sfall() (0x81F8) which now includes proto fallback.
+        get_critter_max_hp_sfall_82(obj: Obj): number {
+            return this.get_critter_max_hp_sfall(obj)
         }
 
-        // BLK-121 — reg_anim_animate improvement:
+        // -----------------------------------------------------------------------
+        // Phase 80 — sfall extended opcodes 0x8290–0x8297
+        // -----------------------------------------------------------------------
+
+        // sfall 0x8290 — set_critter_current_hp_sfall(obj, hp):
+        // Set the current HP of a critter to the given value, clamped to [0, maxHP].
+        // Used by New Reno and other mid-game scripts that directly manage NPC health.
+        set_critter_current_hp_sfall(obj: Obj, hp: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_current_hp_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof hp !== 'number' || !isFinite(hp)) {
+                warn('set_critter_current_hp_sfall: non-finite hp (' + hp + ') — no-op', undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            const maxHP: number = (typeof (critter as any).getStat === 'function')
+                ? ((critter as any).getStat('Max HP') ?? 100)
+                : ((critter as any).pro?.extra?.maxHP ?? 100)
+            const clampedHP = Math.max(0, Math.min(Math.round(hp), maxHP))
+            if (critter.stats && typeof critter.stats.setBase === 'function') {
+                critter.stats.setBase('HP', clampedHP)
+            } else {
+                ;(critter as any).HP = clampedHP
+            }
+        }
+
+        // sfall 0x8291 — get_local_var_sfall(idx):
+        // Return the local script variable at index idx.
+        // Equivalent to local_var() exposed as a dedicated sfall opcode.
+        get_local_var_sfall(idx: number): number {
+            if (!this.lvars) return 0
+            if (this.lvars[idx] === undefined) return 0
+            return typeof this.lvars[idx] === 'number' ? this.lvars[idx] : 0
+        }
+
+        // sfall 0x8292 — set_local_var_sfall(idx, val):
+        // Set the local script variable at index idx to val.
+        // Equivalent to set_local_var() exposed as a dedicated sfall opcode.
+        set_local_var_sfall(idx: number, val: number): void {
+            if (!this.lvars) this.lvars = {}
+            if (typeof val === 'number' && !isFinite(val)) {
+                warn('set_local_var_sfall: non-finite value (' + val + ') for lvar ' + idx + ' — storing 0', 'lvars')
+                val = 0
+            }
+            this.lvars[idx] = typeof val === 'number' ? val : 0
+        }
+
+        // sfall 0x8293 — get_game_time_sfall():
+        // Return the current game time in ticks.
+        // Alias of game_time(); exposed as a dedicated sfall opcode for scripts that
+        // want to avoid caching the vanilla procedure.
+        get_game_time_sfall(): number {
+            return Math.max(1, globalState.gameTickTime ?? 1)
+        }
+
+        // sfall 0x8294 — get_area_known_sfall(areaID):
+        // Return 1 if the world-map area with the given ID is known (visible) to
+        // the player, 0 otherwise.
+        // Reads from globalState.mapAreas when available.
+        get_area_known_sfall(areaID: number): number {
+            if (globalState.mapAreas && (globalState.mapAreas as any)[areaID] !== undefined) {
+                return (globalState.mapAreas as any)[areaID] ? 1 : 0
+            }
+            return 0
+        }
+
+        // sfall 0x8295 — get_kill_counter_sfall(critterType):
+        // Return the number of kills of the given critter type accumulated so far.
+        // Browser build: returns 0 — per-type kill tracking is not implemented.
+        get_kill_counter_sfall(_critterType: number): number {
+            return 0
+        }
+
+        // sfall 0x8296 — add_kill_counter_sfall(critterType, count):
+        // Add count to the kill counter for the given critter type.
+        // Browser build: no-op — per-type kill tracking is not implemented.
+        add_kill_counter_sfall(_critterType: number, _count: number): void {
+            // no-op
+        }
+
+        // sfall 0x8297 — get_player_elevation_sfall():
+        // Return the player's current elevation (0–2).
+        // Alias of get_elevation_sfall(); exposed separately for clarity.
+        get_player_elevation_sfall(): number {
+            return globalState.currentElevation ?? 0
+        }
+
+
         // Trigger a single animation cycle on the object (replaces pure log no-op).
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
             if (!isGameObject(obj)) {
@@ -6066,7 +6193,19 @@ export module Scripting {
     function loadMessageFile(name: string) {
         name = name.toLowerCase()
         info('loading message file: ' + name, 'load')
-        var msg = getFileText('data/text/english/dialog/' + name + '.msg')
+        // BLK-132: Wrap the file-load in a try-catch so that a missing .msg file
+        // (e.g. for a New Reno sub-area that has no translated dialogue) degrades
+        // gracefully to empty messages rather than throwing an unhandled error that
+        // crashes the entire script VM.  The existing warn at call-site will still
+        // fire if the resulting scriptMessages[name] stays undefined.
+        let msg: string
+        try {
+            msg = getFileText('data/text/english/dialog/' + name + '.msg')
+        } catch (e) {
+            warn('loadMessageFile: could not load ' + name + '.msg — using empty message table: ' + e, 'load')
+            scriptMessages[name] = {}
+            return
+        }
         if (scriptMessages[name] === undefined) scriptMessages[name] = {}
 
         // parse message file
