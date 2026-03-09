@@ -523,3 +523,18 @@ Gate: **PASS** — all 3714 tests green, tsc clean.
 
 Gate: **PASS** — all tests green, tsc clean.
 
+
+---
+
+## Phase 85 — UX debug pass: start → New Reno (ui2 panel polish)
+
+- [x] **DialoguePanel buildLines \n fix**: `buildLines()` now splits text on `\n`/`\r\n` before word-wrapping, so multi-paragraph NPC dialogue renders with correct hard line breaks instead of literal `\n` characters appearing in the text.
+- [x] **DialoguePanel scroll arrows visibility**: `▲`/`▼` scroll indicator arrows changed from `FALLOUT_DARK_GRAY` to `FALLOUT_GREEN` — they are now clearly visible against the black panel background.
+- [x] **BarterPanel refused banner de-overlap**: "OFFER REFUSED — add more to your table" banner moved from `btnY - 4` to `btnY - 18`, preventing it from rendering over the YOUR/THEIR value labels at the same y-coordinate.
+- [x] **InventoryPanel scroll offset clamp after USE**: `onKeyDown('Enter')` now clamps `_scrollOffset` to `[0, max(0, items.length - MAX_ROWS)]` after emitting `inventory:useItem`, preventing a stale scroll offset from hiding all items if the list shrinks.
+- [x] **InventoryPanel Delete key drop**: `Delete` key emits `inventory:dropItem`, splices the item from the panel list, and clamps both `_selectedIndex` and `_scrollOffset` — providing a keyboard shortcut to drop the selected item without requiring a mouse click on the DROP button.
+- [x] **LootPanel overflow indicator**: `_drawColumn()` now shows a `+N more` indicator in `FALLOUT_AMBER` at the bottom of the column when more items exist than fit in the visible area — players can see that additional items are present and can be retrieved via keyboard or TAKE ALL.
+- [x] **WorldMapPanel keyboard navigation**: `ArrowDown`/`ArrowUp` navigate the world-view area list with visual highlight; `Enter` enters the highlighted area; selection is reset on `Escape` back from area view and on `show()`.
+- [x] phase85.test.ts: 26 regression tests for all fixes above
+
+Gate: **PASS** — all 3910 tests green, tsc clean.

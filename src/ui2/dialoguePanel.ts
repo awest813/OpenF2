@@ -115,12 +115,12 @@ export class DialoguePanel extends UIPanel {
         // Scroll indicator arrows when reply text overflows the box.
         if (this._replyScrollLine > 0) {
             ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillStyle = cssColor(FALLOUT_GREEN)
             ctx.fillText('▲', width - PADDING - 10, REPLY_CONTENT_TOP)
         }
         if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
             ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillStyle = cssColor(FALLOUT_GREEN)
             ctx.fillText('▼', width - PADDING - 10, REPLY_CONTENT_TOP + (REPLY_VISIBLE_LINES - 1) * REPLY_LINE_H)
         }
 
@@ -216,25 +216,31 @@ function strokeRect(
 
 /**
  * Split `text` into wrapped lines that each fit within `maxWidth` pixels.
- * Uses `ctx.measureText` for accurate glyph-width measurement.
+ * Explicit `\n` (or `\r\n`) line breaks are honoured first; each resulting
+ * paragraph is then independently word-wrapped using `ctx.measureText` for
+ * accurate glyph-width measurement.
  */
 function buildLines(
     ctx: OffscreenCanvasRenderingContext2D,
     text: string,
     maxWidth: number,
 ): string[] {
-    const words = text.split(' ')
-    const lines: string[] = []
-    let line = ''
-    for (const word of words) {
-        const test = line ? line + ' ' + word : word
-        if (ctx.measureText(test).width > maxWidth && line) {
-            lines.push(line)
-            line = word
-        } else {
-            line = test
+    // Normalise CRLF → LF then split on hard line breaks.
+    const paragraphs = text.replace(/\r\n/g, '\n').split('\n')
+    const result: string[] = []
+    for (const paragraph of paragraphs) {
+        const words = paragraph.split(' ')
+        let line = ''
+        for (const word of words) {
+            const test = line ? line + ' ' + word : word
+            if (ctx.measureText(test).width > maxWidth && line) {
+                result.push(line)
+                line = word
+            } else {
+                line = test
+            }
         }
+        result.push(line)  // Empty paragraphs (e.g. from \n\n) intentionally push '' for a visual blank line.
     }
-    if (line) lines.push(line)
-    return lines
+    return result
 }

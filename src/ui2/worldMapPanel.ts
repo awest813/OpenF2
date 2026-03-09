@@ -58,6 +58,8 @@ export class WorldMapPanel extends UIPanel {
     private _currentArea: WorldMapArea | null = null
     private _scrollOffset = 0
     private _isTransitionLocked = false
+    /** Index of the keyboard-highlighted area row (-1 = none). */
+    private _keyboardSelectedIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('worldMap', {
@@ -74,6 +76,7 @@ export class WorldMapPanel extends UIPanel {
         this._currentArea  = null
         this._scrollOffset = 0
         this._isTransitionLocked = false
+        this._keyboardSelectedIndex = -1
     }
 
     /** Switch to area view for the given area. */
@@ -82,6 +85,7 @@ export class WorldMapPanel extends UIPanel {
         this.currentView   = 'area'
         this._scrollOffset = 0
         this._isTransitionLocked = false
+        this._keyboardSelectedIndex = -1
     }
 
 
@@ -134,8 +138,13 @@ export class WorldMapPanel extends UIPanel {
         for (let i = 0; i < this.areas.length; i++) {
             const area = this.areas[i]
             const ry = LIST_Y + 4 + i * AREA_ROW_H
+            const isKeySelected = i === this._keyboardSelectedIndex
+            // Highlight the keyboard-selected row.
+            if (isKeySelected) {
+                fillRect(ctx, LIST_X + 2, ry - 2, LIST_W - 4, AREA_ROW_H, FALLOUT_DARK_GRAY)
+            }
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_AMBER)
+            ctx.fillStyle = cssColor(isKeySelected ? FALLOUT_GREEN : FALLOUT_AMBER)
             ctx.fillText('▶ ' + area.name, LIST_X + 8, ry + 15)
         }
     }
@@ -232,11 +241,33 @@ export class WorldMapPanel extends UIPanel {
             if (this.currentView === 'area') {
                 this.currentView  = 'world'
                 this._currentArea = null
+                this._keyboardSelectedIndex = -1
             } else {
                 EventBus.emit('worldMap:closed', {})
                 this.hide()
             }
             return true
+        }
+        // Keyboard navigation in the world-view area list.
+        if (this.currentView === 'world') {
+            if (key === 'ArrowDown') {
+                if (this.areas.length > 0) {
+                    this._keyboardSelectedIndex = this._keyboardSelectedIndex < 0
+                        ? 0
+                        : Math.min(this._keyboardSelectedIndex + 1, this.areas.length - 1)
+                }
+                return true
+            }
+            if (key === 'ArrowUp') {
+                if (this._keyboardSelectedIndex > 0) {
+                    this._keyboardSelectedIndex--
+                }
+                return true
+            }
+            if (key === 'Enter' && this._keyboardSelectedIndex >= 0 && this._keyboardSelectedIndex < this.areas.length) {
+                this.showArea(this.areas[this._keyboardSelectedIndex])
+                return true
+            }
         }
         return false
     }
