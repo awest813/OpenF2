@@ -67,5 +67,7 @@ Reason:
 - Phase 73: play_sfx/walkTo/loadMap/reg_anim_obj_move_to_tile null guards (BLK-100–104); sfall opcodes 0x8268–0x826F.
 - Phase 74: game_time_advance/give_exp_points non-finite guards (BLK-105–106); gsay_option null-target guard (BLK-107); critter_attempt_placement null-gMap guard (BLK-108); add_timer_event non-positive ticks guard (BLK-109); sfall opcodes 0x8270–0x8277.
 - Phase 80: obj_name() null guard (BLK-128); set_global_var() non-finite value guard (BLK-129); critter_dmg() non-finite damage guard (BLK-130); float_msg() null floatMessages guard (BLK-131); loadMessageFile() try-catch for missing .msg files (BLK-132); sfall opcodes 0x8290–0x8297. Fixed pre-existing duplicate get_critter_max_hp_sfall (0x81F8/0x828F); merged into single canonical implementation with proto-data fallback.
+- Phase 81: set_critter_stat/item_caps_adjust/tile_contains_obj_pid/move_to non-finite guards (BLK-133–137); save schema v20 playerCurrentHp/partyMembersHp persistence (BLK-138); sfall opcodes 0x8298–0x829F (get_critter_stat2, extra_stat, active_hand, item_type, perk_level, distance).
+- Phase 82: Global browser error boundary with recoverable overlay (BLK-139); callProcedureSafe() wrapper applied to all 18 script trigger dispatch points — talk/critter/map_update/map_enter/map_exit/timed_event/use/look_at/description/use_skill_on/pickup/use_obj_on/push/is_dropping/combat/spatial/destroy/damage (BLK-140); per-object map_update isolation (BLK-142); timer event isolation (BLK-143); sfall opcodes 0x82A0–0x82A7 (worldmap_free_move, car_current_town, dude_obj, critter_max_ap alias, tile_light_level).
 
-**Updated gate status:** `READY` — 98 files, 3553 tests passed, tsc clean.
+**Updated gate status:** `READY` — 100 files, 3714 tests passed, tsc clean.

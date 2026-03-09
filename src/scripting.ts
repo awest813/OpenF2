@@ -301,6 +301,36 @@ export module Scripting {
         else console.log(`WARNING: ${msg}`)
     }
 
+    /**
+     * BLK-140 — Safe procedure dispatcher.
+     *
+     * Wraps any script procedure call in a try-catch so that a throwing script
+     * does not propagate an uncaught exception into the game loop.  On error the
+     * warning is logged and execution continues from after the call site (the
+     * flushUnsupportedVMOperations call and the caller's return-value logic still
+     * run, using whatever state was set before the throw).
+     *
+     * This prevents a single bad NPC script from:
+     *   • aborting the entire map_update_p_proc loop (killing all NPC updates)
+     *   • crashing a dialogue session (leaving the player stuck)
+     *   • halting combat turns (freezing the game)
+     *   • aborting timed events (breaking quest triggers)
+     *
+     * @param fn        Zero-argument closure that invokes the procedure.
+     * @param scriptName Human-readable script identifier for the warning.
+     * @param procName  Name of the procedure being called (e.g. 'talk_p_proc').
+     */
+    function callProcedureSafe(fn: () => void, scriptName: string, procName: string): void {
+        try {
+            fn()
+        } catch (e) {
+            warn(
+                `[BLK-140] ${procName} in '${scriptName}' threw an error — skipping: ` +
+                    String(e).slice(0, 300)
+            )
+        }
+    }
+
     export function info(msg: string, type?: DebugLogShowType, script?: Script) {
         if (type !== undefined && Config.scripting.debugLogShowType[type] === false) return
         if (script && (script as any)._vm) console.log(`INFO [${(script as any)._vm.intfile.name}]: ${msg}`)
@@ -6280,6 +6310,62 @@ export module Scripting {
             if (!isGameObject(obj2) || !obj2.position) return -1
             return hexDistance(obj1.position, obj2.position)
         }
+
+        // -----------------------------------------------------------------------
+        // Phase 82 — sfall extended opcodes 0x82A0–0x82A7
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82A0 — get_worldmap_free_move_sfall():
+        // Returns 1 if "free movement" (no AP cost on world map) is enabled.
+        // The browser build does not implement this flag — returns 0.
+        get_worldmap_free_move_sfall(): number {
+            return 0
+        }
+
+        // sfall 0x82A1 — set_worldmap_free_move_sfall(v):
+        // Sets world-map free-movement state.  No-op in the browser build.
+        set_worldmap_free_move_sfall(_v: number): void {
+            // no-op
+        }
+
+        // sfall 0x82A2 — get_car_current_town_sfall():
+        // Returns the area ID of the car's current location, or -1 if the car has
+        // not been acquired / placed.  Reads from globalState.carAreaID when set.
+        get_car_current_town_sfall(): number {
+            const areaID = (globalState as any).carAreaID
+            return typeof areaID === 'number' ? areaID : -1
+        }
+
+        // sfall 0x82A3 — get_dude_obj_sfall():
+        // Returns the player (dude) game object, or 0 when no player exists.
+        // This is the sfall equivalent of the built-in dude_obj() variable.
+        get_dude_obj_sfall(): Obj | 0 {
+            return globalState.player ?? 0
+        }
+
+        // sfall 0x82A4 — set_dude_obj_sfall(obj):
+        // Override which object is treated as the player.  Stub — the browser
+        // build does not support player-object substitution.
+        set_dude_obj_sfall(_obj: Obj): void {
+            // no-op stub
+        }
+
+        // sfall 0x82A5 — alias of 0x8235 get_critter_max_ap_sfall (already defined above).
+        // The vm_bridge maps both 0x8235 and 0x82A5 to the same method.
+
+        // sfall 0x82A6 — get_tile_light_level_sfall(tile):
+        // Returns the light level (0–65536) at the given tile.  The browser build
+        // does not expose per-tile light readback; returns 0.
+        get_tile_light_level_sfall(_tile: number): number {
+            return 0
+        }
+
+        // sfall 0x82A7 — set_tile_light_level_sfall(tile, level):
+        // Sets the light level at a specific tile.  No-op in the browser build.
+        set_tile_light_level_sfall(_tile: number, _level: number): void {
+            // no-op
+        }
+
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
             if (!isGameObject(obj)) {
                 warn('reg_anim_animate_once: not a game object', 'animation', this)
@@ -6433,7 +6519,9 @@ export module Scripting {
         script.fixed_param = userdata
         script._didOverride = false
         trackScriptTrigger(script, 'timed_event_p_proc')
-        script.timed_event_p_proc()
+        // BLK-143: wrap in callProcedureSafe so a throwing timer callback does not
+        // abort subsequent timed events or corrupt the game loop.
+        callProcedureSafe(() => script.timed_event_p_proc(), script.scriptName, 'timed_event_p_proc')
         flushUnsupportedVMOperations(script)
         return script._didOverride
     }
@@ -6452,7 +6540,8 @@ export module Scripting {
         obj._script.self_obj = obj as ScriptableObj
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'use_p_proc')
-        obj._script.use_p_proc()
+        // BLK-140: safe dispatch — a throwing use_p_proc must not crash the game.
+        callProcedureSafe(() => obj._script!.use_p_proc(), obj._script.scriptName, 'use_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6466,7 +6555,8 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'look_at_p_proc')
-        obj._script.look_at_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => obj._script!.look_at_p_proc(), obj._script.scriptName, 'look_at_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6480,7 +6570,12 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'description_p_proc')
-        obj._script.description_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(
+            () => obj._script!.description_p_proc(),
+            obj._script.scriptName,
+            'description_p_proc'
+        )
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6491,7 +6586,9 @@ export module Scripting {
         script.cur_map_index = currentMapID
         script._didOverride = false
         trackScriptTrigger(script, 'talk_p_proc')
-        script.talk_p_proc()
+        // BLK-140: safe dispatch — a throwing talk_p_proc must not leave the player
+        // stuck in a broken dialogue state or crash the game.
+        callProcedureSafe(() => script.talk_p_proc(), script.scriptName, 'talk_p_proc')
         flushUnsupportedVMOperations(script)
         return script._didOverride
     }
@@ -6509,7 +6606,9 @@ export module Scripting {
         // to tile 0 so the critter_p_proc can still run without crashing.
         script.self_tile = obj.position ? toTileNum(obj.position) : 0
         trackScriptTrigger(script, 'critter_p_proc')
-        script.critter_p_proc()
+        // BLK-140: safe dispatch — a throwing critter_p_proc must not abort
+        // subsequent NPC updates or crash the game loop.
+        callProcedureSafe(() => script.critter_p_proc(), script.scriptName, 'critter_p_proc')
         flushUnsupportedVMOperations(script)
         return script._didOverride
     }
@@ -6525,7 +6624,8 @@ export module Scripting {
         script.source_obj = source
         script.self_obj = spatialObj as ScriptableObj
         trackScriptTrigger(script, 'spatial_p_proc')
-        script.spatial_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => script.spatial_p_proc(), script.scriptName, 'spatial_p_proc')
         flushUnsupportedVMOperations(script)
     }
 
@@ -6538,7 +6638,8 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'destroy_p_proc')
-        obj._script.destroy_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => obj._script!.destroy_p_proc(), obj._script.scriptName, 'destroy_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6553,7 +6654,8 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'damage_p_proc')
-        obj._script.damage_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => obj._script!.damage_p_proc(), obj._script.scriptName, 'damage_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6566,7 +6668,12 @@ export module Scripting {
         obj._script._didOverride = false
         obj._script.action_being_used = skillId
         trackScriptTrigger(obj._script, 'use_skill_on_p_proc')
-        obj._script.use_skill_on_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(
+            () => obj._script!.use_skill_on_p_proc(),
+            obj._script.scriptName,
+            'use_skill_on_p_proc'
+        )
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6578,7 +6685,8 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'pickup_p_proc')
-        obj._script.pickup_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => obj._script!.pickup_p_proc(), obj._script.scriptName, 'pickup_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6598,7 +6706,12 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'use_obj_on_p_proc')
-        obj._script.use_obj_on_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(
+            () => obj._script!.use_obj_on_p_proc(),
+            obj._script.scriptName,
+            'use_obj_on_p_proc'
+        )
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6611,7 +6724,8 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'push_p_proc')
-        obj._script.push_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(() => obj._script!.push_p_proc(), obj._script.scriptName, 'push_p_proc')
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6624,7 +6738,12 @@ export module Scripting {
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
         trackScriptTrigger(obj._script, 'is_dropping_p_proc')
-        obj._script.is_dropping_p_proc()
+        // BLK-140: safe dispatch.
+        callProcedureSafe(
+            () => obj._script!.is_dropping_p_proc(),
+            obj._script.scriptName,
+            'is_dropping_p_proc'
+        )
         flushUnsupportedVMOperations(obj._script)
         return obj._script._didOverride
     }
@@ -6660,7 +6779,8 @@ export module Scripting {
             doTerminate = true
         }
         trackScriptTrigger(obj._script, 'combat_p_proc')
-        obj._script.combat_p_proc()
+        // BLK-140: safe dispatch — a throwing combat_p_proc must not crash the combat loop.
+        callProcedureSafe(() => obj._script!.combat_p_proc(), obj._script.scriptName, 'combat_p_proc')
         flushUnsupportedVMOperations(obj._script)
 
         if (doTerminate) {
@@ -6684,7 +6804,12 @@ export module Scripting {
             if (mapScript.map_update_p_proc !== undefined) {
                 mapScript.self_obj = { _script: mapScript }
                 trackScriptTrigger(mapScript, 'map_update_p_proc')
-                mapScript.map_update_p_proc()
+                // BLK-140: safe dispatch — map script errors must not abort NPC updates.
+                callProcedureSafe(
+                    () => mapScript.map_update_p_proc(),
+                    mapScript.scriptName,
+                    'map_update_p_proc'
+                )
                 flushUnsupportedVMOperations(mapScript)
             }
         }
@@ -6702,7 +6827,13 @@ export module Scripting {
                 script.game_time_hour = currentHour
                 script.cur_map_index = currentMapID
                 trackScriptTrigger(script, 'map_update_p_proc')
-                script.map_update_p_proc()
+                // BLK-142: Per-object isolation — one NPC's throwing map_update_p_proc
+                // must not abort subsequent NPC updates.  Wrap each call individually.
+                callProcedureSafe(
+                    () => (script as Script).map_update_p_proc(),
+                    script.scriptName,
+                    'map_update_p_proc'
+                )
                 flushUnsupportedVMOperations(script)
                 updated++
             }
@@ -6719,7 +6850,12 @@ export module Scripting {
             mapScript.game_time = Math.max(1, globalState.gameTickTime)
             mapScript.cur_map_index = mapID
             trackScriptTrigger(mapScript, 'map_exit_p_proc')
-            mapScript.map_exit_p_proc()
+            // BLK-140: safe dispatch — map exit script errors must not abort the transition.
+            callProcedureSafe(
+                () => mapScript.map_exit_p_proc(),
+                mapScript.scriptName,
+                'map_exit_p_proc'
+            )
             flushUnsupportedVMOperations(mapScript)
         }
 
@@ -6730,7 +6866,12 @@ export module Scripting {
                 script.game_time = Math.max(1, globalState.gameTickTime)
                 script.cur_map_index = mapID
                 trackScriptTrigger(script, 'map_exit_p_proc')
-                script.map_exit_p_proc()
+                // BLK-140: per-object isolation for exit scripts.
+                callProcedureSafe(
+                    () => (script as Script).map_exit_p_proc(),
+                    script.scriptName,
+                    'map_exit_p_proc'
+                )
                 flushUnsupportedVMOperations(script)
             }
         }
@@ -6751,7 +6892,13 @@ export module Scripting {
             info('calling map enter')
             mapScript.self_obj = { _script: mapScript }
             trackScriptTrigger(mapScript, 'map_enter_p_proc')
-            mapScript.map_enter_p_proc()
+            // BLK-140: safe dispatch — a throwing map_enter_p_proc must not abort the
+            // map load sequence and leave the player in an invalid state.
+            callProcedureSafe(
+                () => mapScript.map_enter_p_proc(),
+                mapScript.scriptName,
+                'map_enter_p_proc'
+            )
             flushUnsupportedVMOperations(mapScript)
         }
 
@@ -6784,7 +6931,12 @@ export module Scripting {
             script.game_time_hour = Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60)
             script.cur_map_index = currentMapID
             trackScriptTrigger(script, 'map_enter_p_proc')
-            script.map_enter_p_proc()
+            // BLK-140: safe dispatch — per-object enter script errors must not abort the map load.
+            callProcedureSafe(
+                () => (script as Script).map_enter_p_proc(),
+                script.scriptName,
+                'map_enter_p_proc'
+            )
             flushUnsupportedVMOperations(script)
         }
     }

@@ -1455,6 +1455,34 @@ export module ScriptVMBridge {
 
        // 0x829F — get_distance_sfall(obj1, obj2): hex distance between two objects.
        ,0x829F: bridged("get_distance_sfall", 2) // get_distance(obj1, obj2) → dist|-1
+
+       // -----------------------------------------------------------------------
+       // Phase 82 — sfall extended opcodes 0x82A0–0x82A7
+       // -----------------------------------------------------------------------
+
+       // 0x82A0 — get_worldmap_free_move_sfall(): 0 (feature not implemented).
+       ,0x82A0: bridged("get_worldmap_free_move_sfall", 0) // get_worldmap_free_move() → 0
+
+       // 0x82A1 — set_worldmap_free_move_sfall(v): no-op.
+       ,0x82A1: bridged("set_worldmap_free_move_sfall", 1, false) // set_worldmap_free_move(v)
+
+       // 0x82A2 — get_car_current_town_sfall(): car area ID or -1.
+       ,0x82A2: bridged("get_car_current_town_sfall", 0) // get_car_current_town() → areaID|-1
+
+       // 0x82A3 — get_dude_obj_sfall(): player object or 0.
+       ,0x82A3: bridged("get_dude_obj_sfall", 0) // get_dude_obj() → player|0
+
+       // 0x82A4 — set_dude_obj_sfall(obj): no-op stub.
+       ,0x82A4: bridged("set_dude_obj_sfall", 1, false) // set_dude_obj(obj)
+
+       // 0x82A5 — get_critter_max_ap_sfall(obj): max AP from stats.
+       ,0x82A5: bridged("get_critter_max_ap_sfall", 1) // get_critter_max_ap(obj) → maxAP
+
+       // 0x82A6 — get_tile_light_level_sfall(tile): 0 (no per-tile light readback).
+       ,0x82A6: bridged("get_tile_light_level_sfall", 1) // get_tile_light_level(tile) → 0
+
+       // 0x82A7 — set_tile_light_level_sfall(tile, level): no-op.
+       ,0x82A7: bridged("set_tile_light_level_sfall", 2, false) // set_tile_light_level(tile, level)
     }
     Object.assign(opMap, bridgeOpMap)
 

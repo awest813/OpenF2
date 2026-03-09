@@ -746,3 +746,124 @@ export function useElevator(): void {
 }
 
 Scripting.setUseElevatorHandler(useElevator)
+
+// ---------------------------------------------------------------------------
+// BLK-139 — Global browser error boundary
+//
+// Without global error handlers, any uncaught JavaScript exception (including
+// those thrown by async code, requestAnimationFrame callbacks, or WebGL driver
+// errors) produces a silent freeze: the game loop stops, the screen is frozen,
+// and the user has no indication that anything is wrong.
+//
+// These handlers intercept all unhandled errors and:
+//   1. Log the full error to the browser console for developer debugging.
+//   2. Display a recoverable error overlay in the game viewport so the user
+//      sees a clear message and is offered a "Continue" or "Reload" option.
+//
+// "Continue" hides the overlay and lets the game attempt to recover (the
+// requestAnimationFrame loop restarts from the next tick).  This works for
+// recoverable errors (e.g. a single bad NPC script that was not caught by
+// callProcedureSafe).  "Reload" does a hard page reload for catastrophic
+// failures (e.g. WebGL context lost, IndexedDB corruption).
+// ---------------------------------------------------------------------------
+
+;(function installBrowserErrorBoundary() {
+    // Only install in browser environments.
+    if (typeof window === 'undefined') return
+
+    /** Tracks whether the overlay is already visible to suppress duplicates. */
+    let overlayVisible = false
+    /** Counter: max errors shown per minute before throttling. */
+    let recentErrorCount = 0
+    const ERROR_THROTTLE_MAX = 5
+    const ERROR_THROTTLE_WINDOW_MS = 60_000
+    let throttleResetTimer: ReturnType<typeof setTimeout> | null = null
+
+    function showErrorOverlay(message: string, source: string, detail: string) {
+        recentErrorCount++
+        if (recentErrorCount > ERROR_THROTTLE_MAX) return // throttle flood
+
+        if (throttleResetTimer === null) {
+            throttleResetTimer = setTimeout(() => {
+                recentErrorCount = 0
+                throttleResetTimer = null
+            }, ERROR_THROTTLE_WINDOW_MS)
+        }
+
+        if (overlayVisible) return // only one overlay at a time
+
+        overlayVisible = true
+        console.error(`[BLK-139] Unhandled error in ${source}:`, message, detail)
+
+        const overlay = document.createElement('div')
+        overlay.id = 'f2-error-overlay'
+        overlay.style.cssText = [
+            'position:fixed',
+            'top:0',
+            'left:0',
+            'width:100%',
+            'height:100%',
+            'background:rgba(0,0,0,0.85)',
+            'color:#e0c060',
+            'font-family:monospace',
+            'font-size:14px',
+            'display:flex',
+            'flex-direction:column',
+            'align-items:center',
+            'justify-content:center',
+            'z-index:99999',
+            'padding:20px',
+            'box-sizing:border-box',
+        ].join(';')
+
+        const title = document.createElement('div')
+        title.style.cssText = 'font-size:22px;font-weight:bold;margin-bottom:12px;color:#ff9944'
+        title.textContent = '⚠ Game Error'
+
+        const msg = document.createElement('div')
+        msg.style.cssText = 'max-width:600px;text-align:center;margin-bottom:8px;color:#ffcc88'
+        msg.textContent = message.length > 200 ? message.slice(0, 200) + '…' : message
+
+        const src = document.createElement('div')
+        src.style.cssText = 'max-width:700px;text-align:center;font-size:11px;color:#888;margin-bottom:20px;word-break:break-all'
+        src.textContent = `Source: ${source}`
+
+        const btnRow = document.createElement('div')
+        btnRow.style.cssText = 'display:flex;gap:16px'
+
+        const btnContinue = document.createElement('button')
+        btnContinue.textContent = 'Continue'
+        btnContinue.style.cssText = 'padding:10px 24px;background:#4a7a3a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px'
+        btnContinue.onclick = () => {
+            overlay.remove()
+            overlayVisible = false
+        }
+
+        const btnReload = document.createElement('button')
+        btnReload.textContent = 'Reload Page'
+        btnReload.style.cssText = 'padding:10px 24px;background:#7a3a3a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px'
+        btnReload.onclick = () => { window.location.reload() }
+
+        btnRow.appendChild(btnContinue)
+        btnRow.appendChild(btnReload)
+        overlay.appendChild(title)
+        overlay.appendChild(msg)
+        overlay.appendChild(src)
+        overlay.appendChild(btnRow)
+        document.body.appendChild(overlay)
+    }
+
+    window.addEventListener('error', (event: ErrorEvent) => {
+        const msg = event.message || String(event.error) || 'Unknown error'
+        const src = `${event.filename ?? '(unknown)'}:${event.lineno}:${event.colno}`
+        showErrorOverlay(msg, src, String(event.error?.stack ?? ''))
+        // Do NOT preventDefault — allow DevTools to still report the error.
+    })
+
+    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+        const reason = event.reason
+        const msg = (reason instanceof Error ? reason.message : String(reason)) || 'Unhandled Promise rejection'
+        const stack = reason instanceof Error ? (reason.stack ?? '') : ''
+        showErrorOverlay(msg, 'Promise rejection', stack)
+    })
+})()
