@@ -6366,6 +6366,127 @@ export module Scripting {
             // no-op
         }
 
+        // -----------------------------------------------------------------------
+        // Phase 83 — sfall extended opcodes 0x82A8–0x82AF
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82A8 — get_critter_experience_sfall(obj):
+        // Return the total experience points accumulated by a critter.
+        // Reads critter.xp for any critter (player or NPC).  Falls back to
+        // critter.experience for NPCs that store XP in that field instead.
+        get_critter_experience_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_experience_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as any
+            if (typeof critter.xp === 'number') return critter.xp
+            return typeof critter.experience === 'number' ? critter.experience : 0
+        }
+
+        // sfall 0x82A9 — set_critter_experience_sfall(obj, val):
+        // Set the total experience points for a critter.
+        // Writes to critter.xp (and critter.experience for NPCs that use that field).
+        // Values are clamped to [0, 2_147_483_647].
+        set_critter_experience_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_experience_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof val !== 'number' || !isFinite(val)) {
+                warn('set_critter_experience_sfall: non-finite val (' + val + ') — no-op', undefined, this)
+                return
+            }
+            const clamped = Math.max(0, Math.min(Math.round(val), 2_147_483_647))
+            const critter = obj as any
+            critter.xp = clamped
+            critter.experience = clamped
+        }
+
+        // sfall 0x82AA — get_critter_crit_chance_sfall(obj):
+        // Return the critter's critical-hit modifier (percent, signed).
+        // Reads from critter.critChanceMod if set; otherwise returns 0.
+        // Affects the chance that any given attack becomes a critical hit.
+        get_critter_crit_chance_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_crit_chance_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).critChanceMod ?? 0
+        }
+
+        // sfall 0x82AB — set_critter_crit_chance_sfall(obj, val):
+        // Set the critter's critical-hit modifier.  Stored in critter.critChanceMod.
+        // Clamped to [-100, 100] to prevent unreachable probabilities.
+        set_critter_crit_chance_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_crit_chance_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof val !== 'number' || !isFinite(val)) {
+                warn('set_critter_crit_chance_sfall: non-finite val (' + val + ') — no-op', undefined, this)
+                return
+            }
+            ;(obj as any).critChanceMod = Math.max(-100, Math.min(100, Math.round(val)))
+        }
+
+        // sfall 0x82AC — get_critter_npc_flag_sfall(obj, flag):
+        // Return the value of a specific NPC flags bit (0 or 1).
+        // flag is a bit index (0–31); reads from critter.npcFlags bitfield.
+        // Used by New Reno side-quest scripts that track critter disposition bits.
+        get_critter_npc_flag_sfall(obj: Obj, flag: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) return 0
+            const bits: number = (obj as any).npcFlags ?? 0
+            return (bits >>> flag) & 1
+        }
+
+        // sfall 0x82AD — set_critter_npc_flag_sfall(obj, flag, val):
+        // Set or clear a single NPC flags bit.  flag is a bit index (0–31);
+        // a truthy val sets the bit, a falsy val clears it.
+        // Writes to critter.npcFlags; initialises to 0 if not present.
+        set_critter_npc_flag_sfall(obj: Obj, flag: number, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) return
+            const critter = obj as any
+            const bits: number = critter.npcFlags ?? 0
+            critter.npcFlags = val ? (bits | (1 << flag)) : (bits & ~(1 << flag))
+        }
+
+        // sfall 0x82AE — get_critter_outline_color_sfall(obj):
+        // Return the current highlight/outline colour index for a critter.
+        // 0 = no outline.  Reads from critter.sfallOutlineColor.
+        // Used by some quest scripts to check if a critter is already highlighted.
+        get_critter_outline_color_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_outline_color_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).sfallOutlineColor ?? 0
+        }
+
+        // sfall 0x82AF — set_critter_outline_color_sfall(obj, color):
+        // Set the highlight/outline colour for a critter.  0 = remove outline.
+        // Writes to critter.sfallOutlineColor and, when a renderer is attached,
+        // triggers a re-render by calling obj.invalidate() when available.
+        set_critter_outline_color_sfall(obj: Obj, color: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_outline_color_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as any
+            critter.sfallOutlineColor = typeof color === 'number' && color >= 0 ? Math.floor(color) : 0
+            if (typeof critter.invalidate === 'function') {
+                try { critter.invalidate() } catch (_) { /* ignore renderer errors */ }
+            }
+        }
+
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
             if (!isGameObject(obj)) {
                 warn('reg_anim_animate_once: not a game object', 'animation', this)
@@ -6502,7 +6623,9 @@ export module Scripting {
         script.cur_map_index = currentMapID!
         if (script.start !== undefined) {
             trackScriptTrigger(script, 'start')
-            script.start()
+            // BLK-144: wrap start proc in callProcedureSafe so a throwing script
+            // initializer does not propagate up and crash the map-load loop.
+            callProcedureSafe(() => script.start(), script.scriptName, 'start')
             flushUnsupportedVMOperations(script)
         }
     }

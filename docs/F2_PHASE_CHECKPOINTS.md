@@ -503,3 +503,23 @@ Gate: **PASS** — all 3270 tests green, tsc clean.
 - [x] phase82.test.ts: 66 regression tests, all passing
 
 Gate: **PASS** — all 3714 tests green, tsc clean.
+
+---
+
+## Phase 83 — initScript start proc isolation (BLK-144), sfall opcodes 0x82A8–0x82AF
+
+- [x] **BLK-144**: `initScript()` `start` procedure call now wrapped in `callProcedureSafe()`. A throwing script initializer no longer aborts map-load for subsequent objects — every NPC/object on the map initializes safely.
+- [x] New sfall opcode 0x82A8: `get_critter_experience_sfall(obj)` → total XP (playerExperience for player, critter.experience for NPCs)
+- [x] New sfall opcode 0x82A9: `set_critter_experience_sfall(obj, val)` → set total XP, clamped to [0, 2^31-1]
+- [x] New sfall opcode 0x82AA: `get_critter_crit_chance_sfall(obj)` → crit modifier % (reads critChanceMod)
+- [x] New sfall opcode 0x82AB: `set_critter_crit_chance_sfall(obj, val)` → set crit modifier %, clamped to [-100, 100]
+- [x] New sfall opcode 0x82AC: `get_critter_npc_flag_sfall(obj, flag)` → NPC flags bit at position flag (0–31)
+- [x] New sfall opcode 0x82AD: `set_critter_npc_flag_sfall(obj, flag, val)` → set/clear NPC flags bit
+- [x] New sfall opcode 0x82AE: `get_critter_outline_color_sfall(obj)` → outline colour index (0 = none)
+- [x] New sfall opcode 0x82AF: `set_critter_outline_color_sfall(obj, color)` → set outline colour, calls invalidate() when available
+- [x] vm_bridge.ts updated: 8 new entries 0x82A8–0x82AF mapped to bridged() stubs
+- [x] scriptingChecklist.ts updated: BLK-144 + 8 sfall opcode entries all marked implemented
+- [x] phase83.test.ts: regression tests for BLK-144 (7 tests) + all 8 sfall opcodes + checklist integrity
+
+Gate: **PASS** — all tests green, tsc clean.
+

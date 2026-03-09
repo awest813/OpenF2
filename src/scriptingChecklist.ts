@@ -6905,6 +6905,114 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 83 — initScript start proc isolation, sfall 0x82A8–0x82AF
+    // -------------------------------------------------------------------------
+    {
+        id: 'blk_144_init_script_start_isolation',
+        kind: 'bug',
+        description:
+            'BLK-144: initScript() start procedure call now wrapped in callProcedureSafe(). ' +
+            'A throwing script initializer (start proc) no longer crashes the map-load loop. ' +
+            'Every object on the map can initialize safely even if one script is broken.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x82A8 — get_critter_experience_sfall
+    {
+        id: 'sfall_get_critter_experience_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A8: get_critter_experience_sfall(obj) → total XP. ' +
+            'For the player returns globalState.playerExperience; for NPCs reads critter.experience. ' +
+            'Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82A9 — set_critter_experience_sfall
+    {
+        id: 'sfall_set_critter_experience_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82A9: set_critter_experience_sfall(obj, val) — set total XP for a critter. ' +
+            'Clamped to [0, 2^31-1]. No-op for non-critters or non-finite values.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AA — get_critter_crit_chance_sfall
+    {
+        id: 'sfall_get_critter_crit_chance_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AA: get_critter_crit_chance_sfall(obj) → crit modifier %. ' +
+            'Reads critter.critChanceMod; returns 0 when absent. Signed integer.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AB — set_critter_crit_chance_sfall
+    {
+        id: 'sfall_set_critter_crit_chance_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AB: set_critter_crit_chance_sfall(obj, val) — set crit modifier %. ' +
+            'Clamped to [-100, 100]. No-op for non-critters or non-finite values.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AC — get_critter_npc_flag_sfall
+    {
+        id: 'sfall_get_critter_npc_flag_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AC: get_critter_npc_flag_sfall(obj, flag) → 0|1. ' +
+            'Returns the value of NPC flags bit at position flag (0–31). ' +
+            'Reads from critter.npcFlags bitfield.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AD — set_critter_npc_flag_sfall
+    {
+        id: 'sfall_set_critter_npc_flag_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AD: set_critter_npc_flag_sfall(obj, flag, val) — set NPC flags bit. ' +
+            'Writes to critter.npcFlags at bit position flag. Truthy val sets, falsy clears.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AE — get_critter_outline_color_sfall
+    {
+        id: 'sfall_get_critter_outline_color_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AE: get_critter_outline_color_sfall(obj) → colour index. ' +
+            'Returns the highlight/outline colour for a critter. 0 = no outline. ' +
+            'Reads critter.sfallOutlineColor.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82AF — set_critter_outline_color_sfall
+    {
+        id: 'sfall_set_critter_outline_color_83',
+        kind: 'opcode',
+        description:
+            'sfall 0x82AF: set_critter_outline_color_sfall(obj, color) — set outline colour. ' +
+            'Writes critter.sfallOutlineColor and calls obj.invalidate() when available. ' +
+            '0 removes the outline.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
