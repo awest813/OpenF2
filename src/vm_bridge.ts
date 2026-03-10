@@ -1589,6 +1589,34 @@ export namespace ScriptVMBridge {
 
        // 0x82C7 — get_critter_min_str_sfall(obj): minimum Strength for equipped weapon or 0 (stub).
        ,0x82C7: bridged("get_critter_min_str_sfall", 1) // get_critter_min_str(obj) → 0
+
+       // Phase 88 — sfall extended opcodes 0x82C8–0x82CF (weapon proto queries)
+       // These return proto-level weapon data for scripts that need to query weapon
+       // statistics at runtime without calling proto_data() directly.
+
+       // 0x82C8 — get_weapon_min_dam_sfall(obj): minimum weapon damage from proto.
+       ,0x82C8: bridged("get_weapon_min_dam_sfall", 1) // get_weapon_min_dam(obj) → minDmg
+
+       // 0x82C9 — get_weapon_max_dam_sfall(obj): maximum weapon damage from proto.
+       ,0x82C9: bridged("get_weapon_max_dam_sfall", 1) // get_weapon_max_dam(obj) → maxDmg
+
+       // 0x82CA — get_weapon_dmg_type_sfall(obj): damage type index from proto.
+       ,0x82CA: bridged("get_weapon_dmg_type_sfall", 1) // get_weapon_dmg_type(obj) → 0..11
+
+       // 0x82CB — get_weapon_ap_cost1_sfall(obj): primary-attack AP cost from proto.
+       ,0x82CB: bridged("get_weapon_ap_cost1_sfall", 1) // get_weapon_ap_cost1(obj) → AP
+
+       // 0x82CC — get_weapon_ap_cost2_sfall(obj): secondary-attack AP cost from proto.
+       ,0x82CC: bridged("get_weapon_ap_cost2_sfall", 1) // get_weapon_ap_cost2(obj) → AP
+
+       // 0x82CD — get_weapon_max_range1_sfall(obj): primary max range from proto.
+       ,0x82CD: bridged("get_weapon_max_range1_sfall", 1) // get_weapon_max_range1(obj) → tiles
+
+       // 0x82CE — get_weapon_max_range2_sfall(obj): secondary max range from proto.
+       ,0x82CE: bridged("get_weapon_max_range2_sfall", 1) // get_weapon_max_range2(obj) → tiles
+
+       // 0x82CF — get_weapon_ammo_pid_sfall(obj): required ammo proto PID from proto.
+       ,0x82CF: bridged("get_weapon_ammo_pid_sfall", 1) // get_weapon_ammo_pid(obj) → PID|0
     }
     Object.assign(opMap, bridgeOpMap)
 

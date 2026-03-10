@@ -1932,7 +1932,17 @@ export namespace Scripting {
             }
             // Zero damage — nothing to apply; skip critterDamage() to avoid side-effects.
             if (damage === 0) {return}
-            critterDamage(obj, damage, this.self_obj as Critter, true, true, damageType)
+            // BLK-167: Guard against non-critter self_obj (e.g. dart trap objects in the
+            // Temple of Trials).  critterDamage's source param is used for XP attribution
+            // via critterKill; passing a non-critter with no isPlayer property silently
+            // suppresses any XP award.  Detect this and pass null so the damage pipeline
+            // and kill proc both receive a well-typed absent-attacker sentinel.
+            const dmgSource = (isGameObject(this.self_obj) && (this.self_obj as any).type === 'critter')
+                ? this.self_obj as Critter
+                : null
+            // critterDamage's source parameter is typed as Critter but accepts null at
+            // runtime (critterKill guards with `if (source && source.isPlayer)`).
+            critterDamage(obj, damage, dmgSource as Critter, true, true, damageType)
         }
         critter_heal(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -2193,6 +2203,14 @@ export namespace Scripting {
             }
             info('obj_close')
             if (!obj.open) {return}
+            // BLK-166: Guard against objects that don't implement the use() method.
+            // Temple doors/grates opened by map_enter_p_proc may not have a use()
+            // handler in the browser build; fall back to setting open directly.
+            if (typeof (obj as any).use !== 'function') {
+                warn('obj_close: object has no use() method — setting open=false directly', undefined, this)
+                obj.open = false
+                return
+            }
             obj.use(this.self_obj as Critter, false)
             //stub("obj_close", arguments)
         }
@@ -2203,6 +2221,14 @@ export namespace Scripting {
             }
             info('obj_open')
             if (obj.open) {return}
+            // BLK-166: Guard against objects that don't implement the use() method.
+            // Temple doors/grates opened by script may not have a use() handler
+            // in the browser build; fall back to setting open directly.
+            if (typeof (obj as any).use !== 'function') {
+                warn('obj_open: object has no use() method — setting open=true directly', undefined, this)
+                obj.open = true
+                return
+            }
             obj.use(this.self_obj as Critter, false)
             //stub("obj_open", arguments)
         }
@@ -2416,6 +2442,16 @@ export namespace Scripting {
         create_object_sid(pid: number, tile: number, elev: number, sid: number) {
             // Create object of pid and possibly script
             info('create_object_sid: pid=' + pid + ' tile=' + tile + ' elev=' + elev + ' sid=' + sid, undefined, this)
+
+            // BLK-169: Guard against negative tile numbers — Fallout 2 scripts use -1
+            // as a sentinel for "no tile / not yet placed".  Placing an object at a
+            // negative tile gives it an out-of-bounds position ({x:<0, y:0}), which
+            // corrupts pathfinding and LOS calculations.  Return null so the caller
+            // can detect the failure and defer placement.
+            if (typeof tile !== 'number' || tile < 0) {
+                warn('create_object_sid: invalid tile (' + tile + ') — no-op', undefined, this)
+                return null
+            }
 
             if (elev < 0 || elev > 2) {
                 warn('create_object_sid: elev out of range (' + elev + ') — clamping to [0,2]', undefined, this)
@@ -2944,7 +2980,10 @@ export namespace Scripting {
                 return
             }
 
-            const INT = player.getStat('INT')
+            const INT: number = typeof player.getStat === 'function' ? (player.getStat('INT') ?? 5) : 5
+            // BLK-168: Guard against non-numeric INT (getStat may return undefined
+            // for new-game player objects whose stat tables aren't fully initialised
+            // yet; defaulting to 5 matches Fallout 2's base human INT).
             if ((iqTest > 0 && INT < iqTest) || (iqTest < 0 && INT > -iqTest)) {return} // not enough intelligence for this option
 
             dialogueOptionProcs.push(target.bind(this))
@@ -2965,6 +3004,12 @@ export namespace Scripting {
                 warn('float_msg: not game object: ' + obj)
                 return
             }
+            // BLK-170: Guard against null/undefined message — Arroyo and Temple scripts
+            // occasionally call float_msg() with the result of message_str() which can
+            // return null when a message key is missing from the loaded .msg file.
+            // Storing null in floatMessages causes the renderer to crash when trying
+            // to measure text width.  Coerce to empty string and skip silently.
+            if (msg == null || msg === '') {return}
             const colorMap: { [color: number]: string } = {
                 // todo: take the exact values from some palette. also, yellow is ugly.
                 0: 'white', //0: "yellow",
@@ -6893,6 +6938,91 @@ export namespace Scripting {
         // New Reno boxing scripts use this to check fighter eligibility.
         get_critter_min_str_sfall(_obj: Obj): number {
             return 0
+        }
+
+        // sfall 0x82C8 — get_weapon_min_dam_sfall(obj):
+        // Return the weapon item's minimum damage roll from the proto data.
+        // Reads from obj.pro.extra directly (same pattern used by other item
+        // accessors) before falling back to proto_data(pid, 14).
+        // Used by combat scripts that compute expected damage ranges for AI decisions.
+        get_weapon_min_dam_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.minDmg
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 14) as number) ?? 0
+        }
+
+        // sfall 0x82C9 — get_weapon_max_dam_sfall(obj):
+        // Return the weapon item's maximum damage roll from the proto data.
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 15).
+        // Used by combat scripts that compute expected damage ranges for AI decisions.
+        get_weapon_max_dam_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.maxDmg
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 15) as number) ?? 0
+        }
+
+        // sfall 0x82CA — get_weapon_dmg_type_sfall(obj):
+        // Return the weapon's damage type index from the proto (WEAPON_DATA_DMG_TYPE).
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 16).
+        // 0=Normal, 1=Laser, 2=Fire, …
+        get_weapon_dmg_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.dmgType
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 16) as number) ?? 0
+        }
+
+        // sfall 0x82CB — get_weapon_ap_cost1_sfall(obj):
+        // Return the primary-attack AP cost from the weapon proto (WEAPON_DATA_AP_COST_1).
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 21).
+        get_weapon_ap_cost1_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.APCost1
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 21) as number) ?? 0
+        }
+
+        // sfall 0x82CC — get_weapon_ap_cost2_sfall(obj):
+        // Return the secondary-attack AP cost from the weapon proto (WEAPON_DATA_AP_COST_2).
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 22).
+        get_weapon_ap_cost2_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.APCost2
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 22) as number) ?? 0
+        }
+
+        // sfall 0x82CD — get_weapon_max_range1_sfall(obj):
+        // Return the primary-attack maximum range from the weapon proto.
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 23).
+        get_weapon_max_range1_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.maxRange1
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 23) as number) ?? 0
+        }
+
+        // sfall 0x82CE — get_weapon_max_range2_sfall(obj):
+        // Return the secondary-attack maximum range from the weapon proto.
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 24).
+        get_weapon_max_range2_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.maxRange2
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 24) as number) ?? 0
+        }
+
+        // sfall 0x82CF — get_weapon_ammo_pid_sfall(obj):
+        // Return the ammo proto PID required by the weapon (WEAPON_DATA_AMMO_PID).
+        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 26).
+        // 0 if no ammo required (melee/unarmed).
+        get_weapon_ammo_pid_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {return 0}
+            const direct = (obj as any).pro?.extra?.ammoPID
+            if (direct !== undefined) {return direct}
+            return (this.proto_data((obj as any).pid ?? 0, 26) as number) ?? 0
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
