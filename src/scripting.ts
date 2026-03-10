@@ -770,6 +770,15 @@ export namespace Scripting {
         }
         display_msg(msg: string) {
             log('display_msg', arguments)
+            // BLK-179: Guard against null/non-string message — Temple end-of-combat and
+            // Arroyo Elder scripts call display_msg(message_str(msgList, id)); when the
+            // message key is missing from the loaded .msg file, message_str() returns null.
+            // uiLog(null) causes the HTML log renderer to display "null" as a message and
+            // can crash rich-text formatters that call .length on the value.  Drop silently.
+            if (msg == null || typeof msg !== 'string') {
+                warn('display_msg: msg is null/non-string — skipping', undefined, this)
+                return
+            }
             info('DISPLAY MSG: ' + msg, 'displayMessage')
             pushScriptDebuggerMessage(`[display] ${this.scriptName}: ${msg}`)
             if (this._vm) {updateScriptDebuggerVMInfo(this._vm)}
@@ -1436,10 +1445,17 @@ export namespace Scripting {
             if (traitType === 2) {
                 // TRAIT_CHAR — add or remove a character-creation trait by ID.
                 // amount > 0: grant the trait; amount <= 0: revoke it.
+                // BLK-177: Guard against uninitialised charTraits — critters spawned via
+                // create_object_sid() during the Arroyo temple map_enter_p_proc may not
+                // have charTraits initialised before the Elder's trait-grant script fires.
+                // Without this guard, calling .add() or .delete() on undefined throws a
+                // TypeError and crashes the VM, preventing map initialisation.
+                const critterForTrait = obj as Critter
+                if (!critterForTrait.charTraits) {critterForTrait.charTraits = new Set()}
                 if (amount > 0) {
-                    (obj as Critter).charTraits.add(trait)
+                    critterForTrait.charTraits.add(trait)
                 } else {
-                    (obj as Critter).charTraits.delete(trait)
+                    critterForTrait.charTraits.delete(trait)
                 }
                 return
             }
@@ -1459,6 +1475,16 @@ export namespace Scripting {
                 }
                 const safeAmount = Number.isFinite(amount) ? amount : 0
                 const critter = obj as Critter
+                // BLK-178: Guard against null critter.skills — mirrors BLK-174 (give_exp_points).
+                // Arroyo NPC scripts call critter_add_trait(TRAIT_SKILL, …) on partially
+                // initialised critters before the skills component is attached (e.g. during the
+                // Elder's greeting before the character creation screen fully populates the
+                // player object).  Without this guard, critter.skills.setBase() throws a
+                // TypeError and halts the script VM.  Skip the skill adjustment silently.
+                if (!critter.skills) {
+                    warn('critter_add_trait(TRAIT_SKILL): critter.skills is null — no-op', undefined, this)
+                    return
+                }
                 critter.skills.setBase(skillName, critter.skills.getBase(skillName) + safeAmount)
                 return
             }
@@ -2060,6 +2086,15 @@ export namespace Scripting {
             //stub("attack_complex", arguments)
             // since this isn't actually used beyond its basic form, we're not going to bother
             // implementing all of it
+
+            // BLK-176: Guard against null self_obj — Temple NPC scripts call attack_complex()
+            // from map-level scripts (not object scripts) where self_obj is null.  Without this
+            // guard, Combat.start(null as Critter) throws a TypeError and halts the entire
+            // script VM, preventing any further combat or map events from firing.
+            if (!this.self_obj) {
+                warn('attack_complex: self_obj is null — combat start skipped', undefined, this)
+                return
+            }
 
             // begin combat, turn starting with us
             if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter)}
@@ -7155,6 +7190,91 @@ export namespace Scripting {
                 return
             }
             ;(obj as any)._teamNum = typeof team === 'number' ? team : 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 90 — sfall extended opcodes 0x82D8–0x82DF (critter body/weapon/
+        // gender and kill-count queries used by Arroyo NPC and temple scripts).
+        // Note: 0x82D8 (get_critter_body_type_sfall) and 0x82DE
+        // (get_critter_gender_sfall) reuse existing implementations from
+        // opcodes 0x8206 and 0x8231 respectively — no new method needed.
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82D9 — set_critter_body_type_sfall(obj, type):
+        // Set the critter's body type.  Persists in pro.extra.bodyType so that the
+        // existing get_critter_body_type_sfall (0x8206/0x82D8) reads it back correctly.
+        set_critter_body_type_sfall(obj: Obj, type: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_body_type_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const safeType = typeof type === 'number' ? type : 0
+            if (!(obj as any).pro) {;(obj as any).pro = {}}
+            if (!(obj as any).pro.extra) {;(obj as any).pro.extra = {}}
+            ;(obj as any).pro.extra.bodyType = safeType
+        }
+
+        // sfall 0x82DA — get_critter_weapon_type_sfall(obj):
+        // Return the weapon-type code of the critter's currently equipped weapon.
+        // 0=unarmed, 1=melee, 2=ranged, 3=thrown, 4=energy, 5=explosive.
+        get_critter_weapon_type_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_weapon_type_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const weapon = critter.rightHand ?? critter.leftHand
+            if (!weapon) {return 0}
+            return (weapon as any)._weaponType ?? 0
+        }
+
+        // sfall 0x82DB — set_critter_weapon_type_sfall(obj, type):
+        // Override the weapon-type for the critter's active weapon slot.
+        set_critter_weapon_type_sfall(obj: Obj, type: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_weapon_type_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const critter = obj as Critter
+            const weapon = critter.rightHand ?? critter.leftHand
+            if (!weapon) {return}
+            ;(weapon as any)._weaponType = typeof type === 'number' ? type : 0
+        }
+
+        // sfall 0x82DC — get_critter_kills_sfall(obj):
+        // Return the number of kills attributed to this critter.
+        // Used by Arroyo elder script to check how many temple rats the player killed.
+        get_critter_kills_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_kills_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any)._kills ?? 0
+        }
+
+        // sfall 0x82DD — set_critter_kills_sfall(obj, count):
+        // Set the kill count on a critter.
+        set_critter_kills_sfall(obj: Obj, count: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_kills_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any)._kills = typeof count === 'number' && count >= 0 ? count : 0
+        }
+
+        // sfall 0x82DF — set_critter_gender_sfall(obj, gender):
+        // Set the critter's gender (0=male, 1=female).  Used by character-creation
+        // scripts in the Arroyo opening sequence to persist the gender choice on the
+        // player object before the temple run begins.  The companion getter
+        // (0x82DE / 0x8231: get_critter_gender_sfall) reads the .gender property,
+        // so this setter writes to the same field for consistency.
+        set_critter_gender_sfall(obj: Obj, gender: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_gender_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const safeGender = typeof gender === 'number' ? gender : 0
+            ;(obj as any).gender = safeGender === 1 ? 'female' : 'male'
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
