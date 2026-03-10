@@ -1744,6 +1744,16 @@ export namespace Scripting {
                 amount = 0
             }
             const critter = obj as Critter
+            // BLK-183: Guard against null critter.skills — Arroyo village guard NPCs have
+            // critter_mod_skill() called during their map_enter_p_proc initialization before
+            // the skills component is attached (partially-initialised critters spawned via
+            // create_object_sid()).  Without this guard, critter.skills.setBase() and
+            // critter.skills.getBase() throw TypeError, crashing the NPC init sequence.
+            // Mirror the guard from BLK-178 (critter_add_trait TRAIT_SKILL).
+            if (!critter.skills) {
+                warn('critter_mod_skill: critter.skills is null — no-op', undefined, this)
+                return 0
+            }
             critter.skills.setBase(skillName, critter.skills.getBase(skillName) + amount)
             return critter.getSkill(skillName)
         }
@@ -2660,6 +2670,15 @@ export namespace Scripting {
                 sourceObj !== 0 && isGameObject(sourceObj) && (sourceObj as Obj).type === 'critter'
                     ? (sourceObj as Critter)
                     : globalState.player
+            // BLK-180: Guard against objects that don't implement use() — Arroyo
+            // exit grids and misc items (e.g. pip-boy trigger objects) may not have a
+            // use() method in the browser build.  Without this guard, calling use()
+            // on such an object throws TypeError and halts the script VM, preventing
+            // the map transition from firing.  Mirror BLK-166 (obj_open/obj_close).
+            if (typeof (obj as any).use !== 'function') {
+                warn('use_obj: object has no use() method — no-op', undefined, this)
+                return
+            }
             obj.use(source)
         }
         anim(obj: Obj, anim: number, param: number) {
@@ -3155,8 +3174,19 @@ export namespace Scripting {
             }
             //console.log("ANIM FOREVER: " + obj.art + " / " + anim)
             if (anim !== 0) {warn('reg_anim_animate_forever: anim = ' + anim)}
+            // BLK-181: Guard against objects that don't implement singleAnimation() —
+            // Arroyo village NPCs (elder, guards) call reg_anim_animate_forever() during
+            // map_enter_p_proc and dialogue ceremony sequences; critters spawned via
+            // create_object_sid() may not have a singleAnimation method attached in the
+            // browser build.  Without this guard, calling singleAnimation() on such an
+            // object throws TypeError and aborts the animation sequence, preventing NPC
+            // idle animations from looping during the end-of-arroyo ceremony.
+            if (typeof (obj as any).singleAnimation !== 'function') {
+                warn('reg_anim_animate_forever: object has no singleAnimation() — no-op', undefined, this)
+                return
+            }
             function animate() {
-                obj.singleAnimation(false, animate)
+                (obj as any).singleAnimation(false, animate)
             }
             animate()
         }
@@ -3182,6 +3212,16 @@ export namespace Scripting {
                     'movement',
                     this
                 )
+                return
+            }
+            // BLK-182: Guard against objects that don't implement walkTo() — the arroyo
+            // elder's approach-to-player movement script calls animate_move_obj_to_tile()
+            // on the elder critter; if the object is a misc item used as a movement
+            // waypoint, walkTo() is undefined and obj.walkTo(...) throws TypeError,
+            // crashing the ceremony sequence.  Mirror the guard from reg_anim_obj_move_to_tile
+            // (BLK-104) for consistency.
+            if (typeof (obj as any).walkTo !== 'function') {
+                warn('animate_move_obj_to_tile: object cannot walk', 'movement', this)
                 return
             }
             if (!obj.walkTo(tile, !!isRun)) {
@@ -3787,6 +3827,14 @@ export namespace Scripting {
             if (!Number.isFinite(value)) {
                 warn('set_critter_skill_points: non-finite value (' + value + ') — clamping to 0')
                 value = 0
+            }
+            // BLK-184: Guard against null critter.skills — mirrors BLK-183 (critter_mod_skill).
+            // Arroyo NPC initialization scripts call set_critter_skill_points() on freshly
+            // spawned critters before the skills component is attached; without this guard,
+            // skills.setBase() throws TypeError and halts the entire NPC initialization.
+            if (!(obj as Critter).skills) {
+                warn('set_critter_skill_points: critter.skills is null — no-op', undefined, this)
+                return
             }
             (obj as Critter).skills.setBase(skillName, value)
         }
@@ -7275,6 +7323,61 @@ export namespace Scripting {
             }
             const safeGender = typeof gender === 'number' ? gender : 0
             ;(obj as any).gender = safeGender === 1 ? 'female' : 'male'
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 91 — sfall extended opcodes 0x82E0–0x82E7 (critter heal-rate
+        // and sequence queries for Arroyo NPC end-sequence scripts).
+        // Note: 0x82E0 (get_critter_poison_sfall) and 0x82E1 (set_critter_poison_sfall)
+        // reuse existing implementations from opcodes 0x823A/0x823B.
+        // Note: 0x82E2 (get_critter_radiation_sfall) and 0x82E3 (set_critter_radiation_sfall)
+        // reuse existing implementations from opcodes 0x8238/0x8239.
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82E4 — get_critter_heal_rate_sfall(obj):
+        // Return the critter's Healing Rate stat.
+        // The arroyo-to-world-map rest mechanic uses Healing Rate to compute
+        // how much HP the player recovers during travel downtime.
+        get_critter_heal_rate_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_heal_rate_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Healing Rate') ?? 0
+        }
+
+        // sfall 0x82E5 — set_critter_heal_rate_sfall(obj, val):
+        // Set the critter's Healing Rate stat.
+        set_critter_heal_rate_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_heal_rate_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const safeVal = typeof val === 'number' && isFinite(val) ? Math.max(0, val) : 0
+            ;(obj as Critter).stats.setBase('Healing Rate', safeVal)
+        }
+
+        // sfall 0x82E6 — get_critter_sequence_sfall(obj):
+        // Return the critter's Sequence stat (initiative in combat).
+        // The temple of trials final encounter uses sequence to determine turn order
+        // for the last wave of rats and the boss critter.
+        get_critter_sequence_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_sequence_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Sequence') ?? 0
+        }
+
+        // sfall 0x82E7 — set_critter_sequence_sfall(obj, val):
+        // Set the critter's Sequence stat.
+        set_critter_sequence_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_sequence_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const safeVal = typeof val === 'number' && isFinite(val) ? Math.max(0, val) : 0
+            ;(obj as Critter).stats.setBase('Sequence', safeVal)
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
