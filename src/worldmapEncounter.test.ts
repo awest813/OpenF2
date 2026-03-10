@@ -56,7 +56,7 @@ class EncounterTransitionStateMachine {
      * Returns true if the transition started, false if one was already in progress.
      */
     beginTransition(): boolean {
-        if (this.pending) return false
+        if (this.pending) {return false}
         this.pending = true
         this.interactionLocked = true
         return true
@@ -204,7 +204,7 @@ function makeBaseObj() {
         art: null as any,
         inventory,
         addInventoryItem(item: any, amount: number) {
-            for (let i = 0; i < amount; i++) inventory.push({ ...item })
+            for (let i = 0; i < amount; i++) {inventory.push({ ...item })}
         },
         getAnimation(name: string) { return `art_${name}` },
     }
@@ -452,12 +452,12 @@ class TravelHarness {
      * Returns true if an encounter was triggered.
      */
     tickTravel(roll: number): boolean {
-        if (this.transitionPending) return false
+        if (this.transitionPending) {return false}
         this.state.travelTicks++
         this.state.lastEncounterRoll = roll
 
         const rate = this.state.encounterRate
-        if (rate <= 0 || !Number.isFinite(rate)) return false
+        if (rate <= 0 || !Number.isFinite(rate)) {return false}
         if (rate === 100) {
             this.triggerEncounter()
             return true
@@ -476,7 +476,7 @@ class TravelHarness {
     }
 
     resolveEncounter(destinationMap: string): void {
-        if (!this.transitionPending) throw new Error('no encounter in progress')
+        if (!this.transitionPending) {throw new Error('no encounter in progress')}
         this.state.currentMap = destinationMap
         this.state.inEncounter = false
         this.transitionPending = false

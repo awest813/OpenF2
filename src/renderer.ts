@@ -176,7 +176,7 @@ export class Renderer {
     objectRenderInfo(obj: Obj): ObjectRenderInfo | null {
         // BLK-118: Guard against null position — objects in inventory or
         // mid-map-transition have no tile assignment; skip rendering them.
-        if (!obj.position) return null
+        if (!obj.position) {return null}
         const scr = hexToScreen(obj.position.x, obj.position.y)
         let visible = obj.visible
 
@@ -322,7 +322,7 @@ export function objectTransparentAt(obj: Obj, position: Point) {
 export function objectBoundingBox(obj: Obj): BoundingBox | null {
     // BLK-118: Guard against null position — objects in inventory or mid-transition
     // have no tile; skip bounding box calculation to avoid a TypeError.
-    if (!obj.position) return null
+    if (!obj.position) {return null}
     const scr = hexToScreen(obj.position.x, obj.position.y)
 
     if (globalState.images[obj.art] === undefined) {

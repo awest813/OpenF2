@@ -7401,6 +7401,6 @@ export function stubHitCount(): number {
  */
 export function stubChecklistSummary(): { stub: number; partial: number; implemented: number } {
     const summary = { stub: 0, partial: 0, implemented: 0 }
-    for (const entry of SCRIPTING_STUB_CHECKLIST) summary[entry.status]++
+    for (const entry of SCRIPTING_STUB_CHECKLIST) {summary[entry.status]++}
     return summary
 }

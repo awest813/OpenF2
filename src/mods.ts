@@ -110,7 +110,7 @@ export class ModRegistry {
         const resolved = new Map<string, ResolvedModOverride>()
 
         for (const mod of this.mods) {
-            if (!mod.overrides) continue
+            if (!mod.overrides) {continue}
 
             for (const [canonicalPath, resolvedPath] of Object.entries(mod.overrides)) {
                 const existing = resolved.get(canonicalPath)

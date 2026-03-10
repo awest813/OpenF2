@@ -150,7 +150,7 @@ describe('Phase 79-A — BLK-125: anim() codes 1-99 trigger singleAnimation', ()
 
 describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCursorMode', () => {
     it('get_cursor_mode_sfall returns 0 by default', () => {
-        ;(globalState as any).sfallCursorMode = 0
+        (globalState as any).sfallCursorMode = 0
         expect(script.get_cursor_mode_sfall()).toBe(0)
     })
 
@@ -170,7 +170,7 @@ describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCurs
     })
 
     it('set_cursor_mode_sfall sets 0 for NaN input', () => {
-        ;(globalState as any).sfallCursorMode = 5
+        (globalState as any).sfallCursorMode = 5
         script.set_cursor_mode_sfall(NaN)
         expect((globalState as any).sfallCursorMode).toBe(0)
     })
@@ -195,7 +195,7 @@ describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCurs
 
 describe('Phase 79-C — BLK-127: obj_under_cursor_sfall reads globalState.objUnderCursor', () => {
     it('returns 0 when objUnderCursor is null', () => {
-        ;(globalState as any).objUnderCursor = null
+        (globalState as any).objUnderCursor = null
         expect(script.obj_under_cursor_sfall()).toBe(0)
     })
 
@@ -230,12 +230,12 @@ describe('Phase 79-C — BLK-127: obj_under_cursor_sfall reads globalState.objUn
 describe('Phase 79-D — globalState phase-79 fields default correctly', () => {
     it('sfallCursorMode defaults to 0', () => {
         // Reset to ensure default
-        ;(globalState as any).sfallCursorMode = 0
+        (globalState as any).sfallCursorMode = 0
         expect((globalState as any).sfallCursorMode).toBe(0)
     })
 
     it('objUnderCursor defaults to null', () => {
-        ;(globalState as any).objUnderCursor = null
+        (globalState as any).objUnderCursor = null
         expect((globalState as any).objUnderCursor).toBeNull()
     })
 })

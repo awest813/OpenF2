@@ -122,7 +122,7 @@ export function skillPointsPerLevel(int: number): number {
 
 /** XP required to reach `level` from level 1. */
 export function xpForLevel(level: number): number {
-    if (level <= 1) return 0
+    if (level <= 1) {return 0}
     // Sum of 1000 * l for l = 1..level-1
     return (level * (level - 1) / 2) * 1000
 }

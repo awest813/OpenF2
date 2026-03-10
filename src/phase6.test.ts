@@ -375,7 +375,7 @@ describe('SpriteBatch — stats', () => {
     it('bindsSaved = drawCount - uniqueTextures', () => {
         const batch = new SpriteBatch()
         batch.begin()
-        for (let i = 0; i < 5; i++) batch.draw('shared', i * 10, 0, 32, 32)
+        for (let i = 0; i < 5; i++) {batch.draw('shared', i * 10, 0, 32, 32)}
         batch.end()
         // 5 draws, 1 unique texture → 4 binds saved
         expect(batch.stats.bindsSaved).toBe(4)

@@ -74,7 +74,7 @@ describe('Phase 57-A — BLK-051: Combat nextTurn null-player/null-ai guards', (
             // Combat constructor with no player should not throw
             expect(() => new (Combat as any)([])).not.toThrow()
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
             ;(globalState as any).combat = savedCombat
             ;(globalState as any).inCombat = savedInCombat
         }
@@ -299,7 +299,7 @@ describe('Phase 57-D — sfall opcodes 0x81E8–0x81EF', () => {
         try {
             expect(script.game_in_combat_sfall()).toBe(0)
         } finally {
-            ;(globalState as any).inCombat = savedInCombat
+            (globalState as any).inCombat = savedInCombat
         }
     })
 
@@ -309,7 +309,7 @@ describe('Phase 57-D — sfall opcodes 0x81E8–0x81EF', () => {
         try {
             expect(script.game_in_combat_sfall()).toBe(1)
         } finally {
-            ;(globalState as any).inCombat = savedInCombat
+            (globalState as any).inCombat = savedInCombat
         }
     })
 

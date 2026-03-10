@@ -161,7 +161,7 @@ export class WorldMapPanel extends UIPanel {
         ctx.fillText(area ? area.name.toUpperCase() : 'AREA MAP', width / 2, 22)
         ctx.textAlign = 'left'
 
-        if (!area) return
+        if (!area) {return}
 
         // Back button
         fillRect(ctx, LIST_X, LIST_Y - 26, 50, 18, FALLOUT_DARK_GRAY)
@@ -190,7 +190,7 @@ export class WorldMapPanel extends UIPanel {
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
-        if (this._isTransitionLocked) return true
+        if (this._isTransitionLocked) {return true}
         const { width, height } = this.bounds
 
         // Close button
@@ -212,7 +212,7 @@ export class WorldMapPanel extends UIPanel {
             }
         } else {
             const area = this._currentArea
-            if (!area) return true
+            if (!area) {return true}
 
             // Back button
             if (x >= LIST_X && x < LIST_X + 50 && y >= LIST_Y - 26 && y < LIST_Y - 8) {
@@ -236,7 +236,7 @@ export class WorldMapPanel extends UIPanel {
     }
 
     override onKeyDown(key: string): boolean {
-        if (this._isTransitionLocked) return true
+        if (this._isTransitionLocked) {return true}
         if (key === 'Escape') {
             if (this.currentView === 'area') {
                 this.currentView  = 'world'
@@ -294,7 +294,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

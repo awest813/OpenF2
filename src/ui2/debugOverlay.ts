@@ -69,7 +69,7 @@ export class DebugOverlayPanel extends UIPanel {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const combat = EntityManager.get<'combat'>(this.playerEntityId, 'combat')
         let entityCount = 0
-        for (const _id of EntityManager.allIds()) entityCount++
+        for (const _id of EntityManager.allIds()) {entityCount++}
 
         const runtime = this._scriptRuntimeProvider?.()
         const recentLog = runtime && runtime.recentLog.length > 0
@@ -113,12 +113,12 @@ function cssColor(c: UIColor): string {
 
 function hpColor(current: number, max: number): UIColor {
     const ratio = max > 0 ? current / max : 0
-    if (ratio > 0.66) return FALLOUT_GREEN
-    if (ratio > 0.33) return FALLOUT_AMBER
+    if (ratio > 0.66) {return FALLOUT_GREEN}
+    if (ratio > 0.33) {return FALLOUT_AMBER}
     return { r: 195, g: 0, b: 0, a: 255 }
 }
 
 function truncate(text: string, maxLen: number): string {
-    if (text.length <= maxLen) return text
+    if (text.length <= maxLen) {return text}
     return `${text.slice(0, Math.max(0, maxLen - 3))}...`
 }

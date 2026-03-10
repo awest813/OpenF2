@@ -158,37 +158,37 @@ describe('Phase 78-A — BLK-123: sfallSetHookArgs / get_sfall_arg', () => {
 
 describe('Phase 78-B — BLK-124: get_game_mode_sfall reads globalState.uiMode', () => {
     it('returns 0x01 (normal map) by default (no combat, no UI mode)', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         ;(globalState as any).uiMode = 0
         expect(script.get_game_mode_sfall()).toBe(0x01)
     })
 
     it('returns 0x03 in combat (bit 0 + bit 1)', () => {
-        ;(globalState as any).inCombat = true
+        (globalState as any).inCombat = true
         ;(globalState as any).uiMode = 0
         expect(script.get_game_mode_sfall()).toBe(0x03)
     })
 
     it('returns 0x05 in dialogue mode (bit 0 + bit 2)', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         ;(globalState as any).uiMode = 1 // UIMode.dialogue
         expect(script.get_game_mode_sfall()).toBe(0x05)
     })
 
     it('returns 0x09 in barter mode (bit 0 + bit 3)', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         ;(globalState as any).uiMode = 2 // UIMode.barter
         expect(script.get_game_mode_sfall()).toBe(0x09)
     })
 
     it('returns 0x11 in inventory mode (bit 0 + bit 4)', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         ;(globalState as any).uiMode = 4 // UIMode.inventory
         expect(script.get_game_mode_sfall()).toBe(0x11)
     })
 
     it('returns 0x20 on world map (bit 5 only, no normal-map bit)', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         ;(globalState as any).uiMode = 5 // UIMode.worldMap
         expect(script.get_game_mode_sfall()).toBe(0x20)
     })

@@ -370,14 +370,14 @@ describe('ScriptDebuggerPanel — log management', () => {
 
     it('buffer is capped at 8 messages', () => {
         const p = new ScriptDebuggerPanel(800, 600)
-        for (let i = 0; i < 20; i++) p.pushMessage(`line ${i}`)
+        for (let i = 0; i < 20; i++) {p.pushMessage(`line ${i}`)}
         expect((p as any)._log.length).toBeLessThanOrEqual(8)
     })
 
     it('oldest entry is dropped first when buffer overflows', () => {
         const p = new ScriptDebuggerPanel(800, 600)
         p.pushMessage('first')
-        for (let i = 0; i < 8; i++) p.pushMessage(`line ${i}`)
+        for (let i = 0; i < 8; i++) {p.pushMessage(`line ${i}`)}
         expect((p as any)._log).not.toContain('first')
     })
 
@@ -520,7 +520,7 @@ describe('PrototypeInspectorPanel — rendering', () => {
     it('renders without throwing when stats has more than 6 entries', () => {
         const p = new PrototypeInspectorPanel(800, 600)
         const manyStats: Record<string, number> = {}
-        for (let i = 0; i < 20; i++) manyStats[`stat${i}`] = i
+        for (let i = 0; i < 20; i++) {manyStats[`stat${i}`] = i}
         p.setProto({ pid: 1, type: 'misc', subtype: null, name: 'Obj', flags: 0, stats: manyStats })
         expect(() => p.render(makeCtxStub())).not.toThrow()
     })

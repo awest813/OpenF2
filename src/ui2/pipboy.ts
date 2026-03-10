@@ -243,7 +243,7 @@ export class PipBoyPanel extends UIPanel {
         for (let cy = 0; cy < height; cy++) {
             for (let cx = 0; cx < width; cx++) {
                 const cell = cells[cy]?.[cx]
-                if (!cell) continue
+                if (!cell) {continue}
                 const px = offX + cx * cellW
                 const py = offY + cy * cellH
 
@@ -288,7 +288,7 @@ export class PipBoyPanel extends UIPanel {
         const rows: QuestRow[] = []
         for (const [header, state, color] of groups) {
             const entries = all.filter((e) => e.state === state)
-            if (entries.length === 0) continue
+            if (entries.length === 0) {continue}
             rows.push({ kind: 'header', label: header })
             for (const entry of entries) {
                 rows.push({ kind: 'entry', text: '  • ' + entry.id, color })
@@ -358,13 +358,13 @@ export class PipBoyPanel extends UIPanel {
         }
         // Scroll within current tab
         if (key === 'ArrowDown') {
-            if (this.activeTab === 'items') this._itemScrollOffset++
-            else if (this.activeTab === 'quests') this._questScrollOffset++
+            if (this.activeTab === 'items') {this._itemScrollOffset++}
+            else if (this.activeTab === 'quests') {this._questScrollOffset++}
             return true
         }
         if (key === 'ArrowUp') {
-            if (this.activeTab === 'items') this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)
-            else if (this.activeTab === 'quests') this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)
+            if (this.activeTab === 'items') {this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)}
+            else if (this.activeTab === 'quests') {this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)}
             return true
         }
         return false
@@ -414,7 +414,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth
@@ -469,7 +469,7 @@ function drawStat(
 
 function hpColor(stats: StatsComponent): UIColor {
     const ratio = stats.maxHp > 0 ? stats.currentHp / stats.maxHp : 1
-    if (ratio > 0.66) return FALLOUT_GREEN
-    if (ratio > 0.33) return FALLOUT_AMBER
+    if (ratio > 0.66) {return FALLOUT_GREEN}
+    if (ratio > 0.33) {return FALLOUT_AMBER}
     return FALLOUT_RED
 }

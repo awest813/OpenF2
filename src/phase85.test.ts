@@ -201,7 +201,7 @@ describe('Phase 85-D — InventoryPanel scroll offset clamped after USE', () => 
         panel.show()
 
         // Navigate to the last item (index 10).
-        for (let i = 0; i < 10; i++) panel.onKeyDown('ArrowDown')
+        for (let i = 0; i < 10; i++) {panel.onKeyDown('ArrowDown')}
         // _scrollOffset should now be 1 (auto-scrolled to keep item 10 visible).
 
         // Simulate external engine removing all items except 0 after USE event.
@@ -225,7 +225,7 @@ describe('Phase 85-D — InventoryPanel scroll offset clamped after USE', () => 
         panel.show()
 
         // Navigate down to trigger a non-zero scroll offset.
-        for (let i = 0; i < 11; i++) panel.onKeyDown('ArrowDown')
+        for (let i = 0; i < 11; i++) {panel.onKeyDown('ArrowDown')}
 
         // Simulate the engine shrinking the list to 3 items on USE.
         EventBus.on('inventory:useItem', () => {
@@ -354,7 +354,7 @@ describe('Phase 85-F — LootPanel overflow indicator', () => {
         panel.onKeyDown('Tab')  // focuses container column
 
         // The keyboard cursor navigates all 11 items (not just the 10 visible).
-        for (let i = 0; i < 10; i++) panel.onKeyDown('ArrowDown')
+        for (let i = 0; i < 10; i++) {panel.onKeyDown('ArrowDown')}
         // We should now be at item index 10 (the 11th item).
         panel.onKeyDown('Enter')  // transfer to player
 

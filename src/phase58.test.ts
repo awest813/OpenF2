@@ -133,7 +133,7 @@ describe('Phase 58-B — BLK-055: Null position guard in tile_contains_pid_obj',
             expect(result).toBeTruthy()
             expect(result.pid).toBe(200)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -150,7 +150,7 @@ describe('Phase 58-B — BLK-055: Null position guard in tile_contains_pid_obj',
             const result = script.tile_contains_obj_pid(7 * 200 + 3, 0, 100)
             expect(result).toBe(1)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -166,7 +166,7 @@ describe('Phase 58-B — BLK-055: Null position guard in tile_contains_pid_obj',
             const result = script.tile_contains_pid_obj(100, 0, 100)
             expect(result).toBe(0)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 })
@@ -261,7 +261,7 @@ describe('Phase 58-C — sfall opcodes 0x81F0–0x81F7', () => {
         try {
             expect(script.critter_at_sfall(100, 0)).toBe(0)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -276,7 +276,7 @@ describe('Phase 58-C — sfall opcodes 0x81F0–0x81F7', () => {
             const result = script.critter_at_sfall(5 * 200 + 5, 0)
             expect(result).toBe(critter)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -292,7 +292,7 @@ describe('Phase 58-C — sfall opcodes 0x81F0–0x81F7', () => {
             const result = script.critter_at_sfall(3 * 200 + 3, 0)
             expect(result).toBe(critterValid)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 })

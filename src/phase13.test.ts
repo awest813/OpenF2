@@ -134,7 +134,7 @@ describe('Phase 13-B — abs_value (sfall 0x816C)', () => {
  * behaviour consistent with the scripting module's handling of wrong types).
  */
 function stringLengthImpl(str: any): number {
-    if (typeof str !== 'string') return 0
+    if (typeof str !== 'string') {return 0}
     return str.length
 }
 
@@ -214,8 +214,8 @@ describe('Phase 13-D — pow (sfall 0x816E)', () => {
  */
 function objIsValidImpl(obj: any): number {
     // Mirrors isGameObject in scripting.ts: the object must have a truthy _type field.
-    if (obj === null || obj === undefined) return 0
-    if (typeof obj !== 'object') return 0
+    if (obj === null || obj === undefined) {return 0}
+    if (typeof obj !== 'object') {return 0}
     return obj._type ? 1 : 0
 }
 

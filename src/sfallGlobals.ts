@@ -64,7 +64,7 @@ const sfallGlobalInts: number[] = new Array(MAX_SFALL_INT_GLOBALS).fill(0)
  * Returns `0` for out-of-range indices (matching sfall behaviour).
  */
 export function getSfallGlobalInt(index: number): number {
-    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) return 0
+    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) {return 0}
     return sfallGlobalInts[index]
 }
 
@@ -73,7 +73,7 @@ export function getSfallGlobalInt(index: number): number {
  * Out-of-range indices are silently ignored (matching sfall behaviour).
  */
 export function setSfallGlobalInt(index: number, value: number): void {
-    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) return
+    if (index < 0 || index >= MAX_SFALL_INT_GLOBALS) {return}
     sfallGlobalInts[index] = value
 }
 
@@ -126,7 +126,7 @@ export function deserializeSfallGlobals(data: SerializedSfallGlobals): void {
     sfallGlobals.clear()
     if (data.stringKeyed) {
         for (const [k, v] of Object.entries(data.stringKeyed)) {
-            if (typeof v === 'number' && Number.isFinite(v)) sfallGlobals.set(k, v)
+            if (typeof v === 'number' && Number.isFinite(v)) {sfallGlobals.set(k, v)}
         }
     }
 

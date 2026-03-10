@@ -310,7 +310,7 @@ describe('Phase 67-D — sfall opcodes 0x8238–0x823F', () => {
     })
 
     it('get_critter_radiation_sfall returns radiation level from stats', () => {
-        let stored = 42
+        const stored = 42
         const critter = makeObj({
             stats: {
                 getBase: (s: string) => (s === 'Radiation Level' ? stored : 0),

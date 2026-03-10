@@ -377,20 +377,20 @@ describe('Phase 81-F-3 — sfall 0x829A/0x829B: get/set_active_hand_sfall', () =
     })
 
     it('set_active_hand_sfall(1) then get returns 1', () => {
-        if (!globalState.player) return
+        if (!globalState.player) {return}
         script.set_active_hand_sfall(1)
         expect(script.get_active_hand_sfall()).toBe(1)
     })
 
     it('set_active_hand_sfall(0) then get returns 0', () => {
-        if (!globalState.player) return
+        if (!globalState.player) {return}
         script.set_active_hand_sfall(1)
         script.set_active_hand_sfall(0)
         expect(script.get_active_hand_sfall()).toBe(0)
     })
 
     it('out-of-range value is clamped to 0', () => {
-        if (!globalState.player) return
+        if (!globalState.player) {return}
         script.set_active_hand_sfall(99)
         expect(script.get_active_hand_sfall()).toBe(0)
     })

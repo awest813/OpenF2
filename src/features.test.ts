@@ -93,7 +93,7 @@ describe('Audio volume clamping', () => {
  * specifically the Node/undefined fallback behaviour.
  */
 function pickFormatFallback(): string {
-    if (typeof Audio === 'undefined') return 'wav'
+    if (typeof Audio === 'undefined') {return 'wav'}
     // In a real browser this would probe canPlayType; in Node we just return 'wav'
     return 'wav'
 }

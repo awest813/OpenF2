@@ -607,7 +607,7 @@ export function hidev($el: HTMLElement): void {
 function off($el: HTMLElement, events: string): void {
     const eventList = events.split(' ')
     for (const event of eventList) {
-        ;(<any>$el)['on' + event] = null
+        (<any>$el)['on' + event] = null
     }
 }
 
@@ -632,7 +632,7 @@ export function makeEl(tag: string, options: ElementOptions): HTMLElement {
         $el.id = options.id
     }
     if (options.src !== undefined) {
-        ;($el as HTMLImageElement).src = options.src
+        ($el as HTMLImageElement).src = options.src
     }
     if (options.classes !== undefined) {
         $el.className = options.classes.join(' ')

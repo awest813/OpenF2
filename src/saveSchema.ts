@@ -336,16 +336,16 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
         case 1:
             // v1 → v2: add xp/level/karma to player snapshot
             if (save.player) {
-                if (save.player.xp === undefined) save.player.xp = 0
-                if (save.player.level === undefined) save.player.level = 1
-                if (save.player.karma === undefined) save.player.karma = 0
+                if (save.player.xp === undefined) {save.player.xp = 0}
+                if (save.player.level === undefined) {save.player.level = 1}
+                if (save.player.karma === undefined) {save.player.karma = 0}
             }
             save.version = 2
             // falls through
         case 2:
             // v2 → v3: add questLog and reputation snapshots
-            if (save.questLog === undefined) save.questLog = { entries: [] }
-            if (save.reputation === undefined) save.reputation = { karma: 0, reputations: {} }
+            if (save.questLog === undefined) {save.questLog = { entries: [] }}
+            if (save.reputation === undefined) {save.reputation = { karma: 0, reputations: {} }}
             save.version = 3
             // falls through
         case 3:
@@ -358,7 +358,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // v4 → v5: add scriptGlobalVars snapshot.
             // Old saves have no script state — initialize to empty so scripts see a
             // clean slate (default values) rather than throwing on missing gvars.
-            if (save.scriptGlobalVars === undefined) save.scriptGlobalVars = {}
+            if (save.scriptGlobalVars === undefined) {save.scriptGlobalVars = {}}
             save.version = 5
             // falls through
         case 5:
@@ -366,63 +366,63 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // gameTickTime defaults to 0 (game epoch) so the calendar reads
             // the correct starting year/month/day for old saves.
             // critterKillCounts defaults to {} (no kills recorded yet).
-            if (save.gameTickTime === undefined) save.gameTickTime = 0
-            if (save.critterKillCounts === undefined) save.critterKillCounts = {}
+            if (save.gameTickTime === undefined) {save.gameTickTime = 0}
+            if (save.critterKillCounts === undefined) {save.critterKillCounts = {}}
             save.version = 6
             // falls through
         case 6:
             // v6 → v7: add mapVars snapshot.
             // Old saves have no map-variable state — initialize to empty so
             // map scripts start fresh (default values) rather than throwing.
-            if (save.mapVars === undefined) save.mapVars = {}
+            if (save.mapVars === undefined) {save.mapVars = {}}
             save.version = 7
             // falls through
         case 7:
             // v7 → v8: add world-map discovery snapshot.
             // Old saves default to no explicit overrides, preserving runtime
             // defaults from city.txt until the user discovers new areas.
-            if (save.mapAreaStates === undefined) save.mapAreaStates = {}
+            if (save.mapAreaStates === undefined) {save.mapAreaStates = {}}
             save.version = 8
             // falls through
         case 8:
             // v8 → v9: add player character-creation traits snapshot.
             // Old saves have no trait data — initialize to empty array so
             // trait-based script checks start from a clean slate (no traits).
-            if (save.playerCharTraits === undefined) save.playerCharTraits = []
+            if (save.playerCharTraits === undefined) {save.playerCharTraits = []}
             save.version = 9
             // falls through
         case 9:
             // v9 → v10: add player perk-ranks snapshot.
             // Old saves have no persisted perk data — initialize to empty record so
             // perk-based stat bonuses start from a clean slate on legacy saves.
-            if (save.playerPerkRanks === undefined) save.playerPerkRanks = {}
+            if (save.playerPerkRanks === undefined) {save.playerPerkRanks = {}}
             save.version = 10
             // falls through
         case 10:
             // v10 → v11: add sfall global variable snapshot.
             // Old saves have no sfall global state — initialize to empty stores so
             // all sfall-global-based checks start from zero (matching sfall default).
-            if (save.sfallGlobals === undefined) save.sfallGlobals = {}
+            if (save.sfallGlobals === undefined) {save.sfallGlobals = {}}
             save.version = 11
             // falls through
         case 11:
             // v11 → v12: add player character state flags (pc_flag_on/pc_flag_off).
             // Old saves have no pcFlags — default to 0 (no flags set, e.g. not sneaking).
-            if (save.playerPcFlags === undefined) save.playerPcFlags = 0
+            if (save.playerPcFlags === undefined) {save.playerPcFlags = 0}
             save.version = 12
             // falls through
         case 12:
             // v12 → v13: add player active-hand tracker (BLK-034).
             // Old saves default to 0 (primary hand active).
-            if (save.playerActiveHand === undefined) save.playerActiveHand = 0
+            if (save.playerActiveHand === undefined) {save.playerActiveHand = 0}
             save.version = 13
             // falls through
         case 13:
             // v13 → v14: add player base-stats and skill-values snapshots (BLK-035).
             // Old saves default to empty records so the Player class defaults remain
             // in effect (STR=8, PE=8, END=8, CHA=8, INT=8, AGI=8, LCK=8, HP=100).
-            if (save.playerBaseStats === undefined) save.playerBaseStats = {}
-            if (save.playerSkillValues === undefined) save.playerSkillValues = {}
+            if (save.playerBaseStats === undefined) {save.playerBaseStats = {}}
+            if (save.playerSkillValues === undefined) {save.playerSkillValues = {}}
             // playerSkillPoints: undefined means "use Player class default (10)"
             save.version = 14
             // falls through
@@ -440,15 +440,15 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             //   Not set here because it is optional; the normalization pass below
             //   calls sanitizeEquippedPID() which validates and strips invalid values.
             // playerPerksOwed: 0 means no pending perk selections.
-            if (save.playerPerksOwed === undefined) save.playerPerksOwed = 0
+            if (save.playerPerksOwed === undefined) {save.playerPerksOwed = 0}
             save.version = 16
             // falls through
         case 16:
             // v16 → v17: add player name and gender (BLK-048).
             // playerName: string — defaults to 'Player' (class default).
             // playerGender: 'male'|'female' — defaults to 'male' (class default).
-            if (save.playerName === undefined) save.playerName = 'Player'
-            if (save.playerGender === undefined) save.playerGender = 'male'
+            if (save.playerName === undefined) {save.playerName = 'Player'}
+            if (save.playerGender === undefined) {save.playerGender = 'male'}
             save.version = 17
             // falls through
         case 17:
@@ -456,7 +456,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // Old saves default to 0 (empty tank) so the car has no fuel after
             // migration.  Players who had fuel before must refuel; this is safe
             // because the car was not fully drivable in pre-v18 builds anyway.
-            if (save.carFuel === undefined) save.carFuel = 0
+            if (save.carFuel === undefined) {save.carFuel = 0}
             save.version = 18
             // falls through
         case 18:
@@ -465,7 +465,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // after migration.  Players who were crippled before must be
             // re-injured by gameplay; this is safe because pre-v19 builds did
             // not persist injury state at all.
-            if (save.playerInjuryFlags === undefined) save.playerInjuryFlags = 0
+            if (save.playerInjuryFlags === undefined) {save.playerInjuryFlags = 0}
             save.version = 19
             // falls through
         case 19:
@@ -473,7 +473,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // playerCurrentHp: undefined means "derive from base stats" — old
             // saves will load at full HP (same as pre-v20 behaviour).
             // partyMembersHp: default to empty record so no override is applied.
-            if (save.partyMembersHp === undefined) save.partyMembersHp = {}
+            if (save.partyMembersHp === undefined) {save.partyMembersHp = {}}
             // playerCurrentHp is intentionally left undefined when absent (not
             // set here) — the load path treats undefined as "use stat default".
             save.version = 20
@@ -595,8 +595,8 @@ function sanitizeNumericRecord(value: unknown): Record<number, number> {
     const out: Record<number, number> = {}
     for (const [key, rawEntry] of Object.entries(value)) {
         const numericKey = Number(key)
-        if (!Number.isInteger(numericKey)) continue
-        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) continue
+        if (!Number.isInteger(numericKey)) {continue}
+        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) {continue}
         out[numericKey] = rawEntry
     }
     return out
@@ -624,8 +624,8 @@ function sanitizeBooleanRecord(value: unknown): Record<number, boolean> {
     const out: Record<number, boolean> = {}
     for (const [key, rawEntry] of Object.entries(value)) {
         const numericKey = Number(key)
-        if (!Number.isInteger(numericKey)) continue
-        if (typeof rawEntry !== 'boolean') continue
+        if (!Number.isInteger(numericKey)) {continue}
+        if (typeof rawEntry !== 'boolean') {continue}
         out[numericKey] = rawEntry
     }
 
@@ -633,24 +633,24 @@ function sanitizeBooleanRecord(value: unknown): Record<number, boolean> {
 }
 
 function sanitizeTraitArray(value: unknown): number[] {
-    if (!Array.isArray(value)) return []
+    if (!Array.isArray(value)) {return []}
     const out: number[] = []
     for (const entry of value) {
-        if (typeof entry !== 'number' || !Number.isInteger(entry) || entry < 0 || entry > 15) continue
-        if (!out.includes(entry)) out.push(entry)
+        if (typeof entry !== 'number' || !Number.isInteger(entry) || entry < 0 || entry > 15) {continue}
+        if (!out.includes(entry)) {out.push(entry)}
     }
     return out.sort((a, b) => a - b)
 }
 
 function sanitizeSfallGlobals(value: unknown): { stringKeyed: Record<string, number>; intIndexed: Record<number, number> } {
     const out = { stringKeyed: {} as Record<string, number>, intIndexed: {} as Record<number, number> }
-    if (typeof value !== 'object' || value === null) return out
+    if (typeof value !== 'object' || value === null) {return out}
 
     const raw = value as Record<string, unknown>
 
     if (typeof raw.stringKeyed === 'object' && raw.stringKeyed !== null) {
         for (const [k, v] of Object.entries(raw.stringKeyed)) {
-            if (typeof v === 'number' && Number.isFinite(v)) out.stringKeyed[k] = v
+            if (typeof v === 'number' && Number.isFinite(v)) {out.stringKeyed[k] = v}
         }
     }
 
@@ -678,8 +678,8 @@ function sanitizeStringNumericRecord(value: unknown): Record<string, number> {
     // would break saves containing stat names added by future engine versions.
     const out: Record<string, number> = {}
     for (const [key, rawEntry] of Object.entries(value)) {
-        if (typeof key !== 'string' || key === '') continue
-        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) continue
+        if (typeof key !== 'string' || key === '') {continue}
+        if (typeof rawEntry !== 'number' || !Number.isFinite(rawEntry)) {continue}
         out[key] = rawEntry
     }
     return out
@@ -690,7 +690,7 @@ function sanitizeStringNumericRecord(value: unknown): Record<string, number> {
  * PIDs of 0 or negative values are invalid and treated as "no equipped weapon".
  */
 function sanitizeEquippedPID(value: unknown): number | undefined {
-    if (value === undefined || value === null) return undefined
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) return undefined
+    if (value === undefined || value === null) {return undefined}
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {return undefined}
     return value
 }

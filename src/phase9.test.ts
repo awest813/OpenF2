@@ -68,7 +68,7 @@ interface LightObj {
  * Sets per-object lightIntensity (clamped 0–65536) and lightRadius (clamped ≥ 0).
  */
 function objSetLightLevel(obj: LightObj | null, intensity: number, distance: number): void {
-    if (!obj) return
+    if (!obj) {return}
     obj.lightIntensity = Math.max(0, Math.min(65536, intensity))
     obj.lightRadius = Math.max(0, distance)
 }
@@ -200,9 +200,9 @@ function getPcBaseStat(
     stats: ReturnType<typeof makeStatStore> | null,
     stat: number,
 ): number {
-    if (!stats) return 0
+    if (!stats) {return 0}
     const statName = testStatMap[stat]
-    if (!statName) return 0
+    if (!statName) {return 0}
     return stats.getBase(statName)
 }
 
@@ -214,9 +214,9 @@ function setPcBaseStat(
     stat: number,
     value: number,
 ): void {
-    if (!stats) return
+    if (!stats) {return}
     const statName = testStatMap[stat]
-    if (!statName) return
+    if (!statName) {return}
     stats.setBase(statName, value)
 }
 
@@ -323,7 +323,7 @@ interface APObj {
  * Inline replica of the set_critter_current_ap implementation.
  */
 function setCritterCurrentAP(obj: APObj | null, ap: number): void {
-    if (!obj || obj.type !== 'critter') return
+    if (!obj || obj.type !== 'critter') {return}
     if (obj.AP) {
         obj.AP.combat = Math.max(0, ap)
     }
@@ -387,7 +387,7 @@ interface LevelObj {
  * Inline replica of the get_npc_level implementation.
  */
 function getNpcLevel(obj: LevelObj | null): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     return obj.stats.getBase('Level')
 }
 

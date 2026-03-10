@@ -36,26 +36,26 @@ export interface IntFile {
 }
 
 // parse .INT files
-export function parseIntFile(reader: BinaryReader, name: string=""): IntFile {
+export function parseIntFile(reader: BinaryReader, name=""): IntFile {
     reader.seek(0x2A) // seek to procedure table
 
     // read procedure table
-    var numProcs = reader.read32()
-    var procs: Procedure[] = []
-    var procedures: { [name: string]: Procedure } = {}
+    const numProcs = reader.read32()
+    const procs: Procedure[] = []
+    const procedures: { [name: string]: Procedure } = {}
     //console.log("procs: %d", numProcs)
     //console.log("")
 
-    for(var i = 0; i < numProcs; i++) {
-        var nameIndex = reader.read32()
-        var flags = reader.read32()
+    for(let i = 0; i < numProcs; i++) {
+        const nameIndex = reader.read32()
+        const flags = reader.read32()
         //console.log("name index: %d", nameIndex)
         //console.log("flags: %d", flags)
         assertEq(reader.read32(), 0, "unk0 != 0")
         assertEq(reader.read32(), 0, "unk1 != 0")
-        var offset = reader.read32()
+        const offset = reader.read32()
         //console.log("offset: %d", offset)
-        var argc = reader.read32()
+        const argc = reader.read32()
         //console.log("argc: %d", argc)
         //console.log("")
 
@@ -68,23 +68,23 @@ export function parseIntFile(reader: BinaryReader, name: string=""): IntFile {
     }
 
     // offset->identifier table
-    var identEnd = reader.read32()
-    var identifiers: { [offset: number]: string } = {}
+    const identEnd = reader.read32()
+    const identifiers: { [offset: number]: string } = {}
 
-    var baseOffset = reader.offset
-    while(true) {
+    const baseOffset = reader.offset
+    for (;;) {
         if(reader.offset - baseOffset >= identEnd)
-            break
+            {break}
 
-        var len = reader.read16()
-        var offset = reader.offset - baseOffset + 4
-        var str = ""
+        const len = reader.read16()
+        const offset = reader.offset - baseOffset + 4
+        let str = ""
         // console.log("len=%d, offset=%d", len, offset)
 
-        for(var j = 0; j < len; j++) {
-            var c = reader.read8()
+        for(let j = 0; j < len; j++) {
+            const c = reader.read8()
             if(c)
-                str += String.fromCharCode(c)
+                {str += String.fromCharCode(c)}
         }
 
         // console.log("str=%s", str)
@@ -106,27 +106,27 @@ export function parseIntFile(reader: BinaryReader, name: string=""): IntFile {
     console.log("")*/
 
     // offset->strings table
-    var stringEnd = reader.read32()
-    var strings: { [offset: number]: string } = {}
+    const stringEnd = reader.read32()
+    const strings: { [offset: number]: string } = {}
 
     //assertEq(stringEnd, 0xFFFFFFFF, "TODO: string table")
 
     if(stringEnd !== 0xFFFFFFFF) {
         // read string table
-        var baseOffset = reader.offset
-        while(true) {
+        const baseOffset = reader.offset
+        for (;;) {
             if(reader.offset - baseOffset >= stringEnd)
-                break
+                {break}
 
-            var len = reader.read16()
-            var offset = reader.offset - baseOffset + 4
-            var str = ""
+            const len = reader.read16()
+            const offset = reader.offset - baseOffset + 4
+            let str = ""
             // console.log("len=%d, offset=%d, stringEnd=%d", len, offset, stringEnd)
 
-            for(var j = 0; j < len; j++) {
-                var c = reader.read8()
+            for(let j = 0; j < len; j++) {
+                const c = reader.read8()
                 if(c)
-                    str += String.fromCharCode(c)
+                    {str += String.fromCharCode(c)}
             }
 
             // console.log("str=%s", str)
@@ -134,7 +134,7 @@ export function parseIntFile(reader: BinaryReader, name: string=""): IntFile {
         }
     }
 
-    var codeOffset = reader.offset
+    const codeOffset = reader.offset
 
     return {procedures: procedures
            ,proceduresTable: procs

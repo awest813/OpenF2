@@ -76,7 +76,7 @@ describe('Phase 53-A — BLK-039: Weapon slot serialization (leftHandPID/rightHa
             const w = obj.inventory.find(
                 (inv: any) => inv.pid === mobj.leftHandPID && inv.subtype === 'weapon'
             )
-            if (w) obj.leftHand = w
+            if (w) {obj.leftHand = w}
         }
 
         expect(obj.leftHand).toBe(weaponInInventory)
@@ -92,7 +92,7 @@ describe('Phase 53-A — BLK-039: Weapon slot serialization (leftHandPID/rightHa
             const w = obj.inventory.find(
                 (inv: any) => inv.pid === mobj.rightHandPID && inv.subtype === 'weapon'
             )
-            if (w) obj.rightHand = w
+            if (w) {obj.rightHand = w}
         }
 
         expect(obj.rightHand).toBe(weaponInInventory)
@@ -106,7 +106,7 @@ describe('Phase 53-A — BLK-039: Weapon slot serialization (leftHandPID/rightHa
             const w = obj.inventory.find(
                 (inv: any) => inv.pid === mobj.leftHandPID && inv.subtype === 'weapon'
             )
-            if (w) obj.leftHand = w
+            if (w) {obj.leftHand = w}
         }
 
         expect(obj.leftHand).toBeUndefined()

@@ -77,7 +77,7 @@ export class CinematicPlayer {
     play(sequence: CinematicSequence): void {
         this.stop()
 
-        if (!sequence.slides.length) return
+        if (!sequence.slides.length) {return}
 
         this.sequence = sequence
         this.slideIndex = 0
@@ -89,7 +89,7 @@ export class CinematicPlayer {
 
     /** Skip immediately to the end of the current sequence. */
     skip(): void {
-        if (!this._isPlaying) return
+        if (!this._isPlaying) {return}
         this._finish()
     }
 
@@ -109,7 +109,7 @@ export class CinematicPlayer {
     // ------------------------------------------------------------------
 
     private _showSlide(): void {
-        if (!this.sequence) return
+        if (!this.sequence) {return}
 
         const slide = this.sequence.slides[this.slideIndex]
         const total = this.sequence.slides.length
@@ -150,15 +150,15 @@ export class CinematicPlayer {
             if (typeof Image !== 'undefined') {
                 const img = new Image()
                 img.onload = () => {
-                    if (!this._isPlaying) return
+                    if (!this._isPlaying) {return}
                     this.ctx.drawImage(img, 0, 0, width, height)
-                    if (slide.caption) this._renderCaption(slide.caption)
+                    if (slide.caption) {this._renderCaption(slide.caption)}
                 }
                 img.src = slide.imagePath
             }
         }
 
-        if (slide.caption) this._renderCaption(slide.caption)
+        if (slide.caption) {this._renderCaption(slide.caption)}
     }
 
     private _renderCaption(text: string): void {

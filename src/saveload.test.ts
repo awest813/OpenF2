@@ -468,7 +468,7 @@ describe('save storage runtime resilience', () => {
     })
 
     afterEach(() => {
-        ;(globalThis as any).indexedDB = originalIndexedDB
+        (globalThis as any).indexedDB = originalIndexedDB
         resetSaveBackendForTests()
     })
 
@@ -498,7 +498,7 @@ describe('save storage runtime resilience', () => {
     })
 
     it('persists worldPosition in saved snapshots through save()', () => {
-        ;(globalState as any).worldPosition = { x: 42, y: 77 }
+        (globalState as any).worldPosition = { x: 42, y: 77 }
 
         saveLoadInit()
         save('WorldPos slot')

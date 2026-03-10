@@ -65,7 +65,7 @@ function makeObj(script?: Partial<FakeScript>): FakeObj {
 }
 
 function useObjOnImpl(obj: FakeObj, item: FakeObj): boolean | null {
-    if (!obj._script || obj._script.use_obj_on_p_proc === undefined) return null
+    if (!obj._script || obj._script.use_obj_on_p_proc === undefined) {return null}
     obj._script.source_obj = item
     obj._script.self_obj = obj
     obj._script.cur_map_index = 1
@@ -142,7 +142,7 @@ describe('Phase 14-A — use_obj_on_p_proc trigger (useObjOn)', () => {
 // ===========================================================================
 
 function pushImpl(obj: FakeObj, source: FakeObj): boolean | null {
-    if (!obj._script || obj._script.push_p_proc === undefined) return null
+    if (!obj._script || obj._script.push_p_proc === undefined) {return null}
     obj._script.source_obj = source
     obj._script.self_obj = obj
     obj._script.cur_map_index = 1
@@ -211,7 +211,7 @@ describe('Phase 14-B — push_p_proc trigger (push)', () => {
 // ===========================================================================
 
 function isDroppingImpl(obj: FakeObj, source: FakeObj): boolean | null {
-    if (!obj._script || obj._script.is_dropping_p_proc === undefined) return null
+    if (!obj._script || obj._script.is_dropping_p_proc === undefined) {return null}
     obj._script.source_obj = source
     obj._script.self_obj = obj
     obj._script.cur_map_index = 1

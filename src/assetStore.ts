@@ -188,7 +188,7 @@ export class AssetCache<T> {
     }
 
     constructor(maxEntries: number) {
-        if (maxEntries < 1) throw new RangeError('AssetCache: maxEntries must be at least 1')
+        if (maxEntries < 1) {throw new RangeError('AssetCache: maxEntries must be at least 1')}
         this._maxEntries = maxEntries
     }
 

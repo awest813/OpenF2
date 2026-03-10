@@ -86,7 +86,7 @@ interface FidObj {
  * Inline replica of the scripting.ts obj_art_fid implementation.
  */
 function objArtFid(obj: FidObj | null): number {
-    if (obj === null || obj.type === undefined) return 0
+    if (obj === null || obj.type === undefined) {return 0}
     return obj.frmPID ?? 0
 }
 
@@ -218,7 +218,7 @@ interface TraitObj {
 }
 
 function applyObjectTrait(obj: TraitObj, traitType: number, traitId: number, amount: number): void {
-    if (traitType !== 1) return // TRAIT_OBJECT only
+    if (traitType !== 1) {return} // TRAIT_OBJECT only
     switch (traitId) {
         case 10: // OBJECT_CUR_ROT
             obj.orientation = ((amount % 6) + 6) % 6

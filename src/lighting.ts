@@ -20,13 +20,13 @@ import { toTileNum } from './tile.js'
 
 // Floor lighting
 
-export module Lighting {
+export namespace Lighting {
     // length 15
-    var rightside_up_triangles = [2, 3, 0, 3, 4, 1, 5, 6, 3, 6, 7, 4, 8, 9, 6]
-    var upside_down_triangles = [0, 3, 1, 2, 5, 3, 3, 6, 4, 5, 8, 6, 6, 9, 7]
+    const rightside_up_triangles = [2, 3, 0, 3, 4, 1, 5, 6, 3, 6, 7, 4, 8, 9, 6]
+    const upside_down_triangles = [0, 3, 1, 2, 5, 3, 3, 6, 4, 5, 8, 6, 6, 9, 7]
 
     // length 26
-    var rightside_up_table = [
+    const rightside_up_table = [
         -1,
         0x2,
         0x4E,
@@ -55,7 +55,7 @@ export module Lighting {
         0x20
     ]
 
-    var upside_down_table = [
+    const upside_down_table = [
         0x0,
         0x20,
         0x30,
@@ -85,7 +85,7 @@ export module Lighting {
     ]
 
     // length 40
-    export var vertices = [
+    export const vertices = [
         0x10,
         -1,
         -201,
@@ -130,30 +130,32 @@ export module Lighting {
 
     // Framebuffer for triangle-lit tiles
     // XXX: what size should this be?
-    export var intensity_map = new Array(1024 * 12)
+    export const intensity_map = new Array(1024 * 12)
 
     // zero array
-    for (var i = 0; i < intensity_map.length; i++) intensity_map[i] = 0
+    for (let i = 0; i < intensity_map.length; i++) {intensity_map[i] = 0}
 
-    var ambient = 0xa000 // ambient light level
+    const ambient = 0xa000 // ambient light level
 
     // Color look-up table by light intensity
     export const intensityColorTable = (globalThis as unknown as { intensityColorTable: number[] }).intensityColorTable
 
-    export var colorLUT: any = null // string color integer -> palette index
-    export var colorRGB: any = null // palette index -> string color integer
+    // eslint-disable-next-line prefer-const
+    export let colorLUT: any = null // string color integer -> palette index
+    // eslint-disable-next-line prefer-const
+    export let colorRGB: any = null // palette index -> string color integer
 
     function light_get_tile(tilenum: number): number {
         return Math.min(65536, Lightmap.tile_intensity[tilenum])
     }
 
     function init(tilenum: number): boolean {
-        var start = tilenum & 1 // even/odd
+        const start = tilenum & 1 // even/odd
 
-        for (var i = 0, j = start; i <= 36; i += 4, j += 4) {
-            var offset = vertices[1 + j]
-            var t = tilenum + offset
-            var light = Math.max(light_get_tile(t), ambient)
+        for (let i = 0, j = start; i <= 36; i += 4, j += 4) {
+            const offset = vertices[1 + j]
+            const t = tilenum + offset
+            const light = Math.max(light_get_tile(t), ambient)
 
             vertices[3 + i] = light
         }
@@ -161,30 +163,30 @@ export module Lighting {
         // do a uniformly-lit check
         // true means it's triangle lit
 
-        if (vertices[7] !== vertices[3]) return true
+        if (vertices[7] !== vertices[3]) {return true}
 
-        var uni = 1
-        for (var i = 4; i < 36; i += 4) {
-            if (vertices[7 + i] === vertices[3 + i]) uni++ //return true
+        let uni = 1
+        for (let i = 4; i < 36; i += 4) {
+            if (vertices[7 + i] === vertices[3 + i]) {uni++} //return true
         }
 
         return uni !== 9
     }
 
     function renderTris(isRightsideUp: boolean): void {
-        var tris = isRightsideUp ? rightside_up_triangles : upside_down_triangles
-        var table = isRightsideUp ? rightside_up_table : upside_down_table
+        const tris = isRightsideUp ? rightside_up_triangles : upside_down_triangles
+        const table = isRightsideUp ? rightside_up_table : upside_down_table
 
-        for (var i = 0; i < 15; i += 3) {
-            var a = tris[i + 0]
-            var b = tris[i + 1]
-            var c = tris[i + 2]
+        for (let i = 0; i < 15; i += 3) {
+            const a = tris[i + 0]
+            const b = tris[i + 1]
+            const c = tris[i + 2]
 
-            var x = vertices[3 + 4 * a]
-            var y = vertices[3 + 4 * b]
-            var z = vertices[3 + 4 * c]
+            const x = vertices[3 + 4 * a]
+            const y = vertices[3 + 4 * b]
+            const z = vertices[3 + 4 * c]
 
-            var inc, intensityIdx, baseLight, lightInc
+            let inc, intensityIdx, baseLight, lightInc
 
             if (isRightsideUp) {
                 // rightside up triangles
@@ -200,12 +202,12 @@ export module Lighting {
                 baseLight = x
             }
 
-            for (var j = 0; j < 26; j += 2) {
-                var edx = table[1 + j]
+            for (let j = 0; j < 26; j += 2) {
+                const edx = table[1 + j]
                 intensityIdx += table[j]
 
-                var light = baseLight
-                for (var k = 0; k < edx; k++) {
+                let light = baseLight
+                for (let k = 0; k < edx; k++) {
                     if (intensityIdx < 0 || intensityIdx >= intensity_map.length) {
                         // Index out of bounds — skip this lighting step to prevent
                         // buffer overflow; may result in partial lighting but won't crash.

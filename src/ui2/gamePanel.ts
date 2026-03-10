@@ -55,7 +55,7 @@ export class GamePanel extends UIPanel {
 
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const inv = EntityManager.get<'inventory'>(this.playerEntityId, 'inventory')
-        if (!stats) return
+        if (!stats) {return}
 
         // --- Player name ---
         drawLabel(ctx, 'NAME', 20, 14, FALLOUT_DARK_GRAY)
@@ -90,7 +90,7 @@ export class GamePanel extends UIPanel {
     }
 
     override onMouseDown(x: number, y: number, button: 'l' | 'r'): boolean {
-        if (y < 50) return false  // click in the status area, pass through
+        if (y < 50) {return false}  // click in the status area, pass through
 
         // Action buttons region
         const { width } = this.bounds
@@ -107,7 +107,7 @@ export class GamePanel extends UIPanel {
     }
 
     private _onButtonClick(btn: { label: string; panel: string | null }): void {
-        if (!btn.panel) return
+        if (!btn.panel) {return}
         const panelName = btn.panel
         import('../eventBus.js').then(({ EventBus }) => {
             EventBus.emit('audio:playSound', { soundId: 'ui_click' })
@@ -196,7 +196,7 @@ function drawButton(
 
 function hpColorFor(stats: StatsComponent): UIColor {
     const ratio = stats.currentHp / stats.maxHp
-    if (ratio > 0.66) return FALLOUT_GREEN
-    if (ratio > 0.33) return FALLOUT_AMBER
+    if (ratio > 0.66) {return FALLOUT_GREEN}
+    if (ratio > 0.33) {return FALLOUT_AMBER}
     return FALLOUT_RED
 }

@@ -29,8 +29,8 @@ import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from 
 // Turn-based combat system
 
 export class ActionPoints {
-    combat: number = 0 // Combat AP
-    move: number = 0 // Move AP
+    combat = 0 // Combat AP
+    move = 0 // Move AP
     attachedCritter: Critter
 
     constructor(obj: Critter) {
@@ -39,7 +39,7 @@ export class ActionPoints {
     }
 
     resetAP() {
-        var AP = this.getMaxAP()
+        const AP = this.getMaxAP()
         this.combat = AP.combat
         this.move = AP.move
     }
@@ -61,8 +61,8 @@ export class ActionPoints {
     }
 
     subtractMoveAP(value: number): boolean {
-        if (value <= 0) return true
-        if (this.getAvailableMoveAP() < value) return false
+        if (value <= 0) {return true}
+        if (this.getAvailableMoveAP() < value) {return false}
 
         this.move -= value
         if (this.move < 0) {
@@ -77,8 +77,8 @@ export class ActionPoints {
     }
 
     subtractCombatAP(value: number): boolean {
-        if (value <= 0) return true
-        if (this.combat < value) return false
+        if (value <= 0) {return true}
+        if (this.combat < value) {return false}
 
         this.combat -= value
         return true
@@ -94,17 +94,17 @@ export class AI {
         // load and parse AI.TXT
         if (AI.aiTxt !== null)
             // already loaded
-            return
+            {return}
 
         AI.aiTxt = {}
-        var ini = parseIni(getFileText('data/data/ai.txt'))
+        const ini = parseIni(getFileText('data/data/ai.txt'))
         if (ini === null) {
             // AI.TXT unavailable (e.g. asset not yet loaded); leave table empty
             // so that AI critters fall back to a default packet rather than crashing.
             console.warn("combat: couldn't load AI.TXT — AI critters will use default packet")
             return
         }
-        for (var key in ini) {
+        for (const key in ini) {
             ini[key].keyName = key
             AI.aiTxt[ini[key].packet_num] = ini[key]
         }
@@ -118,7 +118,7 @@ export class AI {
         this.combatant = combatant
 
         // load if necessary
-        if (AI.aiTxt === null) AI.init()
+        if (AI.aiTxt === null) {AI.init()}
 
         this.info = AI.getPacketInfo(this.combatant.aiNum)
         if (!this.info) {
@@ -149,7 +149,7 @@ export class Combat {
         // Gather a list of combatants (critters meeting a certain criteria)
         this.combatants = objects.filter((obj) => {
             if (obj instanceof Critter) {
-                if (obj.dead || !obj.visible) return false
+                if (obj.dead || !obj.visible) {return false}
 
                 // TODO: should we initialize AI elsewhere, like in Critter?
                 if (!obj.isPlayer && !obj.ai) {
@@ -198,7 +198,7 @@ export class Combat {
     }
 
     private normalizeHitRegion(region: string): string {
-        if (CriticalEffects.regionHitChanceDecTable[region] !== undefined) return region
+        if (CriticalEffects.regionHitChanceDecTable[region] !== undefined) {return region}
         return 'torso'
     }
 
@@ -215,42 +215,42 @@ export class Combat {
 
         // 4 if weapon has long_range perk
         // 5 if weapon has scope_range perk
-        var distModifier = 2
+        const distModifier = 2
         // 8 if weapon has scope_range perk
-        var minDistance = 0
-        var perception = obj.getStat('PER')
+        const minDistance = 0
+        const perception = obj.getStat('PER')
         // BLK-093: Guard against null positions — attacker or target may lack a tile
         // assignment (e.g. objects in inventory during scripted combat events).
         // Return 0 (no distance penalty) instead of crashing on hexDistance.
-        var distance = (obj.position && target.position) ? hexDistance(obj.position, target.position) : 0
+        let distance = (obj.position && target.position) ? hexDistance(obj.position, target.position) : 0
         if (distance < minDistance)
-            distance += minDistance // yes supposedly += not =, this means 7 grid distance is the worst
+            {distance += minDistance} // yes supposedly += not =, this means 7 grid distance is the worst
         else {
-            var tempPER = perception
-            if (obj.isPlayer === true) tempPER -= 2 // supposedly player gets nerfed like this. WTF?
+            let tempPER = perception
+            if (obj.isPlayer === true) {tempPER -= 2} // supposedly player gets nerfed like this. WTF?
             distance -= tempPER * distModifier
         }
 
         // this appears not to have any effect but was found so elsewhere
         // If anyone can tell me why it exists or what it's for I'd be grateful.
-        if (-2 * perception > distance) distance = -2 * perception
+        if (-2 * perception > distance) {distance = -2 * perception}
 
         // Sharpshooter perk (ID 5): each rank grants +2 effective PER for range penalty.
         // Implemented as reducing the un-multiplied distance by 2*rank before the x4 scale.
         const sharpshooterRank = (obj.perkRanks ?? {})[5] ?? 0
-        if (sharpshooterRank > 0) distance -= 2 * sharpshooterRank
+        if (sharpshooterRank > 0) {distance -= 2 * sharpshooterRank}
 
         // then we multiply a magic number on top. More if there is eye damage involved by the attacker
         // this means for each field distance after PER modification we lose 4 points of hitchance
         // 12 if we have eyedamage
-        var objHasEyeDamage = false
-        if (distance >= 0 && objHasEyeDamage) distance *= 12
-        else distance *= 4
+        const objHasEyeDamage = false
+        if (distance >= 0 && objHasEyeDamage) {distance *= 12}
+        else {distance *= 4}
 
         // and if the result is a positive distance, we return that
         // closeness can not improve hitchance above normal, so we don't return that
-        if (distance >= 0) return distance
-        else return 0
+        if (distance >= 0) {return distance}
+        else {return 0}
     }
 
     getHitChance(obj: Critter, target: Critter, region: string) {
@@ -287,14 +287,14 @@ export class Combat {
             weaponSkill = obj.getSkill('Unarmed')
         }
 
-        var hitDistanceModifier = this.getHitDistanceModifier(obj, target, effectiveWeaponObj)
+        const hitDistanceModifier = this.getHitDistanceModifier(obj, target, effectiveWeaponObj)
         // AC now includes any temporary end-of-turn AP bonus via StatSet.acBonus
-        var AC = target.getStat('AC')
-        var bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
-        var baseCrit = obj.getStat('Critical Chance') + bonusCrit
+        const AC = target.getStat('AC')
+        const bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
+        const baseCrit = obj.getStat('Critical Chance') + bonusCrit
         const regionPenalty = CriticalEffects.regionHitChanceDecTable[normalizedRegion] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
-        var hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
-        var critChance = baseCrit + regionPenalty
+        let hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
+        const critChance = baseCrit + regionPenalty
 
         if (isNaN(hitChance)) {
             console.warn('getHitChance: NaN hit chance — clamping to 0')
@@ -309,15 +309,15 @@ export class Combat {
 
     rollHit(obj: Critter, target: Critter, region: string): any {
         const normalizedRegion = this.normalizeHitRegion(region)
-        var critModifer = obj.getStat('Better Criticals')
-        var hitChance = this.getHitChance(obj, target, normalizedRegion)
+        const critModifer = obj.getStat('Better Criticals')
+        const hitChance = this.getHitChance(obj, target, normalizedRegion)
 
         // hey kids! Did you know FO only rolls the dice once here and uses the results two times?
-        var roll = getRandomInt(1, D100_MAX)
+        const roll = getRandomInt(1, D100_MAX)
 
         if (hitChance.hit - roll > 0) {
             var isCrit = false
-            if (rollSkillCheck(Math.floor(hitChance.hit - roll) / 10, hitChance.crit, false) === true) isCrit = true
+            if (rollSkillCheck(Math.floor(hitChance.hit - roll) / 10, hitChance.crit, false) === true) {isCrit = true}
 
             // Sniper perk (ID 9): make a second d100 roll; use the better outcome
             // for the called-shot location. If the second roll also qualifies as a
@@ -327,15 +327,15 @@ export class Combat {
                 const secondRoll = getRandomInt(1, D100_MAX)
                 if (hitChance.hit - secondRoll > 0) {
                     if (rollSkillCheck(Math.floor(hitChance.hit - secondRoll) / 10, hitChance.crit, false))
-                        isCrit = true
+                        {isCrit = true}
                 }
             }
 
             if (isCrit === true) {
-                var critLevel = Math.floor(Math.max(0, getRandomInt(critModifer, 100 + critModifer)) / 20)
+                const critLevel = Math.floor(Math.max(0, getRandomInt(critModifer, 100 + critModifer)) / 20)
                 this.log('crit level: ' + critLevel)
-                var crit = CriticalEffects.getCritical(target.killType, normalizedRegion, critLevel)
-                var critStatus = crit.doEffectsOn(target)
+                const crit = CriticalEffects.getCritical(target.killType, normalizedRegion, critLevel)
+                const critStatus = crit.doEffectsOn(target)
 
                 return { hit: true, crit: true, DM: critStatus.DM, msgID: critStatus.msgID } // crit
             }
@@ -345,44 +345,44 @@ export class Combat {
 
         // in reverse because miss -> roll > hitchance.hit
         var isCrit = false
-        if (rollSkillCheck(Math.floor(roll - hitChance.hit) / 10, 0, false)) isCrit = true
+        if (rollSkillCheck(Math.floor(roll - hitChance.hit) / 10, 0, false)) {isCrit = true}
         // Jinxed trait (ID 9): 50% added chance for a critical miss on any miss.
         // Pariah Dog companion provides the same non-stacking bonus; check both.
         const attackerJinxed = obj.charTraits?.has(9) ?? false
         const playerJinxed = this.player && !obj.isPlayer ? (this.player.charTraits?.has(9) ?? false) : false
         if ((attackerJinxed || playerJinxed) && !isCrit) {
-            if (getRandomInt(1, D100_MAX) <= JINXED_CRIT_MISS_CHANCE) isCrit = true
+            if (getRandomInt(1, D100_MAX) <= JINXED_CRIT_MISS_CHANCE) {isCrit = true}
         }
 
         return { hit: false, crit: isCrit } // miss
     }
 
     getDamageDone(obj: Critter, target: Critter, critModifer: number) {
-        var weapon = obj.equippedWeapon
+        const weapon = obj.equippedWeapon
         // BLK-053: No weapon equipped — use a synthetic unarmed weapon (Weapon(null))
         // so that critters can deal damage in melee even without an equipped item.
         // Weapon(null) represents a bare-fist punch: 1–2 Normal damage.
-        var wep = weapon?.weapon ?? new Weapon(null)
+        const wep = weapon?.weapon ?? new Weapon(null)
         if (!wep) {
             console.warn('getDamageDone: weapon has no weapon data — returning 0 damage')
             return 0
         }
-        var damageType = wep.getDamageType()
+        const damageType = wep.getDamageType()
 
-        var RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
-        var RB = 0 // ranged bonus (via perk)
-        var CM = critModifer // critical hit damage multiplier
-        var ADR = target.getStat('DR ' + damageType) // damage resistance (includes equipped armor)
-        var ADT = target.getStat('DT ' + damageType) // damage threshold (includes equipped armor)
-        var X = 2 // ammo dividend
-        var Y = 1 // ammo divisor
-        var RM = 0 // ammo resistance modifier
-        var CD = 100 // combat difficulty modifier (easy = 75%, normal = 100%, hard = 125%)
+        const RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
+        const RB = 0 // ranged bonus (via perk)
+        const CM = critModifer // critical hit damage multiplier
+        const ADR = target.getStat('DR ' + damageType) // damage resistance (includes equipped armor)
+        const ADT = target.getStat('DT ' + damageType) // damage threshold (includes equipped armor)
+        const X = 2 // ammo dividend
+        const Y = 1 // ammo divisor
+        const RM = 0 // ammo resistance modifier
+        const CD = 100 // combat difficulty modifier (easy = 75%, normal = 100%, hard = 125%)
 
-        var ammoDamageMult = X / Y
+        const ammoDamageMult = X / Y
 
-        var baseDamage = (CM / 2) * ammoDamageMult * (RD + RB) * (CD / 100)
-        var adjustedDamage = Math.max(0, baseDamage - ADT)
+        const baseDamage = (CM / 2) * ammoDamageMult * (RD + RB) * (CD / 100)
+        const adjustedDamage = Math.max(0, baseDamage - ADT)
         console.log(
             `RD: ${RD} | CM: ${CM} | ADR: ${ADR} | ADT: ${ADT} | Base Dmg: ${baseDamage} Adj Dmg: ${adjustedDamage} | Type: ${damageType}`
         )
@@ -398,20 +398,20 @@ export class Combat {
         // turn to face the target
         // BLK-059: Guard against null positions before calling hexNearestNeighbor.
         if (obj.position && target.position) {
-            var hex = hexNearestNeighbor(obj.position, target.position)
-            if (hex !== null) obj.orientation = hex.direction
+            const hex = hexNearestNeighbor(obj.position, target.position)
+            if (hex !== null) {obj.orientation = hex.direction}
         }
 
         // BLK-117: Track last target and last attacker per critter so that
         // get_last_target() / get_last_attacker() sfall opcodes return real values.
-        ;(obj as any).lastCombatTarget = target
+        (obj as any).lastCombatTarget = target
         ;(target as any).lastCombatAttacker = obj
 
         // Calculate hit and damage synchronously before starting the animation so
         // that we can wrap the callback if the last enemy was just killed (BLK-062).
-        var who = obj.isPlayer ? 'You' : obj.name
-        var targetName = target.isPlayer ? 'you' : target.name
-        var hitRoll = this.rollHit(obj, target, region)
+        const who = obj.isPlayer ? 'You' : obj.name
+        const targetName = target.isPlayer ? 'you' : target.name
+        const hitRoll = this.rollHit(obj, target, region)
         this.log('hit% is ' + this.getHitChance(obj, target, region).hit)
 
         // BLK-062: Track whether this attack killed the last non-player combatant so
@@ -419,9 +419,9 @@ export class Combat {
         let shouldAutoEnd = false
 
         if (hitRoll.hit === true) {
-            var critModifier = hitRoll.crit ? hitRoll.DM : 2
-            var damage = this.getDamageDone(obj, target, critModifier)
-            var extraMsg = hitRoll.crit === true ? this.getCombatMsg(hitRoll.msgID) || '' : ''
+            const critModifier = hitRoll.crit ? hitRoll.DM : 2
+            const damage = this.getDamageDone(obj, target, critModifier)
+            const extraMsg = hitRoll.crit === true ? this.getCombatMsg(hitRoll.msgID) || '' : ''
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage' + extraMsg)
 
             critterDamage(target, damage, obj)
@@ -434,20 +434,20 @@ export class Combat {
         } else {
             this.log(who + ' missed ' + targetName + (hitRoll.crit === true ? ' critically' : ''))
             if (hitRoll.crit === true) {
-                var critFailMod = (obj.getStat('LUK') - 5) * -5
-                var critFailRoll = Math.floor(getRandomInt(1, 100) - critFailMod)
-                var critFailLevel = 1
-                if (critFailRoll <= 20) critFailLevel = 1
-                else if (critFailRoll <= 50) critFailLevel = 2
-                else if (critFailRoll <= 75) critFailLevel = 3
-                else if (critFailRoll <= 95) critFailLevel = 4
-                else critFailLevel = 5
+                const critFailMod = (obj.getStat('LUK') - 5) * -5
+                const critFailRoll = Math.floor(getRandomInt(1, 100) - critFailMod)
+                let critFailLevel = 1
+                if (critFailRoll <= 20) {critFailLevel = 1}
+                else if (critFailRoll <= 50) {critFailLevel = 2}
+                else if (critFailRoll <= 75) {critFailLevel = 3}
+                else if (critFailRoll <= 95) {critFailLevel = 4}
+                else {critFailLevel = 5}
 
                 this.log(who + ' failed at fail level ' + critFailLevel)
 
                 // Map weapon type to appropriate crit fail table
-                var weaponType = CriticalEffects.getWeaponCritFailType(obj)
-                var critFailEffect = CriticalEffects.criticalFailTable[weaponType][critFailLevel]
+                const weaponType = CriticalEffects.getWeaponCritFailType(obj)
+                const critFailEffect = CriticalEffects.criticalFailTable[weaponType][critFailLevel]
                 CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
             }
         }
@@ -457,7 +457,7 @@ export class Combat {
         // nextTurn() will detect numActive===0 (all enemies dead) and call end().
         const effectiveCallback: (() => void) | undefined = shouldAutoEnd
             ? () => {
-                if (callback) callback()
+                if (callback) {callback()}
                 if (globalState.inCombat && globalState.combat === this) {
                     this.nextTurn()
                 }
@@ -477,8 +477,8 @@ export class Combat {
     // queried by the UI or scripts to determine current combat viability.
     canEndCombat(): boolean {
         for (const c of this.combatants) {
-            if (c.isPlayer) continue
-            if (!c.dead) return false
+            if (c.isPlayer) {continue}
+            if (!c.dead) {return false}
         }
         return true
     }
@@ -488,10 +488,10 @@ export class Combat {
     }
 
     maybeTaunt(obj: Critter, type: string, roll: boolean) {
-        if (roll === false) return
+        if (roll === false) {return}
         // BLK-052: Guard against null ai (AI failed to initialize for this critter).
-        if (!obj.ai?.info) return
-        var msgID = getRandomInt(parseInt(obj.ai.info[type + '_start']), parseInt(obj.ai.info[type + '_end']))
+        if (!obj.ai?.info) {return}
+        const msgID = getRandomInt(parseInt(obj.ai.info[type + '_start']), parseInt(obj.ai.info[type + '_end']))
         this.log('[TAUNT ' + obj.name + ': ' + this.getCombatAIMessage(msgID) + ']')
     }
 
@@ -500,10 +500,10 @@ export class Combat {
         // Find the closest living combatant on a different team
 
         const targets = this.combatants.filter((x) => !x.dead && x.teamNum !== obj.teamNum)
-        if (targets.length === 0) return null
+        if (targets.length === 0) {return null}
         // BLK-059: Guard null positions in the sort comparator to avoid crashes when
         // combatants lack a position (e.g. freshly added or off-map).
-        if (!obj.position) return targets[0] ?? null
+        if (!obj.position) {return targets[0] ?? null}
         targets.sort((a, b) => {
             const da = a.position ? hexDistance(obj.position!, a.position) : Infinity
             const db = b.position ? hexDistance(obj.position!, b.position) : Infinity
@@ -550,24 +550,23 @@ export class Combat {
             return this.nextTurn()
         }
 
-        var that = this
-        var target = this.findTarget(obj)
+        const target = this.findTarget(obj)
         if (!target) {
             console.log('[AI has no target]')
             return this.nextTurn()
         }
-        var distance = obj.position && target.position ? hexDistance(obj.position, target.position) : 0
-        var AP = obj.AP!
-        var messageRoll = rollSkillCheck(obj.ai.info.chance, 0, false)
+        const distance = obj.position && target.position ? hexDistance(obj.position, target.position) : 0
+        const AP = obj.AP!
+        const messageRoll = rollSkillCheck(obj.ai.info.chance, 0, false)
 
         if (Config.engine.doLoadScripts === true && obj._script !== undefined) {
             // notify the critter script of a combat event
-            if (Scripting.combatEvent(obj, 'turnBegin') === true) return // end of combat (script override)
+            if (Scripting.combatEvent(obj, 'turnBegin') === true) {return} // end of combat (script override)
         }
 
         if (AP.getAvailableMoveAP() <= 0)
             // out of AP
-            return this.nextTurn()
+            {return this.nextTurn()}
 
         // behaviors
 
@@ -580,7 +579,7 @@ export class Combat {
             const targetPos = { x: 128, y: obj.position?.y ?? 0 } // left edge
             const callback = () => {
                 obj.clearAnim()
-                that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
+                this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             }
 
             if (!this.walkUpTo(obj, idx, targetPos, AP.getAvailableMoveAP(), callback)) {
@@ -590,17 +589,17 @@ export class Combat {
             return
         }
 
-        var weaponObj = obj.equippedWeapon
+        const weaponObj = obj.equippedWeapon
         if (!weaponObj) {
             console.warn('doAITurn: AI critter ' + obj.name + ' has no weapon — skipping turn')
             return this.nextTurn()
         }
-        var weapon = weaponObj.weapon
+        const weapon = weaponObj.weapon
         if (!weapon) {
             console.warn('doAITurn: AI critter ' + obj.name + ' weapon has no weapon data — skipping turn')
             return this.nextTurn()
         }
-        var fireDistance = weapon.getMaximumRange(1)
+        const fireDistance = weapon.getMaximumRange(1)
         this.log(
             'DEBUG: weapon: ' +
                 weapon +
@@ -621,26 +620,26 @@ export class Combat {
                 console.warn('[combat] doAITurn: target has no position — skipping creep')
                 return this.nextTurn()
             }
-            var neighbors = hexNeighbors(target.position)
-            var maxDistance = Math.min(AP.getAvailableMoveAP(), distance - fireDistance)
+            const neighbors = hexNeighbors(target.position)
+            const maxDistance = Math.min(AP.getAvailableMoveAP(), distance - fireDistance)
             this.maybeTaunt(obj, 'move', messageRoll)
 
             // Prefer neighbors nearest to our current position so movement is less erratic.
             // BLK-095: Guard against null obj.position in sort comparator.
             neighbors.sort((a, b) => {
-                if (!obj.position) return 0
+                if (!obj.position) {return 0}
                 return hexDistance(obj.position, a) - hexDistance(obj.position, b)
             })
 
-            var didCreep = false
-            for (var i = 0; i < neighbors.length; i++) {
+            let didCreep = false
+            for (let i = 0; i < neighbors.length; i++) {
                 if (
                     obj.walkTo(
                         neighbors[i],
                         false,
-                        function () {
+                        () => {
                             obj.clearAnim()
-                            that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
+                            this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
                         },
                         maxDistance
                     ) !== false
@@ -668,7 +667,7 @@ export class Combat {
             if (!didCreep) {
                 // no path
                 this.log('[NO PATH]')
-                that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
+                this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             }
         } else if (AP.getAvailableCombatAP() >= 4) {
             // if we are in range, do we have enough AP to attack?
@@ -689,9 +688,9 @@ export class Combat {
                 return this.doAITurn(obj, idx, depth + 1)
             }
 
-            this.attack(obj, target, 'torso', function () {
+            this.attack(obj, target, 'torso', () => {
                 obj.clearAnim()
-                that.doAITurn(obj, idx, depth + 1) // if we can, do another turn
+                this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             })
         } else {
             console.log('[AI IS STUMPED]')
@@ -704,7 +703,7 @@ export class Combat {
         globalState.inCombat = true
         globalState.combat = new Combat(globalState.gMap.getObjects())
 
-        if (forceTurn) globalState.combat.forceTurn(forceTurn)
+        if (forceTurn) {globalState.combat.forceTurn(forceTurn)}
 
         globalState.combat.nextTurn()
         globalState.gMap.updateMap()
@@ -729,9 +728,9 @@ export class Combat {
     }
 
     forceTurn(obj: Critter) {
-        if (obj.isPlayer) this.whoseTurn = this.playerIdx - 1
+        if (obj.isPlayer) {this.whoseTurn = this.playerIdx - 1}
         else {
-            var idx = this.combatants.indexOf(obj)
+            const idx = this.combatants.indexOf(obj)
             if (idx === -1) {
                 console.warn("forceTurn: no combatant '" + obj.name + "' in combatant list — ignoring")
                 return
@@ -741,7 +740,7 @@ export class Combat {
         }
     }
 
-    nextTurn(skipDepth: number = 0): void {
+    nextTurn(skipDepth = 0): void {
         // Guard against infinite skip-recursion when all remaining combatants in a
         // round are dead/non-hostile.  One full rotation of the combatant list is
         // the maximum useful skip depth; beyond that we force-end combat.
@@ -767,15 +766,15 @@ export class Combat {
         }
 
         // update range checks
-        var numActive = 0
-        for (var i = 0; i < this.combatants.length; i++) {
-            var obj = this.combatants[i]
-            if (obj.dead || obj.isPlayer) continue
+        let numActive = 0
+        for (let i = 0; i < this.combatants.length; i++) {
+            const obj = this.combatants[i]
+            if (obj.dead || obj.isPlayer) {continue}
             // BLK-051: Guard against null ai (AI failed to init for this critter).
             // Fall back to a safe default max_dist so the loop can still complete.
             const maxDist: number = obj.ai?.info?.max_dist ?? 20
             // BLK-059: Guard null positions to prevent hexDistance crash.
-            var inRange = (obj.position && this.player.position)
+            const inRange = (obj.position && this.player.position)
                 ? hexDistance(obj.position, this.player.position) <= maxDist
                 : false
 
@@ -789,12 +788,12 @@ export class Combat {
             }
         }
 
-        if (numActive === 0 && this.turnNum !== 1) return this.end()
+        if (numActive === 0 && this.turnNum !== 1) {return this.end()}
 
         this.turnNum++
         this.whoseTurn++
 
-        if (this.whoseTurn >= this.combatants.length) this.whoseTurn = 0
+        if (this.whoseTurn >= this.combatants.length) {this.whoseTurn = 0}
 
         if (this.combatants[this.whoseTurn].isPlayer) {
             // Player's turn starts — clear the player's end-of-turn AC bonus.
@@ -803,8 +802,8 @@ export class Combat {
             this.player.AP!.resetAP()
         } else {
             this.inPlayerTurn = false
-            var critter = this.combatants[this.whoseTurn]
-            if (critter.dead === true || critter.hostile !== true) return this.nextTurn(skipDepth + 1)
+            const critter = this.combatants[this.whoseTurn]
+            if (critter.dead === true || critter.hostile !== true) {return this.nextTurn(skipDepth + 1)}
 
             // Guard against critters that were added mid-combat without AP initialised.
             if (!critter.AP) {

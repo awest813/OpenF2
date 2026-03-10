@@ -129,9 +129,9 @@ describe('Phase 23-A — has_trait TRAIT_CHAR (type 2)', () => {
 
     it('handles all trait IDs 0–15 without stub hits', () => {
         const c = makeCritter()
-        for (let i = 0; i <= 15; i++) c.charTraits.add(i)
+        for (let i = 0; i <= 15; i++) {c.charTraits.add(i)}
         drainStubHits()
-        for (let i = 0; i <= 15; i++) expect(script.has_trait(2, c, i)).toBe(1)
+        for (let i = 0; i <= 15; i++) {expect(script.has_trait(2, c, i)).toBe(1)}
         expect(stubHitCount()).toBe(0)
     })
 })

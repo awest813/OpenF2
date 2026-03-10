@@ -769,7 +769,7 @@ Scripting.setUseElevatorHandler(useElevator)
 
 ;(function installBrowserErrorBoundary() {
     // Only install in browser environments.
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {return}
 
     /** Tracks whether the overlay is already visible to suppress duplicates. */
     let overlayVisible = false
@@ -781,7 +781,7 @@ Scripting.setUseElevatorHandler(useElevator)
 
     function showErrorOverlay(message: string, source: string, detail: string) {
         recentErrorCount++
-        if (recentErrorCount > ERROR_THROTTLE_MAX) return // throttle flood
+        if (recentErrorCount > ERROR_THROTTLE_MAX) {return} // throttle flood
 
         if (throttleResetTimer === null) {
             throttleResetTimer = setTimeout(() => {
@@ -790,7 +790,7 @@ Scripting.setUseElevatorHandler(useElevator)
             }, ERROR_THROTTLE_WINDOW_MS)
         }
 
-        if (overlayVisible) return // only one overlay at a time
+        if (overlayVisible) {return} // only one overlay at a time
 
         overlayVisible = true
         console.error(`[BLK-139] Unhandled error in ${source}:`, message, detail)

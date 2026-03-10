@@ -34,7 +34,7 @@ import {
  * Returns the critter's Poison Level stat, or 0 for non-critters.
  */
 function getPoisonLevel(obj: any): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     return obj.stats?.getBase?.('Poison Level') ?? 0
 }
 
@@ -43,7 +43,7 @@ function getPoisonLevel(obj: any): number {
  * Returns the critter's Radiation Level stat, or 0 for non-critters.
  */
 function getRadiationLevel(obj: any): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     return obj.stats?.getBase?.('Radiation Level') ?? 0
 }
 

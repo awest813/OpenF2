@@ -49,9 +49,9 @@ describe('Phase 37-B — sfall sprintf opcode (0x8192)', () => {
     function callSprintf(fmt: any, arg: any): string {
         // Mirror of the sprintf implementation in scripting.ts — tested standalone
         // so this suite does not require a live Scripting engine.
-        if (typeof fmt !== 'string') return String(fmt ?? '')
+        if (typeof fmt !== 'string') {return String(fmt ?? '')}
         return fmt.replace(/%%|%([disxci])/g, (match: string, spec?: string) => {
-            if (!spec) return '%'
+            if (!spec) {return '%'}
             const n = typeof arg === 'number' ? Math.trunc(arg) : (parseInt(String(arg), 10) || 0)
             switch (spec) {
                 case 'd':

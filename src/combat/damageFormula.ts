@@ -205,7 +205,7 @@ export function calculateDamage(attack: AttackDescriptor): DamageResult {
 }
 
 function rollDice(min: number, max: number): number {
-    if (min >= max) return min
+    if (min >= max) {return min}
     return min + Math.floor(Math.random() * (max - min + 1))
 }
 

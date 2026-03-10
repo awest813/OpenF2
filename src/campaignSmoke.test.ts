@@ -19,7 +19,7 @@ function makeScriptVM(literals: number[]): ScriptVMStub {
         dvarBase: 0,
         script: {
             read32() {
-                if (vm.literalQueue.length === 0) throw new Error('script read32 underflow')
+                if (vm.literalQueue.length === 0) {throw new Error('script read32 underflow')}
                 return vm.literalQueue.shift() as number
             },
             peek16() { return 0 },
@@ -27,11 +27,11 @@ function makeScriptVM(literals: number[]): ScriptVMStub {
         intfile: { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} },
         push(v: any) { this.dataStack.push(v) },
         pop() {
-            if (this.dataStack.length === 0) throw new Error('data stack underflow')
+            if (this.dataStack.length === 0) {throw new Error('data stack underflow')}
             return this.dataStack.pop()
         },
         popAddr() {
-            if (this.retStack.length === 0) throw new Error('return stack underflow')
+            if (this.retStack.length === 0) {throw new Error('return stack underflow')}
             return this.retStack.pop()
         },
     } as ScriptVMStub
@@ -68,7 +68,7 @@ class CampaignHarness {
         const vm = makeScriptVM([40, 2])
         for (const opcode of requiredScriptOps) {
             const handler = opMap[opcode]
-            if (!handler) throw new Error(`missing required opcode 0x${opcode.toString(16)}`)
+            if (!handler) {throw new Error(`missing required opcode 0x${opcode.toString(16)}`)}
             handler.call(vm)
         }
 
@@ -90,7 +90,7 @@ class CampaignHarness {
             bridge_encounter: 'temple_exterior',
         }
         const nextMap = transitionMap[this.state.currentMap]
-        if (!nextMap) throw new Error(`broken map transition from ${this.state.currentMap}`)
+        if (!nextMap) {throw new Error(`broken map transition from ${this.state.currentMap}`)}
 
         this.state.currentMap = nextMap
         this.state.inEncounter = false
@@ -130,7 +130,7 @@ class CampaignHarness {
     }
 
     resume(): string {
-        if (!this.state.scriptFlags.villageIntroDone) throw new Error('critical script progression lost after load')
+        if (!this.state.scriptFlags.villageIntroDone) {throw new Error('critical script progression lost after load')}
         return this.state.currentMap
     }
 }

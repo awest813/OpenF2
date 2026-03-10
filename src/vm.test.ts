@@ -34,11 +34,11 @@ function makeVM(initialStack: any[] = []): MinimalVM {
         intfile: { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} },
         push(v: any) { this.dataStack.push(v) },
         pop() {
-            if (this.dataStack.length === 0) throw 'data stack underflow'
+            if (this.dataStack.length === 0) {throw 'data stack underflow'}
             return this.dataStack.pop()
         },
         popAddr() {
-            if (this.retStack.length === 0) throw 'return stack underflow'
+            if (this.retStack.length === 0) {throw 'return stack underflow'}
             return this.retStack.pop()
         },
     }
@@ -981,7 +981,7 @@ describe('ScriptVM — vmMaxStepsPerCall step limit', () => {
             private stepsExecuted = 0
 
             step(): boolean {
-                if (this.halted) return false
+                if (this.halted) {return false}
                 this.stepsExecuted++
                 this.stepCount++
                 // Advance PC so ScriptVM.run() doesn't re-read the same offset
@@ -1051,7 +1051,7 @@ describe('ScriptVM — vmMaxStepsPerCall step limit', () => {
             private count = 0
 
             step(): boolean {
-                if (this.halted) return false
+                if (this.halted) {return false}
                 if (++this.count >= 3) {
                     this.halted = true
                     return false
@@ -1103,16 +1103,16 @@ function makeStubCritter(bases: Record<string, number>) {
 }
 
 function getCritterBaseStatReplica(obj: any, stat: number): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     const statName = statMapReplica[stat]
-    if (!statName) return 0
+    if (!statName) {return 0}
     return obj.stats.getBase(statName)
 }
 
 function setCritterBaseStatReplica(obj: any, stat: number, value: number): void {
-    if (!obj || obj.type !== 'critter') return
+    if (!obj || obj.type !== 'critter') {return}
     const statName = statMapReplica[stat]
-    if (!statName) return
+    if (!statName) {return}
     obj.stats.setBase(statName, value)
 }
 
@@ -1211,15 +1211,15 @@ describe('in_combat (sfall 0x8168) — inline replica', () => {
 // ---------------------------------------------------------------------------
 
 function useObjReplica(obj: any, sourceObj: any, player: any): any {
-    if (!obj || typeof obj.use !== 'function') return null
+    if (!obj || typeof obj.use !== 'function') {return null}
     const source = sourceObj && sourceObj.type === 'critter' ? sourceObj : player
     obj.use(source)
     return source
 }
 
 function useObjOnObjReplica(source: any, target: any, triggerUse: (target: any, source: any) => void): boolean {
-    if (!source || !target) return false
-    if (typeof source.type !== 'string' || typeof target.type !== 'string') return false
+    if (!source || !target) {return false}
+    if (typeof source.type !== 'string' || typeof target.type !== 'string') {return false}
     triggerUse(target, source)
     return true
 }
@@ -1281,10 +1281,10 @@ describe('use_obj_on_obj procedure behavior — inline replica', () => {
 // ---------------------------------------------------------------------------
 
 function critterInvenObjReplica(critter: any, where: number): any {
-    if (!critter || critter.type !== 'critter') throw new Error('not game object')
-    if (where === 0) return critter.equippedArmor ?? null // INVEN_TYPE_WORN
-    if (where === 1) return critter.rightHand ?? null     // INVEN_TYPE_RIGHT_HAND
-    if (where === 2) return critter.leftHand ?? null      // INVEN_TYPE_LEFT_HAND
+    if (!critter || critter.type !== 'critter') {throw new Error('not game object')}
+    if (where === 0) {return critter.equippedArmor ?? null} // INVEN_TYPE_WORN
+    if (where === 1) {return critter.rightHand ?? null}     // INVEN_TYPE_RIGHT_HAND
+    if (where === 2) {return critter.leftHand ?? null}      // INVEN_TYPE_LEFT_HAND
     return null
 }
 

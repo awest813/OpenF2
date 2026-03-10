@@ -121,7 +121,7 @@ describe('Phase 22-A — proto_data armor DT fields (cases 40-46)', () => {
 
     it('none of cases 40-46 emit a stub hit when PRO is unavailable', () => {
         drainStubHits()
-        for (let i = 40; i <= 46; i++) script.proto_data(0, i)
+        for (let i = 40; i <= 46; i++) {script.proto_data(0, i)}
         expect(stubHitCount()).toBe(0)
     })
 })
@@ -159,7 +159,7 @@ describe('Phase 22-B — proto_data perk (47) + critter XP/kill (48-49)', () => 
 
     it('none of cases 47-49 emit a stub hit when PRO is unavailable', () => {
         drainStubHits()
-        for (let i = 47; i <= 49; i++) script.proto_data(0, i)
+        for (let i = 47; i <= 49; i++) {script.proto_data(0, i)}
         expect(stubHitCount()).toBe(0)
     })
 })

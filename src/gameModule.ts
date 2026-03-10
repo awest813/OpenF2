@@ -35,7 +35,7 @@ export class ModuleRegistry {
 
     get<T extends GameModule>(name: string): T {
         const mod = this.moduleMap.get(name)
-        if (!mod) throw new Error(`Module "${name}" not found`)
+        if (!mod) {throw new Error(`Module "${name}" not found`)}
         return mod as T
     }
 

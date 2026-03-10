@@ -27,13 +27,13 @@ export function parseIni(text: string) {
     const lines = text.split('\n')
     let category = null
 
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].replace(/\s*;.*/, '') // replace comments
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].replace(/\s*;.*/, '') // replace comments
         if (line.trim() === '') {
-        } else if (line[0] === '[') category = line.trim().slice(1, -1)
+        } else if (line[0] === '[') {category = line.trim().slice(1, -1)}
         else {
             // key=value
-            var kv = line.match(/(.+?)=(.+)/)
+            const kv = line.match(/(.+?)=(.+)/)
             if (kv === null) {
                 // MAPS.TXT has one of these, so it's not an exception
                 console.log('warning: parseIni: not a key=value line: ' + line)
@@ -44,7 +44,7 @@ export function parseIni(text: string) {
                 continue
             }
 
-            if (ini[category] === undefined) ini[category] = {}
+            if (ini[category] === undefined) {ini[category] = {}}
             ini[category][kv[1]] = kv[2]
         }
     }
@@ -56,7 +56,7 @@ export function getFileText(path: string, err?: () => void): string {
     const xhr = new XMLHttpRequest()
     xhr.open('GET', path, false)
     xhr.send(null)
-    if (xhr.status !== 200) throw Error(`getFileText: got status ${xhr.status} when requesting '${path}'`)
+    if (xhr.status !== 200) {throw Error(`getFileText: got status ${xhr.status} when requesting '${path}'`)}
 
     return xhr.responseText
 }
@@ -87,14 +87,14 @@ export function getFileBinarySync(path: string) {
     xhr.overrideMimeType('text/plain; charset=x-user-defined')
     xhr.send(null)
 
-    if (xhr.status !== 200) throw Error(`getFileBinarySync: got status ${xhr.status} when requesting '${path}'`)
+    if (xhr.status !== 200) {throw Error(`getFileBinarySync: got status ${xhr.status} when requesting '${path}'`)}
 
     // Convert to ArrayBuffer, and then to DataView
     const data = xhr.responseText
     const buffer = new ArrayBuffer(data.length)
     const arr = new Uint8Array(buffer)
 
-    for (let i = 0; i < data.length; i++) arr[i] = data.charCodeAt(i) & 0xff
+    for (let i = 0; i < data.length; i++) {arr[i] = data.charCodeAt(i) & 0xff}
 
     return new DataView(buffer)
 }
@@ -106,24 +106,24 @@ export function getRandomInt(min: number, max: number) {
 
 export function rollSkillCheck(skill: number, modifier: number, isBounded: boolean) {
     const tempSkill = skill + modifier
-    if (isBounded) clamp(0, 95, tempSkill)
+    if (isBounded) {clamp(0, 95, tempSkill)}
 
     const roll = getRandomInt(0, 100)
     return roll < tempSkill
 }
 
-function rollVsSkill(who: Critter, skill: string, modifier: number = 0) {
-    var skillLevel = who.getSkill(skill) + modifier
-    var roll = skillLevel - getRandomInt(1, 100)
+function rollVsSkill(who: Critter, skill: string, modifier = 0) {
+    const skillLevel = who.getSkill(skill) + modifier
+    const roll = skillLevel - getRandomInt(1, 100)
 
     if (roll <= 0) {
         // failure
-        if (-roll / 10 > getRandomInt(1, 100)) return 0 // critical failure
+        if (-roll / 10 > getRandomInt(1, 100)) {return 0} // critical failure
         return 1 // failure
     } else {
         // success
-        var critChance = who.getStat('Critical Chance')
-        if (roll / 10 + critChance > getRandomInt(1, 100)) return 3 // critical success
+        const critChance = who.getStat('Critical Chance')
+        if (roll / 10 + critChance > getRandomInt(1, 100)) {return 3} // critical success
         return 2 // success
     }
 }
@@ -159,12 +159,12 @@ export function clamp(min: number, max: number, value: number) {
 
 export function getMessage(name: string, id: number): string | null {
     if (globalState.messageFiles[name] !== undefined && globalState.messageFiles[name][id] !== undefined)
-        return globalState.messageFiles[name][id]
+        {return globalState.messageFiles[name][id]}
     else {
         loadMessage(name)
         if (globalState.messageFiles[name] !== undefined && globalState.messageFiles[name][id] !== undefined)
-            return globalState.messageFiles[name][id]
-        else return null
+            {return globalState.messageFiles[name][id]}
+        else {return null}
     }
 }
 
@@ -180,7 +180,7 @@ export function pad(n: any, width: number, z?: string) {
 
 export class BinaryReader {
     data: DataView
-    offset: number = 0
+    offset = 0
     length: number
 
     constructor(data: DataView) {
@@ -195,12 +195,12 @@ export class BinaryReader {
         return this.data.getUint8(this.offset++)
     }
     read16(): number {
-        var r = this.data.getUint16(this.offset)
+        const r = this.data.getUint16(this.offset)
         this.offset += 2
         return r
     }
     read32(): number {
-        var r = this.data.getUint32(this.offset)
+        const r = this.data.getUint32(this.offset)
         this.offset += 4
         return r
     }
@@ -217,11 +217,11 @@ export class BinaryReader {
 }
 
 export function assert(value: boolean, message: string) {
-    if (!value) throw 'AssertionError: ' + message
+    if (!value) {throw 'AssertionError: ' + message}
 }
 
 export function assertEq<T>(value: T, expected: T, message: string) {
-    if (value !== expected) throw `AssertionError: value (${value}) does not match expected (${expected}): ${message}`
+    if (value !== expected) {throw `AssertionError: value (${value}) does not match expected (${expected}): ${message}`}
 }
 
 declare function structuredClone(value: any, options?: StructuredSerializeOptions): any

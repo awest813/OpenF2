@@ -575,7 +575,7 @@ export class WebGLRenderer extends Renderer {
 
     renderUIOverlay(): void {
         const uiManager = globalState.uiManager
-        if (!uiManager) return
+        if (!uiManager) {return}
 
         const canvas = uiManager.render()
 

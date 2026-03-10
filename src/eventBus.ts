@@ -76,7 +76,7 @@ export interface EngineEvents {
     // UI panels
     'ui:openPanel': { panelName: string }
     'ui:closePanel': { panelName: string }
-    'barter:talkRequested': {}
+    'barter:talkRequested': Record<string, never>
     'barter:offerAccepted': {
         playerTable: { name: string; amount: number; value: number }[]
         merchantTable: { name: string; amount: number; value: number }[]
@@ -86,7 +86,7 @@ export interface EngineEvents {
         playerInventory: { name: string; amount: number }[]
         containerInventory: { name: string; amount: number }[]
     }
-    'worldMap:closed': {}
+    'worldMap:closed': Record<string, never>
     'worldMap:travelTo': { mapLookupName: string }
     'elevator:buttonPressed': { mapID: number; level: number; tileNum: number }
     'calledShot:regionSelected': { region: string }
@@ -125,7 +125,7 @@ class EventBusImpl {
         if (!this.handlers[event]) {
             this.handlers[event] = new Set() as any
         }
-        ;(this.handlers[event] as Set<EventHandler<EngineEvents[K]>>).add(handler)
+        (this.handlers[event] as Set<EventHandler<EngineEvents[K]>>).add(handler)
     }
 
     off<K extends keyof EngineEvents>(event: K, handler: EventHandler<EngineEvents[K]>): void {
@@ -137,7 +137,7 @@ class EventBusImpl {
     once<K extends keyof EngineEvents>(event: K, handler: EventHandler<EngineEvents[K]>): void {
         const wrapper = ((payload: EngineEvents[K]) => {
             this.off(event, wrapper as EventHandler<EngineEvents[K]>)
-            ;(handler as Function)(payload)
+            ;(handler as (p: EngineEvents[K]) => void)(payload)
         }) as EventHandler<EngineEvents[K]>
         this.on(event, wrapper)
     }
@@ -147,11 +147,11 @@ class EventBusImpl {
         ...args: EngineEvents[K] extends void ? [] : [EngineEvents[K]]
     ): void {
         const set = this.handlers[event] as Set<EventHandler<EngineEvents[K]>> | undefined
-        if (!set) return
+        if (!set) {return}
         const payload = args[0] as EngineEvents[K]
         for (const handler of set) {
             try {
-                ;(handler as Function)(payload)
+                (handler as (p: EngineEvents[K]) => void)(payload)
             } catch (err) {
                 console.error(`[EventBus] Error in handler for "${event}":`, err)
             }

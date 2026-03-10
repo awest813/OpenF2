@@ -40,7 +40,7 @@ export type SkillCheckDifficultyName = keyof typeof SkillCheckDifficulty
  * @param modifier    - flat modifier applied to the effective skill (default 0)
  * @returns SkillCheckResult
  */
-export function rollSkillCheck(skillValue: number, modifier: number = 0): SkillCheckResult {
+export function rollSkillCheck(skillValue: number, modifier = 0): SkillCheckResult {
     const threshold = Math.max(5, Math.min(95, skillValue + modifier))
     const roll = Math.floor(Math.random() * 100) + 1
     return { success: roll <= threshold, roll, threshold }
@@ -57,7 +57,7 @@ export function rollSkillCheck(skillValue: number, modifier: number = 0): SkillC
 export function rollSkillCheckWithDifficulty(
     skillValue: number,
     difficulty: SkillCheckDifficultyName,
-    extraModifier: number = 0,
+    extraModifier = 0,
 ): SkillCheckResult {
     const modifier = SkillCheckDifficulty[difficulty] + extraModifier
     return rollSkillCheck(skillValue, modifier)

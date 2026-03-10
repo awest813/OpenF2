@@ -259,13 +259,13 @@ export class BarterPanel extends UIPanel {
         //  merchant items (rightInv/rightTbl) can only move between rightInv <-> rightTbl
         const playerSide = sel.col === 'leftInv' || sel.col === 'leftTbl'
         const destPlayerSide = destId === 'leftInv' || destId === 'leftTbl'
-        if (playerSide !== destPlayerSide) return
-        if (sel.col === destId) return
+        if (playerSide !== destPlayerSide) {return}
+        if (sel.col === destId) {return}
 
         const from = this._getList(sel.col)
         const to   = this._getList(destId)
         const item = from[sel.index]
-        if (!item) return
+        if (!item) {return}
 
         from.splice(sel.index, 1)
         // Merge with existing stack if possible
@@ -304,8 +304,8 @@ export class BarterPanel extends UIPanel {
     private _mergeItemsInto(dest: BarterItem[], items: BarterItem[]): void {
         for (const item of items) {
             const existing = dest.find(i => i.name === item.name && i.value === item.value)
-            if (existing) existing.amount += item.amount
-            else dest.push({ ...item })
+            if (existing) {existing.amount += item.amount}
+            else {dest.push({ ...item })}
         }
     }
 }
@@ -335,7 +335,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

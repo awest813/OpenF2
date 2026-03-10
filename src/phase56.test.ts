@@ -205,7 +205,7 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
             killType: null,
             pro: { extra: { XPValue: 1 } },
             hasAnimation: () => true,
-            staticAnimation: (name: string, cb: () => void) => { if (cb) cb() },
+            staticAnimation: (name: string, cb: () => void) => { if (cb) {cb()} },
             frame: 0,
             anim: undefined,
         } as any
@@ -231,7 +231,7 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
             killType: null,
             pro: { extra: { XPValue: 1 } }, // pushes to 1000 → level 2
             hasAnimation: () => true,
-            staticAnimation: (name: string, cb: () => void) => { if (cb) cb() },
+            staticAnimation: (name: string, cb: () => void) => { if (cb) {cb()} },
             frame: 0,
             anim: undefined,
         } as any
@@ -256,7 +256,7 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
             killType: null,
             pro: { extra: { XPValue: 1 } },
             hasAnimation: () => true,
-            staticAnimation: (name: string, cb: () => void) => { if (cb) cb() },
+            staticAnimation: (name: string, cb: () => void) => { if (cb) {cb()} },
             frame: 0,
             anim: undefined,
         } as any
@@ -283,7 +283,7 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
             killType: null,
             pro: { extra: { XPValue: 20999 } },
             hasAnimation: () => true,
-            staticAnimation: (name: string, cb: () => void) => { if (cb) cb() },
+            staticAnimation: (name: string, cb: () => void) => { if (cb) {cb()} },
             frame: 0,
             anim: undefined,
         } as any

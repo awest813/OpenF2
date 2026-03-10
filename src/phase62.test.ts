@@ -73,7 +73,7 @@ describe('Phase 62-A — BLK-062: Combat.attack() auto-end after last kill', () 
             isPlayer: true,
             getStat: () => 5,
             name: 'player',
-            staticAnimation: vi.fn((_: string, cb?: () => void) => { if (cb) cb() }),
+            staticAnimation: vi.fn((_: string, cb?: () => void) => { if (cb) {cb()} }),
         }
         // Target is marked dead after critterDamage (simulated by mock).
         const target: any = {
@@ -113,7 +113,7 @@ describe('Phase 62-A — BLK-062: Combat.attack() auto-end after last kill', () 
             isPlayer: true,
             getStat: () => 5,
             name: 'player',
-            staticAnimation: vi.fn((_: string, cb?: () => void) => { if (cb) cb() }),
+            staticAnimation: vi.fn((_: string, cb?: () => void) => { if (cb) {cb()} }),
         }
         const target: any = {
             dead: false,

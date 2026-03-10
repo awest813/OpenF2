@@ -89,11 +89,11 @@ interface AttackInfo {
 }
 
 function parseAttack(weapon: WeaponObj): { first: AttackInfo; second: AttackInfo } {
-    var attackModes = weapon.pro.extra['attackMode']
-    var modeOne = attackMode[attackModes & 0xf] as number
-    var modeTwo = attackMode[(attackModes >> 4) & 0xf] as number
-    var attackOne: AttackInfo = { mode: modeOne, APCost: 0, maxRange: 0 }
-    var attackTwo: AttackInfo = { mode: modeTwo, APCost: 0, maxRange: 0 }
+    const attackModes = weapon.pro.extra['attackMode']
+    const modeOne = attackMode[attackModes & 0xf] as number
+    const modeTwo = attackMode[(attackModes >> 4) & 0xf] as number
+    const attackOne: AttackInfo = { mode: modeOne, APCost: 0, maxRange: 0 }
+    const attackTwo: AttackInfo = { mode: modeTwo, APCost: 0, maxRange: 0 }
 
     if (modeOne !== attackMode.none) {
         attackOne.APCost = weapon.pro.extra.APCost1
@@ -146,15 +146,15 @@ export class Weapon {
             this.type = 'gun'
             this.minDmg = weapon.pro.extra.minDmg
             this.maxDmg = weapon.pro.extra.maxDmg
-            var s = weapon.art.split('/')
+            const s = weapon.art.split('/')
             this.name = s[s.length - 1]
 
-            var attacks = parseAttack(weapon)
+            const attacks = parseAttack(weapon)
             this.attackOne = attacks.first
             this.attackTwo = attacks.second
 
             this.weaponSkillType = weaponSkillMap[this.name]
-            if (this.weaponSkillType === undefined) console.log('unknown weapon type for ' + this.name)
+            if (this.weaponSkillType === undefined) {console.log('unknown weapon type for ' + this.name)}
         }
 
         this.mode = this.modes[0]
@@ -169,14 +169,14 @@ export class Weapon {
     }
 
     getProjectilePID(): number {
-        if (this.type === 'melee') return -1
+        if (this.type === 'melee') {return -1}
         return this.weapon.pro.extra.projPID
     }
 
     // TODO: enum
     getMaximumRange(attackType: number): number {
-        if (attackType === 1) return this.weapon.pro.extra.maxRange1
-        if (attackType === 2) return this.weapon.pro.extra.maxRange2
+        if (attackType === 1) {return this.weapon.pro.extra.maxRange1}
+        if (attackType === 2) {return this.weapon.pro.extra.maxRange2}
         // Unknown attack type — return a safe minimum range rather than crashing.
         console.warn('getMaximumRange: unknown attack type ' + attackType + ' — returning 1')
         return 1
@@ -187,7 +187,7 @@ export class Weapon {
     }
 
     getSkin(): string | null {
-        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) return null
+        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) {return null}
         const animCodeMap: { [animCode: number]: string } = {
             0: 'a', // None
             1: 'd', // Knife
@@ -205,8 +205,8 @@ export class Weapon {
     }
 
     getAttackSkin(): string | null {
-        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) return null
-        if (this.weapon === 'punch') return 'q'
+        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) {return null}
+        if (this.weapon === 'punch') {return 'q'}
 
         const modeSkinMap: { [mode: string]: string } = {
             punch: 'q',
@@ -230,9 +230,9 @@ export class Weapon {
     }
 
     getAnim(anim: string): string | null {
-        if (weaponAnims[this.name] && weaponAnims[this.name][anim]) return weaponAnims[this.name][anim]
+        if (weaponAnims[this.name] && weaponAnims[this.name][anim]) {return weaponAnims[this.name][anim]}
 
-        var wep = this.getSkin() || 'a'
+        const wep = this.getSkin() || 'a'
         switch (anim) {
             case 'idle':
                 return wep + 'a'
@@ -325,7 +325,7 @@ export function critterKill(
         Scripting.destroy(obj, source)
     }
 
-    if (!animName || !obj.hasAnimation(animName)) animName = 'death'
+    if (!animName || !obj.hasAnimation(animName)) {animName = 'death'}
 
     obj.staticAnimation(
         animName,
@@ -333,7 +333,7 @@ export function critterKill(
             // todo: corpse-ify
             obj.frame-- // go to last frame
             obj.anim = undefined
-            if (callback) callback()
+            if (callback) {callback()}
         },
         true
     )
@@ -343,13 +343,13 @@ export function critterDamage(
     obj: Critter,
     damage: number,
     source: Critter,
-    useScript: boolean = true,
-    useAnim: boolean = true,
+    useScript = true,
+    useAnim = true,
     damageType?: string,
     callback?: () => void
 ) {
     obj.stats.modifyBase('HP', -damage)
-    if (obj.getStat('HP') <= 0) return critterKill(obj, source, useScript)
+    if (obj.getStat('HP') <= 0) {return critterKill(obj, source, useScript)}
 
     if (useScript) {
         // Trigger damage_p_proc on the damaged critter's script so scripted effects
@@ -361,7 +361,7 @@ export function critterDamage(
     if (useAnim && obj.hasAnimation('hitFront')) {
         obj.staticAnimation('hitFront', () => {
             obj.clearAnim()
-            if (callback) callback()
+            if (callback) {callback()}
         })
     }
 }

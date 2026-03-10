@@ -24,7 +24,7 @@ function weightedSelect(sfx: [string, number][], roll: number): string {
     let r = roll
     for (let i = 0; i < sfx.length; i++) {
         const freq = sfx[i][1]
-        if (r < freq) return sfx[i][0]
+        if (r < freq) {return sfx[i][0]}
         r -= freq
     }
     return sfx[sfx.length - 1][0]
@@ -67,8 +67,8 @@ describe('weightedSelect (rollNextSfx algorithm)', () => {
 // ---------------------------------------------------------------------------
 
 function applyDifficultyAndClamp(encRate: number, difficulty: 'easy' | 'normal' | 'hard'): number {
-    if (difficulty === 'easy') encRate -= Math.floor(encRate / 15)
-    else if (difficulty === 'hard') encRate += Math.floor(encRate / 15)
+    if (difficulty === 'easy') {encRate -= Math.floor(encRate / 15)}
+    else if (difficulty === 'hard') {encRate += Math.floor(encRate / 15)}
     return Math.max(1, Math.min(99, encRate))
 }
 

@@ -28,8 +28,8 @@ describe('Phase 30-B — unknown called-shot region safety', () => {
             equippedWeapon: { weapon: { weaponSkillType: 'Small Guns' } },
             getSkill: vi.fn().mockReturnValue(80),
             getStat: vi.fn((name: string) => {
-                if (name === 'PER') return 8
-                if (name === 'Critical Chance') return 5
+                if (name === 'PER') {return 8}
+                if (name === 'Critical Chance') {return 5}
                 return 0
             }),
             isPlayer: false,

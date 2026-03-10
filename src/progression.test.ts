@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
  */
 function xpRequiredForLevel(level: number): number {
     // Level 1 needs 0 XP; level N needs N*(N-1)/2 * 1000
-    if (level <= 1) return 0
+    if (level <= 1) {return 0}
     return (level * (level - 1) / 2) * 1000
 }
 
@@ -25,7 +25,7 @@ function xpRequiredForLevel(level: number): number {
  * Mirrors the loop in scripting.ts give_exp_points.
  */
 function awardXp(startXp: number, startLevel: number, amount: number): { xp: number; level: number } {
-    let xp = startXp + amount
+    const xp = startXp + amount
     let level = startLevel
     while (xp >= xpRequiredForLevel(level + 1)) {
         level++

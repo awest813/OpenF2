@@ -197,13 +197,13 @@ export function createPlayerEntity(opts: PlayerCreationOptions): EntityId {
     const id = EntityManager.create()
 
     const statsOverrides: Partial<Omit<StatsComponent, 'componentType'>> = {}
-    if (opts.strength !== undefined) statsOverrides.strength = opts.strength
-    if (opts.perception !== undefined) statsOverrides.perception = opts.perception
-    if (opts.endurance !== undefined) statsOverrides.endurance = opts.endurance
-    if (opts.charisma !== undefined) statsOverrides.charisma = opts.charisma
-    if (opts.intelligence !== undefined) statsOverrides.intelligence = opts.intelligence
-    if (opts.agility !== undefined) statsOverrides.agility = opts.agility
-    if (opts.luck !== undefined) statsOverrides.luck = opts.luck
+    if (opts.strength !== undefined) {statsOverrides.strength = opts.strength}
+    if (opts.perception !== undefined) {statsOverrides.perception = opts.perception}
+    if (opts.endurance !== undefined) {statsOverrides.endurance = opts.endurance}
+    if (opts.charisma !== undefined) {statsOverrides.charisma = opts.charisma}
+    if (opts.intelligence !== undefined) {statsOverrides.intelligence = opts.intelligence}
+    if (opts.agility !== undefined) {statsOverrides.agility = opts.agility}
+    if (opts.luck !== undefined) {statsOverrides.luck = opts.luck}
 
     const stats = defaultStats(statsOverrides)
     const skills = defaultSkills(stats)
@@ -260,14 +260,14 @@ export function createCritterEntity(opts: CritterCreationOptions): EntityId {
 
     const stats = defaultStats(opts.statsOverrides)
     const combat = defaultCombat()
-    if (opts.teamNumber !== undefined) combat.teamNumber = opts.teamNumber
-    if (opts.isAggressive !== undefined) combat.isAggressive = opts.isAggressive
+    if (opts.teamNumber !== undefined) {combat.teamNumber = opts.teamNumber}
+    if (opts.isAggressive !== undefined) {combat.isAggressive = opts.isAggressive}
 
     const dialogue = defaultDialogue()
-    if (opts.hasTalkProc !== undefined) dialogue.hasTalkProc = opts.hasTalkProc
+    if (opts.hasTalkProc !== undefined) {dialogue.hasTalkProc = opts.hasTalkProc}
 
     const script = defaultScript()
-    if (opts.scriptName) script.scriptName = opts.scriptName
+    if (opts.scriptName) {script.scriptName = opts.scriptName}
 
     EntityManager.add(id, defaultPosition())
     EntityManager.add(id, defaultAnimation())

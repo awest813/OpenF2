@@ -108,8 +108,8 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x801c: function () {
         // op_pop_return
         const addr = this.popAddr()
-        if (addr === -1) this.halted = true
-        else this.pc = addr
+        if (addr === -1) {this.halted = true}
+        else {this.pc = addr}
     },
     0x8010: function () {
         this.halted = true
@@ -118,7 +118,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x802f: function () {
         if (!this.pop()) {
             this.pc = this.pop()
-        } else this.pop()
+        } else {this.pop()}
     }, // op_if
     0x8031: function () {
         const varNum = this.pop()
@@ -148,7 +148,7 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
         const cond = this.pop()
         if (!cond) {
             this.pc = this.pop()
-        } else this.pop()
+        } else {this.pop()}
     },
 
     0x8028: function () {

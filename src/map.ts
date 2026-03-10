@@ -543,7 +543,7 @@ export class GameMap {
             // BLK-092: Guard against objects with null positions — objects in inventory
             // or mid-transition may not have a tile assignment.  Skip them so the
             // pathfinding matrix doesn't crash on a null dereference.
-            if (!obj.position) continue
+            if (!obj.position) {continue}
             // if there are multiple, any blocking one will block
             matrix[obj.position.y][obj.position.x] |= <any>obj.blocks()
         }

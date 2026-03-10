@@ -489,24 +489,24 @@ describe('Phase 84-E-6 — sfall 0x82B6: set_critter_knockout_state_sfall', () =
 
 describe('Phase 84-E-7 — sfall 0x82B7: get_combat_turn_sfall', () => {
     it('returns 0 when not in combat', () => {
-        ;(globalState as any).inCombat = false
+        (globalState as any).inCombat = false
         expect(script.get_combat_turn_sfall()).toBe(0)
     })
 
     it('returns 0 when in combat but combatTurn is not set', () => {
-        ;(globalState as any).inCombat = true
+        (globalState as any).inCombat = true
         delete (globalState as any).combatTurn
         expect(script.get_combat_turn_sfall()).toBe(0)
     })
 
     it('returns combatTurn value when in combat', () => {
-        ;(globalState as any).inCombat = true
+        (globalState as any).inCombat = true
         ;(globalState as any).combatTurn = 3
         expect(script.get_combat_turn_sfall()).toBe(3)
     })
 
     it('returns 0 for negative combatTurn (clamped)', () => {
-        ;(globalState as any).inCombat = true
+        (globalState as any).inCombat = true
         ;(globalState as any).combatTurn = -1
         expect(script.get_combat_turn_sfall()).toBe(0)
     })

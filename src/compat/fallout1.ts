@@ -60,7 +60,7 @@ export function isF1Active(): boolean {
 export function resolveDataPath(relativePath: string): string {
     const prefix = dataPathPrefix(_activeVersion)
     // Avoid double-slash if relativePath starts with a separator.
-    if (relativePath.startsWith('/')) return prefix + relativePath
+    if (relativePath.startsWith('/')) {return prefix + relativePath}
     return prefix + '/' + relativePath
 }
 
@@ -102,7 +102,7 @@ const F1_PROC_NAME_MAP: Readonly<Record<string, string>> = {
  * the INT file's procedure table for the currently active engine version.
  */
 export function resolveProcName(canonicalName: string): string {
-    if (!isF1Active()) return canonicalName
+    if (!isF1Active()) {return canonicalName}
     return F1_PROC_NAME_MAP[canonicalName] ?? canonicalName
 }
 
@@ -129,14 +129,14 @@ export interface F1SaveExtension {
  * safe to call unconditionally in the save-load pipeline.
  */
 export function migrateF1Save(raw: Record<string, unknown>): Record<string, unknown> {
-    if (!isF1Active()) return raw
+    if (!isF1Active()) {return raw}
 
     const save = { ...raw } as Record<string, unknown>
 
     // Provide empty questLog/reputation stubs that the shared migrateSave
     // function will fill in, so F1 saves flow through the common path.
-    if (save['questLog'] === undefined) save['questLog'] = { entries: [] }
-    if (save['reputation'] === undefined) save['reputation'] = { karma: 0, reputations: {} }
+    if (save['questLog'] === undefined) {save['questLog'] = { entries: [] }}
+    if (save['reputation'] === undefined) {save['reputation'] = { karma: 0, reputations: {} }}
 
     return save
 }

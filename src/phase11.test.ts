@@ -160,21 +160,21 @@ class DialogueHarness {
     }
 
     gsay_reply(msg: string) {
-        if (!this.state.active) throw new Error('gsay_reply called before gsay_start')
+        if (!this.state.active) {throw new Error('gsay_reply called before gsay_start')}
         this.state.reply = msg
     }
 
     giq_option(iqTest: number, msg: string) {
-        if (!this.state.active) throw new Error('giq_option called before gsay_start')
+        if (!this.state.active) {throw new Error('giq_option called before gsay_start')}
         // iqTest > 0 → require INT >= iqTest; iqTest < 0 → require INT <= |iqTest|
         const passes = iqTest === 0
             || (iqTest > 0 && this.pc_int >= iqTest)
             || (iqTest < 0 && this.pc_int <= -iqTest)
-        if (passes) this.state.options.push({ msg, iqRequired: iqTest })
+        if (passes) {this.state.options.push({ msg, iqRequired: iqTest })}
     }
 
     gsay_end() {
-        if (!this.state.active) throw new Error('gsay_end called before gsay_start')
+        if (!this.state.active) {throw new Error('gsay_end called before gsay_start')}
         this.state.active = false
         this.state.ended = true
     }
@@ -287,7 +287,7 @@ describe('Phase 2 — encounter transition correctness', () => {
     }
 
     function resolveEncounter(s: EncState, map: string) {
-        if (!s.transitionPending) throw new Error('no pending transition')
+        if (!s.transitionPending) {throw new Error('no pending transition')}
         s.currentMap = map
         s.inEncounter = false
         s.transitionPending = false
@@ -513,9 +513,9 @@ class ProgressionHarness {
         const h = new ProgressionHarness()
         h.state.currentMap = save.currentMap
         h.state.currentElevation = save.currentElevation
-        if (save.worldPosition) h.state.worldPosition = { ...save.worldPosition }
+        if (save.worldPosition) {h.state.worldPosition = { ...save.worldPosition }}
         for (const entry of (save.questLog?.entries ?? [])) {
-            if (entry.state === 'completed') h.state.scriptFlags[entry.id] = true
+            if (entry.state === 'completed') {h.state.scriptFlags[entry.id] = true}
         }
         return h
     }

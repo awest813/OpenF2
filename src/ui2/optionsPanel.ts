@@ -157,7 +157,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

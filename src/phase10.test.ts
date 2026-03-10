@@ -51,7 +51,7 @@ function makeCritter(combatAP: number, maxHP: number): CritterObj {
  * Returns the current combat AP for a critter, or 0 for non-critters/null.
  */
 function getCritterCurrentAP(obj: CritterObj | null): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     return obj.AP ? obj.AP.combat : 0
 }
 
@@ -106,7 +106,7 @@ describe('get_critter_current_ap algorithm (sfall 0x8163)', () => {
  * Returns max HP for a critter, or 0 for non-critters/null.
  */
 function getCritterMaxHP(obj: CritterObj | null): number {
-    if (!obj || obj.type !== 'critter') return 0
+    if (!obj || obj.type !== 'critter') {return 0}
     return obj.getStat('Max HP')
 }
 
@@ -152,7 +152,7 @@ interface PlayerLike {
  * Returns the PC's current character level, or 0 if no player.
  */
 function getPcLevel(player: PlayerLike | null): number {
-    if (!player) return 0
+    if (!player) {return 0}
     return player.level
 }
 
@@ -212,14 +212,14 @@ describe('ScriptVM step counter', () => {
         const vm = { stepCount: 5 }
         // simulate a failed step — counter is NOT incremented
         const stepSucceeded = false
-        if (stepSucceeded) vm.stepCount++
+        if (stepSucceeded) {vm.stepCount++}
         expect(vm.stepCount).toBe(5)
     })
 
     it('accumulates across multiple runs', () => {
         const vm = { stepCount: 0 }
-        for (let i = 0; i < 10; i++) vm.stepCount++
-        for (let i = 0; i < 5; i++) vm.stepCount++
+        for (let i = 0; i < 10; i++) {vm.stepCount++}
+        for (let i = 0; i < 5; i++) {vm.stepCount++}
         expect(vm.stepCount).toBe(15)
     })
 

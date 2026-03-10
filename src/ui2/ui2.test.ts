@@ -41,7 +41,7 @@ class TestPanel extends UIPanel {
     onShowCallCount = 0
     onHideCallCount = 0
 
-    constructor(name: string, bounds: Rect, zOrder: number = 0) {
+    constructor(name: string, bounds: Rect, zOrder = 0) {
         super(name, bounds)
         this.zOrder = zOrder
     }

@@ -98,9 +98,9 @@ export class CharacterScreen extends UIPanel {
         // Content area
         ctx.save()
         ctx.translate(0, 60)
-        if (this.activeTab === 'stats') this.renderStats(ctx)
-        else if (this.activeTab === 'skills') this.renderSkills(ctx)
-        else this.renderPerks(ctx)
+        if (this.activeTab === 'stats') {this.renderStats(ctx)}
+        else if (this.activeTab === 'skills') {this.renderSkills(ctx)}
+        else {this.renderPerks(ctx)}
         ctx.restore()
 
         // Close button
@@ -118,7 +118,7 @@ export class CharacterScreen extends UIPanel {
 
     private renderStats(ctx: OffscreenCanvasRenderingContext2D): void {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
-        if (!stats) return
+        if (!stats) {return}
 
         ctx.font = '12px monospace'
         let y = 20
@@ -165,7 +165,7 @@ export class CharacterScreen extends UIPanel {
     private renderSkills(ctx: OffscreenCanvasRenderingContext2D): void {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const skills = EntityManager.get<'skills'>(this.playerEntityId, 'skills')
-        if (!skills || !stats) return
+        if (!skills || !stats) {return}
 
         ctx.font = '11px monospace'
         ctx.fillStyle = cssColor(FALLOUT_AMBER)
@@ -245,7 +245,7 @@ export class CharacterScreen extends UIPanel {
     }
 
     override onMouseMove(x: number, y: number): void {
-        if (this.activeTab !== 'skills') return
+        if (this.activeTab !== 'skills') {return}
         let sy = 96
         this.hoveredSkill = null
         for (const { key } of SKILL_NAMES) {

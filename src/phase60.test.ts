@@ -99,7 +99,7 @@ describe('Phase 60-B — sfall opcodes 0x8200–0x8207', () => {
             // radius 5, any team: should count center + near (not far)
             expect(script.get_num_nearby_critters_sfall(center, 5, -1)).toBe(2)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -113,7 +113,7 @@ describe('Phase 60-B — sfall opcodes 0x8200–0x8207', () => {
             // Only team 0 critters within radius 5
             expect(script.get_num_nearby_critters_sfall(center, 5, 0)).toBe(2) // center + ally
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -126,7 +126,7 @@ describe('Phase 60-B — sfall opcodes 0x8200–0x8207', () => {
             // Dead critters should not be counted
             expect(script.get_num_nearby_critters_sfall(center, 5, -1)).toBe(1)
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 
@@ -138,7 +138,7 @@ describe('Phase 60-B — sfall opcodes 0x8200–0x8207', () => {
         try {
             expect(() => script.get_num_nearby_critters_sfall(center, 5, -1)).not.toThrow()
         } finally {
-            ;(globalState as any).gMap = savedMap
+            (globalState as any).gMap = savedMap
         }
     })
 

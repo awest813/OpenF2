@@ -28,7 +28,7 @@ import { applyEncounterCritterLoadout, EncounterLoadoutCritter } from './encount
 
 let playerId: number
 
-function makeArmorStats(acBonus: number = 0): ArmorEquipStats {
+function makeArmorStats(acBonus = 0): ArmorEquipStats {
     const dt = zeroDamageStats()
     const dr = zeroDamageStats()
     dt.normal = 5
