@@ -24,11 +24,11 @@ import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.j
 export { SAVE_VERSION, SaveGame, migrateSave }
 
 function applyLoadedMapAreaStates(mapAreaStates: Record<number, boolean> | undefined): void {
-    if (!mapAreaStates || !globalState.mapAreas) return
+    if (!mapAreaStates || !globalState.mapAreas) {return}
 
     for (const areaID in mapAreaStates) {
         const area = globalState.mapAreas[areaID]
-        if (!area) continue
+        if (!area) {continue}
         area.state = mapAreaStates[areaID] === true
     }
 }
@@ -76,7 +76,7 @@ function applyExtraSaveState(save: SaveGame): void {
     }
     // Restore active hand selection (BLK-034).
     if (globalState.player && typeof save.playerActiveHand === 'number') {
-        ;(globalState.player as any).activeHand = save.playerActiveHand
+        (globalState.player as any).activeHand = save.playerActiveHand
     }
     // Restore player base stats so current HP and SPECIAL survive reload (BLK-035).
     if (globalState.player && save.playerBaseStats && Object.keys(save.playerBaseStats).length > 0) {
@@ -100,14 +100,14 @@ function applyExtraSaveState(save: SaveGame): void {
     if (globalState.player && typeof save.playerLeftHandPID === 'number') {
         const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
         if (leftIdx !== -1) {
-            ;(globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
+            (globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
             globalState.player.inventory.splice(leftIdx, 1)
         }
     }
     if (globalState.player && typeof save.playerRightHandPID === 'number') {
         const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
         if (rightIdx !== -1) {
-            ;(globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
+            (globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
             globalState.player.inventory.splice(rightIdx, 1)
         }
     }
@@ -115,7 +115,7 @@ function applyExtraSaveState(save: SaveGame): void {
     if (globalState.player && typeof save.playerArmorPID === 'number') {
         const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
         if (armorIdx !== -1) {
-            ;(globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
+            (globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
             globalState.player.inventory.splice(armorIdx, 1)
         }
     }
@@ -128,7 +128,7 @@ function applyExtraSaveState(save: SaveGame): void {
         globalState.player.name = save.playerName
     }
     if (globalState.player && (save.playerGender === 'male' || save.playerGender === 'female')) {
-        ;(globalState.player as any).gender = save.playerGender
+        (globalState.player as any).gender = save.playerGender
     }
     // BLK-071: Restore car fuel level so the vehicle remains fueled after reload.
     globalState.carFuel = typeof save.carFuel === 'number' ? save.carFuel : 0
@@ -397,11 +397,11 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     if (globalState.player) {
         const p = globalState.player as any
         let injuryFlags = 0
-        if (p.crippledLeftLeg) injuryFlags |= 0x01
-        if (p.crippledRightLeg) injuryFlags |= 0x02
-        if (p.crippledLeftArm) injuryFlags |= 0x04
-        if (p.crippledRightArm) injuryFlags |= 0x08
-        if (p.blinded) injuryFlags |= 0x10
+        if (p.crippledLeftLeg) {injuryFlags |= 0x01}
+        if (p.crippledRightLeg) {injuryFlags |= 0x02}
+        if (p.crippledLeftArm) {injuryFlags |= 0x04}
+        if (p.crippledRightArm) {injuryFlags |= 0x08}
+        if (p.blinded) {injuryFlags |= 0x10}
         save.playerInjuryFlags = injuryFlags
     }
 
@@ -424,7 +424,7 @@ export function save(name: string, slot = -1, callback?: () => void): void {
             const partyMembersHp: Record<string, number> = {}
             for (const member of members) {
                 const name: string | undefined = member?.name
-                if (!name) continue
+                if (!name) {continue}
                 const hp = typeof (member as any).getStat === 'function'
                     ? (member as any).getStat('HP')
                     : (member as any).HP

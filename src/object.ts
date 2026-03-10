@@ -1093,7 +1093,7 @@ export class Critter extends Obj {
             // console.trace();
 
             for (const prop of SERIALIZED_CRITTER_PROPS) {
-                ;(obj as any)[prop] = mobj[prop]
+                (obj as any)[prop] = mobj[prop]
             }
 
             if (mobj.stats) {
@@ -1138,13 +1138,13 @@ export class Critter extends Obj {
                 const w = obj.inventory.find(
                     (inv: any) => inv.pid === mobj.leftHandPID && inv.subtype === 'weapon'
                 ) as WeaponObj | undefined
-                if (w) obj.leftHand = w
+                if (w) {obj.leftHand = w}
             }
             if (typeof mobj.rightHandPID === 'number') {
                 const w = obj.inventory.find(
                     (inv: any) => inv.pid === mobj.rightHandPID && inv.subtype === 'weapon'
                 ) as WeaponObj | undefined
-                if (w) obj.rightHand = w
+                if (w) {obj.rightHand = w}
             }
 
             // BLK-054: Restore the critter's name from the save data.
@@ -1385,12 +1385,12 @@ export class Critter extends Obj {
         // Apply critical effect penalties
         if (stat === 'AGI') {
             // Each crippled leg reduces AGI by 2
-            if (this.crippledLeftLeg) statValue = Math.max(1, statValue - 2)
-            if (this.crippledRightLeg) statValue = Math.max(1, statValue - 2)
+            if (this.crippledLeftLeg) {statValue = Math.max(1, statValue - 2)}
+            if (this.crippledRightLeg) {statValue = Math.max(1, statValue - 2)}
         }
         if (stat === 'PER') {
             // Blindness reduces perception by 5
-            if (this.blinded) statValue = Math.max(1, statValue - 5)
+            if (this.blinded) {statValue = Math.max(1, statValue - 5)}
         }
         
         return statValue
@@ -1526,7 +1526,7 @@ export class Critter extends Obj {
         // BLK-101: Guard against null position — critters in inventory or mid-map-
         // transition have position=null.  Accessing this.position.x would throw a
         // TypeError.  Return false (no movement) rather than crashing.
-        if (!this.position) return false
+        if (!this.position) {return false}
         if (this.position.x === target.x && this.position.y === target.y) {
             // can't walk to the same tile
             return false
@@ -1606,7 +1606,7 @@ export class Critter extends Obj {
         const obj = <SerializedCritter>super.serialize()
 
         for (const prop of SERIALIZED_CRITTER_PROPS) {
-            ;(obj as any)[prop] = (this as any)[prop]
+            (obj as any)[prop] = (this as any)[prop]
         }
 
         // Serialize charTraits as a sorted number array for stable JSON output

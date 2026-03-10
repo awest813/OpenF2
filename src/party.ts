@@ -32,7 +32,7 @@ export class Party {
     removePartyMember(obj: Critter) {
         console.log('party member %o removed', obj)
         if (!arrayRemove(this.party, obj))
-            console.warn('removePartyMember: member not in party — no-op')
+            {console.warn('removePartyMember: member not in party — no-op')}
     }
 
     getPartyMembers(): Critter[] {
@@ -57,6 +57,6 @@ export class Party {
 
     deserialize(objs: SerializedObj[]): void {
         this.party.length = 0
-        for (const obj of objs) this.party.push(<Critter>deserializeObj(obj))
+        for (const obj of objs) {this.party.push(<Critter>deserializeObj(obj))}
     }
 }

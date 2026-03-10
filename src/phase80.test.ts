@@ -222,19 +222,19 @@ describe('Phase 80-D — BLK-131: float_msg() null floatMessages guard', () => {
     })
 
     it('does not throw when floatMessages is undefined', () => {
-        ;(globalState as any).floatMessages = undefined
+        (globalState as any).floatMessages = undefined
         const obj = makeObj()
         expect(() => script.float_msg(obj, 'hello', 0)).not.toThrow()
     })
 
     it('does not throw when floatMessages is null', () => {
-        ;(globalState as any).floatMessages = null
+        (globalState as any).floatMessages = null
         const obj = makeObj()
         expect(() => script.float_msg(obj, 'hello', 0)).not.toThrow()
     })
 
     it('pushes to floatMessages when array is valid', () => {
-        ;(globalState as any).floatMessages = []
+        (globalState as any).floatMessages = []
         const obj = makeObj()
         script.float_msg(obj, 'test message', 0)
         expect((globalState as any).floatMessages).toHaveLength(1)

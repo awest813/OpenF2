@@ -53,7 +53,7 @@ export class QuestLog {
      * No-op if the quest is already active/completed/failed.
      */
     start(id: string, now: number = Date.now()): void {
-        if (this.getState(id) !== 'inactive') return
+        if (this.getState(id) !== 'inactive') {return}
         this.entries.set(id, { id, state: 'active', stateChangedAt: now })
         EventBus.emit('quest:start', { questId: id })
     }
@@ -63,7 +63,7 @@ export class QuestLog {
      * Only valid when the quest is active.
      */
     complete(id: string, now: number = Date.now()): void {
-        if (!this.isActive(id)) return
+        if (!this.isActive(id)) {return}
         this.entries.set(id, { id, state: 'completed', stateChangedAt: now })
         EventBus.emit('quest:complete', { questId: id })
     }
@@ -73,7 +73,7 @@ export class QuestLog {
      * Only valid when the quest is active.
      */
     fail(id: string, now: number = Date.now()): void {
-        if (!this.isActive(id)) return
+        if (!this.isActive(id)) {return}
         this.entries.set(id, { id, state: 'failed', stateChangedAt: now })
         EventBus.emit('quest:fail', { questId: id })
     }

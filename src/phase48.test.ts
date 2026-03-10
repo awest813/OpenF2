@@ -79,7 +79,7 @@ describe('Phase 48-A — get_pc_stat(4) returns GVAR_PLAYER_REPUTATION (globalVa
 describe('Phase 48-B — set_global_var(0, v) syncs reputation.karma', () => {
     beforeEach(() => {
         // Ensure reputation is a fresh Reputation instance for the test
-        ;(globalState as any).reputation = new Reputation()
+        (globalState as any).reputation = new Reputation()
     })
 
     it('updates globalState.reputation.karma when GVAR_0 is set', () => {

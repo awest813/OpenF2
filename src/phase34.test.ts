@@ -40,7 +40,7 @@ class MidLateCampaignHarness {
     }
 
     travelToVaultCity(): void {
-        if ((this.scriptGlobalVars[GVAR_MODOC_PATH_READY] ?? 0) !== 1) throw new Error('Modoc route not ready')
+        if ((this.scriptGlobalVars[GVAR_MODOC_PATH_READY] ?? 0) !== 1) {throw new Error('Modoc route not ready')}
         this.region = 'Vault City'
         this.currentMap = 'vcmain'
         this.mapAreaStates[5] = true
@@ -48,7 +48,7 @@ class MidLateCampaignHarness {
     }
 
     resolveGeckoPowerPath(): void {
-        if (this.region !== 'Vault City') throw new Error('Gecko dependency expected from Vault City route')
+        if (this.region !== 'Vault City') {throw new Error('Gecko dependency expected from Vault City route')}
         this.region = 'Gecko'
         this.currentMap = 'geckmain'
         this.scriptGlobalVars[GVAR_GECKO_REACTOR_FIXED] = 1
@@ -57,7 +57,7 @@ class MidLateCampaignHarness {
     }
 
     travelToBrokenHills(): void {
-        if ((this.scriptGlobalVars[GVAR_VAULT_CITY_CLEARED] ?? 0) !== 1) throw new Error('Vault City/Gecko branch incomplete')
+        if ((this.scriptGlobalVars[GVAR_VAULT_CITY_CLEARED] ?? 0) !== 1) {throw new Error('Vault City/Gecko branch incomplete')}
         this.region = 'Broken Hills'
         this.currentMap = 'brokmain'
         this.mapAreaStates[7] = true
@@ -90,7 +90,7 @@ class MidLateCampaignHarness {
     }
 
     travelToNavarro(): void {
-        if ((this.scriptGlobalVars[GVAR_NAVARRO_ACCESS] ?? 0) !== 1) throw new Error('Navarro route not unlocked')
+        if ((this.scriptGlobalVars[GVAR_NAVARRO_ACCESS] ?? 0) !== 1) {throw new Error('Navarro route not unlocked')}
         this.region = 'Navarro'
         this.currentMap = 'navarro'
         this.mapAreaStates[12] = true
@@ -98,7 +98,7 @@ class MidLateCampaignHarness {
     }
 
     travelToOilRig(): void {
-        if ((this.scriptGlobalVars[GVAR_OIL_RIG_ROUTE_READY] ?? 0) !== 1) throw new Error('Oil Rig route not ready')
+        if ((this.scriptGlobalVars[GVAR_OIL_RIG_ROUTE_READY] ?? 0) !== 1) {throw new Error('Oil Rig route not ready')}
         this.region = 'Enclave / Oil Rig'
         this.currentMap = 'oilrig'
         this.mapAreaStates[13] = true
@@ -143,16 +143,16 @@ class MidLateCampaignHarness {
         h.mapAreaStates = { ...(save.mapAreaStates ?? {}) }
         h.worldPosition = save.worldPosition ?? { x: 0, y: 0 }
 
-        if (h.currentMap === 'oilrig') h.region = 'Enclave / Oil Rig'
-        else if (h.currentMap === 'navarro') h.region = 'Navarro'
-        else if (h.currentMap === 'sfdock') h.region = 'San Francisco'
-        else if (h.currentMap === 'redding') h.region = 'Redding'
-        else if (h.currentMap === 'ncrentr') h.region = 'NCR'
-        else if (h.currentMap === 'renesco') h.region = 'New Reno'
-        else if (h.currentMap === 'brokmain') h.region = 'Broken Hills'
-        else if (h.currentMap === 'geckmain') h.region = 'Gecko'
-        else if (h.currentMap === 'vcmain') h.region = 'Vault City'
-        else h.region = 'Modoc'
+        if (h.currentMap === 'oilrig') {h.region = 'Enclave / Oil Rig'}
+        else if (h.currentMap === 'navarro') {h.region = 'Navarro'}
+        else if (h.currentMap === 'sfdock') {h.region = 'San Francisco'}
+        else if (h.currentMap === 'redding') {h.region = 'Redding'}
+        else if (h.currentMap === 'ncrentr') {h.region = 'NCR'}
+        else if (h.currentMap === 'renesco') {h.region = 'New Reno'}
+        else if (h.currentMap === 'brokmain') {h.region = 'Broken Hills'}
+        else if (h.currentMap === 'geckmain') {h.region = 'Gecko'}
+        else if (h.currentMap === 'vcmain') {h.region = 'Vault City'}
+        else {h.region = 'Modoc'}
 
         return h
     }

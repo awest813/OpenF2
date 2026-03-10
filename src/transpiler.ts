@@ -117,22 +117,22 @@ const opNames: { [opcode: number]: string } = {
 }
 
 export function transpile(intfile: IntFile, reader: BinaryReader): string {
-    var str = ''
-    function emit(msg: string, t: number = 0) {
-        for (var i = 0; i < t; i++) str += ' '
+    let str = ''
+    function emit(msg: string, t = 0) {
+        for (let i = 0; i < t; i++) {str += ' '}
         str += msg + '\n'
     }
-    function emitOp(opcode: number, offset: number, args: any[], t: number = 0) {
-        var sargs = args.map((x) => '0x' + x.toString(16))
-        var p = ''
-        if (opcode === 0x9001) p = ` ("${intfile.strings[args[0]]}" | ${intfile.identifiers[args[0]]})`
+    function emitOp(opcode: number, offset: number, args: any[], t = 0) {
+        const sargs = args.map((x) => '0x' + x.toString(16))
+        let p = ''
+        if (opcode === 0x9001) {p = ` ("${intfile.strings[args[0]]}" | ${intfile.identifiers[args[0]]})`}
         emit(`0x${offset.toString(16)}: ${opcode.toString(16)} ${opNames[opcode]} ${sargs}` + p, t)
     }
 
-    function disasm(t: number = 0): number {
-        var offset = reader.offset
-        var opcode = reader.read16()
-        var args = opArgs[opcode] ? opArgs[opcode](reader) : []
+    function disasm(t = 0): number {
+        const offset = reader.offset
+        const opcode = reader.read16()
+        const args = opArgs[opcode] ? opArgs[opcode](reader) : []
         emitOp(opcode, offset, args, t)
         return opcode
     }
@@ -141,18 +141,18 @@ export function transpile(intfile: IntFile, reader: BinaryReader): string {
 
     // disassemble __start (the code at 00x0-0x2A)
     emit('__start:')
-    for (; reader.offset < 0x2a; ) disasm(2)
+    for (; reader.offset < 0x2a; ) {disasm(2)}
     emit('')
 
     const procOffsets: { [offset: number]: string } = {}
-    for (var procName in intfile.procedures) {
-        var proc = intfile.procedures[procName]
+    for (const procName in intfile.procedures) {
+        const proc = intfile.procedures[procName]
         procOffsets[proc.offset] = procName
     }
 
     // disassemble the rest of the code, marking procedures
     reader.seek(intfile.codeOffset)
-    var t = 0
+    let t = 0
     for (; reader.offset < reader.data.byteLength; ) {
         if (procOffsets[reader.offset] !== undefined) {
             emit('')

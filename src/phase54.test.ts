@@ -49,7 +49,7 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
             outline: null,
             pro: { extra: { XPValue: 150, killType: 0 } },
             hasAnimation: () => false,
-            staticAnimation: (_name: string, cb?: () => void) => { if (cb) cb() },
+            staticAnimation: (_name: string, cb?: () => void) => { if (cb) {cb()} },
         }
 
         critterKill(victim, player, false)
@@ -76,7 +76,7 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
             outline: null,
             pro: { extra: { XPValue: 100, killType: 0 } },
             hasAnimation: () => false,
-            staticAnimation: (_name: string, cb?: () => void) => { if (cb) cb() },
+            staticAnimation: (_name: string, cb?: () => void) => { if (cb) {cb()} },
         }
 
         critterKill(victim, npcAttacker, false)
@@ -109,7 +109,7 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
             outline: null,
             pro: undefined,
             hasAnimation: () => false,
-            staticAnimation: (_name: string, cb?: () => void) => { if (cb) cb() },
+            staticAnimation: (_name: string, cb?: () => void) => { if (cb) {cb()} },
         }
 
         expect(() => critterKill(victim, player, false)).not.toThrow()
@@ -139,7 +139,7 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
             outline: null,
             pro: { extra: { XPValue: 100, killType: 0 } },
             hasAnimation: () => false,
-            staticAnimation: (_name: string, cb?: () => void) => { if (cb) cb() },
+            staticAnimation: (_name: string, cb?: () => void) => { if (cb) {cb()} },
         }
 
         critterKill(victim, player, false)

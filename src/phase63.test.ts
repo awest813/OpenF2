@@ -121,7 +121,7 @@ describe('Phase 63-B — BLK-067: party_member_obj null gParty guard', () => {
 
     it('returns 0 when party member not found', async () => {
         const gs = (await import('./globalState.js')).default
-        if (!gs.gParty) return // skip if no party
+        if (!gs.gParty) {return} // skip if no party
         expect(script.party_member_obj(99999)).toBe(0)
     })
 

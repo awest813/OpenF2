@@ -42,7 +42,7 @@ class EarlyCampaignHarness {
 
     completeTempleTrial(): void {
         this.state.scriptGlobalVars[GVAR_START_ARROYO_TRIAL] = 1
-        if (!this.state.mapVars.artemple) this.state.mapVars.artemple = {}
+        if (!this.state.mapVars.artemple) {this.state.mapVars.artemple = {}}
         // MVAR marker: temple trial completed.
         this.state.mapVars.artemple[0] = 1
     }
@@ -63,16 +63,16 @@ class EarlyCampaignHarness {
     }
 
     resolveEncounterIntoKlamath(): void {
-        if (!this.state.inEncounter) throw new Error('no encounter to resolve')
+        if (!this.state.inEncounter) {throw new Error('no encounter to resolve')}
         this.state.inEncounter = false
         this.state.currentMap = 'klamath'
         this.state.region = 'Klamath'
     }
 
     unlockDenRouteViaVicLead(): void {
-        if (this.state.region !== 'Klamath') throw new Error('Vic lead is unlocked from Klamath branch')
+        if (this.state.region !== 'Klamath') {throw new Error('Vic lead is unlocked from Klamath branch')}
         this.state.scriptGlobalVars[GVAR_DEN_VIC_KNOWN] = 1
-        if (!this.state.mapVars.klamath) this.state.mapVars.klamath = {}
+        if (!this.state.mapVars.klamath) {this.state.mapVars.klamath = {}}
         // MVAR marker: player got the Den/Vic lead.
         this.state.mapVars.klamath[7] = 1
     }
@@ -128,9 +128,9 @@ class EarlyCampaignHarness {
         harness.state.mapAreaStates = { ...(migrated.mapAreaStates ?? {}) }
         harness.state.inEncounter = false
 
-        if (harness.state.currentMap.startsWith('den')) harness.state.region = 'Den'
-        else if (harness.state.currentMap.startsWith('klamath')) harness.state.region = 'Klamath'
-        else harness.state.region = 'Arroyo'
+        if (harness.state.currentMap.startsWith('den')) {harness.state.region = 'Den'}
+        else if (harness.state.currentMap.startsWith('klamath')) {harness.state.region = 'Klamath'}
+        else {harness.state.region = 'Arroyo'}
 
         return harness
     }

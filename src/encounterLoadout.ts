@@ -24,7 +24,7 @@ export function applyEncounterCritterLoadout(
     critter: EncounterLoadoutCritter,
     deps: EncounterLoadoutDeps
 ): void {
-    if (!obj || !critter || !Array.isArray(critter.items) || typeof obj.addInventoryItem !== 'function') return
+    if (!obj || !critter || !Array.isArray(critter.items) || typeof obj.addInventoryItem !== 'function') {return}
 
     if (critter.dead === true && 'dead' in obj) {
         obj.dead = true
@@ -33,18 +33,18 @@ export function applyEncounterCritterLoadout(
     for (let i = 0; i < critter.items.length; i++) {
         const item = critter.items[i]
         const amount = item.amount ?? 1
-        if (amount <= 0) continue
+        if (amount <= 0) {continue}
 
         const itemObj = deps.createItem(item.pid)
         obj.addInventoryItem(itemObj, amount)
 
-        if (item.wielded !== true) continue
+        if (item.wielded !== true) {continue}
 
         const invObj = Array.isArray(obj.inventory) ? obj.inventory.find((inv: any) => inv.pid === item.pid) : itemObj
 
         if (deps.isWeapon(invObj)) {
-            if (!obj.leftHand || !deps.isWeapon(obj.leftHand)) obj.leftHand = invObj
-            else if (!obj.rightHand || !deps.isWeapon(obj.rightHand)) obj.rightHand = invObj
+            if (!obj.leftHand || !deps.isWeapon(obj.leftHand)) {obj.leftHand = invObj}
+            else if (!obj.rightHand || !deps.isWeapon(obj.rightHand)) {obj.rightHand = invObj}
         } else if (!obj.equippedArmor && isArmorItem(invObj)) {
             obj.equippedArmor = invObj
         }

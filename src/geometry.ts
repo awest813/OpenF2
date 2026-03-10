@@ -41,8 +41,8 @@ export interface BoundingBox {
 }
 
 export function hexToScreen(x: number, y: number): Point {
-    var sx = 4816 - ((((x + 1) >> 1) << 5) + ((x >> 1) << 4) - (y << 4))
-    var sy = 12 * (x >> 1) + y * 12 + 11
+    const sx = 4816 - ((((x + 1) >> 1) << 5) + ((x >> 1) << 4) - (y << 4))
+    const sy = 12 * (x >> 1) + y * 12 + 11
 
     return { x: sx, y: sy }
 }
@@ -66,8 +66,8 @@ export function hexToScreen(x: number, y: number): Point {
  * @return float 3d cartesian coordinates
  */
 export function pixelToCube(point: Point): Point3 {
-    let x = point.x / HEX_WIDTH - point.y / 3 / (HEX_HEIGHT / 2);
-    let z = point.y / (HEX_HEIGHT * 3 / 4);
+    const x = point.x / HEX_WIDTH - point.y / 3 / (HEX_HEIGHT / 2);
+    const z = point.y / (HEX_HEIGHT * 3 / 4);
     return { x, y: -x - z, z };
 }
 
@@ -89,24 +89,24 @@ export function pixelToCube(point: Point): Point3 {
  * @return int 3d hexagonal coordinates 
  */
 export function cubeRound(cube: Point3): Point3 {
-    let round = {
+    const round = {
         x: Math.round(cube.x),
         y: Math.round(cube.y),
         z: Math.round(cube.z)
     };
 
-    let diff = {
+    const diff = {
         x: Math.abs(round.x - cube.x),
         y: Math.abs(round.y - cube.y),
         z: Math.abs(round.z - cube.z)
     };
 
     if (diff.x > diff.y && diff.x > diff.z)
-        round.x = -round.y - round.z;
+        {round.x = -round.y - round.z;}
     else if (diff.y > diff.z)
-        round.y = -round.x - round.z;
+        {round.y = -round.x - round.z;}
     else
-        round.z = -round.x - round.y;
+        {round.z = -round.x - round.y;}
 
     return round;
 }
@@ -118,9 +118,9 @@ export function cubeRound(cube: Point3): Point3 {
  * @returns int 2d hexagonal offset coordinates 
  */
 export function сubeRoundToHex(cubeRound: Point3): Point {
-    let x = (cubeRound.x - 150) * (-1);
-    let isEvenX = !(cubeRound.x & 1);
-    let y = (cubeRound.z + (cubeRound.x - Number(isEvenX)) / 2 - 75) | 0;
+    const x = (cubeRound.x - 150) * (-1);
+    const isEvenX = !(cubeRound.x & 1);
+    const y = (cubeRound.z + (cubeRound.x - Number(isEvenX)) / 2 - 75) | 0;
 
     return { x, y };
 }
@@ -138,8 +138,8 @@ export function hexFromScreen(x: number, y: number): Point {
 
 export function hexNeighbors(position: Point): Point[] {
     const neighbors: Point[] = []
-    var x = position.x
-    var y = position.y
+    const x = position.x
+    const y = position.y
 
     function n(x: number, y: number) {
         neighbors.push({ x: x, y: y })
@@ -175,16 +175,16 @@ export function hexInDirectionDistance(position: Point, dir: number, distance: n
 
     let tile = hexInDirection(position, dir)
     // repeat for each further distance
-    for (var i = 0; i < distance - 1; i++) {
+    for (let i = 0; i < distance - 1; i++) {
         tile = hexInDirection(tile, dir)
     }
     return tile
 }
 
 export function directionOfDelta(xa: number, ya: number, xb: number, yb: number): number | null {
-    let neighbors = hexNeighbors({ x: xa, y: ya })
-    for (var i = 0; i < neighbors.length; i++) {
-        if (neighbors[i].x === xb && neighbors[i].y === yb) return i
+    const neighbors = hexNeighbors({ x: xa, y: ya })
+    for (let i = 0; i < neighbors.length; i++) {
+        if (neighbors[i].x === xb && neighbors[i].y === yb) {return i}
     }
 
     return null
@@ -192,8 +192,8 @@ export function directionOfDelta(xa: number, ya: number, xb: number, yb: number)
 
 function hexGridToCube(grid: Point): Point3 {
     //even-q layout -> cube layout
-    var z = grid.y - (grid.x + (grid.x & 1)) / 2
-    var y = -grid.x - z
+    const z = grid.y - (grid.x + (grid.x & 1)) / 2
+    const y = -grid.x - z
     return { x: grid.x, y: y, z: z }
 }
 
@@ -222,7 +222,7 @@ const CUBE_DIRECTIONS: Point3[] = [
  * `center` in cube space.  Used internally by hexesInRadius.
  */
 function hexCubeRing(center: Point3, radius: number): Point3[] {
-    if (radius === 0) return [{ x: center.x, y: center.y, z: center.z }]
+    if (radius === 0) {return [{ x: center.x, y: center.y, z: center.z }]}
     const results: Point3[] = []
     let cube: Point3 = {
         x: center.x + CUBE_DIRECTIONS[4].x * radius,
@@ -246,8 +246,8 @@ export function hexDistance(a: Point, b: Point): number {
     // we convert our hex coordinates into cube coordinates and then
     // we only have to see which of the 3 axes is the longest
 
-    var cubeA = hexGridToCube(a)
-    var cubeB = hexGridToCube(b)
+    const cubeA = hexGridToCube(a)
+    const cubeB = hexGridToCube(b)
     return Math.max(Math.abs(cubeA.x - cubeB.x), Math.abs(cubeA.y - cubeB.y), Math.abs(cubeA.z - cubeB.z))
 }
 
@@ -259,9 +259,9 @@ export function hexDirectionTo(a: Point, b: Point): number {
     if (delta.x) {
         const angle = (Math.atan2(-delta.y, delta.x) * 180) / Math.PI
         let temp = (90 - angle) | 0
-        if (temp < 0) temp += 360
+        if (temp < 0) {temp += 360}
         return Math.min((temp / 60) | 0, 5)
-    } else if (delta.y < 0) return 0
+    } else if (delta.y < 0) {return 0}
     return 2
 }
 
@@ -271,17 +271,17 @@ function hexOppositeDirection(direction: number) {
 
 // The adjacent hex around a nearest to b
 export function hexNearestNeighbor(a: Point, b: Point) {
-    var neighbors = hexNeighbors(a)
-    var min = Infinity,
+    const neighbors = hexNeighbors(a)
+    let min = Infinity,
         minIdx = -1
-    for (var i = 0; i < neighbors.length; i++) {
-        var dist = hexDistance(neighbors[i], b)
+    for (let i = 0; i < neighbors.length; i++) {
+        const dist = hexDistance(neighbors[i], b)
         if (dist < min) {
             min = dist
             minIdx = i
         }
     }
-    if (minIdx === -1) return null
+    if (minIdx === -1) {return null}
     return { hex: neighbors[minIdx], distance: min, direction: minIdx }
 }
 
@@ -290,7 +290,7 @@ export function hexNearestNeighbor(a: Point, b: Point) {
 // (inclusive), with exactly hexDistance(a,b)+1 entries.
 export function hexLine(a: Point, b: Point): Point[] {
     const n = hexDistance(a, b)
-    if (n === 0) return [{ x: a.x, y: a.y }]
+    if (n === 0) {return [{ x: a.x, y: a.y }]}
 
     const cubeA = hexGridToCube(a)
     const cubeB = hexGridToCube(b)
@@ -356,9 +356,9 @@ export function tile_in_tile_rect(tile: Point, a: Point, b: Point, c: Point, d: 
     //b = min x, max y
     //c = max x, max y
     //d = max x, min y
-    var error = false
-    if (c.x != d.x || a.x != b.x || a.x > c.x) error = true
-    if (a.y != d.y || b.y != c.y || a.y > c.y) error = true
+    let error = false
+    if (c.x != d.x || a.x != b.x || a.x > c.x) {error = true}
+    if (a.y != d.y || b.y != c.y || a.y > c.y) {error = true}
     if (error) {
         console.log(
             'This is not a rectangle: (' +
@@ -381,16 +381,16 @@ export function tile_in_tile_rect(tile: Point, a: Point, b: Point, c: Point, d: 
         )
         return false
     }
-    var inside = true
-    if (tile.x <= a.x || tile.x >= c.x) inside = false
-    if (tile.y <= a.y || tile.y >= c.y) inside = false
+    let inside = true
+    if (tile.x <= a.x || tile.x >= c.x) {inside = false}
+    if (tile.y <= a.y || tile.y >= c.y) {inside = false}
 
     return inside
 }
 
 function tile_in_tile_rect2(tile: Point, a: Point, c: Point) {
-    var b = { x: a.x, y: c.y }
-    var d = { x: c.x, y: a.y }
+    const b = { x: a.x, y: c.y }
+    const d = { x: c.x, y: a.y }
     return tile_in_tile_rect(tile, a, b, c, d)
 }
 

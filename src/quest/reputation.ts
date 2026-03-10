@@ -36,7 +36,7 @@ export interface SerializedReputation {
 // ---------------------------------------------------------------------------
 
 export class Reputation {
-    private karma: number = 0
+    private karma = 0
     private reputations: Map<string, number> = new Map()
 
     // ── Karma ────────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ export class Reputation {
     setKarma(value: number): void {
         const clamped = Math.max(KARMA_MIN, Math.min(KARMA_MAX, value))
         const old = this.karma
-        if (clamped === old) return
+        if (clamped === old) {return}
         this.karma = clamped
         EventBus.emit('player:karmaChange', { oldValue: old, newValue: clamped })
     }
@@ -69,7 +69,7 @@ export class Reputation {
 
     setReputation(name: string, value: number): void {
         const old = this.getReputation(name)
-        if (value === old) return
+        if (value === old) {return}
         this.reputations.set(name, value)
         EventBus.emit('player:reputationChange', { name, oldValue: old, newValue: value })
     }
@@ -83,7 +83,7 @@ export class Reputation {
 
     serialize(): SerializedReputation {
         const reputations: { [name: string]: number } = {}
-        for (const [k, v] of this.reputations) reputations[k] = v
+        for (const [k, v] of this.reputations) {reputations[k] = v}
         return { karma: this.karma, reputations }
     }
 

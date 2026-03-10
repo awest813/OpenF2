@@ -15,6 +15,7 @@ limitations under the License.
 
 Scripting system/engine for DarkFO
 */
+/* eslint-disable prefer-rest-params */
 
 import { Combat } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
@@ -44,7 +45,7 @@ import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 
-export module Scripting {
+export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
 
     export function setUseElevatorHandler(handler: () => void): void {
@@ -56,9 +57,9 @@ export module Scripting {
         pushMessage(msg: string): void
     }
 
-    var gameObjects: Obj[] | null = null
-    var mapVars: any = null
-    var globalVars: any = {
+    let gameObjects: Obj[] | null = null
+    let mapVars: any = null
+    const globalVars: any = {
         0: 50, // GVAR_PLAYER_REPUTATION
         //10: 1, // GVAR_START_ARROYO_TRIAL (1 = TRIAL_FIGHT)
         531: 1, // GVAR_TALKED_TO_ELDER
@@ -69,13 +70,13 @@ export module Scripting {
         345: 16, // GVAR_NEW_RENO_FLAG_2 (16 = know_mordino_bit)
         357: 2, // GVAR_NEW_RENO_LIL_JESUS_REFERS (lil_jesus_refers_yes)
     }
-    var currentMapID: number | null = null
-    var currentMapObject: Script | null = null
-    var mapFirstRun = true
-    var scriptMessages: { [scriptName: string]: { [msgID: number]: string } } = {}
-    var dialogueOptionProcs: (() => void)[] = [] // Maps dialogue options to handler callbacks
-    var currentDialogueObject: Obj | null = null
-    export var timeEventList: TimedEvent[] = []
+    let currentMapID: number | null = null
+    let currentMapObject: Script | null = null
+    let mapFirstRun = true
+    const scriptMessages: { [scriptName: string]: { [msgID: number]: string } } = {}
+    let dialogueOptionProcs: (() => void)[] = [] // Maps dialogue options to handler callbacks
+    let currentDialogueObject: Obj | null = null
+    export const timeEventList: TimedEvent[] = []
     let overrideStartPos: StartPos | null = null
     let scriptDebuggerSink: ScriptDebuggerSink | null = null
 
@@ -113,7 +114,7 @@ export module Scripting {
      */
     function isOnDrugs(obj: object): number {
         const expiry = _druggedCritters.get(obj)
-        if (expiry === undefined) return 0
+        if (expiry === undefined) {return 0}
         if (globalState.gameTickTime >= expiry) {
             _druggedCritters.delete(obj)
             return 0
@@ -147,7 +148,7 @@ export module Scripting {
 
     function flushUnsupportedVMOperations(script: Script): void {
         const vm = script._vm
-        if (!vm) return
+        if (!vm) {return}
 
         updateScriptDebuggerVMInfo(vm)
         const unsupportedOperations = vm.drainUnsupportedOperations()
@@ -187,7 +188,7 @@ export module Scripting {
     // This is a module-level buffer reset on each hook invocation.
     const _sfallHookArgs: any[] = []
     let _sfallHookArgCursor = 0
-    let _sfallHookReturnVal: number = 0
+    let _sfallHookReturnVal = 0
 
     /**
      * Push arguments into the sfall hook arg buffer before invoking a hook script.
@@ -208,7 +209,7 @@ export module Scripting {
         return _sfallHookReturnVal
     }
 
-    var statMap: { [stat: number]: string } = {
+    const statMap: { [stat: number]: string } = {
         // SPECIAL primaries (0–6)
         0: 'STR',
         1: 'PER',
@@ -252,7 +253,7 @@ export module Scripting {
         35: 'HP',       // Current HP
     }
 
-    var skillNumToName: { [num: number]: string } = {
+    const skillNumToName: { [num: number]: string } = {
         0: 'Small Guns',
         1: 'Big Guns',
         2: 'Energy Weapons',
@@ -277,28 +278,28 @@ export module Scripting {
 
     function stub(name: string, args: IArguments, type?: DebugLogShowType) {
         if (Config.scripting.debugLogShowType.stub === false || Config.scripting.debugLogShowType[type] === false)
-            return
-        var a = ''
-        for (var i = 0; i < args.length; i++)
-            if (i === args.length - 1) a += args[i]
-            else a += args[i] + ', '
+            {return}
+        let a = ''
+        for (let i = 0; i < args.length; i++)
+            {if (i === args.length - 1) {a += args[i]}
+            else {a += args[i] + ', '}}
         console.log('STUB: ' + name + ': ' + a)
         recordStubHit(name, a)
     }
 
     function log(name: string, args: IArguments, type?: DebugLogShowType) {
-        if (Config.scripting.debugLogShowType.log === false || Config.scripting.debugLogShowType[type] === false) return
-        var a = ''
-        for (var i = 0; i < args.length; i++)
-            if (i === args.length - 1) a += args[i]
-            else a += args[i] + ', '
+        if (Config.scripting.debugLogShowType.log === false || Config.scripting.debugLogShowType[type] === false) {return}
+        let a = ''
+        for (let i = 0; i < args.length; i++)
+            {if (i === args.length - 1) {a += args[i]}
+            else {a += args[i] + ', '}}
         console.log('log: ' + name + ': ' + a)
     }
 
     function warn(msg: string, type?: DebugLogShowType, script?: Script) {
-        if (type !== undefined && Config.scripting.debugLogShowType[type] === false) return
-        if (script && (script as any)._vm) console.log(`WARNING [${(script as any)._vm.intfile.name}]: ${msg}`)
-        else console.log(`WARNING: ${msg}`)
+        if (type !== undefined && Config.scripting.debugLogShowType[type] === false) {return}
+        if (script && (script as any)._vm) {console.log(`WARNING [${(script as any)._vm.intfile.name}]: ${msg}`)}
+        else {console.log(`WARNING: ${msg}`)}
     }
 
     /**
@@ -332,9 +333,9 @@ export module Scripting {
     }
 
     export function info(msg: string, type?: DebugLogShowType, script?: Script) {
-        if (type !== undefined && Config.scripting.debugLogShowType[type] === false) return
-        if (script && (script as any)._vm) console.log(`INFO [${(script as any)._vm.intfile.name}]: ${msg}`)
-        else console.log(`INFO: ${msg}`)
+        if (type !== undefined && Config.scripting.debugLogShowType[type] === false) {return}
+        if (script && (script as any)._vm) {console.log(`INFO [${(script as any)._vm.intfile.name}]: ${msg}`)}
+        else {console.log(`INFO: ${msg}`)}
     }
 
     // http://stackoverflow.com/a/23304189/1958152
@@ -397,9 +398,9 @@ export module Scripting {
      * not overwritten by missing keys from an old save.
      */
     export function setMapVars(vars: Record<string, Record<number, number>>): void {
-        if (!mapVars) mapVars = {}
+        if (!mapVars) {mapVars = {}}
         for (const scriptName of Object.keys(vars)) {
-            if (!mapVars[scriptName]) mapVars[scriptName] = {}
+            if (!mapVars[scriptName]) {mapVars[scriptName] = {}}
             for (const key of Object.keys(vars[scriptName])) {
                 mapVars[scriptName][parseInt(key, 10)] = vars[scriptName][key as any]
             }
@@ -408,8 +409,8 @@ export module Scripting {
 
     function isGameObject(obj: any) {
         // TODO: just use isinstance Obj?
-        if (obj === undefined || obj === null) return false
-        if (obj.isPlayer === true) return true
+        if (obj === undefined || obj === null) {return false}
+        if (obj.isPlayer === true) {return true}
         if (
             obj.type === 'item' ||
             obj.type === 'critter' ||
@@ -418,14 +419,14 @@ export module Scripting {
             obj.type === 'tile' ||
             obj.type === 'misc'
         )
-            return true
+            {return true}
 
         //warn("is NOT GO: " + obj.toString())
         return false
     }
 
     function isSpatial(obj: any): boolean {
-        if (!obj) return false
+        if (!obj) {return false}
         return obj.isSpatial === true
     }
 
@@ -437,15 +438,15 @@ export module Scripting {
     function getScriptMessage(id: number, msg: string | number) {
         if (typeof msg === 'string')
             // passed in a string message
-            return msg
+            {return msg}
 
-        var name = getScriptName(id)
+        const name = getScriptName(id)
         if (name === null) {
             warn('getScriptMessage: no script with ID ' + id)
             return null
         }
 
-        if (scriptMessages[name] === undefined) loadMessageFile(name)
+        if (scriptMessages[name] === undefined) {loadMessageFile(name)}
         if (scriptMessages[name] === undefined) {
             warn('getScriptMessage: message file failed to load for script ' + id + ' (' + name + ')')
             return null
@@ -459,7 +460,7 @@ export module Scripting {
     }
 
     export function dialogueReply(id: number): void {
-        var f = dialogueOptionProcs[id]
+        const f = dialogueOptionProcs[id]
         dialogueOptionProcs = []
         f()
         // by this point we may have already exited dialogue
@@ -483,7 +484,7 @@ export module Scripting {
 
         if (currentDialogueObject) {
             // resume from when we halted in gsay_end
-            var vm = currentDialogueObject._script!._vm!
+            const vm = currentDialogueObject._script!._vm!
             vm.pc = vm.popAddr()
             info(`[resuming from gsay_end (pc=0x${vm.pc.toString(16)})]`)
             vm.run()
@@ -495,7 +496,7 @@ export module Scripting {
     function canSee(obj: Obj, target: Obj): boolean {
         // BLK-086: Guard against null positions — objects in inventory or mid-transition
         // often have null positions.  Without this guard hexDirectionTo crashes.
-        if (!obj.position || !target.position) return false
+        if (!obj.position || !target.position) {return false}
         const dir = Math.abs(obj.orientation - hexDirectionTo(obj.position, target.position))
         return [0, 1, 5].indexOf(dir) !== -1
     }
@@ -504,7 +505,7 @@ export module Scripting {
     function isWithinPerception(obj: Critter, target: Critter): boolean {
         // BLK-087: Guard against null positions — critters without positions cannot
         // perceive or be perceived.  Return false (not within perception) rather than crash.
-        if (!obj.position || !target.position) return false
+        if (!obj.position || !target.position) {return false}
         const dist = hexDistance(obj.position, target.position)
         const perception = obj.getStat('PER')
         const sneakSkill = target.getSkill('Sneak')
@@ -515,20 +516,18 @@ export module Scripting {
         if (canSee(obj, target)) {
             reqDist = perception * 5
 
-            if (false /* some target flags & 2 */)
-                // @ts-ignore: Unreachable code error (this isn't implemented yet)
-                reqDist /= 2
+            // TODO: if (someTargetFlags & 2) { reqDist /= 2 } — not implemented yet
 
             if (target === globalState.player) {
                 // SNK_MODE (bit 3) set via pc_flag_on(3) means sneak mode is active.
                 const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
                 if (isSneaking) {
                     reqDist /= 4
-                    if (sneakSkill > 120) reqDist--
+                    if (sneakSkill > 120) {reqDist--}
                 }
             }
 
-            if (dist <= reqDist) return true
+            if (dist <= reqDist) {return true}
         }
 
         reqDist = globalState.inCombat ? perception * 2 : perception
@@ -537,7 +536,7 @@ export module Scripting {
             const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
             if (isSneaking) {
                 reqDist /= 4
-                if (sneakSkill > 120) reqDist--
+                if (sneakSkill > 120) {reqDist--}
             }
         }
 
@@ -552,7 +551,7 @@ export module Scripting {
             // positions are unavailable we conservatively treat the line-of-sight check
             // as unobstructed (return true) so scripts that call can_see_obj / is_within_perception
             // don't crash and still get a usable result.
-            if (!globalState.gMap || !obj.position || !target.position) return true
+            if (!globalState.gMap || !obj.position || !target.position) {return true}
             // Then, is anything blocking obj from drawing a straight line to target?
             const hit = globalState.gMap.hexLinecast(obj.position, target.position)
             return !hit
@@ -602,7 +601,7 @@ export module Scripting {
     export class Script {
         // Stuff we hacked in
         _didOverride = false // Did the procedure call override the default action?
-        _barterMod: number = 0 // One-time barter modifier set by gdialog_set_barter_mod
+        _barterMod = 0 // One-time barter modifier set by gdialog_set_barter_mod
 
         scriptName!: string
         lvars!: { [lvar: number]: any }
@@ -681,14 +680,14 @@ export module Scripting {
                 warn('set_local_var: non-finite value (' + value + ') for lvar ' + lvar + ' — clamping to 0', 'lvars')
                 value = 0
             }
-            if (!this.lvars) this.lvars = {}
+            if (!this.lvars) {this.lvars = {}}
             this.lvars[lvar] = value
             info('set_local_var: ' + lvar + ' = ' + value + ' [' + this.scriptName + ']', 'lvars')
             log('set_local_var', arguments, 'lvars')
         }
         local_var(lvar: number) {
             log('local_var', arguments, 'lvars')
-            if (!this.lvars) this.lvars = {}
+            if (!this.lvars) {this.lvars = {}}
             if (this.lvars[lvar] === undefined) {
                 warn('local_var: setting default value (0) for LVAR ' + lvar, 'lvars')
                 this.lvars[lvar] = 0
@@ -700,11 +699,11 @@ export module Scripting {
                 warn('map_var: no map script — returning 0 (mvar=' + mvar + ')', undefined, this)
                 return 0
             }
-            var scriptName = this._mapScript.scriptName
+            const scriptName = this._mapScript.scriptName
             if (scriptName === undefined) {
                 warn('map_var: map script has no name — returning 0 (mvar=' + mvar + ')', undefined, this)
                 return 0
-            } else if (mapVars[scriptName] === undefined) mapVars[scriptName] = {}
+            } else if (mapVars[scriptName] === undefined) {mapVars[scriptName] = {}}
             else if (mapVars[scriptName][mvar] === undefined) {
                 warn('map_var: setting default value (0) for MVAR ' + mvar, 'mvars')
                 mapVars[scriptName][mvar] = 0
@@ -719,13 +718,13 @@ export module Scripting {
                 warn('set_map_var: no map script — no-op (mvar=' + mvar + ', value=' + value + ')', undefined, this)
                 return
             }
-            var scriptName = this._mapScript.scriptName
+            const scriptName = this._mapScript.scriptName
             if (scriptName === undefined) {
                 warn('map_var: map script has no name')
                 return
             }
             info('set_map_var: ' + mvar + ' = ' + value, 'mvars')
-            if (mapVars[scriptName] === undefined) mapVars[scriptName] = {}
+            if (mapVars[scriptName] === undefined) {mapVars[scriptName] = {}}
             mapVars[scriptName][mvar] = value
         }
         global_var(gvar: number) {
@@ -743,7 +742,7 @@ export module Scripting {
             return Math.abs(x)
         }
         string_length(str: string): number {
-            if (typeof str !== 'string') return 0
+            if (typeof str !== 'string') {return 0}
             return str.length
         }
         pow(base: number, exp: number): number {
@@ -756,13 +755,13 @@ export module Scripting {
             log('debug_msg', arguments)
             info('DEBUG MSG: [' + this.scriptName + ']: ' + msg, 'debugMessage')
             pushScriptDebuggerMessage(`[debug] ${this.scriptName}: ${msg}`)
-            if (this._vm) updateScriptDebuggerVMInfo(this._vm)
+            if (this._vm) {updateScriptDebuggerVMInfo(this._vm)}
         }
         display_msg(msg: string) {
             log('display_msg', arguments)
             info('DISPLAY MSG: ' + msg, 'displayMessage')
             pushScriptDebuggerMessage(`[display] ${this.scriptName}: ${msg}`)
-            if (this._vm) updateScriptDebuggerVMInfo(this._vm)
+            if (this._vm) {updateScriptDebuggerVMInfo(this._vm)}
             uiLog(msg)
         }
         message_str(msgList: number, msgNum: number) {
@@ -776,7 +775,7 @@ export module Scripting {
                     // target === -1 is the canonical "no explicit type" call.
                     // Some scripts pass an explicit type constant; log and proceed
                     // rather than throwing so the elevator is still activated.
-                    if (target !== -1) log('metarule(15): elevator called with explicit type ' + target + ' (ignored)', arguments)
+                    if (target !== -1) {log('metarule(15): elevator called with explicit type ' + target + ' (ignored)', arguments)}
                     useElevatorHandler()
                     break
                 case 17:
@@ -846,7 +845,7 @@ export module Scripting {
                     }
                     const _dtype = objectGetDamageType(target)
                     const _mapped = _dmgTypeMap[_dtype]
-                    if (_mapped !== undefined) return _mapped
+                    if (_mapped !== undefined) {return _mapped}
                     warn('metarule(49): unrecognised damage type: ' + _dtype)
                     return 0 // fall back to Normal
                 }
@@ -882,7 +881,7 @@ export module Scripting {
                     return 0
                 case 6:
                     // METARULE_ARMOR_WORN: 1 if `target` is a critter wearing armor.
-                    if (isGameObject(target) && (target as any).equippedArmor) return 1
+                    if (isGameObject(target) && (target as any).equippedArmor) {return 1}
                     return 0
                 case 7:
                     // METARULE_CRITTER_IN_PARTY / METARULE_CRITTER_BARTER_INFO.
@@ -915,7 +914,7 @@ export module Scripting {
                 case 16:
                     // METARULE_IS_BIG_GUN: 1 if `target` weapon is a big gun (skill area = big guns).
                     // Check proto flags2 bit for big-gun flag (0x0800 in Fallout 2).
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return ((target as any).extra?.flags2 ?? (target as any).flags2 ?? 0) & 0x0800 ? 1 : 0
                 case 19:
                     // METARULE_PARTY_MEMBER_FOLLOW: 1 if the party-member critter is following.
@@ -923,10 +922,10 @@ export module Scripting {
                     return 0
                 case 20:
                     // METARULE_IS_BIG_GUN_EQUIPPED: 1 if the player currently wields a big gun.
-                    if (!globalState.player) return 0
+                    if (!globalState.player) {return 0}
                     {
                         const wep = (globalState.player as any).rightHand ?? (globalState.player as any).leftHand
-                        if (!wep) return 0
+                        if (!wep) {return 0}
                         return ((wep as any).extra?.flags2 ?? (wep as any).flags2 ?? 0) & 0x0800 ? 1 : 0
                     }
                 case 25:
@@ -939,12 +938,12 @@ export module Scripting {
                     return 0
                 case 27:
                     // METARULE_HOSTILE_TO_PC: 1 if the critter is currently hostile to the player.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).hostile ? 1 : 0
                 case 28:
                     // METARULE_CRITTER_STATE: return state-flags bitfield for the critter.
                     // Dead=1; alive=0.  Prone state not tracked separately yet.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).dead ? 1 : 0
                 case 29:
                     // METARULE_AREA_REACHABLE: 1 if the world-map area with ID `target` is
@@ -952,12 +951,12 @@ export module Scripting {
                     return 1
                 case 31:
                     // METARULE_CRITTER_FLEEING: 1 if the critter is currently fleeing.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).isFleeing ? 1 : 0
                 case 32:
                     // METARULE_CRITTER_LEVEL: return the critter's effective level.
                     // For the player, returns player.level; for NPCs return 1 as safe default.
-                    if (!isGameObject(target)) return 1
+                    if (!isGameObject(target)) {return 1}
                     return (target as any).level ?? 1
                 case 33:
                     // METARULE_PLAYER_ALIVE: 1 if the player is alive.
@@ -967,39 +966,39 @@ export module Scripting {
                     return globalState.inCombat ? 1 : 0
                 case 36:
                     // METARULE_CRITTER_KNOCKED_OUT: 1 if critter is knocked out.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).knockedOut ? 1 : 0
                 case 37:
                     // METARULE_CRITTER_KNOCKED_DOWN: 1 if critter is knocked down.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).knockedDown ? 1 : 0
                 case 38:
                     // METARULE_CRITTER_STUNNED: 1 if critter is stunned.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).stunned ? 1 : 0
                 case 39:
                     // METARULE_CRITTER_ON_FIRE: 1 if critter is on fire.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).onFire ? 1 : 0
                 case 40:
                     // METARULE_CRITTER_CRIPPLED_LEFT_LEG: 1 if critter's left leg is crippled.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).crippledLeftLeg ? 1 : 0
                 case 41:
                     // METARULE_CRITTER_CRIPPLED_RIGHT_LEG: 1 if critter's right leg is crippled.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).crippledRightLeg ? 1 : 0
                 case 42:
                     // METARULE_CRITTER_CRIPPLED_LEFT_ARM: 1 if critter's left arm is crippled.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).crippledLeftArm ? 1 : 0
                 case 43:
                     // METARULE_CRITTER_CRIPPLED_RIGHT_ARM: 1 if critter's right arm is crippled.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).crippledRightArm ? 1 : 0
                 case 45:
                     // METARULE_CRITTER_BLINDED: 1 if critter is blinded.
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).blinded ? 1 : 0
                 case 50:
                     // METARULE_CRITTERS_ENTER_REALSPACE: trigger critters to re-enter real-space
@@ -1017,7 +1016,7 @@ export module Scripting {
                     // METARULE_HAVE_DRUG: 1 if the critter (target) has any drug item in its
                     // inventory.  A "drug" item has subtype === 2 in the PRO sub-type table
                     // (0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key).
-                    if (!isGameObject(target)) return 0
+                    if (!isGameObject(target)) {return 0}
                     return (target as any).inventory?.some(
                         (inv: any) => inv.subtype === 'drug' || (inv.pro?.extra?.subType === 2)
                     ) ? 1 : 0
@@ -1047,7 +1046,7 @@ export module Scripting {
                 return 0
             } else if (id === 100) {
                 // METARULE3_CLR_FIXED_TIMED_EVENTS
-                for (var i = 0; i < timeEventList.length; i++) {
+                for (let i = 0; i < timeEventList.length; i++) {
                     if (timeEventList[i].obj === obj && timeEventList[i].userdata === userdata) {
                         // todo: game object equals
                         info('removing timed event (userdata ' + userdata + ')', 'timer')
@@ -1071,12 +1070,12 @@ export module Scripting {
                 //   encounter list (supports iterating all critters at a tile).
                 // BLK-036: now uses getObjects(elevation) so multi-floor maps return
                 // the correct critter without being biased by the current floor.
-                var tile = obj
-                var tileElevation = typeof userdata === 'number' ? userdata : (globalState.currentElevation ?? 0)
-                var lastCritter: any = radius
-                var tilePos = fromTileNum(typeof tile === 'number' ? tile : 0)
-                var allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
-                var critters = allObjs.filter(function(o) {
+                const tile = obj
+                const tileElevation = typeof userdata === 'number' ? userdata : (globalState.currentElevation ?? 0)
+                const lastCritter: any = radius
+                const tilePos = fromTileNum(typeof tile === 'number' ? tile : 0)
+                const allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
+                const critters = allObjs.filter(function(o) {
                     // BLK-088: Guard against null position — objects without a tile
                     // position (inventory items, mid-transition objects) would crash
                     // on o.position.x without this check.
@@ -1092,8 +1091,8 @@ export module Scripting {
                     return critters.length > 0 ? critters[0] : 0
                 }
                 // Return the critter immediately after lastCritter in the list.
-                var idx = critters.findIndex(function(o: any) { return o === lastCritter })
-                if (idx >= 0 && idx + 1 < critters.length) return critters[idx + 1]
+                const idx = critters.findIndex(function(o: any) { return o === lastCritter })
+                if (idx >= 0 && idx + 1 < critters.length) {return critters[idx + 1]}
                 return 0 // no critter found (or lastCritter was the last one)
             } else if (id === 102) {
                 // METARULE3_CHECK_WALKING_ALLOWED: 1 if movement is permitted at the given tile.
@@ -1101,14 +1100,14 @@ export module Scripting {
                 return 1
             } else if (id === 103) {
                 // METARULE3_CRITTER_IN_COMBAT: 1 if the given critter is currently in combat.
-                if (!isGameObject(obj) || obj.type !== 'critter') return 0
-                if (!globalState.inCombat) return 0
+                if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+                if (!globalState.inCombat) {return 0}
 
                 // Prefer explicit membership in the active combat roster when available.
                 // Fall back to the global combat flag for compatibility with contexts that
                 // do not expose globalState.combat (legacy scripted checks).
                 const active = globalState.combat?.combatants
-                if (!active) return 1
+                if (!active) {return 1}
                 return active.includes(obj as Critter) ? 1 : 0
             } else if (id === 104) {
                 // METARULE3_TILE_LINE_OF_SIGHT: 1 if there is line-of-sight between two tiles.
@@ -1126,10 +1125,10 @@ export module Scripting {
                 // obj = source object (first arg), userdata = target object.
                 const src = obj
                 const tgt = userdata
-                if (!isGameObject(src) || !isGameObject(tgt)) return 0
+                if (!isGameObject(src) || !isGameObject(tgt)) {return 0}
                 // BLK-096: Guard against null positions — objects in inventory or mid-transition
                 // may have no position; hexDistance would crash with a TypeError if either is null.
-                if (!src.position || !tgt.position) return 0
+                if (!src.position || !tgt.position) {return 0}
                 return hexDistance(src.position, tgt.position) <= 12 ? 1 : 0
             } else if (id === 107) {
                 // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
@@ -1139,34 +1138,34 @@ export module Scripting {
             } else if (id === 108) {
                 // METARULE3_CRITTER_DIST: distance in hexes between two critters (obj, userdata).
                 // Returns 0 if either argument is not a valid game object or lacks a position.
-                if (!isGameObject(obj) || !isGameObject(userdata)) return 0
+                if (!isGameObject(obj) || !isGameObject(userdata)) {return 0}
                 // BLK-058: Guard against null positions to prevent hexDistance crash.
-                if (!obj.position || !userdata.position) return 0
+                if (!obj.position || !userdata.position) {return 0}
                 return hexDistance(obj.position, userdata.position)
             } else if (id === 109) {
                 // METARULE3_TILE_DIST: distance in hexes between two tile numbers.
                 const tileA = typeof obj === 'number' ? fromTileNum(obj) : null
                 const tileB = typeof userdata === 'number' ? fromTileNum(userdata) : null
-                if (!tileA || !tileB) return 0
+                if (!tileA || !tileB) {return 0}
                 return hexDistance(tileA, tileB)
             } else if (id === 110) {
                 // METARULE3_CRITTER_TILE: tile number of the given critter.
-                if (!isGameObject(obj)) return -1
+                if (!isGameObject(obj)) {return -1}
                 // BLK-097: Guard against null position — critters in inventory or
                 // mid-transition may have no position; toTileNum(null) crashes.
-                if (!obj.position) return -1
+                if (!obj.position) {return -1}
                 return toTileNum(obj.position)
             } else if (id === 111) {
                 // METARULE3_OBJ_IS_CRITTER_DEAD: 1 if the given critter is dead.
-                if (!isGameObject(obj) || obj.type !== 'critter') return 0
+                if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
                 return (obj as Critter).dead ? 1 : 0
             } else if (id === 112) {
                 // METARULE3_CRITTER_INVEN_OBJ2: return the item at the given inventory slot
                 // of the given critter (obj=critter, userdata=slot index).
-                if (!isGameObject(obj) || obj.type !== 'critter') return null
+                if (!isGameObject(obj) || obj.type !== 'critter') {return null}
                 const slotIdx = typeof userdata === 'number' ? userdata : 0
                 const inv = (obj as Critter).inventory
-                if (!inv || slotIdx < 0 || slotIdx >= inv.length) return null
+                if (!inv || slotIdx < 0 || slotIdx >= inv.length) {return null}
                 return inv[slotIdx]
             } else if (id >= 113 && id <= 115) {
                 // METARULE3 IDs 113–115 — unspecified; return 0 as a safe default.
@@ -1188,7 +1187,7 @@ export module Scripting {
         // player
         give_exp_points(xp: number) {
             const player = globalState.player
-            if (!player) return
+            if (!player) {return}
             // BLK-106: Guard against non-finite XP — NaN or Infinity would corrupt
             // player.xp, causing the level-up while-loop comparison to always be
             // false (NaN >= anything is false) so the player could never level up.
@@ -1231,11 +1230,11 @@ export module Scripting {
             }
             if (stat === 34) {
                 // STAT_gender
-                if ((obj as Player).isPlayer) return (obj as Player).gender === 'female' ? 1 : 0
+                if ((obj as Player).isPlayer) {return (obj as Player).gender === 'female' ? 1 : 0}
                 return 0 // Default to male
             }
-            var namedStat = statMap[stat]
-            if (namedStat !== undefined) return obj.getStat(namedStat)
+            const namedStat = statMap[stat]
+            if (namedStat !== undefined) {return obj.getStat(namedStat)}
             // Unknown stat number — return 0 gracefully rather than emitting a stub
             // hit that floods the console when scripts probe optional stat IDs.
             warn('get_critter_stat: unknown stat ' + stat + ' — returning 0', undefined, this)
@@ -1258,7 +1257,7 @@ export module Scripting {
                 warn('set_critter_stat: non-finite amount (' + amount + ') — clamping to 0', undefined, this)
                 amount = 0
             }
-            ;(obj as Critter).stats.setBase(statName, amount)
+            (obj as Critter).stats.setBase(statName, amount)
             return 0
         }
         has_trait(traitType: number, obj: Obj, trait: number) {
@@ -1269,7 +1268,7 @@ export module Scripting {
 
             if (traitType === 0) {
                 // TRAIT_PERK — return the critter's perk rank for this perk ID
-                if (obj.type !== 'critter') return 0
+                if (obj.type !== 'critter') {return 0}
                 return (obj as Critter).perkRanks[trait] ?? 0
             }
 
@@ -1277,26 +1276,26 @@ export module Scripting {
                 // TRAIT_OBJECT
                 switch (trait) {
                     case 0:
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).equippedArmor ? 1 : 0 // INVEN_TYPE_WORN
                     case 1: // INVEN_TYPE_RIGHT_HAND — 1 if critter has a right-hand item equipped
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).rightHand ? 1 : 0
                     case 2: // INVEN_TYPE_LEFT_HAND — 1 if critter has a left-hand item equipped
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).leftHand ? 1 : 0
                     case 3: // INVEN_TYPE_INV_COUNT — total number of items in inventory
                         return obj.inventory ? obj.inventory.length : 0
                     case 4: // OBJECT_TYPE — generic object type code (0=item, 1=critter, 2=scenery, 3=wall)
-                        if (obj.type === 'critter') return 1
-                        if (obj.type === 'scenery') return 2
-                        if (obj.type === 'wall') return 3
+                        if (obj.type === 'critter') {return 1}
+                        if (obj.type === 'scenery') {return 2}
+                        if (obj.type === 'wall') {return 3}
                         return 0
                     case 5:
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).aiNum // OBJECT_AI_PACKET
                     case 6:
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).teamNum // OBJECT_TEAM_NUM
                     case 7: // OBJECT_LOCKED — 1 if the object is locked
                         return obj.locked ? 1 : 0
@@ -1315,7 +1314,7 @@ export module Scripting {
                     case 668: // OBJECT_NO_BLOCK — 1 if object does not block movement
                         return (obj as any).extra?.noBlock ? 1 : 0
                     case 669: // OBJECT_CUR_WEIGHT — total carried weight in lbs
-                        if (obj.type !== 'critter') return 0
+                        if (obj.type !== 'critter') {return 0}
                         return (obj as Critter).stats.getBase('Carry')
                     default:
                         // Unknown TRAIT_OBJECT sub-case — return 0 silently so scripts
@@ -1330,7 +1329,7 @@ export module Scripting {
                 // Fallout 2 trait IDs 0–15 correspond to the 16 creation-time mutations
                 // (Fast Metabolism, Bruiser, Small Frame, etc.).  We store these in the
                 // `charTraits` Set on the Critter instance.
-                if (obj.type !== 'critter') return 0
+                if (obj.type !== 'critter') {return 0}
                 return (obj as Critter).charTraits.has(trait) ? 1 : 0
             }
 
@@ -1340,7 +1339,7 @@ export module Scripting {
                 // SKILL_UNARMED) to read back the accumulated trait-skill value that was set via
                 // critter_add_trait(TRAIT_SKILL, …).  Without this handler the result was
                 // always 0, causing fight-setup logic to skip all skill adjustments.
-                if (obj.type !== 'critter') return 0
+                if (obj.type !== 'critter') {return 0}
                 const skillName = skillNumToName[trait]
                 if (!skillName) {
                     log('has_trait(TRAIT_SKILL,' + trait + '): unknown skill id — returning 0', arguments)
@@ -1369,8 +1368,8 @@ export module Scripting {
                 // TRAIT_PERK — set the perk rank for this perk ID.
                 // Guard: some mock objects and edge-case NPCs lack a perkRanks record;
                 // initialise it on demand so no TypeError is thrown.
-                if (!(obj as Critter).perkRanks) (obj as Critter).perkRanks = {}
-                ;(obj as Critter).perkRanks[trait] = Math.max(0, amount)
+                if (!(obj as Critter).perkRanks) {(obj as Critter).perkRanks = {}
+                ;}(obj as Critter).perkRanks[trait] = Math.max(0, amount)
                 return
             }
 
@@ -1398,15 +1397,15 @@ export module Scripting {
                         obj.visible = amount !== 0
                         return
                     case 667: // OBJECT_IS_FLAT — mark object as flat (rendered below critters)
-                        if (!(obj as any).extra) (obj as any).extra = {}
-                        ;(obj as any).extra.isFlat = amount !== 0
+                        if (!(obj as any).extra) {(obj as any).extra = {}
+                        ;}(obj as any).extra.isFlat = amount !== 0
                         return
                     case 668: // OBJECT_NO_BLOCK — mark object as non-blocking for movement
-                        if (!(obj as any).extra) (obj as any).extra = {}
-                        ;(obj as any).extra.noBlock = amount !== 0
+                        if (!(obj as any).extra) {(obj as any).extra = {}
+                        ;}(obj as any).extra.noBlock = amount !== 0
                         return
                     case 669: // OBJECT_CUR_WEIGHT — set the critter's carry weight
-                        ;(obj as Critter).stats.setBase('Carry', Math.max(0, amount))
+                        (obj as Critter).stats.setBase('Carry', Math.max(0, amount))
                         return
                     default:
                         // Unknown TRAIT_OBJECT sub-case — log silently and return.
@@ -1419,9 +1418,9 @@ export module Scripting {
                 // TRAIT_CHAR — add or remove a character-creation trait by ID.
                 // amount > 0: grant the trait; amount <= 0: revoke it.
                 if (amount > 0) {
-                    ;(obj as Critter).charTraits.add(trait)
+                    (obj as Critter).charTraits.add(trait)
                 } else {
-                    ;(obj as Critter).charTraits.delete(trait)
+                    (obj as Critter).charTraits.delete(trait)
                 }
                 return
             }
@@ -1471,7 +1470,7 @@ export module Scripting {
             for (let i = obj.inventory.length - 1; i >= 0; i--) {
                 if (obj.inventory[i].pid === MONEY_PID) {
                     obj.inventory[i].amount = Math.max(0, obj.inventory[i].amount + amount)
-                    if (obj.inventory[i].amount <= 0) obj.inventory.splice(i, 1)
+                    if (obj.inventory[i].amount <= 0) {obj.inventory.splice(i, 1)}
                     return
                 }
             }
@@ -1527,9 +1526,9 @@ export module Scripting {
             }
 
             //info("obj_is_carrying_obj_pid: " + pid, "inventory")
-            var count = 0
-            for (var i = 0; i < obj.inventory.length; i++) {
-                if (obj.inventory[i].pid === pid) count++
+            let count = 0
+            for (let i = 0; i < obj.inventory.length; i++) {
+                if (obj.inventory[i].pid === pid) {count++}
             }
             return count
         }
@@ -1579,7 +1578,7 @@ export module Scripting {
                     const removed = Math.min(remaining, obj.inventory[i].amount)
                     obj.inventory[i].amount -= removed
                     remaining -= removed
-                    if (obj.inventory[i].amount <= 0) obj.inventory.splice(i, 1)
+                    if (obj.inventory[i].amount <= 0) {obj.inventory.splice(i, 1)}
                 }
             }
             return count - remaining
@@ -1608,16 +1607,16 @@ export module Scripting {
                 (obj as any).equippedArmor,
             ]
             for (const slot of equipped) {
-                if (slot && slot.pid === pid) return slot
+                if (slot && slot.pid === pid) {return slot}
             }
 
-            for (var i = 0; i < obj.inventory.length; i++) {
-                if (obj.inventory[i].pid === pid) return obj.inventory[i]
+            for (let i = 0; i < obj.inventory.length; i++) {
+                if (obj.inventory[i].pid === pid) {return obj.inventory[i]}
             }
             return 0
         }
         elevation(obj: Obj) {
-            if (isSpatial(obj) || isGameObject(obj)) return globalState.currentElevation
+            if (isSpatial(obj) || isGameObject(obj)) {return globalState.currentElevation}
             else {
                 warn('elevation: not an object: ' + obj)
                 return -1
@@ -1715,9 +1714,9 @@ export module Scripting {
                 warn('critter_inven_obj: not game object — returning null', undefined, this)
                 return null
             }
-            if (where === 0) return obj.equippedArmor ?? null // INVEN_TYPE_WORN
-            else if (where === 1) return obj.rightHand // INVEN_TYPE_RIGHT_HAND
-            else if (where === 2) return obj.leftHand // INVEN_TYPE_LEFT_HAND
+            if (where === 0) {return obj.equippedArmor ?? null} // INVEN_TYPE_WORN
+            else if (where === 1) {return obj.rightHand} // INVEN_TYPE_RIGHT_HAND
+            else if (where === 2) {return obj.leftHand} // INVEN_TYPE_LEFT_HAND
             else if (where === -2) {
                 // INVEN_TYPE_INV_COUNT — return the number of items in the critter's inventory
                 return obj.inventory ? obj.inventory.length : 0
@@ -1740,17 +1739,17 @@ export module Scripting {
                 case 1: // INVEN_CMD_LAST
                     return obj.inventory.length > 0 ? obj.inventory[obj.inventory.length - 1] : null
                 case 2: // INVEN_CMD_PREV — item before itemIndex; null when at the start
-                    if (itemIndex <= 0) return null
+                    if (itemIndex <= 0) {return null}
                     return itemIndex - 1 < obj.inventory.length ? obj.inventory[itemIndex - 1] : null
                 case 3: // INVEN_CMD_NEXT — item after itemIndex; null when at the end
-                    if (itemIndex < 0 || itemIndex + 1 >= obj.inventory.length) return null
+                    if (itemIndex < 0 || itemIndex + 1 >= obj.inventory.length) {return null}
                     return obj.inventory[itemIndex + 1]
                 case 11: // INVEN_CMD_LEFT_HAND
                     return (obj as Critter).leftHand ?? null
                 case 12: // INVEN_CMD_RIGHT_HAND
                     return (obj as Critter).rightHand ?? null
                 case 13: // INVEN_CMD_INDEX_PTR
-                    if (itemIndex < 0 || itemIndex >= obj.inventory.length) return null
+                    if (itemIndex < 0 || itemIndex >= obj.inventory.length) {return null}
                     return obj.inventory[itemIndex]
                 default:
                     // Unknown command index — log and return null rather than emitting
@@ -1764,7 +1763,7 @@ export module Scripting {
             // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
             // Fallout 2 returns -1 when placement fails; we mirror that here so
             // calling scripts can detect and handle the failure gracefully.
-            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) return -1
+            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) {return -1}
             // BLK-108: Guard against null gMap — critter_attempt_placement delegates
             // to move_to(), which calls gMap.changeElevation() without checking gMap.
             // During map transitions or in test environments this crash is silent and
@@ -1792,17 +1791,17 @@ export module Scripting {
             //   bit 2 (0x04): knocked down (prone)
             //   bit 3 (0x08): any crippled body part
             //   bit 4 (0x10): fleeing
-            var state = 0
-            if (obj.dead === true) state |= 0x01
-            if ((obj as any).knockedOut === true) state |= 0x02
-            if ((obj as any).knockedDown === true) state |= 0x04
+            let state = 0
+            if (obj.dead === true) {state |= 0x01}
+            if ((obj as any).knockedOut === true) {state |= 0x02}
+            if ((obj as any).knockedDown === true) {state |= 0x04}
             const hasCrippledLimb =
                 (obj as any).crippledLeftLeg ||
                 (obj as any).crippledRightLeg ||
                 (obj as any).crippledLeftArm ||
                 (obj as any).crippledRightArm
-            if (hasCrippledLimb) state |= 0x08
-            if ((obj as any).isFleeing === true) state |= 0x10
+            if (hasCrippledLimb) {state |= 0x08}
+            if ((obj as any).isFleeing === true) {state |= 0x10}
 
             return state
         }
@@ -1855,15 +1854,15 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            if (how & 1) critter.knockedOut = true
-            if (how & 2) critter.knockedDown = true
-            if (how & 4) critter.crippledLeftLeg = true
-            if (how & 8) critter.crippledRightLeg = true
-            if (how & 16) critter.crippledLeftArm = true
-            if (how & 32) critter.crippledRightArm = true
-            if (how & 64) critter.blinded = true
-            if (how & 128) critterKill(critter)
-            if (how & 256) critter.onFire = true
+            if (how & 1) {critter.knockedOut = true}
+            if (how & 2) {critter.knockedDown = true}
+            if (how & 4) {critter.crippledLeftLeg = true}
+            if (how & 8) {critter.crippledRightLeg = true}
+            if (how & 16) {critter.crippledLeftArm = true}
+            if (how & 32) {critter.crippledRightArm = true}
+            if (how & 64) {critter.blinded = true}
+            if (how & 128) {critterKill(critter)}
+            if (how & 256) {critter.onFire = true}
         }
         critter_is_fleeing(obj: Obj) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -1912,7 +1911,7 @@ export module Scripting {
                 damage = 0
             }
             // Zero damage — nothing to apply; skip critterDamage() to avoid side-effects.
-            if (damage === 0) return
+            if (damage === 0) {return}
             critterDamage(obj, damage, this.self_obj as Critter, true, true, damageType)
         }
         critter_heal(obj: Obj, amount: number) {
@@ -1933,28 +1932,28 @@ export module Scripting {
             const maxHP = critter.getStat('Max HP')
             const currentHP = critter.getStat('HP')
             const healAmount = Math.min(amount, maxHP - currentHP)
-            if (healAmount > 0) critter.stats.modifyBase('HP', healAmount)
+            if (healAmount > 0) {critter.stats.modifyBase('HP', healAmount)}
         }
         poison(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('poison: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).stats.modifyBase('Poison Level', amount)
+            (obj as Critter).stats.modifyBase('Poison Level', amount)
         }
         radiation_dec(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('radiation_dec: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).stats.modifyBase('Radiation Level', -amount)
+            (obj as Critter).stats.modifyBase('Radiation Level', -amount)
         }
         radiation_add(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('radiation_add: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).stats.modifyBase('Radiation Level', amount)
+            (obj as Critter).stats.modifyBase('Radiation Level', amount)
         }
 
         // combat
@@ -1974,18 +1973,18 @@ export module Scripting {
             // implementing all of it
 
             // begin combat, turn starting with us
-            if (Config.engine.doCombat) Combat.start(this.self_obj as Critter)
+            if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter)}
         }
         terminate_combat() {
             info('[terminate_combat]')
-            if (globalState.combat) globalState.combat.end()
+            if (globalState.combat) {globalState.combat.end()}
         }
         critter_set_flee_state(obj: Obj, isFleeing: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('critter_set_flee_state: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).isFleeing = isFleeing !== 0
+            (obj as Critter).isFleeing = isFleeing !== 0
         }
 
         // ---------------------------------------------------------------------------
@@ -2073,7 +2072,7 @@ export module Scripting {
                 warn('pickup_obj: no player', undefined, this)
                 return
             }
-            if (globalState.gMap) globalState.gMap.removeObject(obj)
+            if (globalState.gMap) {globalState.gMap.removeObject(obj)}
             player.inventory.push(obj)
         }
 
@@ -2101,7 +2100,7 @@ export module Scripting {
                 return
             }
             const idx = source.inventory.indexOf(obj)
-            if (idx !== -1) source.inventory.splice(idx, 1)
+            if (idx !== -1) {source.inventory.splice(idx, 1)}
             if (globalState.gMap && source.position) {
                 obj.position = { ...source.position }
                 globalState.gMap.addObject(obj)
@@ -2147,7 +2146,7 @@ export module Scripting {
                 return
             }
             info('obj_close')
-            if (!obj.open) return
+            if (!obj.open) {return}
             obj.use(this.self_obj as Critter, false)
             //stub("obj_close", arguments)
         }
@@ -2157,14 +2156,14 @@ export module Scripting {
                 return
             }
             info('obj_open')
-            if (obj.open) return
+            if (obj.open) {return}
             obj.use(this.self_obj as Critter, false)
             //stub("obj_open", arguments)
         }
         proto_data(pid: number, data_member: number): any {
             // data_member 0 (PROTO_DATA_PID) can be returned directly without
             // loading the proto — the PID is the argument itself.
-            if (data_member === 0) return pid
+            if (data_member === 0) {return pid}
 
             // Load the prototype for this PID.  The PID encodes both the object
             // type (bits 31-24) and the 1-based prototype index (bits 15-0).
@@ -2255,7 +2254,7 @@ export module Scripting {
                     // WEAPON_DATA_BURST_ROUNDS (weapons) / ARMOR_DATA_DR_LASER (armor).
                     // Disambiguate by item sub-type: subType 0 = armor, 3 = weapon.
                     if (pro.extra?.subType === 0)
-                        return pro.extra?.stats?.['DR Laser'] ?? 0
+                        {return pro.extra?.stats?.['DR Laser'] ?? 0}
                     return pro.extra?.rounds ?? 0
 
                 // --- Armor-specific item fields ---
@@ -2377,7 +2376,7 @@ export module Scripting {
                 elev = Math.max(0, Math.min(2, elev))
             }
 
-            var obj = createObjectWithPID(pid, sid)
+            const obj = createObjectWithPID(pid, sid)
             if (!obj) {
                 warn("create_object_sid: couldn't create object", undefined, this)
                 return null
@@ -2428,7 +2427,7 @@ export module Scripting {
                 warn('set_name: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).name = String(name ?? '')
+            (obj as any).name = String(name ?? '')
         }
         obj_item_subtype(obj: Obj) {
             if (!isGameObject(obj)) {
@@ -2436,7 +2435,7 @@ export module Scripting {
                 return null
             }
 
-            if (obj.type === 'item' && (obj as any).pro !== undefined) return (obj as any).pro.extra.subtype
+            if (obj.type === 'item' && (obj as any).pro !== undefined) {return (obj as any).pro.extra.subtype}
 
             // Fallback: map the string subtype to its Fallout 2 integer constant.
             // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key
@@ -2520,13 +2519,13 @@ export module Scripting {
             }
             if (anim === 1000)
                 // set rotation
-                obj.orientation = param
+                {obj.orientation = param}
             else if (anim === 1010)
                 // set frame
-                obj.frame = param
+                {obj.frame = param}
             else if (anim === 0)
                 // ANIM_stand — reset to idle standing frame
-                obj.frame = 0
+                {obj.frame = 0}
             else if (anim >= 1 && anim <= 99) {
                 // Standard ANIM_* animation constants (1=walk, 2=jump_begin, …, 50=fall_front_blood, etc.).
                 // BLK-125 (Phase 79): Trigger a one-shot animation cycle on the object using
@@ -2534,7 +2533,7 @@ export module Scripting {
                 // frame=0 for objects that don't support singleAnimation (e.g. static items).
                 log('anim', arguments, 'animation')
                 if (typeof (obj as any).singleAnimation === 'function') {
-                    try { ;(obj as any).singleAnimation(false, null) } catch (_e) { /* ignore */ }
+                    try { (obj as any).singleAnimation(false, null) } catch (_e) { /* ignore */ }
                 } else {
                     obj.frame = 0
                 }
@@ -2611,7 +2610,7 @@ export module Scripting {
             if (!isGameObject(obj)) {
                 warn('obj_type: not game object: ' + obj)
                 return null
-            } else if (obj.type === 'critter') return 1 // critter
+            } else if (obj.type === 'critter') {return 1} // critter
             else if (obj.pid === undefined) {
                 warn('obj_type: no PID')
                 return null
@@ -2638,8 +2637,8 @@ export module Scripting {
                 warn('set_exit_grids: gameObjects is null — skipping', undefined, this)
                 return
             }
-            for (var i = 0; i < gameObjects.length; i++) {
-                var obj = gameObjects[i]
+            for (let i = 0; i < gameObjects.length; i++) {
+                const obj = gameObjects[i]
                 if (obj.type === 'misc' && obj.extra && obj.extra.exitMapID !== undefined) {
                     obj.extra.exitMapID = mapID
                     obj.extra.startingPosition = tileNum
@@ -2662,7 +2661,7 @@ export module Scripting {
             return hexDistance(a.position, b.position)
         }
         tile_distance(a: number, b: number) {
-            if (a === -1 || b === -1) return 9999
+            if (a === -1 || b === -1) {return 9999}
             return hexDistance(fromTileNum(a), fromTileNum(b))
         }
         tile_num(obj: Obj) {
@@ -2685,12 +2684,12 @@ export module Scripting {
                 warn('tile_contains_pid_obj: gMap is null — returning 0', undefined, this)
                 return 0
             }
-            var pos = fromTileNum(tile)
-            var objects = globalState.gMap.getObjects(elevation)
-            for (var i = 0; i < objects.length; i++) {
+            const pos = fromTileNum(tile)
+            const objects = globalState.gMap.getObjects(elevation)
+            for (let i = 0; i < objects.length; i++) {
                 // BLK-055: Guard against objects without a position (edge case during
                 // map transitions or after explosive removal).
-                if (!objects[i].position) continue
+                if (!objects[i].position) {continue}
                 if (objects[i].position.x === pos.x && objects[i].position.y === pos.y && objects[i].pid === pid) {
                     return objects[i]
                 }
@@ -2707,7 +2706,7 @@ export module Scripting {
                 // player object exists but has not yet been placed on the map (e.g.
                 // during initial script execution before map_enter_p_proc completes).
                 // Fall back to always-visible (1) so scripts proceed safely.
-                if (!globalState.player.position) return 1
+                if (!globalState.player.position) {return 1}
                 const tilePos = fromTileNum(tile)
                 const dist = hexDistance(globalState.player.position, tilePos)
                 return dist <= 14 ? 1 : 0
@@ -2729,21 +2728,21 @@ export module Scripting {
             // did not match the current floor, even when the target floor existed).
             // BLK-135: Guard against invalid tile numbers — negative values or NaN
             // produce meaningless coordinates from fromTileNum().  Return 0 early.
-            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
-            var pos = fromTileNum(tile)
-            var objs = (globalState.gMap?.getObjects(elevation)) ?? []
-            for (var i = 0; i < objs.length; i++) {
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) {return 0}
+            const pos = fromTileNum(tile)
+            const objs = (globalState.gMap?.getObjects(elevation)) ?? []
+            for (let i = 0; i < objs.length; i++) {
                 // BLK-055: Guard against objects without a position.
-                if (!objs[i].position) continue
-                if (objs[i].position.x === pos.x && objs[i].position.y === pos.y && objs[i].pid === pid) return 1
+                if (!objs[i].position) {continue}
+                if (objs[i].position.x === pos.x && objs[i].position.y === pos.y && objs[i].pid === pid) {return 1}
             }
             return 0
         }
         rotation_to_tile(srcTile: number, destTile: number) {
-            var src = fromTileNum(srcTile),
+            const src = fromTileNum(srcTile),
                 dest = fromTileNum(destTile)
-            var hex = hexNearestNeighbor(src, dest)
-            if (hex !== null) return hex.direction
+            const hex = hexNearestNeighbor(src, dest)
+            if (hex !== null) {return hex.direction}
             warn('rotation_to_tile: invalid hex: ' + srcTile + ' / ' + destTile)
             return -1 // TODO/XXX: what does this return if invalid?
         }
@@ -2774,7 +2773,7 @@ export module Scripting {
             }
             obj.position = fromTileNum(tileNum)
 
-            if (obj instanceof Critter && obj.isPlayer) centerCamera(obj.position)
+            if (obj instanceof Critter && obj.isPlayer) {centerCamera(obj.position)}
         }
 
         // combat
@@ -2832,7 +2831,7 @@ export module Scripting {
         //gSay_Option(msgList, msgID, target, reaction) { stub("gSay_Option", arguments) },
         gsay_reply(msgList: number, msgID: string | number) {
             log('gSay_Reply', arguments)
-            var msg = getScriptMessage(msgList, msgID)
+            const msg = getScriptMessage(msgList, msgID)
             if (msg === null || msg === '') {
                 warn('gsay_reply: message is null/empty — reply skipped', undefined, this)
                 return
@@ -2859,7 +2858,7 @@ export module Scripting {
         }
         gsay_option(msgList: number, msgID: string | number, target: any, reaction: number) {
             log('gsay_option', arguments)
-            var msg = getScriptMessage(msgList, msgID)
+            const msg = getScriptMessage(msgList, msgID)
             if (msg === null || msg === '') {
                 warn('gsay_option: msg is null/empty — option skipped', undefined, this)
                 return
@@ -2879,7 +2878,7 @@ export module Scripting {
         }
         giq_option(iqTest: number, msgList: number, msgID: string | number, target: any, reaction: number) {
             log('giQ_Option', arguments)
-            var msg = getScriptMessage(msgList, msgID)
+            const msg = getScriptMessage(msgList, msgID)
             if (msg === null) {
                 console.warn('giq_option: msg is null')
                 return
@@ -2900,7 +2899,7 @@ export module Scripting {
             }
 
             const INT = player.getStat('INT')
-            if ((iqTest > 0 && INT < iqTest) || (iqTest < 0 && INT > -iqTest)) return // not enough intelligence for this option
+            if ((iqTest > 0 && INT < iqTest) || (iqTest < 0 && INT > -iqTest)) {return} // not enough intelligence for this option
 
             dialogueOptionProcs.push(target.bind(this))
             uiAddDialogueOption(msg, dialogueOptionProcs.length - 1)
@@ -2920,7 +2919,7 @@ export module Scripting {
                 warn('float_msg: not game object: ' + obj)
                 return
             }
-            var colorMap: { [color: number]: string } = {
+            const colorMap: { [color: number]: string } = {
                 // todo: take the exact values from some palette. also, yellow is ugly.
                 0: 'white', //0: "yellow",
                 1: 'black',
@@ -2936,8 +2935,8 @@ export module Scripting {
                 11: 'dark gray',
                 12: 'light gray',
             }
-            var color = colorMap[type]
-            if (type === -2 /* FLOAT_MSG_WARNING */ || type === -1 /* FLOAT_MSG_SEQUENTIAL */) color = colorMap[9]
+            let color = colorMap[type]
+            if (type === -2 /* FLOAT_MSG_WARNING */ || type === -1 /* FLOAT_MSG_SEQUENTIAL */) {color = colorMap[9]}
             // BLK-131: Guard against missing floatMessages array — globalState is
             // initialised with floatMessages:[] but a custom init path or a partial
             // reset could leave it undefined.  Array spread access on undefined
@@ -2988,7 +2987,7 @@ export module Scripting {
                 return
             }
             //console.log("ANIM FOREVER: " + obj.art + " / " + anim)
-            if (anim !== 0) warn('reg_anim_animate_forever: anim = ' + anim)
+            if (anim !== 0) {warn('reg_anim_animate_forever: anim = ' + anim)}
             function animate() {
                 obj.singleAnimation(false, animate)
             }
@@ -3003,13 +3002,13 @@ export module Scripting {
             // XXX: is this correct? FCMALPNK passes a procedure name
             // but is it a call (wouldn't make sense for NOption) or
             // a procedure reference that this should call?
-            if (typeof tileNum === 'function') tileNum = tileNum.call(this)
+            if (typeof tileNum === 'function') {tileNum = tileNum.call(this)}
             if (isNaN(tileNum)) {
                 warn('animate_move_obj_to_tile: invalid tile num', 'movement', this)
                 return
             }
 
-            var tile = fromTileNum(tileNum)
+            const tile = fromTileNum(tileNum)
             if (tile.x < 0 || tile.x >= 200 || tile.y < 0 || tile.y >= 200) {
                 warn(
                     'animate_move_obj_to_tile: invalid tile: ' + tile.x + ', ' + tile.y + ' (' + tileNum + ')',
@@ -3081,7 +3080,7 @@ export module Scripting {
             }
 
             // Make a transient object so we can explode at the tile.
-            var explosives = createObjectWithPID(makePID(0 /* items */, 85 /* Plastic Explosives */), -1)
+            const explosives = createObjectWithPID(makePID(0 /* items */, 85 /* Plastic Explosives */), -1)
             explosives.position = fromTileNum(tile)
             globalState.gMap.addObject(explosives)
             // Use the script-supplied damage value: half as min, full as max.
@@ -3147,7 +3146,7 @@ export module Scripting {
                 return
             }
             info('rm_timer_event: ' + obj + ', ' + obj.pid)
-            for (var i = 0; i < timeEventList.length; i++) {
+            for (let i = 0; i < timeEventList.length; i++) {
                 const timedEvent = timeEventList[i]
                 if (timedEvent.obj && timedEvent.obj.pid === obj.pid) {
                     // TODO: better object equality
@@ -3191,7 +3190,7 @@ export module Scripting {
         // sfall extended opcodes — PC/critter stat helpers
         get_pc_base_stat(stat: number): number {
             const player = globalState.player
-            if (!player) return 0
+            if (!player) {return 0}
             const statName = statMap[stat]
             if (!statName) {
                 warn('get_pc_base_stat: unknown stat number: ' + stat, undefined, this)
@@ -3201,7 +3200,7 @@ export module Scripting {
         }
         set_pc_base_stat(stat: number, value: number): void {
             const player = globalState.player
-            if (!player) return
+            if (!player) {return}
             const statName = statMap[stat]
             if (!statName) {
                 warn('set_pc_base_stat: unknown stat number: ' + stat, undefined, this)
@@ -3245,7 +3244,7 @@ export module Scripting {
         }
         get_pc_level(): number {
             const player = globalState.player
-            if (!player) return 0
+            if (!player) {return 0}
             return player.level
         }
 
@@ -3272,7 +3271,7 @@ export module Scripting {
                 warn('set_critter_base_stat: unknown stat number: ' + stat, undefined, this)
                 return
             }
-            ;(obj as Critter).stats.setBase(statName, value)
+            (obj as Critter).stats.setBase(statName, value)
         }
         in_combat(): number {
             return globalState.inCombat ? 1 : 0
@@ -3303,13 +3302,13 @@ export module Scripting {
             // 3 = super mutants, 4 = ghouls, …).  The counts are stored on
             // globalState so they survive map transitions within a session.
             const counts = globalState.critterKillCounts
-            if (!counts) return 0
+            if (!counts) {return 0}
             return counts[killType] ?? 0
         }
         set_critter_kills(killType: number, amount: number): void {
             // Overwrite the kill count for the given kill type.
             if (!globalState.critterKillCounts) {
-                ;(globalState as any).critterKillCounts = {}
+                (globalState as any).critterKillCounts = {}
             }
             globalState.critterKillCounts[killType] = Math.max(0, amount)
         }
@@ -3325,7 +3324,7 @@ export module Scripting {
             }
             const critter = obj as Critter
             // bodyType is stored in the critter prototype extra data.
-            if (critter.pro?.extra?.bodyType !== undefined) return critter.pro.extra.bodyType
+            if (critter.pro?.extra?.bodyType !== undefined) {return critter.pro.extra.bodyType}
             return 0
         }
 
@@ -3342,12 +3341,12 @@ export module Scripting {
             // Return the number of live objects on the current map whose PID
             // matches `mapPID`.  Used by scripted encounter clean-up and loot
             // scripts to check whether all enemies are dead.
-            if (!globalState.gMap) return 0
+            if (!globalState.gMap) {return 0}
             let count = 0
             for (const level of globalState.gMap.objects) {
-                if (!level) continue
+                if (!level) {continue}
                 for (const obj of level) {
-                    if (obj.pid === mapPID) count++
+                    if (obj.pid === mapPID) {count++}
                 }
             }
             return count
@@ -3359,7 +3358,7 @@ export module Scripting {
             // caseSensitive: 0 = case-insensitive, 1 = case-sensitive.
             const a = typeof str1 === 'string' ? str1 : String(str1)
             const b = typeof str2 === 'string' ? str2 : String(str2)
-            if (caseSensitive) return a === b ? 0 : 1
+            if (caseSensitive) {return a === b ? 0 : 1}
             return a.toLowerCase() === b.toLowerCase() ? 0 : 1
         }
 
@@ -3367,9 +3366,9 @@ export module Scripting {
         substr(str: string, start: number, len: number): string {
             // Returns a substring of `str` starting at `start` with length `len`.
             // Negative `len` means "to end of string".  Mirrors sfall substr().
-            if (typeof str !== 'string') return ''
+            if (typeof str !== 'string') {return ''}
             const s = start < 0 ? Math.max(0, str.length + start) : start
-            if (len < 0) return str.slice(s)
+            if (len < 0) {return str.slice(s)}
             return str.slice(s, s + len)
         }
 
@@ -3385,7 +3384,7 @@ export module Scripting {
             // Parse a string as a base-10 integer.  Mirrors sfall string_to_int().
             // Returns 0 for non-string inputs or strings that cannot be parsed.
             // parseInt already handles leading/trailing whitespace, so no trim needed.
-            if (typeof str !== 'string') return 0
+            if (typeof str !== 'string') {return 0}
             const n = parseInt(str, 10)
             return Number.isFinite(n) ? n : 0
         }
@@ -3394,7 +3393,7 @@ export module Scripting {
             // the sfall sprintf("%d", n) pattern commonly used for display and logging.
             // Returns '0' for non-number inputs to match sfall's safe-zero default for
             // invalid arguments (consistent with how string_to_int returns 0 on error).
-            if (typeof n !== 'number') return '0'
+            if (typeof n !== 'number') {return '0'}
             return Math.trunc(n).toString()
         }
 
@@ -3404,11 +3403,11 @@ export module Scripting {
         // This is one of the most commonly used sfall opcodes; many scripts use it for
         // display messages, UI labels, and debug output.
         sprintf(fmt: any, arg: any): string {
-            if (typeof fmt !== 'string') return String(fmt ?? '')
+            if (typeof fmt !== 'string') {return String(fmt ?? '')}
             // Replace each format specifier with the corresponding formatted value.
             // The %%|%([disxci]) pattern handles: %% → literal %, and %d/%i/%s/%x/%c specifiers.
             return fmt.replace(/%%|%([disxci])/g, (match: string, spec?: string) => {
-                if (!spec) return '%'
+                if (!spec) {return '%'}
                 const n = typeof arg === 'number' ? Math.trunc(arg) : (parseInt(String(arg), 10) || 0)
                 switch (spec) {
                     case 'd':
@@ -3431,7 +3430,7 @@ export module Scripting {
         // Used by scripts that conditionally call procedures only on scripted objects
         // to avoid crashing when triggering NPC interactions on unscripted objects.
         obj_has_script(obj: Obj): number {
-            if (!isGameObject(obj)) return 0
+            if (!isGameObject(obj)) {return 0}
             return (obj as any)._script ? 1 : 0
         }
 
@@ -3464,14 +3463,14 @@ export module Scripting {
             }
             const c = obj as Critter
             let flags = 0
-            if (c.dead)             flags |= 0x0001  // CRITTER_FLAG_DEAD
-            if (c.knockedOut)       flags |= 0x0002  // CRITTER_FLAG_KNOCKED_OUT
-            if (c.knockedDown)      flags |= 0x0004  // CRITTER_FLAG_KNOCKED_DOWN
-            if (c.crippledLeftLeg)  flags |= 0x0008  // CRITTER_FLAG_CRIPPLED_LEFT_LEG
-            if (c.crippledRightLeg) flags |= 0x0010  // CRITTER_FLAG_CRIPPLED_RIGHT_LEG
-            if (c.crippledLeftArm)  flags |= 0x0020  // CRITTER_FLAG_CRIPPLED_LEFT_ARM
-            if (c.crippledRightArm) flags |= 0x0040  // CRITTER_FLAG_CRIPPLED_RIGHT_ARM
-            if (c.blinded)          flags |= 0x0080  // CRITTER_FLAG_BLINDED
+            if (c.dead)             {flags |= 0x0001}  // CRITTER_FLAG_DEAD
+            if (c.knockedOut)       {flags |= 0x0002}  // CRITTER_FLAG_KNOCKED_OUT
+            if (c.knockedDown)      {flags |= 0x0004}  // CRITTER_FLAG_KNOCKED_DOWN
+            if (c.crippledLeftLeg)  {flags |= 0x0008}  // CRITTER_FLAG_CRIPPLED_LEFT_LEG
+            if (c.crippledRightLeg) {flags |= 0x0010}  // CRITTER_FLAG_CRIPPLED_RIGHT_LEG
+            if (c.crippledLeftArm)  {flags |= 0x0020}  // CRITTER_FLAG_CRIPPLED_LEFT_ARM
+            if (c.crippledRightArm) {flags |= 0x0040}  // CRITTER_FLAG_CRIPPLED_RIGHT_ARM
+            if (c.blinded)          {flags |= 0x0080}  // CRITTER_FLAG_BLINDED
             return flags
         }
 
@@ -3515,7 +3514,7 @@ export module Scripting {
                 warn('set_weapon_ammo_pid: not a game object: ' + weapon)
                 return
             }
-            if (!weapon.extra) weapon.extra = {}
+            if (!weapon.extra) {weapon.extra = {}}
             weapon.extra.ammoType = pid
         }
 
@@ -3534,7 +3533,7 @@ export module Scripting {
                 warn('set_weapon_ammo_count: not a game object: ' + weapon)
                 return
             }
-            if (!weapon.extra) weapon.extra = {}
+            if (!weapon.extra) {weapon.extra = {}}
             weapon.extra.ammoLoaded = Math.max(0, count)
         }
 
@@ -3549,7 +3548,7 @@ export module Scripting {
 
         // sfall extended opcode — get the display name of any game object (0x817D)
         get_critter_name(obj: Obj): string {
-            if (!isGameObject(obj)) return ''
+            if (!isGameObject(obj)) {return ''}
             return (obj as any).name ?? ''
         }
 
@@ -3562,8 +3561,8 @@ export module Scripting {
         // Scripts use this to gate combat-only or dialogue-only code paths.
         get_game_mode(): number {
             let mode = 0
-            if (globalState.inCombat) mode |= 1
-            if (currentDialogueObject !== null) mode |= 2
+            if (globalState.inCombat) {mode |= 1}
+            if (currentDialogueObject !== null) {mode |= 2}
             return mode
         }
 
@@ -3618,7 +3617,7 @@ export module Scripting {
                 warn('set_critter_skill_points: non-finite value (' + value + ') — clamping to 0')
                 value = 0
             }
-            ;(obj as Critter).skills.setBase(skillName, value)
+            (obj as Critter).skills.setBase(skillName, value)
         }
 
         // sfall extended opcode — get current ambient light level (0x8182).
@@ -3645,7 +3644,7 @@ export module Scripting {
                 warn('set_critter_hp: not a critter: ' + obj)
                 return
             }
-            ;(obj as Critter).stats.setBase('HP', Math.max(0, hp))
+            (obj as Critter).stats.setBase('HP', Math.max(0, hp))
         }
 
         // sfall extended opcode — get max action points for a critter (0x8185).
@@ -3696,7 +3695,7 @@ export module Scripting {
         list_next(): Obj | null {
             this._listIterIndex = (this._listIterIndex ?? 0) + 1
             const objs = this._listIterObjects ?? []
-            if (this._listIterIndex >= objs.length) return null
+            if (this._listIterIndex >= objs.length) {return null}
             return objs[this._listIterIndex]
         }
         list_end(): void {
@@ -3705,7 +3704,7 @@ export module Scripting {
         }
         // Internal state for sfall list iteration (not serialized).
         _listIterObjects: Obj[] = []
-        _listIterIndex: number = 0
+        _listIterIndex = 0
 
         // sfall extended opcode — tile number N steps in a direction (0x8189).
         // tile_num_in_direction(tile, dir, count):
@@ -3715,10 +3714,10 @@ export module Scripting {
         // Returns the tile number of the destination, or the original tile when
         // the input is out of range (count <= 0 or bad tile).
         tile_num_in_direction(tile: number, dir: number, count: number): number {
-            if (typeof tile !== 'number' || typeof dir !== 'number' || typeof count !== 'number') return tile ?? 0
-            if (count <= 0) return tile
+            if (typeof tile !== 'number' || typeof dir !== 'number' || typeof count !== 'number') {return tile ?? 0}
+            if (count <= 0) {return tile}
             const start = fromTileNum(tile)
-            if (!start) return tile
+            if (!start) {return tile}
             const dest = hexInDirectionDistance(start, ((dir % 6) + 6) % 6, count)
             return toTileNum(dest)
         }
@@ -3755,7 +3754,7 @@ export module Scripting {
                 warn('set_object_art_fid: not a game object: ' + obj)
                 return
             }
-            ;(obj as any).frmType = (fid >> 24) & 0xff
+            (obj as any).frmType = (fid >> 24) & 0xff
             ;(obj as any).frmPID = fid & 0xffffff
             ;(obj as any).fid = fid & 0xffffff
             log('set_object_art_fid: fid=0x' + fid.toString(16), arguments)
@@ -3777,7 +3776,7 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+            if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
         }
         get_script_return_value(): number {
             // Return the most recent sfall hook-script return value.
@@ -3795,8 +3794,8 @@ export module Scripting {
                 warn('load_map: gMap is null — cannot load map ' + map, undefined, this)
                 return
             }
-            if (typeof map === 'string') globalState.gMap.loadMap(map.split('.')[0].toLowerCase())
-            else globalState.gMap.loadMapByID(map)
+            if (typeof map === 'string') {globalState.gMap.loadMap(map.split('.')[0].toLowerCase())}
+            else {globalState.gMap.loadMapByID(map)}
         }
         play_gmovie(movieID: number) {
             // Play a full-motion video clip by ID.  The browser build does not
@@ -3809,11 +3808,11 @@ export module Scripting {
                 // MARK_TYPE_TOWN
                 if (markState === -66) {
                     // MARK_STATE_INVISIBLE — hide the area
-                    if (globalState.markAreaKnown) globalState.markAreaKnown(area, 0)
+                    if (globalState.markAreaKnown) {globalState.markAreaKnown(area, 0)}
                 } else {
                     // MARK_STATE_UNKNOWN (0), MARK_STATE_KNOWN (1), MARK_STATE_VISITED (2)
-                    if (globalState.markAreaKnown) globalState.markAreaKnown(area, markState)
-                    else log('mark_area_known', arguments)
+                    if (globalState.markAreaKnown) {globalState.markAreaKnown(area, markState)}
+                    else {log('mark_area_known', arguments)}
                 }
             } else if (areaType === 1) {
                 // MARK_TYPE_MAP — individual map reveal within a town area.
@@ -3847,7 +3846,7 @@ export module Scripting {
             // is null.  Without the guard, any script that calls play_sfx() will crash
             // with a TypeError.  Skip silently rather than emitting a stub warning so
             // every map-enter sound effect does not flood the console.
-            if (!globalState.audioEngine) return
+            if (!globalState.audioEngine) {return}
             globalState.audioEngine.playSfx(sfx)
         }
 
@@ -3856,7 +3855,7 @@ export module Scripting {
             log('party_member_obj', arguments, 'party')
             // BLK-067: Guard against null gParty to prevent crash during early init
             // or when tests run without a full game-state setup.
-            if (!globalState.gParty) return 0
+            if (!globalState.gParty) {return 0}
             return globalState.gParty.getPartyMemberByPID(pid) || 0
         }
         party_add(obj: Critter) {
@@ -3956,7 +3955,7 @@ export module Scripting {
                 return
             }
             // `level` is defined on Player; set it as a dynamic property for NPCs.
-            ;(obj as any).level = Math.max(1, level)
+            (obj as any).level = Math.max(1, level)
         }
 
         // sfall extended opcode — return the weight of an object in lbs (0x81A2).
@@ -3967,8 +3966,8 @@ export module Scripting {
             }
             // Weight is stored in proto data as weight in lbs * 10 (grams).
             const pro = (obj as any).pro
-            if (pro?.extra?.weight !== undefined) return Math.round(pro.extra.weight / 10)
-            if (pro?.weight !== undefined) return Math.round(pro.weight / 10)
+            if (pro?.extra?.weight !== undefined) {return Math.round(pro.extra.weight / 10)}
+            if (pro?.weight !== undefined) {return Math.round(pro.weight / 10)}
             return 0
         }
 
@@ -4024,7 +4023,7 @@ export module Scripting {
                 warn('set_combat_free_move: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).freeMoveAP = Math.max(0, typeof ap === 'number' ? ap : 0)
+            (obj as any).freeMoveAP = Math.max(0, typeof ap === 'number' ? ap : 0)
         }
 
         // Phase 51 — sfall extended opcodes 0x81B6–0x81BD
@@ -4100,21 +4099,21 @@ export module Scripting {
         // Returns the number of critters within `radius` hexes of `tile` at elevation `elev`.
         // Used by AI and encounter scripts to assess nearby threat density.
         num_critters_in_radius(tile: number, elev: number, radius: number): number {
-            if (!globalState.gMap) return 0
+            if (!globalState.gMap) {return 0}
             const origin = fromTileNum(tile)
-            if (!origin) return 0
+            if (!origin) {return 0}
             // Use elevation-specific object list so critters on other floors are excluded.
             const objects = typeof globalState.gMap.getObjects === 'function'
                 ? globalState.gMap.getObjects(elev)
                 : (gameObjects ?? [])
             let count = 0
             for (const obj of objects) {
-                if (obj.type !== 'critter') continue
-                if ((obj as Critter).dead) continue
+                if (obj.type !== 'critter') {continue}
+                if ((obj as Critter).dead) {continue}
                 // BLK-089: Guard against null position — critters in inventory or
                 // mid-transition may have no position; skip them instead of crashing.
-                if (!obj.position) continue
-                if (hexDistance(origin, obj.position) <= radius) count++
+                if (!obj.position) {continue}
+                if (hexDistance(origin, obj.position) <= radius) {count++}
             }
             return count
         }
@@ -4137,7 +4136,7 @@ export module Scripting {
                 warn('set_object_ai_num: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).aiNum = num
+            (obj as Critter).aiNum = num
         }
 
         // sfall 0x81BD — get_critter_hostile_to_dude(obj):
@@ -4196,7 +4195,7 @@ export module Scripting {
         // sfall 0x81C1 — get_sfall_arg_at(idx):
         // BLK-123 (Phase 78): Returns the hook-script arg at the given zero-based index.
         get_sfall_arg_at(idx: number): number {
-            if (typeof idx !== 'number' || idx < 0 || idx >= _sfallHookArgs.length) return 0
+            if (typeof idx !== 'number' || idx < 0 || idx >= _sfallHookArgs.length) {return 0}
             const v = _sfallHookArgs[idx]
             return typeof v === 'number' ? v : 0
         }
@@ -4238,7 +4237,7 @@ export module Scripting {
                 warn('set_critter_team: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).teamNum = typeof team === 'number' ? team : 0
+            (obj as Critter).teamNum = typeof team === 'number' ? team : 0
         }
 
         // Phase 53 — sfall 0x81C8 — critter_mod_skill_points(critter, delta):
@@ -4303,12 +4302,12 @@ export module Scripting {
                 mode |= 0x20 // world-map mode — no normal-map bit
             } else {
                 mode |= 0x01 // on a normal map
-                if (globalState.inCombat) mode |= 0x02
-                if (ui === 1 /* dialogue */) mode |= 0x04
-                if (ui === 2 /* barter   */) mode |= 0x08
-                if (ui === 4 /* inventory*/) mode |= 0x10
+                if (globalState.inCombat) {mode |= 0x02}
+                if (ui === 1 /* dialogue */) {mode |= 0x04}
+                if (ui === 2 /* barter   */) {mode |= 0x08}
+                if (ui === 4 /* inventory*/) {mode |= 0x10}
             }
-            if (mode === 0) mode = 0x01 // fallback: normal mode
+            if (mode === 0) {mode = 0x01} // fallback: normal mode
             return mode
         }
 
@@ -4342,7 +4341,7 @@ export module Scripting {
                 return -1
             }
             const player = globalState.player
-            if (!player || !obj.position || !player.position) return -1
+            if (!player || !obj.position || !player.position) {return -1}
             const objTile = toTileNum(obj.position)
             const playerTile = toTileNum(player.position)
             return this.tile_distance(objTile, playerTile)
@@ -4382,15 +4381,15 @@ export module Scripting {
         // and elevation.  Returns 0 if no object is present.
         // Useful for scripts that probe what's on the floor before triggering.
         get_tile_pid_sfall(tile: number, elev: number): number {
-            if (!globalState.gMap) return 0
+            if (!globalState.gMap) {return 0}
             const objects = typeof globalState.gMap.getObjects === 'function'
                 ? globalState.gMap.getObjects(elev)
                 : []
             const tilePos = fromTileNum(tile)
-            if (!tilePos) return 0
+            if (!tilePos) {return 0}
             for (const o of objects) {
-                if (!isGameObject(o)) continue
-                if (o.type === 'critter') continue
+                if (!isGameObject(o)) {continue}
+                if (o.type === 'critter') {continue}
                 if (o.position && o.position.x === tilePos.x && o.position.y === tilePos.y) {
                     return o.pid ?? 0
                 }
@@ -4429,8 +4428,8 @@ export module Scripting {
                 return 0
             }
             const pro = (obj as any).pro
-            if (pro?.extra?.cost !== undefined) return pro.extra.cost
-            if (pro?.cost !== undefined) return pro.cost
+            if (pro?.extra?.cost !== undefined) {return pro.extra.cost}
+            if (pro?.cost !== undefined) {return pro.cost}
             return 0
         }
 
@@ -4573,9 +4572,9 @@ export module Scripting {
             const pos = fromTileNum(tile)
             const objects = globalState.gMap?.getObjects(elev) ?? []
             for (const o of objects) {
-                if (!isGameObject(o) || o.type !== 'critter') continue
-                if (!o.position) continue
-                if (o.position.x === pos.x && o.position.y === pos.y) return o
+                if (!isGameObject(o) || o.type !== 'critter') {continue}
+                if (!o.position) {continue}
+                if (o.position.x === pos.x && o.position.y === pos.y) {return o}
             }
             return 0
         }
@@ -4598,7 +4597,7 @@ export module Scripting {
             // Also check getStat safely and fall back to proto / direct property.
             if (typeof (obj as any).getStat === 'function') {
                 const hp = (obj as any).getStat('Max HP')
-                if (typeof hp === 'number' && isFinite(hp)) return hp
+                if (typeof hp === 'number' && isFinite(hp)) {return hp}
             }
             return (obj as any).pro?.extra?.maxHP ?? (obj as any).maxHP ?? 0
         }
@@ -4620,7 +4619,7 @@ export module Scripting {
         // Sums the critterKillCounts globalState object.
         get_total_kills_sfall(): number {
             const counts = globalState.critterKillCounts
-            if (!counts) return 0
+            if (!counts) {return 0}
             return Object.values(counts).reduce((sum: number, n: any) => sum + (n as number), 0)
         }
 
@@ -4633,7 +4632,7 @@ export module Scripting {
                 return 0
             }
             const extra = (obj as any).pro?.extra
-            if (!extra) return 0
+            if (!extra) {return 0}
             // Map common field indices to proto.extra properties
             switch (field) {
                 case 0: return extra.age ?? 0
@@ -4674,7 +4673,7 @@ export module Scripting {
             }
             const critter = obj as Critter
             const weapon = critter.equippedWeapon?.weapon
-            if (!weapon) return 1
+            if (!weapon) {return 1}
             // maxRange1 is the primary-mode range; weapon.weapon is the raw WeaponObj.
             return (weapon.weapon as any)?.pro?.extra?.maxRange1 ?? 1
         }
@@ -4712,16 +4711,16 @@ export module Scripting {
                 warn('get_num_nearby_critters_sfall: not a game object: ' + obj, undefined, this)
                 return 0
             }
-            if (!obj.position) return 0
+            if (!obj.position) {return 0}
             const elev = globalState.currentElevation ?? 0
             const objects = globalState.gMap?.getObjects(elev) ?? []
             let count = 0
             for (const o of objects) {
-                if (!isGameObject(o) || o.type !== 'critter') continue
-                if ((o as Critter).dead) continue
-                if (!o.position) continue
-                if (team !== -1 && (o as Critter).teamNum !== team) continue
-                if (hexDistance(obj.position, o.position) <= radius) count++
+                if (!isGameObject(o) || o.type !== 'critter') {continue}
+                if ((o as Critter).dead) {continue}
+                if (!o.position) {continue}
+                if (team !== -1 && (o as Critter).teamNum !== team) {continue}
+                if (hexDistance(obj.position, o.position) <= radius) {count++}
             }
             return count
         }
@@ -4743,7 +4742,7 @@ export module Scripting {
                 warn('set_critter_hostile_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as Critter).hostile = hostile !== 0
+            (obj as Critter).hostile = hostile !== 0
         }
 
         // sfall 0x8205 — get_inven_slot_sfall(critter, slot):
@@ -4811,9 +4810,9 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            if (!critter.charTraits) critter.charTraits = new Set()
-            if (value) critter.charTraits.add(traitId)
-            else critter.charTraits.delete(traitId)
+            if (!critter.charTraits) {critter.charTraits = new Set()}
+            if (value) {critter.charTraits.add(traitId)}
+            else {critter.charTraits.delete(traitId)}
         }
 
         // sfall 0x820A — get_critter_race_sfall(obj):
@@ -5012,7 +5011,7 @@ export module Scripting {
         // Return the prototype number (PID) of an object.
         // Alias of obj_pid() exposed under the sfall opcode convention.
         get_proto_num_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) return 0
+            if (!isGameObject(obj)) {return 0}
             return (obj as any).pid ?? 0
         }
 
@@ -5052,7 +5051,7 @@ export module Scripting {
                 warn('set_flags_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).flags = flags
+            (obj as any).flags = flags
         }
 
         // sfall 0x8223 — critter_skill_level_sfall(obj, skillId):
@@ -5098,9 +5097,9 @@ export module Scripting {
         // Return 1 if the critter can see the given tile (LOS check).
         // Browser build: returns 1 when distance is ≤ perception×5 (simplified LOS).
         obj_can_see_tile_sfall(obj: Obj, tileNum: number): number {
-            if (!isGameObject(obj) || !obj.position) return 0
+            if (!isGameObject(obj) || !obj.position) {return 0}
             const dest = fromTileNum(tileNum)
-            if (!dest) return 0
+            if (!dest) {return 0}
             const dist = hexDistance(obj.position, dest)
             const per = isGameObject(obj) && obj.type === 'critter'
                 ? (obj as Critter).getStat('PER')
@@ -5123,7 +5122,7 @@ export module Scripting {
         // sfall 0x8228 — get_critter_name_sfall(obj):
         // Return the display name of a critter.  Alias of get_critter_name().
         get_critter_name_sfall(obj: Obj): string {
-            if (!isGameObject(obj)) return ''
+            if (!isGameObject(obj)) {return ''}
             return (obj as any).name ?? ''
         }
 
@@ -5145,7 +5144,7 @@ export module Scripting {
         // Return the AI packet index for a critter.
         // Reads from critter.aiPacket or proto.extra.aiPacket.
         get_critter_ai_packet_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return -1
+            if (!isGameObject(obj) || obj.type !== 'critter') {return -1}
             return (obj as any).aiPacket ?? (obj as any).pro?.extra?.aiPacket ?? 0
         }
 
@@ -5157,7 +5156,7 @@ export module Scripting {
                 warn('set_critter_ai_packet_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).aiPacket = packetId
+            (obj as any).aiPacket = packetId
         }
 
         // sfall 0x822D — obj_under_cursor_sfall():
@@ -5172,10 +5171,10 @@ export module Scripting {
         // attackType: 0=rightHand (primary), 1=leftHand (secondary).
         // Returns 0 when no weapon is equipped or the attack type is out of range.
         get_attack_weapon_sfall(obj: Obj, attackType: number): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             const critter = obj as Critter
-            if (attackType === 0) return (critter as any).rightHand ?? 0
-            if (attackType === 1) return (critter as any).leftHand ?? 0
+            if (attackType === 0) {return (critter as any).rightHand ?? 0}
+            if (attackType === 1) {return (critter as any).leftHand ?? 0}
             return 0
         }
 
@@ -5183,9 +5182,9 @@ export module Scripting {
         // Return the PID of the scenery object on a tile at the given elevation.
         // Returns 0 when no scenery is found (simplified; does not iterate all objects).
         get_tile_pid_at_sfall(tileNum: number, elevation: number): number {
-            if (!globalState.gMap) return 0
+            if (!globalState.gMap) {return 0}
             const tilePos = fromTileNum(tileNum)
-            if (!tilePos) return 0
+            if (!tilePos) {return 0}
             const objects = globalState.gMap.getObjects ? globalState.gMap.getObjects(elevation) : []
             for (const obj of objects) {
                 if (obj.position &&
@@ -5206,7 +5205,7 @@ export module Scripting {
         // Falls through to the vanilla obj_name / critter name path.
         // Returns '' when obj is not a valid game object or has no name.
         get_object_name_sfall(obj: Obj): string {
-            if (!isGameObject(obj)) return ''
+            if (!isGameObject(obj)) {return ''}
             return (obj as any).name ?? ''
         }
 
@@ -5226,7 +5225,7 @@ export module Scripting {
         // Return the current combat round number (1-based).
         // Returns 0 when not in combat.
         get_combat_round_sfall(): number {
-            if (!globalState.inCombat || !globalState.combat) return 0
+            if (!globalState.inCombat || !globalState.combat) {return 0}
             return (globalState.combat as any).round ?? 0
         }
 
@@ -5240,7 +5239,7 @@ export module Scripting {
                 return 0
             }
             const critter = obj as Critter
-            if (globalState.inCombat && critter.AP) return critter.AP.combat
+            if (globalState.inCombat && critter.AP) {return critter.AP.combat}
             // Outside combat return max AP derived from Agility.
             const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
             return Math.max(1, 5 + Math.floor(agi / 2))
@@ -5255,7 +5254,7 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+            if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
         }
 
         // sfall 0x8235 — get_critter_max_ap_sfall(obj):
@@ -5293,7 +5292,7 @@ export module Scripting {
                 return 0
             }
             const critter = obj as Critter
-            if (!Array.isArray(critter.inventory)) return 0
+            if (!Array.isArray(critter.inventory)) {return 0}
             let total = 0
             for (const item of critter.inventory) {
                 const w: number = (item as any).pro?.extra?.weight ?? 0
@@ -5366,9 +5365,9 @@ export module Scripting {
                 return 0
             }
             const party = globalState.gParty
-            if (!party) return 0
+            if (!party) {return 0}
             const members = (party as any).members
-            if (!Array.isArray(members)) return 0
+            if (!Array.isArray(members)) {return 0}
             return members.some((m: any) => m === obj || m?.pid === (obj as any).pid) ? 1 : 0
         }
 
@@ -5391,7 +5390,7 @@ export module Scripting {
                 warn('set_critter_proto_flags_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).flags = flags >>> 0
+            (obj as any).flags = flags >>> 0
         }
 
         // sfall 0x823F — get_party_count_sfall():
@@ -5399,7 +5398,7 @@ export module Scripting {
         // counting the player).  Returns 0 when no party exists.
         get_party_count_sfall(): number {
             const party = globalState.gParty
-            if (!party) return 0
+            if (!party) {return 0}
             const members = (party as any).members
             return Array.isArray(members) ? members.length : 0
         }
@@ -5429,7 +5428,7 @@ export module Scripting {
                 warn('set_critter_damage_type_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).damageType = Math.max(0, Math.min(6, Math.floor(type)))
+            (obj as any).damageType = Math.max(0, Math.min(6, Math.floor(type)))
         }
 
         // sfall 0x8242 — get_combat_free_move_sfall():
@@ -5538,7 +5537,7 @@ export module Scripting {
         // sfall 0x824A — get_string_length_sfall(str):
         // Return the length of a string.  Returns 0 for non-string arguments.
         get_string_length_sfall(str: any): number {
-            if (typeof str !== 'string') return 0
+            if (typeof str !== 'string') {return 0}
             return str.length
         }
 
@@ -5546,8 +5545,8 @@ export module Scripting {
         // Return the character code (UTF-16 code unit) of `str` at zero-based index
         // `pos`.  Returns -1 when `str` is not a string or `pos` is out of range.
         get_char_code_sfall(str: any, pos: number): number {
-            if (typeof str !== 'string') return -1
-            if (pos < 0 || pos >= str.length) return -1
+            if (typeof str !== 'string') {return -1}
+            if (pos < 0 || pos >= str.length) {return -1}
             return str.charCodeAt(pos)
         }
 
@@ -5555,7 +5554,7 @@ export module Scripting {
         // Return 1 if `haystack` contains `needle` (case-sensitive), 0 otherwise.
         // Returns 0 for non-string inputs.
         string_contains_sfall(haystack: any, needle: any): number {
-            if (typeof haystack !== 'string' || typeof needle !== 'string') return 0
+            if (typeof haystack !== 'string' || typeof needle !== 'string') {return 0}
             return haystack.includes(needle) ? 1 : 0
         }
 
@@ -5563,7 +5562,7 @@ export module Scripting {
         // Return the first zero-based index of `needle` in `haystack`, or -1 if not
         // found.  Returns -1 for non-string inputs.
         string_index_of_sfall(haystack: any, needle: any): number {
-            if (typeof haystack !== 'string' || typeof needle !== 'string') return -1
+            if (typeof haystack !== 'string' || typeof needle !== 'string') {return -1}
             return haystack.indexOf(needle)
         }
 
@@ -5572,9 +5571,9 @@ export module Scripting {
         // has no script.  Used by scripts that want to verify or compare script
         // attachments before calling scripted procedures.
         get_object_script_id_sfall(obj: any): number {
-            if (!isGameObject(obj)) return -1
+            if (!isGameObject(obj)) {return -1}
             const script = (obj as Obj)._script
-            if (!script) return -1
+            if (!script) {return -1}
             // sid is the numeric script identifier loaded from the map data.
             const sid: number | undefined = (script as any).sid ?? (script as any)._sid
             return typeof sid === 'number' ? sid : -1
@@ -5614,7 +5613,7 @@ export module Scripting {
                 warn('set_object_art_fid_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).frmType = (fid >> 24) & 0xff
+            (obj as any).frmType = (fid >> 24) & 0xff
             ;(obj as any).frmPID = fid & 0xffffff
             ;(obj as any).fid = fid & 0xffffff
             log('set_object_art_fid_sfall: fid=0x' + fid.toString(16), arguments)
@@ -5625,8 +5624,8 @@ export module Scripting {
         // armor=2, container=1, drug=0, misc=5, key=6).
         // Returns -1 for non-item objects.
         get_item_subtype_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) return -1
-            if (obj.type !== 'item') return -1
+            if (!isGameObject(obj)) {return -1}
+            if (obj.type !== 'item') {return -1}
             const subtypeMap: Record<string, number> = {
                 drug: 0,
                 container: 1,
@@ -5637,7 +5636,7 @@ export module Scripting {
                 key: 6,
             }
             const sub = (obj as any).subtype as string
-            if (typeof sub === 'string' && sub in subtypeMap) return subtypeMap[sub]
+            if (typeof sub === 'string' && sub in subtypeMap) {return subtypeMap[sub]}
             return -1
         }
 
@@ -5645,7 +5644,7 @@ export module Scripting {
         // Return the current combat target of a critter, or 0 when not in combat /
         // no target is set.  Used by AI and scripted combat hooks to check targeting.
         get_combat_target_sfall(obj: Obj): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).combatTarget ?? (obj as any)._combatTarget ?? 0
         }
 
@@ -5653,8 +5652,8 @@ export module Scripting {
         // Assign a specific combat target to a critter.  Browser build: stores the
         // target reference on the critter object so get_combat_target_sfall() reads it.
         set_combat_target_sfall(obj: Obj, target: Obj | number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') return
-            ;(obj as any).combatTarget = isGameObject(target) ? target : null
+            if (!isGameObject(obj) || obj.type !== 'critter') {return
+            ;}(obj as any).combatTarget = isGameObject(target) ? target : null
             log('set_combat_target_sfall', arguments)
         }
 
@@ -5692,18 +5691,18 @@ export module Scripting {
         // opcode (0x8101) but exposed as a sfall-namespaced call so scripts that
         // query it via the sfall dispatch table still get a value.
         get_critter_hurt_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
-            var state = 0
-            if ((obj as any).dead === true) state |= 0x01
-            if ((obj as any).knockedOut === true) state |= 0x02
-            if ((obj as any).knockedDown === true) state |= 0x04
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            let state = 0
+            if ((obj as any).dead === true) {state |= 0x01}
+            if ((obj as any).knockedOut === true) {state |= 0x02}
+            if ((obj as any).knockedDown === true) {state |= 0x04}
             const hasCrippledLimb =
                 (obj as any).crippledLeftLeg ||
                 (obj as any).crippledRightLeg ||
                 (obj as any).crippledLeftArm ||
                 (obj as any).crippledRightArm
-            if (hasCrippledLimb) state |= 0x08
-            if ((obj as any).isFleeing === true) state |= 0x10
+            if (hasCrippledLimb) {state |= 0x08}
+            if ((obj as any).isFleeing === true) {state |= 0x10}
             return state
         }
 
@@ -5712,8 +5711,8 @@ export module Scripting {
         // property on the Critter object (same mapping as critter_state above).
         // Bit 0 (dead) is intentionally ignored — use kill_critter for that.
         set_critter_hurt_state_sfall(obj: Obj, state: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') return
-            ;(obj as any).knockedOut = !!(state & 0x02)
+            if (!isGameObject(obj) || obj.type !== 'critter') {return
+            ;}(obj as any).knockedOut = !!(state & 0x02)
             ;(obj as any).knockedDown = !!(state & 0x04)
             const crippled = !!(state & 0x08)
             ;(obj as any).crippledLeftLeg = crippled
@@ -5727,15 +5726,15 @@ export module Scripting {
         // Return 1 if the critter is currently fleeing combat, 0 otherwise.
         // Convenience wrapper around the isFleeing property.
         get_critter_is_fleeing_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).isFleeing ? 1 : 0
         }
 
         // sfall 0x825B — set_critter_is_fleeing_sfall(obj, flag):
         // Set or clear the fleeing state on the given critter.
         set_critter_is_fleeing_sfall(obj: Obj, flag: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') return
-            ;(obj as any).isFleeing = flag !== 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return
+            ;}(obj as any).isFleeing = flag !== 0
         }
 
         // sfall 0x825C — get_tile_blocked_sfall(tileNum, elev):
@@ -5743,7 +5742,7 @@ export module Scripting {
         // elevation, 0 otherwise.  Uses the map object list; returns 0 when the
         // map is not loaded.
         get_tile_blocked_sfall(tileNum: number, _elev: number): number {
-            if (!globalState.gMap) return 0
+            if (!globalState.gMap) {return 0}
             const pos = fromTileNum(tileNum)
             const objs = globalState.gMap.objectsAtPosition(pos)
             return objs.some((o) => o.blocks()) ? 1 : 0
@@ -5753,7 +5752,7 @@ export module Scripting {
         // Return the critter's current maximum HP (Max HP stat).  Returns 0 for
         // non-critters or null objects.
         get_critter_hit_pts_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as Critter).getStat('Max HP')
         }
 
@@ -5793,8 +5792,8 @@ export module Scripting {
             }
             const c = obj as Critter
             const item = isGameObject(weapon) ? (weapon as any) : null
-            if (slot === 0) c.rightHand = item
-            else if (slot === 1) c.leftHand = item
+            if (slot === 0) {c.rightHand = item}
+            else if (slot === 1) {c.leftHand = item}
         }
 
         // sfall 0x8262 — get_object_type_sfall (second opcode alias):
@@ -5853,7 +5852,7 @@ export module Scripting {
                 return
             }
             const critter = obj as Critter
-            if (critter.AP) critter.AP.combat = Math.max(0, ap)
+            if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
         }
 
         // sfall 0x826A — get_object_flags_sfall(obj):
@@ -5875,14 +5874,14 @@ export module Scripting {
                 warn('set_object_flags_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).flags = flags >>> 0
+            (obj as any).flags = flags >>> 0
         }
 
         // sfall 0x826C — critter_is_dead_sfall(obj):
         // Return 1 if the given object is a dead critter, 0 otherwise.
         // Non-critters always return 0 (they cannot be "dead" in the FO2 sense).
         critter_is_dead_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as Critter).dead ? 1 : 0
         }
 
@@ -5905,7 +5904,7 @@ export module Scripting {
                 warn('set_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).lightLevel = Math.max(0, Math.min(65536, level))
+            (obj as any).lightLevel = Math.max(0, Math.min(65536, level))
         }
 
         // sfall 0x826F — get_elevation_sfall():
@@ -5928,7 +5927,7 @@ export module Scripting {
                 warn('get_tile_at_object_sfall: not a game object: ' + obj, undefined, this)
                 return -1
             }
-            if ((obj as any).position == null) return -1
+            if ((obj as any).position == null) {return -1}
             return toTileNum((obj as any).position)
         }
 
@@ -5936,7 +5935,7 @@ export module Scripting {
         // Return 1 if the critter is currently fleeing, 0 otherwise.
         // Alias of the isFleeing flag used by critter_state().
         critter_get_flee_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).isFleeing === true ? 1 : 0
         }
 
@@ -5947,7 +5946,7 @@ export module Scripting {
                 warn('critter_set_flee_state_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any).isFleeing = fleeing !== 0
+            (obj as any).isFleeing = fleeing !== 0
         }
 
         // sfall 0x8273 is an alias of get_combat_difficulty_sfall() (0x81EC) —
@@ -5965,8 +5964,8 @@ export module Scripting {
         // Browser build: partial — delegates to getHitChance when combat module
         // is available; returns 0 if not in combat or combat is not initialized.
         get_critter_hit_chance_sfall(attacker: Obj, target: Obj): number {
-            if (!isGameObject(attacker) || !isGameObject(target)) return 0
-            if (!globalState.combat) return 0
+            if (!isGameObject(attacker) || !isGameObject(target)) {return 0}
+            if (!globalState.combat) {return 0}
             try {
                 return (globalState.combat as any).getHitChance?.(attacker as Critter, target as Critter) ?? 0
             } catch (_e) {
@@ -5980,7 +5979,7 @@ export module Scripting {
         get_tile_distance_sfall(tile1: number, tile2: number): number {
             const pos1 = fromTileNum(tile1)
             const pos2 = fromTileNum(tile2)
-            if (!pos1 || !pos2) return 0
+            if (!pos1 || !pos2) {return 0}
             return hexDistance(pos1, pos2)
         }
 
@@ -5998,41 +5997,41 @@ export module Scripting {
         // sfall 0x8278 — get_critter_knockout_sfall(obj):
         // Returns 1 if the critter is currently knocked out (unconscious), 0 otherwise.
         get_critter_knockout_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).knockedOut ? 1 : 0
         }
 
         // sfall 0x8279 — get_critter_knockdown_sfall(obj):
         // Returns 1 if the critter is currently knocked down (prone), 0 otherwise.
         get_critter_knockdown_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).knockedDown ? 1 : 0
         }
 
         // sfall 0x827A — get_critter_crippled_legs_sfall(obj):
         // Returns a bitmask: bit 0 (0x01) = left leg crippled, bit 1 (0x02) = right leg.
         get_critter_crippled_legs_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             let mask = 0
-            if ((obj as any).crippledLeftLeg)  mask |= 0x01
-            if ((obj as any).crippledRightLeg) mask |= 0x02
+            if ((obj as any).crippledLeftLeg)  {mask |= 0x01}
+            if ((obj as any).crippledRightLeg) {mask |= 0x02}
             return mask
         }
 
         // sfall 0x827B — get_critter_crippled_arms_sfall(obj):
         // Returns a bitmask: bit 0 (0x01) = left arm crippled, bit 1 (0x02) = right arm.
         get_critter_crippled_arms_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             let mask = 0
-            if ((obj as any).crippledLeftArm)  mask |= 0x01
-            if ((obj as any).crippledRightArm) mask |= 0x02
+            if ((obj as any).crippledLeftArm)  {mask |= 0x01}
+            if ((obj as any).crippledRightArm) {mask |= 0x02}
             return mask
         }
 
         // sfall 0x827C — get_critter_dead_sfall(obj):
         // Returns 1 if the critter is dead, 0 otherwise.  Safe for non-critter objects.
         get_critter_dead_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) return 0
+            if (!isGameObject(obj)) {return 0}
             return (obj as any).dead ? 1 : 0
         }
 
@@ -6046,14 +6045,14 @@ export module Scripting {
         // sfall 0x827E — get_critter_poison_level_sfall(obj):
         // Returns the current poison level of the critter (same as get_poison).
         get_critter_poison_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as Critter).stats?.getBase('Poison Level') ?? 0
         }
 
         // sfall 0x827F — get_critter_radiation_level_sfall(obj):
         // Returns the current radiation level of the critter (same as get_radiation).
         get_critter_radiation_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as Critter).stats?.getBase('Radiation Level') ?? 0
         }
 
@@ -6064,14 +6063,14 @@ export module Scripting {
         // sfall 0x8280 — get_last_target_sfall(obj): BLK-117
         // Returns the last combat target of the given critter, or 0 if unset.
         get_last_target_sfall(obj: Obj): Obj | 0 {
-            if (!obj || typeof obj !== 'object') return 0
+            if (!obj || typeof obj !== 'object') {return 0}
             return (obj as any).lastCombatTarget ?? 0
         }
 
         // sfall 0x8281 — get_last_attacker_sfall(obj): BLK-117
         // Returns the last combat attacker of the given critter, or 0 if unset.
         get_last_attacker_sfall(obj: Obj): Obj | 0 {
-            if (!obj || typeof obj !== 'object') return 0
+            if (!obj || typeof obj !== 'object') {return 0}
             return (obj as any).lastCombatAttacker ?? 0
         }
 
@@ -6079,7 +6078,7 @@ export module Scripting {
         // Returns the critter's current level.  For the player, reads player.level;
         // for NPCs, returns 1 (partial — NPC level tracking is not yet implemented).
         get_critter_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             // Player has a real level property; NPCs default to 1.
             return (obj as any).level ?? 1
         }
@@ -6089,7 +6088,7 @@ export module Scripting {
         // player.xp; for NPCs, returns 0 (no XP tracking for non-player critters).
         // NOTE: distinct from get_critter_xp_sfall (0x81F0) which reads proto XPValue.
         get_critter_current_xp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).xp ?? 0
         }
 
@@ -6105,7 +6104,7 @@ export module Scripting {
                 warn('set_critter_level_sfall: invalid level ' + level + ' — no-op', undefined, this)
                 return
             }
-            ;(obj as any).level = Math.floor(level)
+            (obj as any).level = Math.floor(level)
         }
 
         // sfall 0x8285 — get_critter_base_stat_sfall(obj, stat):
@@ -6140,14 +6139,14 @@ export module Scripting {
                 warn('set_critter_base_stat_sfall: non-finite value ' + value + ' — no-op', undefined, this)
                 return
             }
-            ;(obj as Critter).stats?.setBase(statName, Math.round(value))
+            (obj as Critter).stats?.setBase(statName, Math.round(value))
         }
 
         // sfall 0x8287 — get_obj_weight_sfall(obj):
         // Return the object's weight in lbs from its proto data.  Returns 0 for
         // non-game-objects or when no weight data is available.
         get_obj_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) return 0
+            if (!isGameObject(obj)) {return 0}
             return (obj as any).pro?.extra?.weight ?? (obj as any).weight ?? 0
         }
 
@@ -6169,36 +6168,36 @@ export module Scripting {
         // sfall 0x828A — get_critter_worn_armor_sfall(obj):
         // Returns the armor item currently equipped by the critter, or 0 if none.
         get_critter_worn_armor_sfall(obj: Obj): Obj | 0 {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).equippedArmor ?? 0
         }
 
         // sfall 0x828B — get_critter_weapon_sfall(obj, hand):
         // Returns the weapon in the given hand (0 = right, 1 = left), or 0 if empty.
         get_critter_weapon_sfall(obj: Obj, hand: number): Obj | 0 {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
-            if (hand === 1) return (obj as any).leftHand ?? 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            if (hand === 1) {return (obj as any).leftHand ?? 0}
             return (obj as any).rightHand ?? 0
         }
 
         // sfall 0x828C — get_tile_x_sfall(tile):
         // Returns the x hex coordinate of a tile number.
         get_tile_x_sfall(tile: number): number {
-            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) {return 0}
             return fromTileNum(tile).x
         }
 
         // sfall 0x828D — get_tile_y_sfall(tile):
         // Returns the y hex coordinate of a tile number.
         get_tile_y_sfall(tile: number): number {
-            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) return 0
+            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) {return 0}
             return fromTileNum(tile).y
         }
 
         // sfall 0x828E — tile_from_coords_sfall(x, y):
         // Returns the tile number for the given (x, y) hex coordinates.
         tile_from_coords_sfall(x: number, y: number): number {
-            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) return 0
+            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) {return 0}
             return toTileNum({ x: Math.round(x), y: Math.round(y) })
         }
 
@@ -6234,7 +6233,7 @@ export module Scripting {
             if (critter.stats && typeof critter.stats.setBase === 'function') {
                 critter.stats.setBase('HP', clampedHP)
             } else {
-                ;(critter as any).HP = clampedHP
+                (critter as any).HP = clampedHP
             }
         }
 
@@ -6242,8 +6241,8 @@ export module Scripting {
         // Return the local script variable at index idx.
         // Equivalent to local_var() exposed as a dedicated sfall opcode.
         get_local_var_sfall(idx: number): number {
-            if (!this.lvars) return 0
-            if (this.lvars[idx] === undefined) return 0
+            if (!this.lvars) {return 0}
+            if (this.lvars[idx] === undefined) {return 0}
             return typeof this.lvars[idx] === 'number' ? this.lvars[idx] : 0
         }
 
@@ -6251,7 +6250,7 @@ export module Scripting {
         // Set the local script variable at index idx to val.
         // Equivalent to set_local_var() exposed as a dedicated sfall opcode.
         set_local_var_sfall(idx: number, val: number): void {
-            if (!this.lvars) this.lvars = {}
+            if (!this.lvars) {this.lvars = {}}
             if (typeof val === 'number' && !isFinite(val)) {
                 warn('set_local_var_sfall: non-finite value (' + val + ') for lvar ' + idx + ' — storing 0', 'lvars')
                 val = 0
@@ -6309,7 +6308,7 @@ export module Scripting {
         // may be 0 (FO2 null convention); the base get_critter_stat already handles
         // that, but this exposes the same path as a dedicated sfall opcode.
         get_critter_stat_sfall2(obj: Obj, stat: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return this.get_critter_stat(obj as Critter, stat)
         }
 
@@ -6327,7 +6326,7 @@ export module Scripting {
                 val = 0
             }
             const critter = obj as any
-            if (!critter.extraStats) critter.extraStats = {}
+            if (!critter.extraStats) {critter.extraStats = {}}
             critter.extraStats[stat] = val
         }
 
@@ -6343,8 +6342,8 @@ export module Scripting {
         // Switch the player's active weapon hand: 0 = primary, 1 = secondary.
         // Clamps out-of-range values to the valid set {0, 1}.
         set_active_hand_sfall(hand: number): void {
-            if (!globalState.player) return
-            ;(globalState.player as any).activeHand = (hand === 1) ? 1 : 0
+            if (!globalState.player) {return
+            ;}(globalState.player as any).activeHand = (hand === 1) ? 1 : 0
         }
 
         // sfall 0x829C — get_item_type_sfall(item):
@@ -6355,7 +6354,7 @@ export module Scripting {
         // non-items rather than a subtype enum — some sfall scripts test for -1 to
         // detect non-item objects.
         get_item_type_sfall(item: Obj): number {
-            if (!isGameObject(item) || item.type !== 'item') return -1
+            if (!isGameObject(item) || item.type !== 'item') {return -1}
             const subtypeMap: Record<string, number> = {
                 drug: 0,
                 container: 1,
@@ -6366,7 +6365,7 @@ export module Scripting {
                 key: 6,
             }
             const sub = (item as any).subtype as string
-            if (typeof sub === 'string' && sub in subtypeMap) return subtypeMap[sub]
+            if (typeof sub === 'string' && sub in subtypeMap) {return subtypeMap[sub]}
             return -1
         }
 
@@ -6396,7 +6395,7 @@ export module Scripting {
                 level = 0
             }
             const critter = obj as Critter
-            if (!critter.perkRanks) (critter as any).perkRanks = {}
+            if (!critter.perkRanks) {(critter as any).perkRanks = {}}
             critter.perkRanks[perkId] = Math.max(0, Math.round(level))
         }
 
@@ -6405,8 +6404,8 @@ export module Scripting {
         // Returns -1 when either object has no position (e.g. in inventory) or is
         // not a valid game object.  Uses the same hexDistance() path as normal LOS.
         get_distance_sfall(obj1: Obj, obj2: Obj): number {
-            if (!isGameObject(obj1) || !obj1.position) return -1
-            if (!isGameObject(obj2) || !obj2.position) return -1
+            if (!isGameObject(obj1) || !obj1.position) {return -1}
+            if (!isGameObject(obj2) || !obj2.position) {return -1}
             return hexDistance(obj1.position, obj2.position)
         }
 
@@ -6479,7 +6478,7 @@ export module Scripting {
                 return 0
             }
             const critter = obj as any
-            if (typeof critter.xp === 'number') return critter.xp
+            if (typeof critter.xp === 'number') {return critter.xp}
             return typeof critter.experience === 'number' ? critter.experience : 0
         }
 
@@ -6526,7 +6525,7 @@ export module Scripting {
                 warn('set_critter_crit_chance_sfall: non-finite val (' + val + ') — no-op', undefined, this)
                 return
             }
-            ;(obj as any).critChanceMod = Math.max(-100, Math.min(100, Math.round(val)))
+            (obj as any).critChanceMod = Math.max(-100, Math.min(100, Math.round(val)))
         }
 
         // sfall 0x82AC — get_critter_npc_flag_sfall(obj, flag):
@@ -6538,7 +6537,7 @@ export module Scripting {
                 warn('get_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
                 return 0
             }
-            if (typeof flag !== 'number' || flag < 0 || flag > 31) return 0
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) {return 0}
             const bits: number = (obj as any).npcFlags ?? 0
             return (bits >>> flag) & 1
         }
@@ -6552,7 +6551,7 @@ export module Scripting {
                 warn('set_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            if (typeof flag !== 'number' || flag < 0 || flag > 31) return
+            if (typeof flag !== 'number' || flag < 0 || flag > 31) {return}
             const critter = obj as any
             const bits: number = critter.npcFlags ?? 0
             critter.npcFlags = val ? (bits | (1 << flag)) : (bits & ~(1 << flag))
@@ -6598,7 +6597,7 @@ export module Scripting {
         // Used by New Reno merchant and reward scripts that need to know how many
         // item types the player is carrying before deciding what to offer/sell.
         get_inven_count_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).inventory?.length ?? 0
         }
 
@@ -6608,11 +6607,11 @@ export module Scripting {
         // available; falls back to the Fallout 2 formula (5 + ceil(Agility/2)).
         // Used by New Reno boxing scripts that track the fighter's unmodified AP.
         get_critter_base_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             const critter = obj as any
             if (critter.stats && typeof critter.stats.getBase === 'function') {
                 const base = critter.stats.getBase('Max AP')
-                if (typeof base === 'number' && isFinite(base)) return base
+                if (typeof base === 'number' && isFinite(base)) {return base}
             }
             const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
             return 5 + Math.ceil(agi / 2)
@@ -6625,7 +6624,7 @@ export module Scripting {
         // Returns 0 for non-critters or when inventory is empty.
         // Used by New Reno shop/barter scripts that check encumbrance.
         get_critter_inventory_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             const inv: any[] = (obj as any).inventory ?? []
             let total = 0
             for (const entry of inv) {
@@ -6642,11 +6641,11 @@ export module Scripting {
         // (25 + STR*25) when the stat is unavailable or zero.
         // Used by New Reno shop scripts to check whether the player can carry loot.
         get_critter_carry_limit_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             const critter = obj as any
             if (typeof critter.getStat === 'function') {
                 const cw = critter.getStat('Carry Weight')
-                if (typeof cw === 'number' && isFinite(cw) && cw > 0) return cw
+                if (typeof cw === 'number' && isFinite(cw) && cw > 0) {return cw}
             }
             const str = typeof critter.getStat === 'function' ? (critter.getStat('STR') ?? 5) : 5
             return 25 + str * 25
@@ -6666,7 +6665,7 @@ export module Scripting {
         // Reads critter.knockedOut; returns 0 for non-critters or when not set.
         // Used by New Reno boxing scripts to determine whether a fighter is down.
         get_critter_knockout_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return 0
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
             return (obj as any).knockedOut ? 1 : 0
         }
 
@@ -6676,8 +6675,8 @@ export module Scripting {
         // No-op for non-critters.  Does not trigger an animation change in the
         // browser build (full engine integration would be required for that).
         set_critter_knockout_state_sfall(obj: Obj, state: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') return
-            ;(obj as any).knockedOut = state ? true : false
+            if (!isGameObject(obj) || obj.type !== 'critter') {return
+            ;}(obj as any).knockedOut = state ? true : false
         }
 
         // sfall 0x82B7 — get_combat_turn_sfall():
@@ -6685,7 +6684,7 @@ export module Scripting {
         // or 0 when not in combat.
         // Used by New Reno encounter scripts that grant bonuses on specific turns.
         get_combat_turn_sfall(): number {
-            if (!globalState.inCombat) return 0
+            if (!globalState.inCombat) {return 0}
             return typeof (globalState as any).combatTurn === 'number'
                 ? Math.max(0, (globalState as any).combatTurn)
                 : 0
@@ -6733,7 +6732,7 @@ export module Scripting {
         // Return the display name of an object as a string, or 0 for invalid objects.
         // Used by New Reno merchant and faction scripts to identify objects by name.
         get_obj_name_sfall(obj: Obj): string | number {
-            if (!isGameObject(obj)) return 0
+            if (!isGameObject(obj)) {return 0}
             return this.obj_name(obj) ?? 0
         }
 
@@ -6743,7 +6742,7 @@ export module Scripting {
         // reads aiPacket; this reads aiNum (the same field set by OBJECT_AI_PACKET).
         // Used by New Reno encounter scripts to branch on combatant AI behaviour.
         get_critter_ai_num_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') return -1
+            if (!isGameObject(obj) || obj.type !== 'critter') {return -1}
             return (obj as Critter).aiNum
         }
 
@@ -6771,7 +6770,7 @@ export module Scripting {
             // anim 0 = idle/stand animation; trigger it as a single non-looping cycle
             if (typeof (obj as any).singleAnimation === 'function') {
                 try {
-                    ;(obj as any).singleAnimation(false, null)
+                    (obj as any).singleAnimation(false, null)
                 } catch (e) {
                     warn('reg_anim_animate_once: singleAnimation threw: ' + e, 'animation', this)
                 }
@@ -6781,7 +6780,7 @@ export module Scripting {
         // BLK-122 — gfade_out real CSS implementation:
         // Fade the game canvas to black using a CSS transition.  Safe in Node.js.
         gfade_out_css(_time: number): void {
-            if (typeof document === 'undefined') return
+            if (typeof document === 'undefined') {return}
             const cnv = document.getElementById('cnv')
             if (cnv) {
                 cnv.style.transition = 'opacity 0.5s ease-in-out'
@@ -6792,7 +6791,7 @@ export module Scripting {
         // BLK-122 — gfade_in real CSS implementation:
         // Restore the game canvas from a previous fade-out.  Safe in Node.js.
         gfade_in_css(_time: number): void {
-            if (typeof document === 'undefined') return
+            if (typeof document === 'undefined') {return}
             const cnv = document.getElementById('cnv')
             if (cnv) {
                 cnv.style.transition = 'opacity 0.5s ease-in-out'
@@ -6806,7 +6805,7 @@ export module Scripting {
     }
 
     export function deserializeScript(obj: SerializedScript): Script {
-        var script = loadScript(obj.name)
+        const script = loadScript(obj.name)
         script.lvars = obj.lvars
         // TODO: do some kind of logic like enterMap/updateMap
         return script
@@ -6828,13 +6827,13 @@ export module Scripting {
             scriptMessages[name] = {}
             return
         }
-        if (scriptMessages[name] === undefined) scriptMessages[name] = {}
+        if (scriptMessages[name] === undefined) {scriptMessages[name] = {}}
 
         // parse message file
-        var lines = msg.split(/\r|\n/)
+        const lines = msg.split(/\r|\n/)
 
         // preprocess and merge lines
-        for (var i = 0; i < lines.length; i++) {
+        for (let i = 0; i < lines.length; i++) {
             // comments/blanks
             if (lines[i][0] === '#' || lines[i].trim() === '') {
                 lines.splice(i--, 1)
@@ -6849,9 +6848,9 @@ export module Scripting {
             }
         }
 
-        for (var i = 0; i < lines.length; i++) {
+        for (let i = 0; i < lines.length; i++) {
             // e.g. {100}{}{You have entered a dark cave in the side of a mountain.}
-            var m = lines[i].match(/\{(\d+)\}\{.*\}\{(.*)\}/)
+            const m = lines[i].match(/\{(\d+)\}\{.*\}\{(.*)\}/)
             if (m === null) {
                 warn('message parsing: skipping invalid line: ' + lines[i])
                 continue
@@ -6868,11 +6867,11 @@ export module Scripting {
     export function loadScript(name: string): Script {
         info('loading script ' + name, 'load')
 
-        var path = 'data/scripts/' + name.toLowerCase() + '.int'
-        var data: DataView = getFileBinarySync(path)
-        var reader = new BinaryReader(data)
+        const path = 'data/scripts/' + name.toLowerCase() + '.int'
+        const data: DataView = getFileBinarySync(path)
+        const reader = new BinaryReader(data)
         //console.log("[%s] loaded %d bytes", name, reader.length)
-        var intfile = parseIntFile(reader, name.toLowerCase())
+        const intfile = parseIntFile(reader, name.toLowerCase())
 
         //console.log("%s int file: %o", name, intfile)
 
@@ -6881,7 +6880,7 @@ export module Scripting {
         }
 
         reader.seek(0)
-        var vm = new ScriptVMBridge.GameScriptVM(reader, intfile)
+        const vm = new ScriptVMBridge.GameScriptVM(reader, intfile)
         vm.scriptObj.scriptName = name
         vm.scriptObj.lvars = {}
         vm.scriptObj._mapScript = currentMapObject || vm.scriptObj // map scripts are their own map scripts
@@ -6926,7 +6925,7 @@ export module Scripting {
     }
 
     export function use(obj: Obj, source: Obj): boolean | null {
-        if (!obj._script || obj._script.use_p_proc === undefined) return null
+        if (!obj._script || obj._script.use_p_proc === undefined) {return null}
 
         // If the item being used is a drug, mark the source critter as
         // "on drugs" so that metarule(18) checks return the correct result
@@ -6946,7 +6945,7 @@ export module Scripting {
     }
 
     export function lookAt(obj: Obj, source: Obj): boolean | null {
-        if (!obj._script || obj._script.look_at_p_proc === undefined) return null
+        if (!obj._script || obj._script.look_at_p_proc === undefined) {return null}
 
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
@@ -6961,7 +6960,7 @@ export module Scripting {
     }
 
     export function description(obj: Obj, source: Obj): boolean | null {
-        if (!obj._script || obj._script.description_p_proc === undefined) return null
+        if (!obj._script || obj._script.description_p_proc === undefined) {return null}
 
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
@@ -6994,7 +6993,7 @@ export module Scripting {
 
     export function updateCritter(script: Script, obj: Critter): boolean {
         // critter heartbeat (critter_p_proc)
-        if (!script.critter_p_proc) return false // TODO: Should we override or not if it doesn't exist? Probably not.
+        if (!script.critter_p_proc) {return false} // TODO: Should we override or not if it doesn't exist? Probably not.
 
         script.game_time = globalState.gameTickTime
         script.cur_map_index = currentMapID
@@ -7015,8 +7014,8 @@ export module Scripting {
     export function spatial(spatialObj: Obj, source: Obj) {
         // TODO: Spatial type
         const script = spatialObj._script
-        if (!script) return // no script attached — silently ignore
-        if (!script.spatial_p_proc) return // no spatial_p_proc defined — silently ignore
+        if (!script) {return} // no script attached — silently ignore
+        if (!script.spatial_p_proc) {return} // no spatial_p_proc defined — silently ignore
 
         script.game_time = globalState.gameTickTime
         script.cur_map_index = currentMapID
@@ -7029,7 +7028,7 @@ export module Scripting {
     }
 
     export function destroy(obj: Obj, source?: Obj) {
-        if (!obj._script || !obj._script.destroy_p_proc) return null
+        if (!obj._script || !obj._script.destroy_p_proc) {return null}
 
         obj._script.self_obj = obj as ScriptableObj
         obj._script.source_obj = source || 0
@@ -7044,7 +7043,7 @@ export module Scripting {
     }
 
     export function damage(obj: Obj, target: Obj, source: Obj, damage: number) {
-        if (!obj._script || obj._script.damage_p_proc === undefined) return null
+        if (!obj._script || obj._script.damage_p_proc === undefined) {return null}
 
         obj._script.self_obj = obj as ScriptableObj
         obj._script.target_obj = target
@@ -7060,7 +7059,7 @@ export module Scripting {
     }
 
     export function useSkillOn(who: Critter, skillId: number, obj: Obj): boolean {
-        if (!obj._script) return false // no script on this object — treat as no-override
+        if (!obj._script) {return false} // no script on this object — treat as no-override
         obj._script.self_obj = obj as ScriptableObj
         obj._script.source_obj = who
         obj._script.cur_map_index = currentMapID
@@ -7078,7 +7077,7 @@ export module Scripting {
     }
 
     export function pickup(obj: Obj, source: Critter): boolean {
-        if (!obj._script) return false // no script — default pickup behaviour applies
+        if (!obj._script) {return false} // no script — default pickup behaviour applies
         obj._script.self_obj = obj as ScriptableObj
         obj._script.source_obj = source
         obj._script.cur_map_index = currentMapID
@@ -7091,7 +7090,7 @@ export module Scripting {
     }
 
     export function useObjOn(obj: Obj, item: Obj): boolean | null {
-        if (!obj._script || obj._script.use_obj_on_p_proc === undefined) return null
+        if (!obj._script || obj._script.use_obj_on_p_proc === undefined) {return null}
 
         // If the item being used on this target is a drug, mark the target
         // critter as "on drugs" so that metarule(44)/WHO_ON_DRUGS queries return
@@ -7116,7 +7115,7 @@ export module Scripting {
     }
 
     export function push(obj: Obj, source: Critter): boolean | null {
-        if (!obj._script || obj._script.push_p_proc === undefined) return null
+        if (!obj._script || obj._script.push_p_proc === undefined) {return null}
 
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
@@ -7130,7 +7129,7 @@ export module Scripting {
     }
 
     export function isDropping(obj: Obj, source: Critter): boolean | null {
-        if (!obj._script || obj._script.is_dropping_p_proc === undefined) return null
+        if (!obj._script || obj._script.is_dropping_p_proc === undefined) {return null}
 
         obj._script.source_obj = source
         obj._script.self_obj = obj as ScriptableObj
@@ -7148,7 +7147,7 @@ export module Scripting {
     }
 
     export function combatEvent(obj: Obj, event: 'turnBegin'): boolean {
-        if (!obj._script) return false // no script — not a bug; many map objects lack one
+        if (!obj._script) {return false} // no script — not a bug; many map objects lack one
 
         let fixed_param: number | null = null
         switch (event) {
@@ -7160,7 +7159,7 @@ export module Scripting {
                 return false
         }
 
-        if (!obj._script.combat_p_proc) return false
+        if (!obj._script.combat_p_proc) {return false}
 
         info('[COMBAT EVENT ' + event + ']')
 
@@ -7173,7 +7172,7 @@ export module Scripting {
 
         // hack so that the procedure is allowed to finish before
         // we actually terminate combat
-        var doTerminate: any = false // did combat_p_proc terminate combat?
+        let doTerminate: any = false // did combat_p_proc terminate combat?
         obj._script.terminate_combat = function () {
             doTerminate = true
         }
@@ -7216,9 +7215,9 @@ export module Scripting {
         const secs = Math.floor(globalState.gameTickTime / 10) % 86400
         const currentHour = Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60)
 
-        var updated = 0
-        for (var i = 0; i < gameObjects.length; i++) {
-            var script = gameObjects[i]._script
+        let updated = 0
+        for (let i = 0; i < gameObjects.length; i++) {
+            const script = gameObjects[i]._script
             if (script !== undefined && script.map_update_p_proc !== undefined) {
                 script.combat_is_initialized = globalState.inCombat ? 1 : 0
                 script.self_obj = gameObjects[i] as ScriptableObj
@@ -7321,7 +7320,7 @@ export module Scripting {
     }
 
     export function objectEnterMap(obj: Obj, elevation: number, mapID: number) {
-        var script = obj._script
+        const script = obj._script
         if (script !== undefined && script.map_enter_p_proc !== undefined) {
             const secs = Math.floor(globalState.gameTickTime / 10) % 86400
             script.combat_is_initialized = 0

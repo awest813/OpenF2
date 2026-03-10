@@ -461,7 +461,7 @@ describe('Phase 82-E-3 — sfall 0x82A2: get_car_current_town_sfall', () => {
         delete (globalState as any).carAreaID
         const result = script.get_car_current_town_sfall()
         expect(result).toBe(-1)
-        if (orig !== undefined) (globalState as any).carAreaID = orig
+        if (orig !== undefined) {(globalState as any).carAreaID = orig}
     })
 
     it('returns carAreaID when set', () => {
@@ -469,7 +469,7 @@ describe('Phase 82-E-3 — sfall 0x82A2: get_car_current_town_sfall', () => {
         ;(globalState as any).carAreaID = 7
         expect(script.get_car_current_town_sfall()).toBe(7)
         if (orig !== undefined) {
-            ;(globalState as any).carAreaID = orig
+            (globalState as any).carAreaID = orig
         } else {
             delete (globalState as any).carAreaID
         }

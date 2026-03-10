@@ -46,7 +46,7 @@ export class EntityManagerImpl {
     }
 
     destroy(id: EntityId): void {
-        if (!this.alive.has(id)) return
+        if (!this.alive.has(id)) {return}
         for (const map of this.storage.values()) {
             map.delete(id)
         }
@@ -104,16 +104,16 @@ export class EntityManagerImpl {
      *   for (const id of EntityManager.query(['position', 'combat'])) { ... }
      */
     query(types: ComponentType[]): EntityId[] {
-        if (types.length === 0) return Array.from(this.alive)
+        if (types.length === 0) {return Array.from(this.alive)}
 
         // Start from the smallest set to minimize iteration
         let smallest: Map<EntityId, AnyComponent> | undefined
         for (const t of types) {
             const map = this.storage.get(t)
-            if (!map || map.size === 0) return []
-            if (!smallest || map.size < smallest.size) smallest = map
+            if (!map || map.size === 0) {return []}
+            if (!smallest || map.size < smallest.size) {smallest = map}
         }
-        if (!smallest) return []
+        if (!smallest) {return []}
 
         const result: EntityId[] = []
         for (const id of smallest.keys()) {
@@ -138,7 +138,7 @@ export class EntityManagerImpl {
             const components: AnyComponent[] = []
             for (const map of this.storage.values()) {
                 const c = map.get(id)
-                if (c) components.push(c)
+                if (c) {components.push(c)}
             }
             entities.push({ id, components })
         }

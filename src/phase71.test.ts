@@ -110,7 +110,7 @@ describe('Phase 71-B — BLK-092: recalcPath null-position guard', () => {
         // Simulate the patched recalcPath inner loop
         expect(() => {
             for (const obj of objects) {
-                if (!obj.position) continue
+                if (!obj.position) {continue}
                 matrix[obj.position.y][obj.position.x] |= obj.blocks() as any
             }
         }).not.toThrow()
@@ -191,7 +191,7 @@ describe('Phase 71-D — BLK-094/095: doAITurn position guards', () => {
 
         // Patched sort: returns 0 when obj.position is null
         const comparator = (a: any, b: any): number => {
-            if (!objNoPos.position) return 0
+            if (!objNoPos.position) {return 0}
             const { hexDistance } = require('./geometry.js')
             return hexDistance(objNoPos.position, a) - hexDistance(objNoPos.position, b)
         }

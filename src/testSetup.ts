@@ -6,7 +6,7 @@
 // heart.ts assigns window.onkeydown/onkeyup/onfocus/onblur at module scope.
 // Provide a minimal stub so these assignments don't throw in Node.
 if (typeof window === 'undefined') {
-    ;(global as any).window = {
+    (global as any).window = {
         onkeydown: null,
         onkeyup: null,
         onfocus: null,
@@ -38,7 +38,7 @@ if (typeof OffscreenCanvas === 'undefined') {
             textBaseline: 'alphabetic',
         }
     }
-    ;(global as any).OffscreenCanvas = class MockOffscreenCanvas {
+    (global as any).OffscreenCanvas = class MockOffscreenCanvas {
         width: number
         height: number
         constructor(w: number, h: number) {
@@ -46,7 +46,7 @@ if (typeof OffscreenCanvas === 'undefined') {
             this.height = h
         }
         getContext(type: string) {
-            if (type === '2d') return _makeCtx2dStub()
+            if (type === '2d') {return _makeCtx2dStub()}
             return null
         }
     }

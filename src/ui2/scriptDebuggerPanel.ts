@@ -31,7 +31,7 @@ const MAX_LOG_LINES = 8
 export class ScriptDebuggerPanel extends UIPanel {
     private _log: string[] = []
     /** Current VM step count, updated by the engine via setVMInfo(). */
-    private _stepCount: number = 0
+    private _stepCount = 0
     /** Name of the procedure the VM is currently executing, or null. */
     private _currentProcedure: string | null = null
 

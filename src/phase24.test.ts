@@ -203,7 +203,7 @@ describe('Phase 24-C — metarule(49) handles all Fallout 2 damage types', () =>
     it('none of the damage-type calls emit stub hits', () => {
         drainStubHits()
         const types = ['Normal', 'Laser', 'Fire', 'Plasma', 'Electrical', 'EMP', 'Explosive']
-        for (const t of types) script.metarule(49, makeObj({ dmgType: t }))
+        for (const t of types) {script.metarule(49, makeObj({ dmgType: t }))}
         expect(stubHitCount()).toBe(0)
     })
 })
@@ -367,7 +367,7 @@ describe('Phase 24-F — metarule3 IDs 108–115 de-stub', () => {
 
     it('none of IDs 108–115 emit stub hits', () => {
         drainStubHits()
-        for (let id = 108; id <= 115; id++) script.metarule3(id, 0, 0, 0)
+        for (let id = 108; id <= 115; id++) {script.metarule3(id, 0, 0, 0)}
         expect(stubHitCount()).toBe(0)
     })
 })

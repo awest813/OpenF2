@@ -26,7 +26,7 @@ export function awardXP(
     hasTraitSkilled: boolean,
     educatedRanks: number,
 ): number {
-    if (amount <= 0) return 0
+    if (amount <= 0) {return 0}
 
     stats.xp += amount
     EventBus.emit('player:xpGain', { entityId: playerId, amount, total: stats.xp })
@@ -65,7 +65,7 @@ function levelUp(
     // Skill points: 5 + 2×INT, +5 from Skilled trait, +2 per Educated rank
     const int = effectiveStat(stats.intelligence, stats.intelligenceMod)
     let sp = skillPointsPerLevel(int)
-    if (hasTraitSkilled) sp += 5
+    if (hasTraitSkilled) {sp += 5}
     sp += educatedRanks * 2
     skills.availablePoints += sp
 
@@ -92,8 +92,8 @@ export function spendSkillPoint(
     const isTagged = skills.tagged.has(skillKey)
     const cost = getSkillPointCost(current, isTagged)
 
-    if (skills.availablePoints < cost) return false
-    if (current >= 300) return false  // hard cap
+    if (skills.availablePoints < cost) {return false}
+    if (current >= 300) {return false}  // hard cap
 
     skills.availablePoints -= cost
     ;(skills as any)[skillKey] = current + 1
@@ -120,12 +120,12 @@ export function spendSkillPoint(
  */
 export function getSkillPointCost(current: number, tagged: boolean): number {
     let cost: number
-    if (current < 100)      cost = 1
-    else if (current < 125) cost = 2
-    else if (current < 150) cost = 3
-    else if (current < 175) cost = 4
-    else                    cost = 5
+    if (current < 100)      {cost = 1}
+    else if (current < 125) {cost = 2}
+    else if (current < 150) {cost = 3}
+    else if (current < 175) {cost = 4}
+    else                    {cost = 5}
 
-    if (tagged) cost = Math.ceil(cost / 2)
+    if (tagged) {cost = Math.ceil(cost / 2)}
     return cost
 }

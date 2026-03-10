@@ -29,23 +29,23 @@ export function fromTileNum(tile: number): Point {
 
 export function tileToScreen(x: number, y: number): Point {
     x = 99 - x // this algorithm expects x to be reversed
-    var sx = 4752 + 32 * y - 48 * x
-    var sy = 24 * y + 12 * x
+    const sx = 4752 + 32 * y - 48 * x
+    const sy = 24 * y + 12 * x
 
     return { x: sx, y: sy }
 }
 
 export function tileFromScreen(x: number, y: number): Point {
-    var off_x = -4800 + x
-    var off_y = y
-    var xx = off_x - (off_y * 4) / 3
-    var tx = xx / 64
+    const off_x = -4800 + x
+    const off_y = y
+    const xx = off_x - (off_y * 4) / 3
+    let tx = xx / 64
 
-    if (xx >= 0) tx++
+    if (xx >= 0) {tx++}
     tx = -tx
-    var yy = off_y + off_x / 4
-    var ty = yy / 32
-    if (yy < 0) ty--
+    const yy = off_y + off_x / 4
+    let ty = yy / 32
+    if (yy < 0) {ty--}
 
     return { x: 99 - Math.round(tx), y: Math.round(ty) }
 }
@@ -75,24 +75,24 @@ export function setCenterTile() {
 // tile_coord(0x5018) should be (230, 304)
 
 function tile_coord(tileNum: number): Point | null {
-    if (tileNum < 0 || tileNum >= 200 * 200) return null
+    if (tileNum < 0 || tileNum >= 200 * 200) {return null}
 
     //var tile_x = 0x62 // todo: ?
     //var tile_y = 0x64 // todo: ?
     setCenterTile()
-    var tile_x = /*199 -*/ globalState.centerTile.x
-    var tile_y = globalState.centerTile.y
+    const tile_x = /*199 -*/ globalState.centerTile.x
+    const tile_y = globalState.centerTile.y
 
-    var tile_offx = 272
-    var tile_offy = 182
+    const tile_offx = 272
+    const tile_offy = 182
 
-    var a2 = tile_offx // x (normally this would be cameraX aka tile_offx)
-    var a3 = tile_offy // y (normally this would be cameraY aka tile_offy)
+    let a2 = tile_offx // x (normally this would be cameraX aka tile_offx)
+    let a3 = tile_offy // y (normally this would be cameraY aka tile_offy)
 
-    var v3 = 200 - 1 - (tileNum % 200)
-    var v4 = Math.floor(tileNum / 200)
+    const v3 = 200 - 1 - (tileNum % 200)
+    const v4 = Math.floor(tileNum / 200)
 
-    var v5 = Math.floor((v3 - tile_x) / -2)
+    const v5 = Math.floor((v3 - tile_x) / -2)
 
     a2 += 48 * Math.ceil((v3 - tile_x) / 2) // TODO: ceil, round or floor?
     a3 += 12 * v5
@@ -108,7 +108,7 @@ function tile_coord(tileNum: number): Point | null {
         }
     }
 
-    var v6 = v4 - tile_y
+    const v6 = v4 - tile_y
     a2 += 16 * v6
     a3 += 12 * v6
 

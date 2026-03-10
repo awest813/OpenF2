@@ -23,13 +23,13 @@ import { opMap, ScriptVM } from "./vm.js"
 
 // Bridge between Scripting API and the Scripting VM
 
-export module ScriptVMBridge {
+export namespace ScriptVMBridge {
     // create a bridged function that calls procedures on scriptObj
-    function bridged(procName: string, argc: number, pushResult: boolean=true) {
+    function bridged(procName: string, argc: number, pushResult=true) {
         return function(this: GameScriptVM) {
-            var args = []
-            for(var i = 0; i < argc; i++)
-                args.push(this.pop())
+            const args = []
+            for(let i = 0; i < argc; i++)
+                {args.push(this.pop())}
             args.reverse()
 
             const targetFn = (<any>this.scriptObj)[procName]
@@ -40,24 +40,24 @@ export module ScriptVMBridge {
                 console.warn(
                     `[ScriptVMBridge] missing procedure "${procName}" for opcode 0x${this.lastOpcode.toString(16)} in ${this.intfile.name}; returning 0`
                 )
-                if(pushResult) this.push(0)
+                if(pushResult) {this.push(0)}
                 return
             }
 
-            var r = targetFn.apply(this.scriptObj, args)
+            const r = targetFn.apply(this.scriptObj, args)
             if(pushResult)
                 // Guard against undefined returns from stub/partial procedures.
                 // Any procedure that returns without an explicit value would push
                 // `undefined` onto the VM data stack, corrupting subsequent arithmetic
                 // and comparisons.  Coerce to 0 (the Fallout 2 "false/null" sentinel)
                 // so the stack stays in a known state.
-                this.push(r ?? 0)
+                {this.push(r ?? 0)}
         }
     }
 
     function varName(this: ScriptVM, value: any): string {
         if(typeof value === "number")
-            return this.intfile.identifiers[value]
+            {return this.intfile.identifiers[value]}
         return value
     }
 
@@ -120,7 +120,7 @@ export module ScriptVMBridge {
        ,0x80D7: bridged("drop_obj", 1, false)
 
        ,0x8016: function() { this.mapScript()[this.pop()] = 0 } // op_export_var
-       ,0x8015: function() { var name = varName.call(this, this.pop()); this.mapScript()[name] = this.pop() } // op_store_external
+       ,0x8015: function() { const name = varName.call(this, this.pop()); this.mapScript()[name] = this.pop() } // op_store_external
        ,0x8014: function() { this.push(this.mapScript()[varName.call(this, this.pop())]) } // op_fetch_external
 
        ,0x80B9: bridged("script_overrides", 0, false)
@@ -261,16 +261,16 @@ export module ScriptVMBridge {
        //,0x8121: bridged("giq_option", 5) // TODO: wrap this so that target becomes a function
        // giq_option
        ,0x8121: function() { // giq_option
-            var reaction = this.pop()
-            var target = this.pop()
-            var msgId = this.pop()
-            var msgList = this.pop()
-            var iqTest = this.pop()
+            const reaction = this.pop()
+            const target = this.pop()
+            const msgId = this.pop()
+            const msgList = this.pop()
+            const iqTest = this.pop()
 
             // wrap target in a function
             //var targetFn = () => { this.call() }
             //console.log("TARGET=%o, proc=%o this=%o", targetFn, this.intfile.proceduresTable[target], this)
-            var targetProc = this.intfile.proceduresTable[target]?.name
+            const targetProc = this.intfile.proceduresTable[target]?.name
             if (!targetProc) {
                 console.warn(`[vm_bridge] giq_option: procedure at index ${target} not found — option skipped`)
                 return
@@ -278,7 +278,7 @@ export module ScriptVMBridge {
             // TODO: do we save the current PC as the return address?
             // otherwise when end_dialogue is reached, we will have
             // interrupted to this targetFn, and have no way back
-            var targetFn = () => { this.call(targetProc!) }
+            const targetFn = () => { this.call(targetProc!) }
 
             this.scriptObj.giq_option(iqTest, msgList, msgId, targetFn, reaction)
         }
@@ -286,17 +286,17 @@ export module ScriptVMBridge {
        // gsay_option (0x811F) — adds a dialogue option without an INT requirement.
        // Opcode takes 4 args: msgList, msgID, target (procedure index), reaction.
        ,0x811F: function() { // gsay_option
-            var reaction = this.pop()
-            var target = this.pop()
-            var msgId = this.pop()
-            var msgList = this.pop()
+            const reaction = this.pop()
+            const target = this.pop()
+            const msgId = this.pop()
+            const msgList = this.pop()
 
-            var targetProc = this.intfile.proceduresTable[target]?.name
+            const targetProc = this.intfile.proceduresTable[target]?.name
             if (!targetProc) {
                 console.warn(`[vm_bridge] gsay_option: procedure at index ${target} not found — option skipped`)
                 return
             }
-            var targetFn = () => { this.call(targetProc!) }
+            const targetFn = () => { this.call(targetProc!) }
 
             this.scriptObj.gsay_option(msgList, msgId, targetFn, reaction)
         }
@@ -690,17 +690,17 @@ export module ScriptVMBridge {
        ,0x81D7: function(this: GameScriptVM) {
            const proc = this.pop()  // procedure name or function ref
            const obj  = this.pop()  // target game object
-           if (!obj || typeof obj !== 'object') return // null/invalid object — no-op
+           if (!obj || typeof obj !== 'object') {return} // null/invalid object — no-op
            const script = (obj as any)._script
-           if (!script) return // no script attached — no-op
+           if (!script) {return} // no script attached — no-op
            // Resolve to a callable: string → method name, function → direct call
-           let fn: Function | null = null
+           let fn: ((...args: unknown[]) => unknown) | null = null
            if (typeof proc === 'string' && typeof script[proc] === 'function') {
                fn = script[proc].bind(script)
            } else if (typeof proc === 'function') {
                fn = proc.bind(script)
            }
-           if (!fn) return // procedure not found — silent no-op
+           if (!fn) {return} // procedure not found — silent no-op
            try {
                // Set self_obj so the called procedure sees the correct object context.
                const prevSelf = script.self_obj
@@ -1567,10 +1567,10 @@ export module ScriptVMBridge {
     // define a game-oriented Script VM that has a ScriptProto instance
     export class GameScriptVM extends ScriptVM {
         scriptObj = new Scripting.Script()
-        lastOpcode: number = -1
+        lastOpcode = -1
 
         step(): boolean {
-            if (this.halted) return false
+            if (this.halted) {return false}
             this.script.seek(this.pc)
             this.lastOpcode = this.script.read16()
             this.script.seek(this.pc)
@@ -1589,7 +1589,7 @@ export module ScriptVMBridge {
 
         mapScript(): any {
             if(this.scriptObj._mapScript)
-                return this.scriptObj._mapScript
+                {return this.scriptObj._mapScript}
             return this.scriptObj
         }
     }

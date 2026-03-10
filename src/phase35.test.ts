@@ -36,7 +36,7 @@ class FullPlaythroughHarness {
     }
 
     runMidLateCampaign(): void {
-        if ((this.scriptGlobalVars[GVAR_DEN_ROUTE] ?? 0) !== 1) throw new Error('early campaign not complete')
+        if ((this.scriptGlobalVars[GVAR_DEN_ROUTE] ?? 0) !== 1) {throw new Error('early campaign not complete')}
         this.scriptGlobalVars[GVAR_MIDLATE_ROUTE] = 1
         this.scriptGlobalVars[GVAR_NAVARRO_ACCESS] = 1
         this.scriptGlobalVars[GVAR_OILRIG_READY] = 1
@@ -55,7 +55,7 @@ class FullPlaythroughHarness {
     }
 
     triggerEndingFlow(): void {
-        if ((this.scriptGlobalVars[GVAR_OILRIG_READY] ?? 0) !== 1) throw new Error('Oil Rig route not unlocked')
+        if ((this.scriptGlobalVars[GVAR_OILRIG_READY] ?? 0) !== 1) {throw new Error('Oil Rig route not unlocked')}
         this.currentMap = 'oilrig'
         this.region = 'Enclave / Oil Rig'
         this.worldPosition = { x: 86, y: 38 }

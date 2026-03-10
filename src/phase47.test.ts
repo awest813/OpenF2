@@ -44,11 +44,11 @@ function makeVM(initialStack: any[] = []): MinimalVM {
         intfile: { procedures: {}, proceduresTable: [], strings: {}, identifiers: {} },
         push(v: any) { this.dataStack.push(v) },
         pop() {
-            if (this.dataStack.length === 0) return 0 // safe in test context
+            if (this.dataStack.length === 0) {return 0} // safe in test context
             return this.dataStack.pop()
         },
         popAddr() {
-            if (this.retStack.length === 0) return -1
+            if (this.retStack.length === 0) {return -1}
             return this.retStack.pop()
         },
     }
@@ -313,7 +313,7 @@ describe('Phase 47-G — encounter evalCond uses actual player level', () => {
             const playerLevel = globalState.player ? globalState.player.level : 1
             expect(playerLevel).toBe(7)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 
@@ -324,7 +324,7 @@ describe('Phase 47-G — encounter evalCond uses actual player level', () => {
             const playerLevel = globalState.player ? (globalState.player as any).level : 1
             expect(playerLevel).toBe(1)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 })
@@ -350,7 +350,7 @@ describe('Phase 47-H — encounter perk roll bonuses (Scout/Ranger/Explorer)', (
             expect(rangerBonus).toBe(1)
             expect(explorerBonus).toBe(2)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 
@@ -367,7 +367,7 @@ describe('Phase 47-H — encounter perk roll bonuses (Scout/Ranger/Explorer)', (
             expect((ranks[28] ?? 0) > 0 ? 1 : 0).toBe(0)
             expect((ranks[29] ?? 0) > 0 ? 2 : 0).toBe(0)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 })
@@ -390,7 +390,7 @@ describe('Phase 47-I — Cautious Nature perk (ID 16) adds +3 to surrounding spa
             const roll = baseRoll + ((ranks[16] ?? 0) > 0 ? 3 : 0)
             expect(roll).toBe(8)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 
@@ -407,7 +407,7 @@ describe('Phase 47-I — Cautious Nature perk (ID 16) adds +3 to surrounding spa
             const roll = baseRoll + ((ranks[16] ?? 0) > 0 ? 3 : 0)
             expect(roll).toBe(5)
         } finally {
-            ;(globalState as any).player = prevPlayer
+            (globalState as any).player = prevPlayer
         }
     })
 })

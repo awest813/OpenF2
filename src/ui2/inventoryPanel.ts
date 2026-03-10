@@ -209,7 +209,7 @@ export class InventoryPanel extends UIPanel {
             return true
         }
         if (key === 'ArrowDown') {
-            if (this.items.length === 0) return true
+            if (this.items.length === 0) {return true}
             // Move selection down; initialise to first item when nothing is selected.
             const next = this._selectedIndex < 0 ? 0 : Math.min(this._selectedIndex + 1, this.items.length - 1)
             this._selectedIndex = next
@@ -220,8 +220,8 @@ export class InventoryPanel extends UIPanel {
             return true
         }
         if (key === 'ArrowUp') {
-            if (this.items.length === 0) return true
-            if (this._selectedIndex < 0) return true
+            if (this.items.length === 0) {return true}
+            if (this._selectedIndex < 0) {return true}
             const next = Math.max(this._selectedIndex - 1, 0)
             this._selectedIndex = next
             // Auto-scroll so the selected item stays visible.
@@ -281,7 +281,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

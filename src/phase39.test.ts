@@ -109,7 +109,7 @@ describe('Phase 39-C — create_object_sid elevation clamping', () => {
             try { script.create_object_sid(0, 0, -1, -1) } catch (e) {
                 // Any throw from createObjectWithPID or addObject is acceptable;
                 // only an elev-range throw is the regression we're guarding against.
-                if (String(e).includes('elev out of range')) throw e
+                if (String(e).includes('elev out of range')) {throw e}
             }
         }).not.toThrow()
     })
@@ -118,7 +118,7 @@ describe('Phase 39-C — create_object_sid elevation clamping', () => {
         const script = new (Scripting as any).Script()
         expect(() => {
             try { script.create_object_sid(0, 0, 5, -1) } catch (e) {
-                if (String(e).includes('elev out of range')) throw e
+                if (String(e).includes('elev out of range')) {throw e}
             }
         }).not.toThrow()
     })

@@ -111,8 +111,8 @@ describe('getTimeHour', () => {
 // ---------------------------------------------------------------------------
 
 function applyEncounterDifficulty(encRate: number, difficulty: 'easy' | 'normal' | 'hard'): number {
-    if (difficulty === 'easy') return encRate - Math.floor(encRate / 15)
-    if (difficulty === 'hard') return encRate + Math.floor(encRate / 15)
+    if (difficulty === 'easy') {return encRate - Math.floor(encRate / 15)}
+    if (difficulty === 'hard') {return encRate + Math.floor(encRate / 15)}
     return encRate
 }
 
@@ -249,8 +249,8 @@ function resolveEncounterRate(
     // Use the explicit override if present (even if zero)
     const raw = tableRate !== undefined ? tableRate : frequencyDefaults[frequency]
     // null from tableRate means missing/corrupted entry
-    if (raw === null || raw === undefined) return null
-    if (!Number.isFinite(raw as number)) return null
+    if (raw === null || raw === undefined) {return null}
+    if (!Number.isFinite(raw as number)) {return null}
     return raw as number
 }
 
@@ -259,13 +259,13 @@ function shouldEncounterOccur(
     roll: number,
     difficulty: 'easy' | 'normal' | 'hard' = 'normal'
 ): boolean {
-    if (rate === null) return false
-    if (rate <= 0) return false
-    if (rate === 100) return true
+    if (rate === null) {return false}
+    if (rate <= 0) {return false}
+    if (rate === 100) {return true}
 
     let adjusted = rate
-    if (difficulty === 'easy') adjusted -= Math.floor(adjusted / 15)
-    else if (difficulty === 'hard') adjusted += Math.floor(adjusted / 15)
+    if (difficulty === 'easy') {adjusted -= Math.floor(adjusted / 15)}
+    else if (difficulty === 'hard') {adjusted += Math.floor(adjusted / 15)}
     adjusted = Math.max(1, Math.min(99, adjusted))
 
     return roll < adjusted

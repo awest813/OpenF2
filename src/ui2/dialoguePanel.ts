@@ -169,7 +169,7 @@ export class DialoguePanel extends UIPanel {
         }
         // Arrow keys scroll the reply text.
         if (key === 'ArrowUp') {
-            if (this._replyScrollLine > 0) this._replyScrollLine--
+            if (this._replyScrollLine > 0) {this._replyScrollLine--}
             return true
         }
         if (key === 'ArrowDown') {
@@ -207,7 +207,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

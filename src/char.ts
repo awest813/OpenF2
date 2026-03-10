@@ -25,13 +25,13 @@ import { clamp } from "./util.js";
 export class SkillSet {
     baseSkills: { [name: string]: number } = {};
     tagged: string[] = [];
-    skillPoints: number = 0;
+    skillPoints = 0;
 
     constructor(baseSkills?: { [name: string]: number }, tagged?: string[], skillPoints?: number) {
         // Copy construct a SkillSet
-        if(baseSkills) this.baseSkills = baseSkills;
-        if(tagged) this.tagged = tagged;
-        if(skillPoints) this.skillPoints = skillPoints;
+        if(baseSkills) {this.baseSkills = baseSkills;}
+        if(tagged) {this.tagged = tagged;}
+        if(skillPoints) {this.skillPoints = skillPoints;}
     }
 
     clone(): SkillSet {
@@ -73,7 +73,7 @@ export class SkillSet {
 
         for(const dep of skillDep.dependencies) {
             if(dep.statType)
-                skillValue += Math.floor(stats.get(dep.statType) * dep.multiplier);
+                {skillValue += Math.floor(stats.get(dep.statType) * dep.multiplier);}
         }
 
         return skillValue;
@@ -85,7 +85,7 @@ export class SkillSet {
 
     // TODO: Respect min and max bounds in inc/dec
 
-    incBase(skill: string, useSkillPoints: boolean=true): boolean {
+    incBase(skill: string, useSkillPoints=true): boolean {
         const base = this.getBase(skill);
 
         if(useSkillPoints) {
@@ -103,7 +103,7 @@ export class SkillSet {
         return true;
     }
 
-    decBase(skill: string, useSkillPoints: boolean=true) {
+    decBase(skill: string, useSkillPoints=true) {
         const base = this.getBase(skill);
 
         if(useSkillPoints) {
@@ -126,19 +126,19 @@ export class SkillSet {
 
     untag(skill: string) {
         if(this.isTagged(skill))
-            this.tagged.splice(this.tagged.indexOf(skill), 1);
+            {this.tagged.splice(this.tagged.indexOf(skill), 1);}
     }
 }
 
 export class StatSet {
     baseStats: { [name: string]: number } = {};
     useBonuses: boolean;
-    apBonus: number = 0; // Bonus AP from perks/traits
-    acBonus: number = 0; // Temporary AC bonus (e.g. from unused AP at end of combat turn)
+    apBonus = 0; // Bonus AP from perks/traits
+    acBonus = 0; // Temporary AC bonus (e.g. from unused AP at end of combat turn)
 
-    constructor(baseStats?: { [name: string]: number }, useBonuses: boolean=true, apBonus: number=0) {
+    constructor(baseStats?: { [name: string]: number }, useBonuses=true, apBonus=0) {
         // Copy construct a StatSet
-        if(baseStats) this.baseStats = baseStats;
+        if(baseStats) {this.baseStats = baseStats;}
         this.useBonuses = useBonuses;
         this.apBonus = apBonus;
     }
@@ -156,18 +156,18 @@ export class StatSet {
 
         for(const stat in stats) {
             if(bonusStats[stat] !== undefined)
-                stats[stat] += bonusStats[stat];
+                {stats[stat] += bonusStats[stat];}
         }
 
         // Note: Armor DT/DR bonuses are added dynamically in Critter.getStat() when armor is equipped
 
         // Define Max HP = HP if it does not exist
         if(stats["Max HP"] === undefined && stats["HP"] !== undefined)
-            stats["Max HP"] = stats["HP"];
+            {stats["Max HP"] = stats["HP"];}
 
         // Define HP = Max HP if it does not exist
         if(stats["HP"] === undefined && stats["Max HP"] !== undefined)
-            stats["HP"] = stats["Max HP"];
+            {stats["HP"] = stats["Max HP"];}
 
         return new StatSet(stats, false);
     }
@@ -197,7 +197,7 @@ export class StatSet {
         if(this.useBonuses) {
             for(const dep of statDep.dependencies) {
                 if(dep.statType)
-                    statValue += Math.floor(this.get(dep.statType) * dep.multiplier);
+                    {statValue += Math.floor(this.get(dep.statType) * dep.multiplier);}
             }
         }
 

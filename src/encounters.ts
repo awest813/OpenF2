@@ -30,7 +30,7 @@ const PERK_SCOUT           = 22
 const PERK_RANGER          = 28
 const PERK_EXPLORER        = 29
 
-export module Encounters {
+export namespace Encounters {
     enum Tok {
         IF = 0,
         LPAREN = 1,
@@ -51,7 +51,7 @@ export module Encounters {
     export type Node = IfNode | OpNode | CallNode | VarNode | IntNode;
 
     function tokenizeCond(data: string): Token[] {
-        var tokensRe: { [re: string]: number } = {
+        const tokensRe: { [re: string]: number } = {
             "if": Tok.IF,
             "and": Tok.OP,
             "[a-z_]+": Tok.IDENT,
@@ -62,18 +62,18 @@ export module Encounters {
         }
 
         function match(str: string): Token|null {
-            for(var re in tokensRe) {
-                var m = str.match(new RegExp("^\\s*(" + re + ")\\s*"))
+            for(const re in tokensRe) {
+                const m = str.match(new RegExp("^\\s*(" + re + ")\\s*"))
                 if(m !== null)
-                    return [tokensRe[re], m[1], m[0].length]
+                    {return [tokensRe[re], m[1], m[0].length]}
             }
             return null
         }
 
-        var acc = data
-        var toks: Token[] = []
+        let acc = data
+        const toks: Token[] = []
         while(acc.length > 0) {
-            var m = match(acc)
+            const m = match(acc)
             if(m === null) {
                 console.warn("encounters: error parsing condition: '" + data + "': choked on '" + acc + "' — skipping token")
                 break
@@ -87,12 +87,12 @@ export module Encounters {
 
     function parseCond(data: string) {
         data = data.replace("%", "") // percentages don't really matter
-        var tokens = tokenizeCond(data)
-        var curTok = 0
+        const tokens = tokenizeCond(data)
+        let curTok = 0
 
         function expect(t: Tok) {
             if(tokens[curTok] === undefined || tokens[curTok++][0] !== t)
-                console.warn("encounters: expected token " + t + " but got " + tokens[curTok-1] + " in: " + data)
+                {console.warn("encounters: expected token " + t + " but got " + tokens[curTok-1] + " in: " + data)}
         }
 
         function next() {
@@ -101,29 +101,29 @@ export module Encounters {
 
         function peek() {
             if(curTok >= tokens.length)
-                return null
+                {return null}
             return tokens[curTok]
         }
 
         function call(name: string): Node {
             expect(Tok.LPAREN)
-            var arg = expr()
+            const arg = expr()
             expect(Tok.RPAREN)
             return {type: 'call', name, arg}
         }
 
         function checkOp(node: Node): Node {
-            var t = peek()
+            const t = peek()
             if(t === null || t[0] !== Tok.OP)
-                return node
+                {return node}
 
             curTok++
-            var rhs = checkOp(expr())
+            const rhs = checkOp(expr())
             return {type: 'op', op: t[1], lhs: node, rhs: rhs}
         }
 
         function expr(): Node {
-            var t = next()
+            const t = next()
             switch(t[0]) {
                 case Tok.IF:
                     expect(Tok.LPAREN)
@@ -132,7 +132,7 @@ export module Encounters {
                     return checkOp({type: 'if', cond: cond})
                 case Tok.IDENT:
                     if(peek()![0] === Tok.LPAREN)
-                        return checkOp(call(t[1]))
+                        {return checkOp(call(t[1]))}
                     return checkOp({type: 'var', name: t[1]})
                 case Tok.INT:
                     return checkOp({type: 'int', value: t[2]})
@@ -149,14 +149,14 @@ export module Encounters {
         // conditions are formed by conjunctions, so
         // x AND y AND z can just be collapsed to [x, y, z] here
 
-        var cond: Node
+        let cond: Node
         try {
             cond = parseCond(data)
         } catch(e) {
             console.warn('encounters: parseConds failed for "' + data + '": ' + e + ' — treating as always-true')
             return [{type: 'int', value: 1} as Node]
         }
-        var out: Node[] = []
+        const out: Node[] = []
 
         function visit(node: Node) {
             if(node.type === "op" && node.op === "and") {
@@ -164,7 +164,7 @@ export module Encounters {
                 visit(node.rhs)
             }
             else
-                out.push(node)
+                {out.push(node)}
         }
 
         visit(cond)
@@ -208,7 +208,7 @@ export module Encounters {
                     case "player":
                         if(node.arg.type !== "var") { console.warn("evalCond: player arg not a var"); return 0 }
                         if(node.arg.name === "level")
-                            return globalState.player ? globalState.player.level : 1
+                            {return globalState.player ? globalState.player.level : 1}
                         console.warn("evalCond: unhandled player property: " + node.arg.name)
                         return 0
                     case "rand": // random percentage
@@ -254,35 +254,35 @@ export module Encounters {
 
     function evalConds(conds: Node[]): boolean {
         // TODO: Array.every
-        for(var i = 0; i < conds.length; i++) {
+        for(let i = 0; i < conds.length; i++) {
             if(evalCond(conds[i]) === false)
-                return false
+                {return false}
         }
         return true
     }
 
     function evalEncounterCritter(critter: Worldmap.EncounterCritter): Worldmap.EncounterCritter {
-        var items = []
-        for(var i = 0; i < critter.items.length; i++) {
-            var item = critter.items[i]
-            var amount = 1
+        const items = []
+        for(let i = 0; i < critter.items.length; i++) {
+            const item = critter.items[i]
+            let amount = 1
 
             if(item.range) {
                 amount = getRandomInt(item.range.start, item.range.end)
             }
 
             if(amount > 0)
-                items.push({pid: item.pid, wielded: item.wielded, amount: amount})
+                {items.push({pid: item.pid, wielded: item.wielded, amount: amount})}
         }
 
         return {items: items, pid: critter.pid, script: critter.script, dead: critter.dead}
     }
 
     function evalEncounterCritters(count: number, group: Worldmap.EncounterGroup): Worldmap.EncounterCritter[] {
-        var critters: Worldmap.EncounterCritter[] = []
+        const critters: Worldmap.EncounterCritter[] = []
 
-        for(var i = 0; i < group.critters.length; i++) {
-            var critter = group.critters[i]
+        for(let i = 0; i < group.critters.length; i++) {
+            const critter = group.critters[i]
 
             if(critter.cond) {
                 if(!evalConds(critter.cond)) {
@@ -290,17 +290,17 @@ export module Encounters {
                     continue
                 }
                 else
-                    console.log("critter cond true: %o", critter.cond)
+                    {console.log("critter cond true: %o", critter.cond)}
             }
 
             if(critter.ratio === undefined)
-                critters.push(evalEncounterCritter(critter))
+                {critters.push(evalEncounterCritter(critter))}
             else {
-                var num = Math.ceil(critter.ratio/100 * count)
+                const num = Math.ceil(critter.ratio/100 * count)
                 // TODO: better distribution (might be +1 now)
                 console.log("critter nums: %d (%d% of %d)", num, critter.ratio, count)
-                for(var j = 0; j < num; j++)
-                    critters.push(evalEncounterCritter(critter))
+                for(let j = 0; j < num; j++)
+                    {critters.push(evalEncounterCritter(critter))}
             }
         }
 
@@ -310,45 +310,45 @@ export module Encounters {
     function pickEncounter(encounters: Worldmap.Encounter[]) {
         // Pick an encounter from an encounter list based on a roll
 
-        var succEncounters = encounters.filter(function(enc) {
-            if(enc.enc === null) return false // skip encounters with invalid enc ref
+        let succEncounters = encounters.filter(function(enc) {
+            if(enc.enc === null) {return false} // skip encounters with invalid enc ref
             return (enc.cond !== null) ? evalConds(enc.cond) : true
         })
-        var numEncounters = succEncounters.length
-        var totalChance = succEncounters.reduce(function(sum, x) { return x.chance + sum }, 0)
+        let numEncounters = succEncounters.length
+        let totalChance = succEncounters.reduce(function(sum, x) { return x.chance + sum }, 0)
 
         if(numEncounters === 0) {
             console.warn("pickEncounter: no conditioned encounters passed — using all encounters unconditionally")
             succEncounters = encounters.slice()
             numEncounters = succEncounters.length
             totalChance = succEncounters.reduce(function(sum, x) { return x.chance + sum }, 0)
-            if(numEncounters === 0) return null
+            if(numEncounters === 0) {return null}
         }
 
         console.log("pickEncounter: num: %d, chance: %d, encounters: %o", numEncounters, totalChance, succEncounters)
 
-        var luck = globalState.player.getStat("LUK")
-        var roll = getRandomInt(0, totalChance) + (luck - 5)
+        const luck = globalState.player.getStat("LUK")
+        let roll = getRandomInt(0, totalChance) + (luck - 5)
 
         // Apply perk-based encounter roll modifiers (Fallout 2 perk IDs per PERKS.MSG):
         //   Scout (ID 22): +1 roll, Ranger (ID 28): +1 roll, Explorer (ID 29): +2 roll.
         // These perks are not yet in perks.ts but can be granted by scripts; check
         // perkRanks directly so the bonuses activate as soon as a script awards them.
-        var perkRanks = globalState.player.perkRanks ?? {}
-        if ((perkRanks[PERK_SCOUT] ?? 0) > 0) roll += 1
-        if ((perkRanks[PERK_RANGER] ?? 0) > 0) roll += 1
-        if ((perkRanks[PERK_EXPLORER] ?? 0) > 0) roll += 2
+        const perkRanks = globalState.player.perkRanks ?? {}
+        if ((perkRanks[PERK_SCOUT] ?? 0) > 0) {roll += 1}
+        if ((perkRanks[PERK_RANGER] ?? 0) > 0) {roll += 1}
+        if ((perkRanks[PERK_EXPLORER] ?? 0) > 0) {roll += 2}
 
         // Remove chances from roll until either we reach the end of the list or the roll runs out.
         // If our roll does *not* run out (i.e., its value exceeds totalChance), then
         // we will choose the last encounter in the list.
 
-        var acc = roll
-        var idx = 0
+        let acc = roll
+        let idx = 0
         for(; idx < succEncounters.length; idx++) {
-            var chance = succEncounters[idx].chance
+            const chance = succEncounters[idx].chance
             if(acc < chance)
-                break
+                {break}
 
             acc -= chance
         }
@@ -361,15 +361,15 @@ export module Encounters {
         // set up critters' positions in their formations
 
         groups.forEach(function(group) {
-            var dir = getRandomInt(0, 5)
-            var formation = group.position.type
+            let dir = getRandomInt(0, 5)
+            const formation = group.position.type
             let pos: Point
 
             if(formation === "surrounding")
-                pos = {x: playerPos.x, y: playerPos.y}
+                {pos = {x: playerPos.x, y: playerPos.y}}
             else {
                 // choose a random starting point from the map
-                var randomPoint = map.randomStartPoints[getRandomInt(0, map.randomStartPoints.length - 1)]
+                const randomPoint = map.randomStartPoints[getRandomInt(0, map.randomStartPoints.length - 1)]
                 pos = fromTileNum(randomPoint.tileNum)
             }
 
@@ -386,16 +386,16 @@ export module Encounters {
                     case "surrounding":
                         var roll = globalState.player.getStat("PER") + getRandomInt(-2, 2)
                         // Cautious Nature perk (Fallout 2 perk ID 16): +3 to formation spacing.
-                        if (((globalState.player.perkRanks ?? {})[PERK_CAUTIOUS_NATURE] ?? 0) > 0) roll += 3
+                        if (((globalState.player.perkRanks ?? {})[PERK_CAUTIOUS_NATURE] ?? 0) > 0) {roll += 3}
 
                         if(roll < 0)
-                            roll = 0
+                            {roll = 0}
 
                         pos = hexInDirectionDistance(pos, dir, roll)
 
                         dir++
                         if(dir >= 6)
-                            dir = 0
+                            {dir = 0}
 
                         var rndSpacing = getRandomInt(0, Math.floor(roll / 2))
                         var rndDir = getRandomInt(0, 5)
@@ -422,11 +422,11 @@ export module Encounters {
     }
 
     export function evalEncounter(encTable: Worldmap.EncounterTable) {
-        var mapIndex = getRandomInt(0, encTable.maps.length - 1)
-        var mapLookupName = encTable.maps[mapIndex]
-        var mapName = lookupMapNameFromLookup(mapLookupName)
-        var groups: Worldmap.EncounterGroup[] = []
-        var encounter = pickEncounter(encTable.encounters)
+        const mapIndex = getRandomInt(0, encTable.maps.length - 1)
+        let mapLookupName = encTable.maps[mapIndex]
+        let mapName = lookupMapNameFromLookup(mapLookupName)
+        const groups: Worldmap.EncounterGroup[] = []
+        const encounter = pickEncounter(encTable.encounters)
 
         if(encounter === null) {
             console.warn("evalEncounter: pickEncounter returned null — skipping encounter")
@@ -448,22 +448,22 @@ export module Encounters {
             // player ambush
             console.log("(player ambush)")
 
-            var party = encounter.enc.party
-            var group = Worldmap.getEncounterGroup(party.name)
-            var position = group.position
+            const party = encounter.enc.party
+            const group = Worldmap.getEncounterGroup(party.name)
+            const position = group.position
 
             console.log("party: %d-%d of %s", party.start, party.end, party.name)
             console.log("encounter group: %o", group)
             console.log("position:", position)
 
-            var critterCount = getRandomInt(party.start, party.end)
-            var critters = evalEncounterCritters(critterCount, group)
+            const critterCount = getRandomInt(party.start, party.end)
+            const critters = evalEncounterCritters(critterCount, group)
             groups.push({critters: critters, position: position, target: "player"})
         }
         else if(encounter.enc.type === "fighting") {
             // two factions fighting
-            var firstParty = encounter.enc.firstParty
-            var secondParty = encounter.enc.secondParty
+            const firstParty = encounter.enc.firstParty
+            const secondParty = encounter.enc.secondParty
             console.log("two factions: %o vs %o", firstParty, secondParty)
 
             if(!firstParty) {
@@ -471,14 +471,14 @@ export module Encounters {
                 return null
             }
 
-            var firstGroup = Worldmap.getEncounterGroup(firstParty.name)
-            var firstCritterCount = getRandomInt(firstParty.start, firstParty.end)
+            const firstGroup = Worldmap.getEncounterGroup(firstParty.name)
+            const firstCritterCount = getRandomInt(firstParty.start, firstParty.end)
             groups.push({critters: evalEncounterCritters(firstCritterCount, firstGroup), target: 1, position: firstGroup.position})
 
             // one-party fighting? TODO: check what all is allowed with `fighting`
             if(secondParty && secondParty.name !== undefined) {
-                var secondGroup = Worldmap.getEncounterGroup(secondParty.name)
-                var secondCritterCount = getRandomInt(secondParty.start, secondParty.end)
+                const secondGroup = Worldmap.getEncounterGroup(secondParty.name)
+                const secondCritterCount = getRandomInt(secondParty.start, secondParty.end)
                 groups.push({critters: evalEncounterCritters(secondCritterCount, secondGroup), target: 0, position: secondGroup.position})
             }
         }

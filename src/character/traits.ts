@@ -135,7 +135,7 @@ export function applyTraits(
     const ids = traitIds.slice(0, 2)
     for (const id of ids) {
         const trait = TRAIT_MAP.get(id)
-        if (trait) trait.apply(stats, skills)
+        if (trait) {trait.apply(stats, skills)}
     }
 }
 
@@ -146,6 +146,6 @@ export function removeTraits(
 ): void {
     for (const id of traitIds) {
         const trait = TRAIT_MAP.get(id)
-        if (trait) trait.remove(stats, skills)
+        if (trait) {trait.remove(stats, skills)}
     }
 }

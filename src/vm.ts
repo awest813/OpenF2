@@ -36,26 +36,26 @@ export interface UnsupportedVmOperation {
 export class ScriptVM {
     script: BinaryReader
     intfile: IntFile
-    pc: number = 0
+    pc = 0
     dataStack: any[] = []
     retStack: number[] = []
-    svarBase: number = 0
-    dvarBase: number = 0
-    halted: boolean = false
+    svarBase = 0
+    dvarBase = 0
+    halted = false
     /** Total number of opcode steps executed by this VM instance. */
-    stepCount: number = 0
+    stepCount = 0
     /** Name of the procedure currently being executed, or null when idle. */
     currentProcedureName: string | null = null
     /** Name of the most recently entered procedure (including when currently idle). */
     lastProcedureName: string | null = null
     /** Wall-clock time spent in the most recent top-level call(), in milliseconds. */
-    lastCallTimeMs: number = 0
+    lastCallTimeMs = 0
     /** Cumulative wall-clock time spent in all top-level call() invocations, in milliseconds. */
-    totalCallTimeMs: number = 0
+    totalCallTimeMs = 0
     /** Number of top-level call() invocations that exceeded the configured slow-call threshold. */
-    slowCallCount: number = 0
+    slowCallCount = 0
     /** Wall-clock time of the most recent top-level call() that exceeded the slow-call threshold, in milliseconds. */
-    lastSlowCallTimeMs: number = 0
+    lastSlowCallTimeMs = 0
     /** Deterministic FIFO log of unsupported VM operations encountered during execution. */
     unsupportedOperations: UnsupportedVmOperation[] = []
     /** Name of the active top-level caller procedure for the current VM execution chain. */
@@ -91,15 +91,15 @@ export class ScriptVM {
     }
 
     dis(): string {
-        var offset = this.script.offset
-        var disassembly = transpile(this.intfile, this.script)
+        const offset = this.script.offset
+        const disassembly = transpile(this.intfile, this.script)
         this.script.seek(offset)
         return disassembly
     }
 
     // call a named procedure
     call(procName: string, args: any[] = []): any {
-        var proc = this.intfile.procedures[procName]
+        const proc = this.intfile.procedures[procName]
         // console.log("CALL " + procName + " @ " + proc.offset + " from " + this.scriptObj.scriptName)
         if (!proc) {
             // Unknown procedure — log a warning and return undefined gracefully
@@ -122,7 +122,7 @@ export class ScriptVM {
         const shouldPushTopLevelReturnSentinel = previousProcedure !== null || previousRetDepth === 0
 
         this.currentProcedureName = procName
-        if (isTopLevel) this.topLevelCallerProcedureName = procName
+        if (isTopLevel) {this.topLevelCallerProcedureName = procName}
         this.lastProcedureName = procName
 
         // Args are passed in reverse order (stack-based calling convention).
@@ -130,7 +130,7 @@ export class ScriptVM {
         reversedArgs.forEach((arg) => this.push(arg))
         this.push(args.length)
 
-        if (shouldPushTopLevelReturnSentinel) this.retStack.push(-1)
+        if (shouldPushTopLevelReturnSentinel) {this.retStack.push(-1)}
 
         const t0 = isTopLevel ? performance.now() : 0
         let completed = false
@@ -172,15 +172,15 @@ export class ScriptVM {
     }
 
     step(): boolean {
-        if (this.halted) return false
+        if (this.halted) {return false}
 
         // fetch op
-        var pc = this.pc
+        const pc = this.pc
         this.script.seek(pc)
-        var opcode = this.script.read16()
+        const opcode = this.script.read16()
 
         // dispatch based on opMap
-        if (opMap[opcode] !== undefined) opMap[opcode].call(this)
+        if (opMap[opcode] !== undefined) {opMap[opcode].call(this)}
         else {
             this.recordUnsupportedOpcode(opcode, this.pc)
             const unsupportedOpcodeError = new Error(
@@ -196,14 +196,14 @@ export class ScriptVM {
                 console.log('disassembly:')
                 console.log(transpile(this.intfile, this.script))
             }
-            if (Config.engine.failOnUnknownVmOpcode) throw unsupportedOpcodeError
+            if (Config.engine.failOnUnknownVmOpcode) {throw unsupportedOpcodeError}
             return false
         }
 
         this.stepCount++
         if (this.pc === pc)
             // PC wasn't explicitly set, let's advance it to the current file offset
-            this.pc = this.script.offset
+            {this.pc = this.script.offset}
         return true
     }
 

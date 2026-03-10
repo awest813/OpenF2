@@ -105,7 +105,7 @@ describe('Phase 73-B — BLK-101: walkTo() null position guard', () => {
             canRun: () => false,
             walkTo(target: any, running?: boolean): boolean {
                 // Re-use the actual implementation logic via import below
-                if (!this.position) return false
+                if (!this.position) {return false}
                 return false
             },
         }

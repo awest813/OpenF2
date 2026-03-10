@@ -17,8 +17,8 @@ function isGameplayPanelName(panelName: string): panelName is GameplayPanelName 
  * `Config.ui.forceUI2OnlyGameplayPanels` is enabled.
  */
 export function assertNoLegacyGameplayPanelFallback(panelName: string, caller: string): void {
-    if (!Config.ui.forceUI2OnlyGameplayPanels) return
-    if (!isGameplayPanelName(panelName)) return
+    if (!Config.ui.forceUI2OnlyGameplayPanels) {return}
+    if (!isGameplayPanelName(panelName)) {return}
 
     const message =
         `[UI2_ONLY_GAMEPLAY_PANELS] Legacy gameplay panel fallback blocked ` +

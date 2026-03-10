@@ -40,17 +40,17 @@ function checkPrereqs(
     stats: StatsComponent,
     skills: SkillsComponent,
 ): boolean {
-    if (p.minLevel !== undefined && stats.level < p.minLevel) return false
-    if (p.minStrength !== undefined && stats.strength + stats.strengthMod < p.minStrength) return false
-    if (p.minPerception !== undefined && stats.perception + stats.perceptionMod < p.minPerception) return false
-    if (p.minEndurance !== undefined && stats.endurance + stats.enduranceMod < p.minEndurance) return false
-    if (p.minCharisma !== undefined && stats.charisma + stats.charismaMod < p.minCharisma) return false
-    if (p.minIntelligence !== undefined && stats.intelligence + stats.intelligenceMod < p.minIntelligence) return false
-    if (p.minAgility !== undefined && stats.agility + stats.agilityMod < p.minAgility) return false
-    if (p.minLuck !== undefined && stats.luck + stats.luckMod < p.minLuck) return false
+    if (p.minLevel !== undefined && stats.level < p.minLevel) {return false}
+    if (p.minStrength !== undefined && stats.strength + stats.strengthMod < p.minStrength) {return false}
+    if (p.minPerception !== undefined && stats.perception + stats.perceptionMod < p.minPerception) {return false}
+    if (p.minEndurance !== undefined && stats.endurance + stats.enduranceMod < p.minEndurance) {return false}
+    if (p.minCharisma !== undefined && stats.charisma + stats.charismaMod < p.minCharisma) {return false}
+    if (p.minIntelligence !== undefined && stats.intelligence + stats.intelligenceMod < p.minIntelligence) {return false}
+    if (p.minAgility !== undefined && stats.agility + stats.agilityMod < p.minAgility) {return false}
+    if (p.minLuck !== undefined && stats.luck + stats.luckMod < p.minLuck) {return false}
     if (p.minSkill !== undefined) {
         const val = (skills as any)[p.minSkill.skill] as number
-        if (val < p.minSkill.value) return false
+        if (val < p.minSkill.value) {return false}
     }
     return true
 }
@@ -61,7 +61,7 @@ export function isPerkAvailable(
     skills: SkillsComponent,
     currentRank: number,
 ): boolean {
-    if (currentRank >= perk.ranks) return false
+    if (currentRank >= perk.ranks) {return false}
     return checkPrereqs(perk.prerequisites, stats, skills)
 }
 
@@ -213,10 +213,10 @@ export function grantPerk(
     currentPerks: Map<number, number>,
 ): boolean {
     const perk = PERK_MAP.get(perkId)
-    if (!perk) return false
+    if (!perk) {return false}
 
     const rank = currentPerks.get(perkId) ?? 0
-    if (!isPerkAvailable(perk, stats, skills, rank)) return false
+    if (!isPerkAvailable(perk, stats, skills, rank)) {return false}
 
     const newRank = rank + 1
     currentPerks.set(perkId, newRank)

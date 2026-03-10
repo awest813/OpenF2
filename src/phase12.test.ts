@@ -87,9 +87,9 @@ function gsayMessageImpl(
     _reaction: number
 ): void {
     const store = msgStore[msgList]
-    if (!store) return
+    if (!store) {return}
     const msg = store[msgID] ?? null
-    if (msg === null) return
+    if (msg === null) {return}
     replyLog.push(msg)
 }
 
@@ -464,9 +464,9 @@ interface SimpleSaveState {
         serialize: () => []
         deserialize: () => void
     }
-    dirtyMapCache: {}
+    dirtyMapCache: Record<string, never>
     questLog: QuestLog
-    reputation: { serialize: () => { karma: number; reputations: {} } }
+    reputation: { serialize: () => { karma: number; reputations: Record<string, never> } }
 }
 
 function makeSimpleState(mapName: string, flags: Record<string, boolean | string | number> = {}): SimpleSaveState {
@@ -564,13 +564,13 @@ interface FakeScriptProcCtx {
 }
 
 function runMapExitProc(script: FakeScriptProcCtx | null, mapID: number): void {
-    if (!script?.map_exit_p_proc) return
+    if (!script?.map_exit_p_proc) {return}
     script.cur_map_index = mapID
     script.map_exit_p_proc()
 }
 
 function runLookAtProc(script: FakeScriptProcCtx | null, mapID: number): boolean | null {
-    if (!script?.look_at_p_proc) return null
+    if (!script?.look_at_p_proc) {return null}
     script.cur_map_index = mapID
     script._didOverride = false
     script.look_at_p_proc()
@@ -578,7 +578,7 @@ function runLookAtProc(script: FakeScriptProcCtx | null, mapID: number): boolean
 }
 
 function runDescriptionProc(script: FakeScriptProcCtx | null, mapID: number): boolean | null {
-    if (!script?.description_p_proc) return null
+    if (!script?.description_p_proc) {return null}
     script.cur_map_index = mapID
     script._didOverride = false
     script.description_p_proc()

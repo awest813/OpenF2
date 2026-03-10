@@ -47,14 +47,14 @@ export class NullAudioEngine implements AudioEngine {
 
 export class HTMLAudioEngine implements AudioEngine {
     //lastSfxTime: number = 0
-    nextSfxTime: number = 0
+    nextSfxTime = 0
     nextSfx: string | null = null
     musicAudio: HTMLAudioElement | null = null
 
     /** Current music volume (0.0–1.0). */
-    private musicVolume: number = 1.0
+    private musicVolume = 1.0
     /** Current SFX volume (0.0–1.0). */
-    private sfxVolume: number = 1.0
+    private sfxVolume = 1.0
 
     /**
      * Ordered list of audio format extensions to probe when loading a sound.
@@ -67,7 +67,7 @@ export class HTMLAudioEngine implements AudioEngine {
 
     setMusicVolume(vol: number): void {
         this.musicVolume = Math.max(0, Math.min(1, vol))
-        if (this.musicAudio) this.musicAudio.volume = this.musicVolume
+        if (this.musicAudio) {this.musicAudio.volume = this.musicVolume}
     }
 
     setSfxVolume(vol: number): void {
@@ -76,7 +76,7 @@ export class HTMLAudioEngine implements AudioEngine {
 
     playSfx(sfx: string): void {
         const sound = this.playSound('sfx/' + sfx)
-        if (sound) sound.volume = this.sfxVolume
+        if (sound) {sound.volume = this.sfxVolume}
     }
 
     playMusic(music: string): void {
@@ -104,7 +104,7 @@ export class HTMLAudioEngine implements AudioEngine {
     }
 
     stopMusic(): void {
-        if (this.musicAudio) this.musicAudio.pause()
+        if (this.musicAudio) {this.musicAudio.pause()}
     }
 
     stopAll(): void {
@@ -119,7 +119,7 @@ export class HTMLAudioEngine implements AudioEngine {
      * a Node test environment where `Audio` is unavailable).
      */
     private _pickFormat(): string {
-        if (typeof Audio === 'undefined') return 'wav'
+        if (typeof Audio === 'undefined') {return 'wav'}
         const probe = new Audio()
         const mimeMap: Record<string, string> = {
             wav: 'audio/wav',
@@ -128,7 +128,7 @@ export class HTMLAudioEngine implements AudioEngine {
         }
         for (const ext of HTMLAudioEngine.FORMAT_CANDIDATES) {
             const support = probe.canPlayType(mimeMap[ext] ?? '')
-            if (support === 'probably' || support === 'maybe') return ext
+            if (support === 'probably' || support === 'maybe') {return ext}
         }
         return 'wav'
     }
@@ -136,20 +136,20 @@ export class HTMLAudioEngine implements AudioEngine {
     rollNextSfx(): string {
         // Randomly obtain the next map sfx
         const curMapInfo = getCurrentMapInfo()
-        if (!curMapInfo) return ''
+        if (!curMapInfo) {return ''}
 
         const sfx = curMapInfo.ambientSfx
-        if (!sfx || sfx.length === 0) return ''
+        if (!sfx || sfx.length === 0) {return ''}
 
         const sumFreqs = sfx.reduce((sum: number, x: [string, number]) => sum + x[1], 0)
-        if (sumFreqs <= 0) return ''
+        if (sumFreqs <= 0) {return ''}
 
         let roll = getRandomInt(0, sumFreqs)
 
-        for (var i = 0; i < sfx.length; i++) {
-            var freq = sfx[i][1]
+        for (let i = 0; i < sfx.length; i++) {
+            const freq = sfx[i][1]
 
-            if (roll < freq) return sfx[i][0]
+            if (roll < freq) {return sfx[i][0]}
 
             roll -= freq
         }
@@ -159,11 +159,11 @@ export class HTMLAudioEngine implements AudioEngine {
     }
 
     tick(): void {
-        var time = window.performance.now()
+        const time = window.performance.now()
 
         if (!this.nextSfx) {
             this.nextSfx = this.rollNextSfx()
-            if (!this.nextSfx) return
+            if (!this.nextSfx) {return}
         }
 
         if (time >= this.nextSfxTime) {

@@ -64,7 +64,7 @@ describe('Phase 59-A — BLK-056: giq_option null-player guard', () => {
                 expect(msg).not.toContain('player')
             }
         } finally {
-            ;(globalState as any).player = savedPlayer
+            (globalState as any).player = savedPlayer
         }
     })
 
@@ -81,7 +81,7 @@ describe('Phase 59-A — BLK-056: giq_option null-player guard', () => {
                 expect(msg).not.toContain('player.getStat')
             }
         } finally {
-            ;(globalState as any).player = savedPlayer
+            (globalState as any).player = savedPlayer
         }
     })
 })
@@ -201,7 +201,7 @@ describe('Phase 59-D — sfall opcodes 0x81F8–0x81FF', () => {
         try {
             expect(script.get_total_kills_sfall()).toBe(0)
         } finally {
-            ;(globalState as any).critterKillCounts = saved
+            (globalState as any).critterKillCounts = saved
         }
     })
 
@@ -211,7 +211,7 @@ describe('Phase 59-D — sfall opcodes 0x81F8–0x81FF', () => {
         try {
             expect(script.get_total_kills_sfall()).toBe(10)
         } finally {
-            ;(globalState as any).critterKillCounts = saved
+            (globalState as any).critterKillCounts = saved
         }
     })
 

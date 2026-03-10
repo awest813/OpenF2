@@ -41,9 +41,9 @@ export class Player extends Critter {
     gender = 'male'
     leftHand = <WeaponObj>createObjectWithPID(9)
 
-    xp: number = 0
-    level: number = 1
-    karma: number = 0
+    xp = 0
+    level = 1
+    karma = 0
 
     /**
      * Player-character state flags (bitfield).
@@ -57,7 +57,7 @@ export class Player extends Critter {
      * Set/cleared by pc_flag_on(flag) / pc_flag_off(flag) scripting calls.
      * Persisted in save schema v12+.
      */
-    pcFlags: number = 0
+    pcFlags = 0
 
     /**
      * Currently active weapon hand (BLK-034).
@@ -70,7 +70,7 @@ export class Player extends Critter {
      * Updated when inventory-hand commands switch the active slot.
      * Persisted in save schema v13+.
      */
-    activeHand: number = 0
+    activeHand = 0
 
     inventory = [createObjectWithPID(41).setAmount(1337)]
 
@@ -91,20 +91,20 @@ export class Player extends Critter {
                    ], stats: null, skills: null, tempChanges: null}
     */
 
-    move(position: Point, curIdx?: number, signalEvents: boolean = true): boolean {
-        if (!super.move(position, curIdx, signalEvents)) return false
+    move(position: Point, curIdx?: number, signalEvents = true): boolean {
+        if (!super.move(position, curIdx, signalEvents)) {return false}
 
-        if (signalEvents) Events.emit('playerMoved', position)
+        if (signalEvents) {Events.emit('playerMoved', position)}
 
         // check if the player has entered an exit grid
-        var objs = globalState.gMap.objectsAtPosition(this.position)
-        for (var i = 0; i < objs.length; i++) {
+        const objs = globalState.gMap.objectsAtPosition(this.position)
+        for (let i = 0; i < objs.length; i++) {
             if (objs[i].type === 'misc' && objs[i].extra && objs[i].extra.exitMapID !== undefined) {
                 // walking on an exit grid
                 // todo: exit grids are likely multi-hex (maybe have a set?)
-                var exitMapID = objs[i].extra.exitMapID
-                var startingPosition = fromTileNum(objs[i].extra.startingPosition)
-                var startingElevation = objs[i].extra.startingElevation
+                const exitMapID = objs[i].extra.exitMapID
+                const startingPosition = fromTileNum(objs[i].extra.startingPosition)
+                const startingElevation = objs[i].extra.startingElevation
                 this.clearAnim()
 
                 if (startingPosition.x === -1 || startingPosition.y === -1 || exitMapID < 0) {
@@ -128,7 +128,7 @@ export class Player extends Critter {
                         globalState.gMap.changeElevation(startingElevation, true)
                         globalState.player.move(startingPosition)
                         centerCamera(globalState.player.position)
-                    } else globalState.gMap.loadMapByID(exitMapID, startingPosition, startingElevation)
+                    } else {globalState.gMap.loadMapByID(exitMapID, startingPosition, startingElevation)}
                 }
 
                 return false

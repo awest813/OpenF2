@@ -64,7 +64,7 @@ export class BitmapFontRenderer {
 
     /** Width in pixels of a single character, or 0 if the char is unknown. */
     charWidth(ch: string): number {
-        if (!this.font) return 8  // monospace fallback
+        if (!this.font) {return 8}  // monospace fallback
         const code = ch.charCodeAt(0)
         const sym = this.font.symbols[code]
         return sym ? sym.width + (this.font.spacing ?? 1) : 0
@@ -72,9 +72,9 @@ export class BitmapFontRenderer {
 
     /** Total pixel width of a string. */
     measureText(text: string): number {
-        if (!this.font) return text.length * 8
+        if (!this.font) {return text.length * 8}
         let w = 0
-        for (const ch of text) w += this.charWidth(ch)
+        for (const ch of text) {w += this.charWidth(ch)}
         return w
     }
 
@@ -190,9 +190,9 @@ export const FALLOUT_DARK_GRAY: UIColor = { r: 40, g: 40, b: 40, a: 255 }
 export abstract class UIPanel {
     readonly name: string
     bounds: Rect
-    visible: boolean = false
+    visible = false
     /** Z-order: higher values render on top. */
-    zOrder: number = 0
+    zOrder = 0
 
     constructor(name: string, bounds: Rect) {
         this.name = name
@@ -210,8 +210,8 @@ export abstract class UIPanel {
     }
 
     toggle(): void {
-        if (this.visible) this.hide()
-        else this.show()
+        if (this.visible) {this.hide()}
+        else {this.show()}
     }
 
     /** Override to react when panel becomes visible. */
@@ -263,7 +263,7 @@ export class UIManagerImpl {
     constructor(width: number, height: number) {
         this.offscreen = new OffscreenCanvas(width, height)
         const ctx = this.offscreen.getContext('2d')
-        if (!ctx) throw new Error('UIManager: could not get 2D context')
+        if (!ctx) {throw new Error('UIManager: could not get 2D context')}
         this.ctx = ctx
     }
 
@@ -274,7 +274,7 @@ export class UIManagerImpl {
 
     get<T extends UIPanel>(name: string): T {
         const p = this.panels.find((p) => p.name === name)
-        if (!p) throw new Error(`UIPanel "${name}" not registered`)
+        if (!p) {throw new Error(`UIPanel "${name}" not registered`)}
         return p as T
     }
 
@@ -287,7 +287,7 @@ export class UIManagerImpl {
     render(): OffscreenCanvas {
         this.ctx.clearRect(0, 0, this.offscreen.width, this.offscreen.height)
         for (const panel of this.panels) {
-            if (!panel.visible) continue
+            if (!panel.visible) {continue}
             this.ctx.save()
             this.ctx.translate(panel.bounds.x, panel.bounds.y)
             panel.render(this.ctx)
@@ -301,7 +301,7 @@ export class UIManagerImpl {
      * Call from the render loop when Config.ui.showFonts is enabled.
      */
     renderFontDebug(): void {
-        if (!this.fontRenderer) return
+        if (!this.fontRenderer) {return}
         const sample = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%'
         this.fontRenderer.drawText(this.ctx, sample, 4, 4, FALLOUT_GREEN)
     }
@@ -309,7 +309,7 @@ export class UIManagerImpl {
     handleMouseDown(x: number, y: number, button: 'l' | 'r'): boolean {
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) continue
+            if (!panel.visible) {continue}
             if (panel.containsPoint(x, y)) {
                 if (panel.onMouseDown(x - panel.bounds.x, y - panel.bounds.y, button)) {
                     return true
@@ -322,7 +322,7 @@ export class UIManagerImpl {
     handleMouseMove(x: number, y: number): void {
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) continue
+            if (!panel.visible) {continue}
             if (panel.containsPoint(x, y)) {
                 panel.onMouseMove(x - panel.bounds.x, y - panel.bounds.y)
                 return
@@ -333,8 +333,8 @@ export class UIManagerImpl {
     handleKeyDown(key: string): boolean {
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) continue
-            if (panel.onKeyDown(key)) return true
+            if (!panel.visible) {continue}
+            if (panel.onKeyDown(key)) {return true}
         }
         return false
     }

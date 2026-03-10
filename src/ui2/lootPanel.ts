@@ -235,7 +235,7 @@ export class LootPanel extends UIPanel {
         if (key === 'ArrowDown' || key === 'ArrowUp') {
             const side = this._selectedSide ?? 'container'
             const items = side === 'player' ? this.playerInventory : this.containerInventory
-            if (items.length === 0) return true
+            if (items.length === 0) {return true}
             const delta = key === 'ArrowDown' ? 1 : -1
             const next  = this._selectedIndex < 0
                 ? (delta > 0 ? 0 : items.length - 1)
@@ -252,7 +252,7 @@ export class LootPanel extends UIPanel {
                 // Keep selection within the (now shorter) source list.
                 const remaining = this._selectedSide === 'player' ? this.playerInventory : this.containerInventory
                 this._selectedIndex = Math.min(this._selectedIndex, remaining.length - 1)
-                if (this._selectedIndex < 0) this._selectedSide = null
+                if (this._selectedIndex < 0) {this._selectedSide = null}
             }
             return true
         }
@@ -267,7 +267,7 @@ export class LootPanel extends UIPanel {
         const from = fromSide === 'player' ? this.playerInventory : this.containerInventory
         const to   = toSide   === 'player' ? this.playerInventory : this.containerInventory
         const item = from[fromIdx]
-        if (!item) return
+        if (!item) {return}
 
         from.splice(fromIdx, 1)
         const existing = to.find(i => i.name === item.name)
@@ -320,7 +320,7 @@ function strokeRect(
     ctx: OffscreenCanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     color: UIColor,
-    lineWidth: number = 1,
+    lineWidth = 1,
 ): void {
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth

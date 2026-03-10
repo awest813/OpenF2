@@ -62,7 +62,7 @@ export class SpriteBatch {
 
     /** Open a new frame.  Must be called before draw(). */
     begin(): void {
-        if (this._open) throw new Error('SpriteBatch.begin() called while batch is already open')
+        if (this._open) {throw new Error('SpriteBatch.begin() called while batch is already open')}
         this._commands.length = 0
         this._beginTime = performance.now()
         this._open = true
@@ -85,10 +85,10 @@ export class SpriteBatch {
         y: number,
         width: number,
         height: number,
-        frame: number = 0,
+        frame = 0,
         layer: DrawLayer = DrawLayer.Object,
     ): void {
-        if (!this._open) throw new Error('SpriteBatch.draw() called outside begin/end block')
+        if (!this._open) {throw new Error('SpriteBatch.draw() called outside begin/end block')}
         const cmd = this._commandPool.pop()
         if (cmd) {
             cmd.textureKey = textureKey
@@ -114,12 +114,12 @@ export class SpriteBatch {
      * together, while minimising per-layer texture switches.
      */
     end(): DrawCommand[] {
-        if (!this._open) throw new Error('SpriteBatch.end() called without a matching begin()')
+        if (!this._open) {throw new Error('SpriteBatch.end() called without a matching begin()')}
         this._open = false
 
         // Sort by layer first, then by textureKey within each layer.
         this._commands.sort((a, b) => {
-            if (a.layer !== b.layer) return a.layer - b.layer
+            if (a.layer !== b.layer) {return a.layer - b.layer}
             return a.textureKey < b.textureKey ? -1 : a.textureKey > b.textureKey ? 1 : 0
         })
 

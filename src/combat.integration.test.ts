@@ -91,8 +91,8 @@ describe('called-shot combat + UI integration', () => {
             equippedWeapon: { weapon: { weaponSkillType: 'Small Guns' } },
             getSkill: vi.fn().mockReturnValue(90),
             getStat: vi.fn((name: string) => {
-                if (name === 'PER') return 8
-                if (name === 'Critical Chance') return 5
+                if (name === 'PER') {return 8}
+                if (name === 'Critical Chance') {return 5}
                 return 0
             }),
             isPlayer: true,
@@ -101,7 +101,7 @@ describe('called-shot combat + UI integration', () => {
 
         const target: any = {
             getStat: vi.fn((name: string) => {
-                if (name === 'AC') return 15
+                if (name === 'AC') {return 15}
                 return 0
             }),
             position: { x: 1, y: 1 },
@@ -178,8 +178,8 @@ describe('hit-chance fidelity regression tests', () => {
             equippedWeapon: { weapon: { weaponSkillType: 'Small Guns' } },
             getSkill: vi.fn().mockReturnValue(80),
             getStat: vi.fn((name: string) => {
-                if (name === 'PER') return 8
-                if (name === 'Critical Chance') return 5
+                if (name === 'PER') {return 8}
+                if (name === 'Critical Chance') {return 5}
                 return 0
             }),
             isPlayer: false,
@@ -388,7 +388,7 @@ describe('AP spend correctness regression tests', () => {
             equippedWeapon: { weapon: { weaponSkillType: 'Small Guns' } },
             getSkill: vi.fn().mockReturnValue(70),
             getStat: vi.fn((name: string) => {
-                if (name === 'Critical Chance') return 5
+                if (name === 'Critical Chance') {return 5}
                 return 0
             }),
             position: { x: 0, y: 0 },

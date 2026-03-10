@@ -28,13 +28,13 @@ import { applyEncounterCritterLoadout } from './encounterLoadout.js'
 
 // World Map system
 
-export module Worldmap {
+export namespace Worldmap {
     let worldmap: Worldmap = null
     let worldmapPlayer: WorldmapPlayer = null
     let $worldmap: HTMLElement | null = null
     let $worldmapPlayer: HTMLElement | null = null
     let $worldmapTarget: HTMLElement | null = null
-    let worldmapTimer: number = -1
+    let worldmapTimer = -1
     let lastEncounterCheck = 0
     let isEncounterTransitionPending = false
 
@@ -203,7 +203,7 @@ export module Worldmap {
 
         function parseEncounterReference(data: string): any {
             // "(4-8) ncr_masters_army ambush player"
-            if (data === 'special1') return { type: 'special' }
+            if (data === 'special1') {return { type: 'special' }}
 
             const party = '(?:\\((\\d+)-(\\d+)\\) ([a-z0-9_]+))'
             const re = party + ' ?(?:(ambush player)|(fighting) ' + party + ')?'
@@ -239,14 +239,14 @@ export module Worldmap {
 
             for (; i < s.length; i++) {
                 const kv = s[i].split(':')
-                if (kv.length === 2) enc[kv[0].toLowerCase()] = kv[1].toLowerCase()
-                if (s[i].toLowerCase().trim() === 'special') isSpecial = true
+                if (kv.length === 2) {enc[kv[0].toLowerCase()] = kv[1].toLowerCase()}
+                if (s[i].toLowerCase().trim() === 'special') {isSpecial = true}
             }
 
             let cond: string | null = s[i - 1].toLowerCase().trim()
             if (cond.indexOf('if') !== 0)
                 // conditions start with "if"
-                cond = null
+                {cond = null}
 
             return {
                 chance: parseInt(enc.chance), // integeral percentage
@@ -263,7 +263,7 @@ export module Worldmap {
             const m = data.match(/(?:\((\d+)-(\d+)\))?(\d+)(?:\((wielded)\))?/)
 
             let range = null
-            if (m[1] !== undefined) range = { start: parseInt(m[1]), end: parseInt(m[2]) }
+            if (m[1] !== undefined) {range = { start: parseInt(m[1]), end: parseInt(m[2]) }}
 
             const item = { range: range, pid: parseInt(m[3]), wielded: m[4] !== undefined }
 
@@ -280,7 +280,7 @@ export module Worldmap {
                 const kv = s[i].split(':').map((x) => x.toLowerCase().trim())
                 if (kv[0] === 'item') {
                     items.push(parseEncounterItem(kv[1]))
-                } else if (kv.length === 2) enc[kv[0]] = kv[1]
+                } else if (kv.length === 2) {enc[kv[0]] = kv[1]}
             }
 
             const isDead = s[0] === 'dead'
@@ -288,7 +288,7 @@ export module Worldmap {
             let cond = s[i - 1].toLowerCase().trim()
             if (cond.indexOf('if') !== 0)
                 // conditions start with "if"
-                cond = null
+                {cond = null}
 
             return {
                 ratio: enc.ratio ? parseInt(enc.ratio) : null,
@@ -306,7 +306,7 @@ export module Worldmap {
             const out: { [key: string]: string | number } = {}
             for (let i = 0; i < items.length; i++) {
                 const s: any = items[i].split(':')
-                if (isNumeric(s[1])) s[1] = parseFloat(s[1])
+                if (isNumeric(s[1])) {s[1] = parseFloat(s[1])}
                 out[s[0].toLowerCase()] = s[1]
             }
             return out
@@ -317,7 +317,7 @@ export module Worldmap {
         const encounterGroups: { [groupName: string]: EncounterGroup } = {}
 
         const squares: Square[][] = new Array(NUM_SQUARES_X) // (4*7) x (5*6) array (i.e., number of tiles -- 840)
-        for (let i = 0; i < NUM_SQUARES_X; i++) squares[i] = new Array(NUM_SQUARES_Y)
+        for (let i = 0; i < NUM_SQUARES_X; i++) {squares[i] = new Array(NUM_SQUARES_Y)}
 
         // console.log(ini)
 
@@ -331,7 +331,7 @@ export module Worldmap {
 
                 for (const position in ini[key]) {
                     const pos = position.match(/(\d)_(\d)/)
-                    if (pos === null) continue
+                    if (pos === null) {continue}
 
                     const x = tileX * 7 + parseInt(pos[1])
                     const y = tileY * 6 + parseInt(pos[2])
@@ -406,7 +406,7 @@ export module Worldmap {
      *   2 = MARK_STATE_VISITED  — same as KNOWN for display purposes
      */
     export function markAreaKnown(areaID: number, markState: number): void {
-        if (!globalState.mapAreas) return
+        if (!globalState.mapAreas) {return}
         const area = globalState.mapAreas[areaID]
         if (!area) {
             console.warn('markAreaKnown: unknown area id ' + areaID)
@@ -428,7 +428,7 @@ export module Worldmap {
         globalState.mapAreaStates[areaID] = true
 
         // Render the area on the world map DOM (mirrors the init() rendering logic)
-        if ($worldmap === null) return
+        if ($worldmap === null) {return}
         const $area = makeEl('div', { classes: ['area'] })
         $worldmap.appendChild($area)
 
@@ -453,14 +453,14 @@ export module Worldmap {
         return { x: Math.floor(pos.x / grid.cellSize), y: Math.floor(pos.y / grid.cellSize) }
     }
 
-    function setSquareStateAt(squarePos: Point, newState: number, seeAdjacent: boolean = true): void {
+    function setSquareStateAt(squarePos: Point, newState: number, seeAdjacent = true): void {
         const grid = getGridConfig()
-        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) return
+        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {return}
 
         const oldState = worldmap.squares[squarePos.x][squarePos.y].state
         worldmap.squares[squarePos.x][squarePos.y].state = newState
 
-        if (oldState === WORLDMAP_DISCOVERED && newState === WORLDMAP_SEEN) return
+        if (oldState === WORLDMAP_DISCOVERED && newState === WORLDMAP_SEEN) {return}
 
         // console.log( worldmap.squares[squarePos.x][squarePos.y].fillType )
 
@@ -480,7 +480,7 @@ export module Worldmap {
 
         if (seeAdjacent === true) {
             setSquareStateAt({ x: squarePos.x - 1, y: squarePos.y }, WORLDMAP_SEEN, false)
-            if (worldmap.squares[squarePos.x][squarePos.y].fillType === 'fill_w') return // only fill the left tile
+            if (worldmap.squares[squarePos.x][squarePos.y].fillType === 'fill_w') {return} // only fill the left tile
             setSquareStateAt({ x: squarePos.x + 1, y: squarePos.y }, WORLDMAP_SEEN, false)
 
             setSquareStateAt({ x: squarePos.x, y: squarePos.y - 1 }, WORLDMAP_SEEN, false)
@@ -519,17 +519,17 @@ export module Worldmap {
             })
 
             // player was ambushed, so begin combat
-            if (enc.encounterType === 'ambush' && Config.engine.doCombat === true) Combat.start()
+            if (enc.encounterType === 'ambush' && Config.engine.doCombat === true) {Combat.start()}
         })
     }
 
     export function doEncounter(): void {
         const squarePos = positionToSquare(worldmapPlayer)
-        if (!squarePos) return
+        if (!squarePos) {return}
         const square = worldmap.squares[squarePos.x]?.[squarePos.y]
-        if (!square) return
+        if (!square) {return}
         const encTable = worldmap.encounterTables[square.encounterType]
-        if (!encTable) return
+        if (!encTable) {return}
 
         console.log('enc table: %s -> %o', square.encounterType, encTable)
         execEncounter(encTable)
@@ -537,30 +537,30 @@ export module Worldmap {
 
     export function didEncounter(): boolean {
         const squarePos = positionToSquare(worldmapPlayer)
-        if (!squarePos) return false
+        if (!squarePos) {return false}
         const grid = getGridConfig()
-        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) return false
+        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {return false}
         const square = worldmap.squares[squarePos.x][squarePos.y]
-        if (!square) return false
+        if (!square) {return false}
         const tableRate = worldmap.encounterRates[square.frequency]
         let encRate = tableRate === undefined ? encounterRateForFrequency(square.frequency) : tableRate
-        if (!Number.isFinite(encRate)) return false
+        if (!Number.isFinite(encRate)) {return false}
 
         //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
 
         if (encRate <= 0)
             // 0% or negative encounter rate (none)
-            return false
+            {return false}
         else if (encRate === 100)
             // 100% encounter rate (forced)
-            return true
+            {return true}
         else {
             // Adjust for difficulty, then clamp to [1, 99] so the modifier can
             // never force an encounter (100+) or make one impossible (<=0).
             if (Config.engine.encounterDifficulty === 'easy')
-                encRate -= Math.floor(encRate / 15)
+                {encRate -= Math.floor(encRate / 15)}
             else if (Config.engine.encounterDifficulty === 'hard')
-                encRate += Math.floor(encRate / 15)
+                {encRate += Math.floor(encRate / 15)}
 
             encRate = Math.max(MIN_ENCOUNTER_RATE, Math.min(MAX_ENCOUNTER_RATE, encRate))
 
@@ -578,8 +578,8 @@ export module Worldmap {
 
 
     function setWorldmapInteractionLocked(locked: boolean): void {
-        if ($worldmap) $worldmap.style.pointerEvents = locked ? 'none' : 'auto'
-        if ($worldmapTarget) $worldmapTarget.style.pointerEvents = locked ? 'none' : 'auto'
+        if ($worldmap) {$worldmap.style.pointerEvents = locked ? 'none' : 'auto'}
+        if ($worldmapTarget) {$worldmapTarget.style.pointerEvents = locked ? 'none' : 'auto'}
     }
 
     function centerWorldmapTarget(x: number, y: number): void {
@@ -612,12 +612,12 @@ export module Worldmap {
         isEncounterTransitionPending = false
         setWorldmapInteractionLocked(false)
 
-        if (!globalState.mapAreas) globalState.mapAreas = loadAreas()
+        if (!globalState.mapAreas) {globalState.mapAreas = loadAreas()}
 
         // Apply save-loaded discovery overrides (if any) so map visibility is
         // stable across save/load and consistent with METARULE_IS_AREA_KNOWN.
         for (const areaID in globalState.mapAreaStates) {
-            if (!globalState.mapAreas[areaID]) continue
+            if (!globalState.mapAreas[areaID]) {continue}
             globalState.mapAreas[areaID].state = globalState.mapAreaStates[areaID] === true
         }
 
@@ -626,7 +626,7 @@ export module Worldmap {
         globalState.markAreaKnown = markAreaKnown
 
         $worldmap.onclick = function (this: HTMLElement, e: MouseEvent) {
-            if (isEncounterTransitionPending) return
+            if (isEncounterTransitionPending) {return}
             // Calculate viewport-relative offset
             const box = this.getBoundingClientRect()
             const offsetLeft = box.left + window.pageXOffset
@@ -655,7 +655,7 @@ export module Worldmap {
         }
 
         $worldmapTarget.onclick = function (e: MouseEvent) {
-            if (isEncounterTransitionPending) return
+            if (isEncounterTransitionPending) {return}
             const area = withinArea(worldmapPlayer)
             if (area !== null) {
                 // we're on a hotspot, visit the area map
@@ -668,7 +668,7 @@ export module Worldmap {
 
         for (const key in globalState.mapAreas) {
             const area = globalState.mapAreas[key]
-            if (area.state !== true) continue
+            if (area.state !== true) {continue}
 
             const $area = makeEl('div', { classes: ['area'] })
             $worldmap.appendChild($area)
@@ -701,9 +701,9 @@ export module Worldmap {
         for (let x = 0; x < columns; x++) {
             for (let y = 0; y < rows; y++) {
                 let state: string | number = worldmap.squares[x][y].state
-                if (state === WORLDMAP_UNDISCOVERED) state = 'undiscovered'
-                else if (state === WORLDMAP_DISCOVERED) state = 'discovered'
-                else if (state === WORLDMAP_SEEN) state = 'seen'
+                if (state === WORLDMAP_UNDISCOVERED) {state = 'undiscovered'}
+                else if (state === WORLDMAP_DISCOVERED) {state = 'discovered'}
+                else if (state === WORLDMAP_SEEN) {state = 'seen'}
 
                 const $el = makeEl('div', {
                     classes: ['worldmapSquare', 'worldmapSquare-' + state],
@@ -819,7 +819,7 @@ export module Worldmap {
             $worldmap.scrollLeft = sx
             $worldmap.scrollTop = sy
 
-            if (currentSquare.state !== WORLDMAP_DISCOVERED) setSquareStateAt(squarePos, WORLDMAP_DISCOVERED)
+            if (currentSquare.state !== WORLDMAP_DISCOVERED) {setSquareStateAt(squarePos, WORLDMAP_DISCOVERED)}
 
             // check for encounters
             const time = window.performance.now()

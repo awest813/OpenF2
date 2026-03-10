@@ -26,7 +26,7 @@ function getPROType(pid: number) {
 
 export function loadPRO(pid: number, pidID: number) {
     if(!globalState.proMap)
-        return null
+        {return null}
 
     // use the proto/ .lst files to look up type/pid
     const type = getPROType(pid)
@@ -56,9 +56,9 @@ export function makePID(type: number, pid: number) {
 
 function getCritterArtPath(frmPID: number) {
     console.log("FRM PID: " + frmPID)
-    var idx = (frmPID & 0x00000fff)
-    var id1 = (frmPID & 0x0000f000) >> 12
-    var id2 = (frmPID & 0x00ff0000) >> 16
+    const idx = (frmPID & 0x00000fff)
+    const id1 = (frmPID & 0x0000f000) >> 12
+    const id2 = (frmPID & 0x00ff0000) >> 16
     //var id3 = (frmPID & 0x70000000) >> 28
 
     if (id2 == 0x1b || id2 == 0x1d ||
@@ -69,7 +69,7 @@ function getCritterArtPath(frmPID: number) {
         return "art/critters/" + getLstId("art/critters/critters", idx).split(',')[0].toLowerCase() + "aa"
     }
 
-    var path = "art/critters/" + getLstId("art/critters/critters", idx).split(',')[0].toLowerCase()
+    let path = "art/critters/" + getLstId("art/critters/critters", idx).split(',')[0].toLowerCase()
 
     if(id1 >= 0x0b) {
         console.warn("getCritterArtPath: id1=0x" + id1.toString(16) + " >= 0x0b for FRM PID 0x" + frmPID.toString(16) + " — using base art")
@@ -81,22 +81,22 @@ function getCritterArtPath(frmPID: number) {
         return path + "aa"
     }
     else if(id2 === 0x24)
-        path += "ch"
+        {path += "ch"}
     else if(id2 === 0x25)
-        path += "cj"
+        {path += "cj"}
     else if(id2 >= 0x30)
-        path += 'r' + String.fromCharCode(id2 + 0x31)
+        {path += 'r' + String.fromCharCode(id2 + 0x31)}
     else if(id2 >= 0x14) {
         console.warn("getCritterArtPath: id2=0x" + id2.toString(16) + " >= 0x14 unhandled for FRM PID 0x" + frmPID.toString(16) + " — using base art")
         return path + "aa"
     }
     else if (id2 === 0x12) {
         if(id1 === 0x01)
-            path += "dm"
+            {path += "dm"}
         else if(id1 === 0x04)
-            path += "gm"
+            {path += "gm"}
         else
-            path += "as"
+            {path += "as"}
     }
     else if(id2 === 0x0d) {
         console.warn("getCritterArtPath: id2=0x0d unhandled for FRM PID 0x" + frmPID.toString(16) + " — using base art")
@@ -108,7 +108,7 @@ function getCritterArtPath(frmPID: number) {
             path += String.fromCharCode(id1 + 'c'.charCodeAt(0))
         }
         else
-            path += 'a'
+            {path += 'a'}
         path += String.fromCharCode(id2 + 'a'.charCodeAt(0))
     }
 
@@ -120,16 +120,16 @@ export function lookupInterfaceArt(idx: number) {
 }
 
 export function lookupArt(frmPID: number) {
-    var type = getPROType(frmPID)
-    var pidID = frmPID & 0xffff
+    const type = getPROType(frmPID)
+    const pidID = frmPID & 0xffff
 
     if(type === "critters")
-        return getCritterArtPath(frmPID)
+        {return getCritterArtPath(frmPID)}
 
-    var lsts: { [lst: string]: string } = {
+    const lsts: { [lst: string]: string } = {
                 "items": "art/items/items",
                 "scenery": "art/scenery/scenery", "misc": "art/misc/misc"}
-    var path = "art/" + type + "/" + getLstId(lsts[type], pidID).split('.')[0]
+    const path = "art/" + type + "/" + getLstId(lsts[type], pidID).split('.')[0]
 
     // console.log("LOOKUP ART: " + path)
     return path.toLowerCase()
