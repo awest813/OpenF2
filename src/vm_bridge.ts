@@ -1704,6 +1704,35 @@ export namespace ScriptVMBridge {
 
        // 0x82E7 — set_critter_sequence_sfall(obj, val): set critter Sequence stat.
        ,0x82E7: bridged("set_critter_sequence_sfall", 2, false) // set_critter_sequence(obj, val)
+
+       // -----------------------------------------------------------------------
+       // Phase 92 — sfall extended opcodes 0x82E8–0x82EF (critter level, age,
+       // kill-type, party count and max-level queries for arroyo end-sequence).
+       // -----------------------------------------------------------------------
+
+       // 0x82E8 — get_critter_level_sfall(obj): effective critter/player level (alias of 0x8282).
+       ,0x82E8: bridged("get_critter_level_sfall", 1) // reuses existing get_critter_level_sfall
+
+       // 0x82E9 — set_critter_level_sfall(obj, val): set critter level (alias of 0x8284).
+       ,0x82E9: bridged("set_critter_level_sfall", 2, false) // reuses existing set_critter_level_sfall
+
+       // 0x82EA — get_critter_age_sfall(obj): age field (0 if unset).
+       ,0x82EA: bridged("get_critter_age_sfall", 1) // get_critter_age(obj) → 0..∞
+
+       // 0x82EB — set_critter_age_sfall(obj, val): set critter age.
+       ,0x82EB: bridged("set_critter_age_sfall", 2, false) // set_critter_age(obj, val)
+
+       // 0x82EC — get_critter_kill_type_sfall2(obj): kill-type index (alias of 0x821C).
+       ,0x82EC: bridged("get_critter_kill_type_sfall2", 1) // get_kill_type(obj) → int
+
+       // 0x82ED — set_critter_kill_type_sfall2(obj, val): set kill-type index.
+       ,0x82ED: bridged("set_critter_kill_type_sfall2", 2, false) // set_kill_type(obj, val)
+
+       // 0x82EE — get_party_size_sfall(): current NPC party size.
+       ,0x82EE: bridged("get_party_size_sfall", 0) // → party member count
+
+       // 0x82EF — get_max_level_sfall(): engine maximum player level (99).
+       ,0x82EF: bridged("get_max_level_sfall", 0) // → 99
     }
     Object.assign(opMap, bridgeOpMap)
 

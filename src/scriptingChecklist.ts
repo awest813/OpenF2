@@ -8195,6 +8195,160 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    // BLK-185 — get_pc_stat(0) null skills guard
+    {
+        id: 'blk_185_get_pc_stat_null_skills',
+        kind: 'procedure',
+        description:
+            'BLK-185: get_pc_stat(PCSTAT_unspent_skill_points=0) guards against null ' +
+            'player.skills.  Arroyo Elder scripts call get_pc_stat(0) after the XP award; ' +
+            'when skills is null (partially-initialised player), player.skills.skillPoints ' +
+            'throws TypeError.  Mirror of BLK-174.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-186 — get_critter_skill() missing getSkill method guard
+    {
+        id: 'blk_186_get_critter_skill_no_getskill',
+        kind: 'procedure',
+        description:
+            'BLK-186: get_critter_skill() guards against critters that lack the ' +
+            'getSkill() method.  Proto-only arroyo NPC objects may be typed as critter ' +
+            'but have no SkillSet attached; calling a missing method throws TypeError.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-187 — tile_distance() non-finite tile guard
+    {
+        id: 'blk_187_tile_distance_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-187: tile_distance() guards against non-finite tile numbers.  Arroyo ' +
+            'transition scripts compute tile positions from arithmetic that can yield NaN; ' +
+            'fromTileNum(NaN) produces {x:NaN,y:NaN} and hexDistance propagates NaN ' +
+            'into all downstream proximity checks.  Returns 9999 for non-finite inputs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-188 — rm_mult_objs_from_inven() null inventory guard
+    {
+        id: 'blk_188_rm_mult_objs_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-188: rm_mult_objs_from_inven() guards against objects with no inventory ' +
+            'array.  Arroyo reward scripts call this on freshly created containers that ' +
+            'have not yet had their inventory initialised; obj.inventory.length throws ' +
+            'TypeError on undefined.  Returns 0 as a no-op.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-189 — kill_critter() null object guard
+    {
+        id: 'blk_189_kill_critter_null_obj',
+        kind: 'procedure',
+        description:
+            'BLK-189: kill_critter() guards against null/non-critter arguments.  ' +
+            'Arroyo and temple scripts occasionally call kill_critter(0) (the Fallout 2 ' +
+            'null-ref convention) or pass a partially-initialised object; critterKill(null) ' +
+            'throws immediately on obj.dead = true.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // sfall 0x82E8 — get_critter_level_sfall2
+    {
+        id: 'sfall_get_critter_level2_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E8: get_critter_level_sfall2(obj) → effective level (alias of 0x8282).  ' +
+            'Arroyo encounter scripts compiled against sfall 4.3+ use this alternate slot to ' +
+            'query critter levels for the temple final encounter.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E9 — set_critter_level_sfall2
+    {
+        id: 'sfall_set_critter_level2_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E9: set_critter_level_sfall2(obj, val) → set critter level [1,99].  ' +
+            'Alias of 0x8284 with an explicit [1,99] cap; used by arroyo NPC scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82EA — get_critter_age_sfall
+    {
+        id: 'sfall_get_critter_age_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82EA: get_critter_age_sfall(obj) → age value (0 if unset).  ' +
+            'Arroyo NPC characterisation scripts store age for dialogue branching.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82EB — set_critter_age_sfall
+    {
+        id: 'sfall_set_critter_age_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82EB: set_critter_age_sfall(obj, val) → set critter age.  ' +
+            'Stored for future use; no immediate gameplay effect in this build.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82EC — get_critter_kill_type_sfall2
+    {
+        id: 'sfall_get_critter_kill_type2_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82EC: get_critter_kill_type_sfall2(obj) → kill-type index.  ' +
+            'Alias of 0x821C; arroyo end-sequence kill-count scripts use this opcode ' +
+            'variant to tally temple-rat kills for the elder reward dialogue.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82ED — set_critter_kill_type_sfall2
+    {
+        id: 'sfall_set_critter_kill_type2_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82ED: set_critter_kill_type_sfall2(obj, val) → set kill-type index.  ' +
+            'Used by encounter initialisation scripts to assign the correct kill category.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82EE — get_party_size_sfall
+    {
+        id: 'sfall_get_party_size_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82EE: get_party_size_sfall() → current NPC party member count.  ' +
+            'Arroyo elder dialogue checks party size to adjust farewell messages.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82EF — get_max_level_sfall
+    {
+        id: 'sfall_get_max_level_92',
+        kind: 'opcode',
+        description:
+            'sfall 0x82EF: get_max_level_sfall() → 99 (Fallout 2 maximum player level).  ' +
+            'Used by scripts that check if the player has reached the level cap.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

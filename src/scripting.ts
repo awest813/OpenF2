@@ -1642,6 +1642,17 @@ export namespace Scripting {
                 return 0
             }
             let remaining = count
+            // BLK-188: Guard against undefined/null inventory — arroyo reward scripts
+            // sometimes call rm_mult_objs_from_inven() on a freshly created chest or
+            // container object that has no inventory array yet (inventory is initialised
+            // lazily on first add, not during create_object_sid).  Accessing
+            // obj.inventory.length on undefined throws TypeError.  Mirror the parallel
+            // guard in add_mult_objs_to_inven (which checks obj.inventory === undefined):
+            // return 0 as a no-op with a warning so the caller receives a safe result.
+            if (!Array.isArray(obj.inventory)) {
+                warn('rm_mult_objs_from_inven: obj has no inventory — no-op', undefined, this)
+                return 0
+            }
             // Iterate backward so splicing does not skip entries.
             for (let i = obj.inventory.length - 1; i >= 0 && remaining > 0; i--) {
                 if (obj.inventory[i].approxEq(item)) {
@@ -1896,6 +1907,14 @@ export namespace Scripting {
         }
         kill_critter(obj: Critter, deathFrame: number) {
             log('kill_critter', arguments)
+            // BLK-189: Guard against null/non-critter object — scripts in the Arroyo
+            // temple and end-sequence occasionally call kill_critter(0) or with a
+            // partially-initialised object reference; critterKill(null) would
+            // immediately throw 'Cannot set properties of null' on obj.dead = true.
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('kill_critter: not a critter: ' + obj, undefined, this)
+                return
+            }
             critterKill(obj)
         }
         get_poison(obj: Obj) {
@@ -1916,7 +1935,13 @@ export namespace Scripting {
             const player = globalState.player
             switch (pcstat) {
                 case 0: // PCSTAT_unspent_skill_points
-                    return player ? player.skills.skillPoints : 0
+                    // BLK-185: Guard against null player.skills — Arroyo Elder scripts
+                    // call get_pc_stat(0) to read unspent skill points after the XP
+                    // award from give_exp_points(2500).  When the skills component has
+                    // not yet been attached to a partially-initialised player object,
+                    // player.skills is null and .skillPoints throws TypeError.  Mirror
+                    // BLK-174 (give_exp_points null-skills guard): return 0 safely.
+                    return player ? (player.skills ? player.skills.skillPoints : 0) : 0
                 case 1: // PCSTAT_level
                     return player ? player.level : 1
                 case 2: // PCSTAT_experience
@@ -2839,6 +2864,18 @@ export namespace Scripting {
         }
         tile_distance(a: number, b: number) {
             if (a === -1 || b === -1) {return 9999}
+            // BLK-187: Guard against non-finite tile numbers — Arroyo transition and
+            // encounter scripts compute tile positions from formulas that can yield NaN
+            // (e.g. a tile index formula that divides by zero when the player spawns at
+            // an uninitialised position).  fromTileNum(NaN) returns {x:NaN, y:NaN} and
+            // hexDistance then propagates NaN into all downstream distance comparisons,
+            // silently breaking LOS and proximity checks.  Return 9999 (maximum sentinel
+            // distance) so callers treat the positions as "out of range".
+            if (typeof a !== 'number' || !Number.isFinite(a) ||
+                typeof b !== 'number' || !Number.isFinite(b)) {
+                warn('tile_distance: non-finite tile (' + a + ', ' + b + ') — returning 9999', undefined, this)
+                return 9999
+            }
             return hexDistance(fromTileNum(a), fromTileNum(b))
         }
         tile_num(obj: Obj) {
@@ -3801,6 +3838,16 @@ export namespace Scripting {
             const skillName = skillNumToName[skill]
             if (!skillName) {
                 warn('get_critter_skill: unknown skill number: ' + skill)
+                return 0
+            }
+            // BLK-186: Guard against missing getSkill method — Arroyo NPC objects
+            // created via proto-only initialisation (e.g. summoned guards that use
+            // create_object_sid with a critter PID but no full SkillSet component)
+            // may lack getSkill().  Calling a non-function throws TypeError and halts
+            // the VM.  Fall back to 0 with a warning so the calling script can
+            // continue its logic path without crashing.
+            if (typeof (obj as Critter).getSkill !== 'function') {
+                warn('get_critter_skill: critter has no getSkill() method — returning 0', undefined, this)
                 return 0
             }
             return (obj as Critter).getSkill(skillName)
@@ -7378,6 +7425,64 @@ export namespace Scripting {
             }
             const safeVal = typeof val === 'number' && isFinite(val) ? Math.max(0, val) : 0
             ;(obj as Critter).stats.setBase('Sequence', safeVal)
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 92 — sfall extended opcodes 0x82E8–0x82EF (critter level alias,
+        // age, kill-type, party count and max-level queries for arroyo end-sequence).
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82EA — get_critter_age_sfall(obj):
+        // Return the critter's age.  No age field in this build; returns 0.
+        get_critter_age_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_age_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).age ?? 0
+        }
+
+        // sfall 0x82EB — set_critter_age_sfall(obj, val):
+        // Set the critter's age.  Stored for future use; no gameplay effect.
+        set_critter_age_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_age_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).age = typeof val === 'number' && isFinite(val) ? Math.max(0, Math.trunc(val)) : 0
+        }
+
+        // sfall 0x82EC — get_critter_kill_type_sfall(obj):
+        // Alias of the existing 0x81F4 / 0x821C — return the kill-type index.
+        get_critter_kill_type_sfall2(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_kill_type_sfall2: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any).killType ?? 0
+        }
+
+        // sfall 0x82ED — set_critter_kill_type_sfall(obj, val):
+        // Set the kill-type index on a critter.
+        set_critter_kill_type_sfall2(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_kill_type_sfall2: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any).killType = typeof val === 'number' && isFinite(val) ? Math.max(0, Math.trunc(val)) : 0
+        }
+
+        // sfall 0x82EE — get_party_size_sfall():
+        // Return the current number of NPCs in the player's party.
+        // Delegates to gParty (same as metarule(24) / METARULE_PARTY_COUNT).
+        get_party_size_sfall(): number {
+            return globalState.gParty ? globalState.gParty.getPartyMembers().length : 0
+        }
+
+        // sfall 0x82EF — get_max_level_sfall():
+        // Return the engine's maximum player level cap (99 in Fallout 2).
+        get_max_level_sfall(): number {
+            return 99
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
