@@ -7699,6 +7699,191 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 89 — Arroyo end-sequence polish (BLK-171..175) + sfall 0x82D0–0x82D7
+    // -----------------------------------------------------------------------
+
+    // BLK-171 — set_world_map_pos non-finite coordinate guard
+    {
+        id: 'blk_171_set_world_map_pos_non_finite',
+        kind: 'procedure',
+        description:
+            'set_world_map_pos(x, y): previously stored any x/y directly into ' +
+            'globalState.worldPosition without validation.  Arroyo exit scripts ' +
+            'compute the world map destination from tile arithmetic; a broken ' +
+            'formula produces NaN or Infinity which corrupts worldPosition and ' +
+            'breaks all subsequent world map navigation, encounter rolls, and area ' +
+            'detection.  Now guards for non-finite coordinates and no-ops with a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-172 — move_obj_inven_to_obj undefined inventory guard
+    {
+        id: 'blk_172_move_obj_inven_to_obj_null_inventory',
+        kind: 'procedure',
+        description:
+            'move_obj_inven_to_obj(obj, other): previously accessed obj.inventory.length ' +
+            'and other.inventory.length without checking whether the inventory arrays ' +
+            'exist.  isGameObject() only validates type/pid, not inventory presence.  ' +
+            'Temple item containers (chests, boxes) created via create_object_sid may ' +
+            'not yet have their inventory array initialised, causing TypeError on the ' +
+            '.length access.  Now treats a missing inventory as an empty array and warns.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-173 — override_map_start non-finite position guard
+    {
+        id: 'blk_173_override_map_start_non_finite',
+        kind: 'procedure',
+        description:
+            'override_map_start(x, y, elev, rot): previously stored any x/y directly ' +
+            'into overrideStartPos without validation.  Temple exit grids compute the ' +
+            'player spawn tile from level arithmetic; a broken formula yields NaN or ' +
+            'Infinity which corrupts overrideStartPos and causes the player to appear ' +
+            'at an invalid/out-of-bounds map position on the next map load.  ' +
+            'Now guards for non-finite x/y and no-ops with a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-174 — give_exp_points null-skills guard on level-up
+    {
+        id: 'blk_174_give_exp_points_null_skills',
+        kind: 'procedure',
+        description:
+            'give_exp_points(xp): the level-up loop calls player.skills.skillPoints += N. ' +
+            'The Elder\'s dialogue calls give_exp_points(2500) when temple completion is ' +
+            'confirmed.  When the player object is partially initialised (skills component ' +
+            'not yet attached, e.g. early Arroyo character-creation flow), accessing ' +
+            'skills.skillPoints throws TypeError and crashes the level-up loop, leaving ' +
+            'the player stuck at level 1.  Now skips the skill-point award when ' +
+            'player.skills is absent and warns.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-175 — rm_timer_event remove all matching events
+    {
+        id: 'blk_175_rm_timer_event_remove_all',
+        kind: 'procedure',
+        description:
+            'rm_timer_event(obj): previously used break after removing the first ' +
+            'matching event.  Temple of Trials dart-trap scripts add multiple timer ' +
+            'events to the same trap object (one per player proximity trigger); ' +
+            'removing only the first left stale events that would fire phantom damage ' +
+            'ticks on the player after the trap was cleared.  Now iterates in reverse ' +
+            'and removes ALL events whose obj.pid matches, eliminating phantom traps.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // sfall 0x82D0 — get_critter_reaction_sfall
+    {
+        id: 'sfall_get_critter_reaction_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D0: get_critter_reaction_sfall(npc, pc) → reaction value (0–100). ' +
+            'Returns the stored reaction value of npc toward pc, defaulting to 50 (neutral). ' +
+            'Arroyo and Temple scripts query NPC reaction to adjust dialogue tone and barter ' +
+            'prices.  Elder and Hakunin scripts use this to gate special dialogue options.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82D1 — set_critter_reaction_sfall
+    {
+        id: 'sfall_set_critter_reaction_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D1: set_critter_reaction_sfall(npc, pc, val) → sets NPC reaction. ' +
+            'Stores the reaction value (clamped to [0,100]) on the NPC object for later ' +
+            'reads via get_critter_reaction_sfall.  Arroyo village NPCs have their reaction ' +
+            'adjusted when the player completes the temple or earns Elder approval.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82D2 — get_game_difficulty_sfall
+    {
+        id: 'sfall_get_game_difficulty_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D2: get_game_difficulty_sfall() → 0..2 (0=easy, 1=normal, 2=hard). ' +
+            'Returns the current game difficulty.  Arroyo scripts check this to conditionally ' +
+            'award bonus XP, skip optional encounters, or unlock extra dialogue options for ' +
+            'hard-mode players.  Defaults to 1 (normal) when not explicitly set.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82D3 — set_game_difficulty_sfall
+    {
+        id: 'sfall_set_game_difficulty_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D3: set_game_difficulty_sfall(level) → sets game difficulty. ' +
+            'Partial: stores the value; the engine does not yet cascade it through ' +
+            'encounter-rate or XP formula branches.  Level must be 0–2; out-of-range ' +
+            'values are silently ignored.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82D4 — get_combat_difficulty_sfall
+    {
+        id: 'sfall_get_combat_difficulty_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D4: get_combat_difficulty_sfall() → 0..2 (0=wimpy, 1=normal, 2=rough). ' +
+            'Returns the current combat difficulty.  Temple combat scripts use this to scale ' +
+            'enemy HP and damage multipliers for a harder experience on rough mode.  ' +
+            'Defaults to 1 (normal) when not explicitly set.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82D5 — set_combat_difficulty_sfall
+    {
+        id: 'sfall_set_combat_difficulty_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D5: set_combat_difficulty_sfall(level) → sets combat difficulty. ' +
+            'Partial: stores the value; full cascade through the damage formula pipeline ' +
+            'is not yet wired.  Level must be 0–2; out-of-range values are silently ignored.',
+        status: 'partial',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82D6 — get_critter_team_sfall
+    {
+        id: 'sfall_get_critter_team_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D6: get_critter_team_sfall(obj) → team number (≥0). ' +
+            'Returns the critter\'s combat team/faction number used by AI to determine ' +
+            'friend-or-foe relationships in Temple and Arroyo encounters.  Returns 0 ' +
+            '(neutral/unaffiliated) when no team has been assigned.  ' +
+            'Villager and guard critters in arroyo.int use this for combat routing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82D7 — set_critter_team_sfall
+    {
+        id: 'sfall_set_critter_team_89',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D7: set_critter_team_sfall(obj, team) → sets critter team number. ' +
+            'Assigns a combat team/faction to a critter.  Used by arroyo.int to re-assign ' +
+            'villager faction after the Elder\'s intro script fires on temple completion, ' +
+            'ensuring guards fight alongside the player rather than as neutrals.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
