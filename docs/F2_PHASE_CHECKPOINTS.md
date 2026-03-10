@@ -583,3 +583,79 @@ Gate: **PASS** — all 3964 tests green, tsc clean.
 - [x] phase14.test.ts: stub count upper bound updated to ≤ 19
 
 Gate: **PASS** — all 4025 tests green, tsc clean.
+
+---
+
+## Phase 88 — Arroyo full-playability hardening: obj guard pass, sfall 0x82C8–0x82CF
+
+- [x] **BLK-166**: `obj_open()`/`obj_close()` missing `use()` method guard — Arroyo door/scenery objects lacking a `use()` method no longer throw TypeError; the call is silently skipped.
+- [x] **BLK-167**: `critter_dmg()` non-critter `self_obj` guard — Temple dart traps use a non-critter trigger as `self_obj`; damage source is treated as `null` so XP attribution is handled cleanly.
+- [x] **BLK-168**: `giq_option()` non-numeric INT stat guard — When player INT is uninitialised, `getStat("INT")` returns undefined; the IQ test now defaults to INT 5.
+- [x] **BLK-169**: `create_object_sid()` negative tile guard — A negative tile number produces an off-map y-coordinate; now warns and returns `null` for negative tiles.
+- [x] **BLK-170**: `float_msg()` null/empty message guard — Passing null (from a missing `message_str()` key) now coerces to empty string and skips silently.
+- [x] New sfall opcodes 0x82C8–0x82CF: weapon property queries (min/max damage, damage type, AP costs, ranges, ammo PID).
+- [x] phase88.test.ts: regression tests for all BLK items, sfall opcodes, arroyo smoke tests, and checklist integrity.
+
+Gate: **PASS** — all 4088 tests green, tsc clean.
+
+---
+
+## Phase 89 — Arroyo exit hardening: world-map/inventory/timer guards, sfall 0x82D0–0x82D7
+
+- [x] **BLK-171**: `set_world_map_pos()` non-finite coordinate guard — Rejects NaN/Infinity coordinates so `globalState.worldPosition` is never corrupted.
+- [x] **BLK-172**: `move_obj_inven_to_obj()` undefined inventory guard — `Array.isArray()` guards added for both source and destination inventory arrays.
+- [x] **BLK-173**: `override_map_start()` non-finite position guard — Non-finite x/y values rejected so `overrideStartPos` is never corrupted.
+- [x] **BLK-174**: `give_exp_points()` null-skills guard — Elder dialogue awards 2500 XP; when `player.skills` is null, the skill-point award is skipped but XP and level-up still apply.
+- [x] **BLK-175**: `rm_timer_event()` removes ALL matching events — Temple dart traps now correctly remove all timer events for a given object.
+- [x] New sfall opcodes 0x82D0–0x82D7: reaction level, game/combat difficulty, team number queries.
+- [x] phase89.test.ts: regression tests for all BLK items, sfall opcodes, arroyo smoke tests, and checklist integrity.
+
+Gate: **PASS** — all 4152 tests green, tsc clean.
+
+---
+
+## Phase 90 — Arroyo combat/trait hardening: attack/display guards, sfall 0x82D8–0x82DF
+
+- [x] **BLK-176**: `attack_complex()` null `self_obj` guard — Temple NPC scripts call `attack_complex()` from map context with null `self_obj`; now warns and returns without starting combat.
+- [x] **BLK-177**: `critter_add_trait(TRAIT_CHAR)` uninitialised `charTraits` guard — Initialises `charTraits` to an empty `Set` on demand.
+- [x] **BLK-178**: `critter_add_trait(TRAIT_SKILL)` null `skills` guard — Guards `skills.setBase()` when `skills` is null; mirrors BLK-174.
+- [x] **BLK-179**: `display_msg()` null/non-string guard — Guards against null/non-string messages before passing to `uiLog()`.
+- [x] New sfall opcodes 0x82D8–0x82DF: critter body type, weapon type, counter, gender queries.
+- [x] phase90.test.ts: regression tests for all BLK items, sfall opcodes, arroyo smoke tests, and checklist integrity.
+
+Gate: **PASS** — all 4216 tests green, tsc clean.
+
+---
+
+## Phase 91 — Arroyo end-sequence debug (continued): animation/skill guards, sfall 0x82E0–0x82E7
+
+- [x] **BLK-180**: `use_obj()` missing `use()` method guard — Guards with `typeof obj.use !== "function"`.
+- [x] **BLK-181**: `reg_anim_animate_forever()` missing `singleAnimation()` guard — Guards against objects without `singleAnimation`.
+- [x] **BLK-182**: `animate_move_obj_to_tile()` missing `walkTo()` guard — Guards against objects without `walkTo`; mirrors BLK-181.
+- [x] **BLK-183**: `critter_mod_skill()` null `skills` guard — Guards `skills.getBase()` when `skills` is null.
+- [x] **BLK-184**: `set_critter_skill_points()` null `skills` guard — Guards `skills.setBase()` when `skills` is null; mirrors BLK-183.
+- [x] New sfall opcodes 0x82E0–0x82E7: critter poison, radiation, heal-rate, sequence queries.
+- [x] phase91.test.ts: regression tests for all BLK items, sfall opcodes, arroyo smoke tests, and checklist integrity.
+
+Gate: **PASS** — all 4281 tests green, tsc clean.
+
+---
+
+## Phase 92 — Arroyo end-sequence debug and polish (final): final guards, sfall 0x82E8–0x82EF
+
+- [x] **BLK-185**: `get_pc_stat(0)` null `player.skills` guard — Returns 0 safely when `player.skills` is null; mirrors BLK-174.
+- [x] **BLK-186**: `get_critter_skill()` missing `getSkill()` method guard — Returns 0 when `getSkill` is not a function; guards proto-only arroyo NPC objects.
+- [x] **BLK-187**: `tile_distance()` non-finite tile guard — Returns 9999 for non-finite tile numbers, preventing NaN propagation into downstream proximity/encounter checks.
+- [x] **BLK-188**: `rm_mult_objs_from_inven()` null inventory guard — Guards with `Array.isArray(obj.inventory)`, returning 0 for uninitialised containers; mirrors `add_mult_objs_to_inven`.
+- [x] **BLK-189**: `kill_critter()` null/non-critter guard — Guards against null (Fallout 2 null-ref `0`) and non-critter objects before calling `critterKill()`.
+- [x] New sfall opcode 0x82E8: `get_critter_level_sfall` (alias of 0x8282)
+- [x] New sfall opcode 0x82E9: `set_critter_level_sfall` (alias of 0x8284)
+- [x] New sfall opcode 0x82EA: `get_critter_age_sfall(obj)` — critter age value (0 if unset)
+- [x] New sfall opcode 0x82EB: `set_critter_age_sfall(obj, val)` — set critter age, stored for future use
+- [x] New sfall opcode 0x82EC: `get_critter_kill_type_sfall2(obj)` — critter kill-type index (alias of 0x821C)
+- [x] New sfall opcode 0x82ED: `set_critter_kill_type_sfall2(obj, val)` — set critter kill-type index
+- [x] New sfall opcode 0x82EE: `get_party_size_sfall()` — current NPC party member count
+- [x] New sfall opcode 0x82EF: `get_max_level_sfall()` — 99 (Fallout 2 maximum player level cap)
+- [x] phase92.test.ts: 44 regression tests for all BLK items, sfall opcodes, arroyo end-sequence smoke tests, and checklist integrity.
+
+Gate: **PASS** — all 4325 tests green, tsc clean.
