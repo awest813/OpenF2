@@ -10,10 +10,12 @@
  *   F. Checklist reflects proto_data as 'partial'
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import { Scripting } from './scripting.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
+import globalState from './globalState.js'
+import { Reputation } from './quest/reputation.js'
 
 // ---------------------------------------------------------------------------
 // A. Save schema v5 — scriptGlobalVars migration
@@ -100,6 +102,22 @@ describe('Phase 16-A — save schema v5: scriptGlobalVars', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 16-B — Scripting.setGlobalVars round-trip', () => {
+    let originalGlobals: Record<string, number>
+
+    beforeEach(() => {
+        originalGlobals = { ...Scripting.getGlobalVars() }
+    })
+
+    afterEach(() => {
+        const globals = Scripting.getGlobalVars()
+        for (const key of Object.keys(globals)) {
+            if (!(key in originalGlobals)) {delete (globals as any)[key]}
+        }
+        for (const key of Object.keys(originalGlobals)) {
+            (globals as any)[key] = originalGlobals[key]
+        }
+    })
+
     it('setGlobalVars then getGlobalVars returns merged values', () => {
         // Set known vars via the scripting API
         const script = new Scripting.Script()
@@ -133,6 +151,31 @@ describe('Phase 16-B — Scripting.setGlobalVars round-trip', () => {
         // Key 200 should be updated; key 201 should remain untouched
         expect(script.global_var(200)).toBe(99)
         expect(script.global_var(201)).toBe(66)
+    })
+
+    it('setGlobalVars syncs GVAR_0 into reputation karma when present', () => {
+        const prevRep = globalState.reputation
+        ;(globalState as any).reputation = new Reputation()
+        try {
+            Scripting.setGlobalVars({ 0: 125 })
+            expect(Scripting.getGlobalVars()[0]).toBe(125)
+            expect(globalState.reputation.getKarma()).toBe(125)
+        } finally {
+            (globalState as any).reputation = prevRep
+        }
+    })
+
+    it('setGlobalVars clamps non-finite values and keeps karma consistent', () => {
+        const prevRep = globalState.reputation
+        ;(globalState as any).reputation = new Reputation()
+        try {
+            Scripting.setGlobalVars({ 0: NaN as any, 77: Infinity as any })
+            expect(Scripting.getGlobalVars()[0]).toBe(0)
+            expect(Scripting.getGlobalVars()[77]).toBe(0)
+            expect(globalState.reputation.getKarma()).toBe(0)
+        } finally {
+            (globalState as any).reputation = prevRep
+        }
     })
 })
 

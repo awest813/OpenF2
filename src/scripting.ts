@@ -60,7 +60,7 @@ export namespace Scripting {
     let gameObjects: Obj[] | null = null
     let mapVars: any = null
     const globalVars: any = {
-        0: 50, // GVAR_PLAYER_REPUTATION
+        0: 0, // GVAR_PLAYER_REPUTATION (karma) — start at neutral to match Reputation
         //10: 1, // GVAR_START_ARROYO_TRIAL (1 = TRIAL_FIGHT)
         531: 1, // GVAR_TALKED_TO_ELDER
         452: 2, // GVAR_DEN_VIC_KNOWN
@@ -369,7 +369,18 @@ export namespace Scripting {
      */
     export function setGlobalVars(vars: Record<number, number>): void {
         for (const key of Object.keys(vars)) {
-            globalVars[parseInt(key, 10)] = (vars as any)[key]
+            const gvar = parseInt(key, 10)
+            let value = (vars as any)[key]
+            // Mirror set_global_var: sanitize non-finite numbers on load to avoid poisoning state.
+            if (typeof value === 'number' && !Number.isFinite(value)) {
+                warn('setGlobalVars: non-finite value (' + value + ') for gvar ' + gvar + ' — clamping to 0', 'gvars')
+                value = 0
+            }
+            globalVars[gvar] = value
+            // Keep karma/reputation in sync when restoring saves that include GVAR_0.
+            if (gvar === 0 && globalState.reputation) {
+                globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
+            }
         }
     }
 
