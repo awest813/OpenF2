@@ -1675,6 +1675,35 @@ export namespace ScriptVMBridge {
 
        // 0x82DF — set_critter_gender_sfall(obj, gender): set critter gender.
        ,0x82DF: bridged("set_critter_gender_sfall", 2, false) // set_critter_gender(obj, gender)
+
+       // -----------------------------------------------------------------------
+       // Phase 91 — sfall extended opcodes 0x82E0–0x82E7 (critter poison,
+       // radiation, heal-rate and sequence queries for Arroyo end-sequence).
+       // -----------------------------------------------------------------------
+
+       // 0x82E0 — get_critter_poison_sfall(obj): Poison Level (alias of 0x823A).
+       ,0x82E0: bridged("get_critter_poison_sfall", 1) // reuses existing get_critter_poison_sfall → level
+
+       // 0x82E1 — set_critter_poison_sfall(obj, val): set Poison Level (alias of 0x823B).
+       ,0x82E1: bridged("set_critter_poison_sfall", 2, false) // reuses existing set_critter_poison_sfall
+
+       // 0x82E2 — get_critter_radiation_sfall(obj): Radiation Level (alias of 0x8238).
+       ,0x82E2: bridged("get_critter_radiation_sfall", 1) // reuses existing get_critter_radiation_sfall → level
+
+       // 0x82E3 — set_critter_radiation_sfall(obj, val): set Radiation Level (alias of 0x8239).
+       ,0x82E3: bridged("set_critter_radiation_sfall", 2, false) // reuses existing set_critter_radiation_sfall
+
+       // 0x82E4 — get_critter_heal_rate_sfall(obj): critter's Healing Rate stat.
+       ,0x82E4: bridged("get_critter_heal_rate_sfall", 1) // get_critter_heal_rate(obj) → 0..∞
+
+       // 0x82E5 — set_critter_heal_rate_sfall(obj, val): set critter Healing Rate.
+       ,0x82E5: bridged("set_critter_heal_rate_sfall", 2, false) // set_critter_heal_rate(obj, val)
+
+       // 0x82E6 — get_critter_sequence_sfall(obj): critter's Sequence stat.
+       ,0x82E6: bridged("get_critter_sequence_sfall", 1) // get_critter_sequence(obj) → 0..∞
+
+       // 0x82E7 — set_critter_sequence_sfall(obj, val): set critter Sequence stat.
+       ,0x82E7: bridged("set_critter_sequence_sfall", 2, false) // set_critter_sequence(obj, val)
     }
     Object.assign(opMap, bridgeOpMap)
 

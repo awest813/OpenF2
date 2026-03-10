@@ -8032,6 +8032,169 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // ---------------------------------------------------------------------------
+    // Phase 91 — Arroyo end-sequence debug/polish (BLK-180..184) + sfall 0x82E0–0x82E7
+    // ---------------------------------------------------------------------------
+    // BLK-180 — use_obj() missing use() method guard
+    {
+        id: 'blk_180_use_obj_missing_use_method',
+        kind: 'procedure',
+        description:
+            'BLK-180: use_obj() guards against calling obj.use(source) when use is not a ' +
+            'function.  Arroyo exit grids and misc items (pip-boy trigger objects) may not ' +
+            'have a use() method in the browser build; without this guard the script VM ' +
+            'throws TypeError and the map transition never fires.  Mirror of BLK-166.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-181 — reg_anim_animate_forever() missing singleAnimation() guard
+    {
+        id: 'blk_181_reg_anim_animate_forever_no_single_anim',
+        kind: 'procedure',
+        description:
+            'BLK-181: reg_anim_animate_forever() guards against calling ' +
+            'obj.singleAnimation() when the method is absent.  Village elder and guard ' +
+            'NPCs in the arroyo ceremony sequence call reg_anim_animate_forever(); critters ' +
+            'spawned without singleAnimation crash the animation loop.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // BLK-182 — animate_move_obj_to_tile() missing walkTo() guard
+    {
+        id: 'blk_182_animate_move_obj_to_tile_no_walk_to',
+        kind: 'procedure',
+        description:
+            'BLK-182: animate_move_obj_to_tile() guards against calling obj.walkTo() when ' +
+            'the method is absent.  The arroyo elder approach-to-player movement calls ' +
+            'this function; misc item waypoints without walkTo crash with TypeError.  ' +
+            'Mirrors the guard already present in reg_anim_obj_move_to_tile (BLK-104).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // BLK-183 — critter_mod_skill() null skills guard
+    {
+        id: 'blk_183_critter_mod_skill_null_skills',
+        kind: 'procedure',
+        description:
+            'BLK-183: critter_mod_skill() guards against null critter.skills.  Arroyo ' +
+            'village guard NPCs have critter_mod_skill() called during map_enter_p_proc ' +
+            'before the skills component is attached; without this guard skills.setBase() ' +
+            'throws TypeError and halts NPC initialization.  Mirror of BLK-178.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-184 — set_critter_skill_points() null skills guard
+    {
+        id: 'blk_184_set_critter_skill_points_null_skills',
+        kind: 'procedure',
+        description:
+            'BLK-184: set_critter_skill_points() guards against null critter.skills.  ' +
+            'Mirrors BLK-183 for the set_critter_skill_points() call site; partially-' +
+            'initialised arroyo NPC critters crash when skills.setBase() is called before ' +
+            'the skills component is attached.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E0 — get_critter_poison_sfall
+    {
+        id: 'sfall_get_critter_poison_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E0: get_critter_poison_sfall(obj) → Poison Level stat.  Used by ' +
+            'the Arroyo elder end-sequence dialogue to check if the player needs antidote ' +
+            'before departing for the world map.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E1 — set_critter_poison_sfall
+    {
+        id: 'sfall_set_critter_poison_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E1: set_critter_poison_sfall(obj, val) → set Poison Level.  ' +
+            'Allows the elder or completion scripts to clear the player poison after ' +
+            'the temple run.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82E2 — get_critter_radiation_sfall
+    {
+        id: 'sfall_get_critter_radiation_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E2: get_critter_radiation_sfall(obj) → Radiation Level stat.  ' +
+            'The temple of trials has irradiated zones; the elder may check the player ' +
+            'radiation before the departure blessing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E3 — set_critter_radiation_sfall
+    {
+        id: 'sfall_set_critter_radiation_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E3: set_critter_radiation_sfall(obj, val) → set Radiation Level.  ' +
+            'Used by completion scripts to cleanse radiation on arroyo map exit.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82E4 — get_critter_heal_rate_sfall
+    {
+        id: 'sfall_get_critter_heal_rate_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E4: get_critter_heal_rate_sfall(obj) → Healing Rate stat.  ' +
+            'The arroyo-to-world-map rest mechanic uses Healing Rate to compute how much ' +
+            'HP the player recovers during travel downtime.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E5 — set_critter_heal_rate_sfall
+    {
+        id: 'sfall_set_critter_heal_rate_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E5: set_critter_heal_rate_sfall(obj, val) → set Healing Rate.  ' +
+            'Allows modding scripts to adjust rest-healing for balance during early-game ' +
+            'Arroyo region travel.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82E6 — get_critter_sequence_sfall
+    {
+        id: 'sfall_get_critter_sequence_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E6: get_critter_sequence_sfall(obj) → Sequence stat.  ' +
+            'The temple final encounter uses Sequence to determine combat turn order ' +
+            'for the last rat wave.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82E7 — set_critter_sequence_sfall
+    {
+        id: 'sfall_set_critter_sequence_91',
+        kind: 'opcode',
+        description:
+            'sfall 0x82E7: set_critter_sequence_sfall(obj, val) → set Sequence stat.  ' +
+            'Used by encounter scripts to balance combat pacing for arroyo rats and guards.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
