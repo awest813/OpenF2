@@ -7884,6 +7884,154 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'medium',
         impact: 'medium',
     },
+
+    // Phase 90 — Arroyo debug/audit/polish (BLK-176..180) + sfall 0x82D8–0x82DF
+    // Further hardening of Arroyo NPC, temple combat, and character-creation scripts.
+    {
+        id: 'blk_176_attack_complex_null_self_obj',
+        kind: 'procedure',
+        description:
+            'BLK-176: attack_complex() — Guard against null self_obj.  Temple NPC scripts ' +
+            '(e.g. atheatr1.int) call attack_complex() from map-level context where self_obj ' +
+            'is null.  Combat.start(null as Critter) previously threw TypeError and halted ' +
+            'the VM, preventing any further combat or map events.  Now warns and returns.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_177_critter_add_trait_char_null_chartraits',
+        kind: 'procedure',
+        description:
+            'BLK-177: critter_add_trait(TRAIT_CHAR) — Guard against uninitialised charTraits. ' +
+            'Critters spawned via create_object_sid() during artemple.int map_enter_p_proc may ' +
+            'not have charTraits initialised before the Elder\'s trait-grant script fires.  ' +
+            'Calling .add()/.delete() on undefined previously threw TypeError.  Now initialises ' +
+            'charTraits on demand (parallel to sfall critter trait helpers).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_178_critter_add_trait_skill_null_skills',
+        kind: 'procedure',
+        description:
+            'BLK-178: critter_add_trait(TRAIT_SKILL) — Guard against null critter.skills. ' +
+            'Mirrors BLK-174 (give_exp_points).  Arroyo NPC scripts call ' +
+            'critter_add_trait(TRAIT_SKILL, …) on partially initialised critters before the ' +
+            'skills component is attached.  critter.skills.setBase() previously threw TypeError ' +
+            'and halted the script VM.  Now warns and skips the adjustment safely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    {
+        id: 'blk_179_display_msg_null_message',
+        kind: 'procedure',
+        description:
+            'BLK-179: display_msg() — Guard against null/non-string message.  Temple ' +
+            'end-of-combat and Arroyo Elder scripts call display_msg(message_str(msgList, id)); ' +
+            'when the message key is missing from the loaded .msg file, message_str() returns ' +
+            'null.  uiLog(null) caused the HTML log renderer to display "null" and could crash ' +
+            'rich-text formatters.  Now warns and returns without logging.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'medium',
+    },
+
+    // sfall 0x82D8 — get_critter_body_type_sfall
+    {
+        id: 'sfall_get_critter_body_type_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D8: get_critter_body_type_sfall(obj) → body type (0=biped, ' +
+            '1=quadruped, 2=robotic, 3=winged).  Used by Arroyo elder and NPC scripts to ' +
+            'branch on critter movement and animation class at runtime.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82D9 — set_critter_body_type_sfall
+    {
+        id: 'sfall_set_critter_body_type_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82D9: set_critter_body_type_sfall(obj, type) → sets critter body type. ' +
+            'Overrides movement/animation class at runtime for shape-shifting or summon scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82DA — get_critter_weapon_type_sfall
+    {
+        id: 'sfall_get_critter_weapon_type_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DA: get_critter_weapon_type_sfall(obj) → weapon type of active weapon ' +
+            '(0=unarmed, 1=melee, 2=ranged, 3=thrown, 4=energy, 5=explosive).  Used by ' +
+            'temple combat scripts to determine which attack type is active.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82DB — set_critter_weapon_type_sfall
+    {
+        id: 'sfall_set_critter_weapon_type_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DB: set_critter_weapon_type_sfall(obj, type) → override active weapon type. ' +
+            'Allows scripts to force a critter into a specific attack mode.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82DC — get_critter_kills_sfall
+    {
+        id: 'sfall_get_critter_kills_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DC: get_critter_kills_sfall(obj) → kill count.  Used by Arroyo elder ' +
+            'script to check how many temple rats the player killed when awarding the tribal ' +
+            'warrior recognition dialogue.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82DD — set_critter_kills_sfall
+    {
+        id: 'sfall_set_critter_kills_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DD: set_critter_kills_sfall(obj, count) → set critter kill count. ' +
+            'Used to reset kill tracking on map reload or when re-running the temple.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82DE — get_critter_gender_sfall
+    {
+        id: 'sfall_get_critter_gender_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DE: get_critter_gender_sfall(obj) → gender (0=male, 1=female).  ' +
+            'Dedicated gender accessor used by Arroyo opening-sequence scripts that branch ' +
+            'on player gender before the character creation screen fully populates stats.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82DF — set_critter_gender_sfall
+    {
+        id: 'sfall_set_critter_gender_90',
+        kind: 'opcode',
+        description:
+            'sfall 0x82DF: set_critter_gender_sfall(obj, gender) → set critter gender. ' +
+            'Used by character-creation scripts in the Arroyo opening sequence to persist ' +
+            'the gender choice on the player object before the temple run begins.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------

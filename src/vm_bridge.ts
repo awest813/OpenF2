@@ -1646,6 +1646,35 @@ export namespace ScriptVMBridge {
 
        // 0x82D7 — set_critter_team_sfall(obj, team): set critter's combat team number.
        ,0x82D7: bridged("set_critter_team_sfall", 2, false) // set_critter_team(obj, team)
+
+       // -----------------------------------------------------------------------
+       // Phase 90 — sfall extended opcodes 0x82D8–0x82DF (critter body/weapon/
+       // gender and kill-count queries for Arroyo NPC and temple scripts).
+       // -----------------------------------------------------------------------
+
+       // 0x82D8 — get_critter_body_type_sfall(obj): critter body type (alias of 0x8206).
+       ,0x82D8: bridged("get_critter_body_type_sfall", 1) // reuses existing get_critter_body_type_sfall → 0..3
+
+       // 0x82D9 — set_critter_body_type_sfall(obj, type): set critter body type.
+       ,0x82D9: bridged("set_critter_body_type_sfall", 2, false) // set_critter_body_type(obj, type)
+
+       // 0x82DA — get_critter_weapon_type_sfall(obj): weapon type of active weapon.
+       ,0x82DA: bridged("get_critter_weapon_type_sfall", 1) // get_critter_weapon_type(obj) → 0..5
+
+       // 0x82DB — set_critter_weapon_type_sfall(obj, type): override active weapon type.
+       ,0x82DB: bridged("set_critter_weapon_type_sfall", 2, false) // set_critter_weapon_type(obj, type)
+
+       // 0x82DC — get_critter_kills_sfall(obj): kill count attributed to this critter.
+       ,0x82DC: bridged("get_critter_kills_sfall", 1) // get_critter_kills(obj) → count
+
+       // 0x82DD — set_critter_kills_sfall(obj, count): set critter kill count.
+       ,0x82DD: bridged("set_critter_kills_sfall", 2, false) // set_critter_kills(obj, count)
+
+       // 0x82DE — get_critter_gender_sfall(obj): gender (alias of 0x8231).
+       ,0x82DE: bridged("get_critter_gender_sfall", 1) // reuses existing get_critter_gender_sfall → 0|1
+
+       // 0x82DF — set_critter_gender_sfall(obj, gender): set critter gender.
+       ,0x82DF: bridged("set_critter_gender_sfall", 2, false) // set_critter_gender(obj, gender)
     }
     Object.assign(opMap, bridgeOpMap)
 
