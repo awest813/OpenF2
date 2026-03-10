@@ -117,3 +117,23 @@ Next available sfall opcode: **0x8248**
 | `get_script_field_sfall` (0x824F) | opcode | partial | P3 | Returns 0 for all fields; engine-internal script context fields not exposed. |
 
 Next available sfall opcode: **0x8250**
+
+## Phase 87 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `rm_mult_objs_from_inven non-positive count` (BLK-161) | procedure | implemented | P1 | Non-positive/non-finite count now treated as no-op returning 0; mirrors BLK-146 (add_mult_objs_to_inven). |
+| `obj_carrying_pid_obj null inventory` (BLK-162) | procedure | implemented | P0 | Guard against undefined `obj.inventory` array before iteration; returns 0 safely. |
+| `poison non-finite amount` (BLK-163) | procedure | implemented | P1 | Non-finite poison amounts rejected with warning; `modifyBase('Poison Level', …)` not called. |
+| `radiation_add non-finite amount` (BLK-164) | procedure | implemented | P1 | Non-finite radiation amounts rejected with warning; mirrors BLK-163. |
+| `radiation_dec non-finite amount` (BLK-165) | procedure | implemented | P1 | Non-finite radiation-dec amounts rejected with warning; completes the radiation-guard family. |
+| `get_critter_active_weapon_sfall` (0x82C0) | opcode | implemented | P2 | Returns weapon in active hand slot (rightHand for NPCs, active-hand for player) or 0. |
+| `get_critter_base_skill_sfall` (0x82C1) | opcode | implemented | P2 | Returns raw base skill allocation without SPECIAL modifier; delegates to `has_trait(TRAIT_SKILL, …)`. |
+| `set_critter_base_skill_sfall` (0x82C2) | opcode | implemented | P2 | Sets base skill directly; delegates to `set_critter_skill_points()`, inheriting BLK-159 non-finite guard. |
+| `get_critter_in_combat_sfall` (0x82C3) | opcode | implemented | P2 | Returns 1 if critter is in active combat roster, 0 otherwise; delegates to same check as metarule3(103). |
+| `get_map_var_sfall` (0x82C4) | opcode | implemented | P2 | Reads map variable by index via sfall opcode path; delegates to `map_var()`. |
+| `set_map_var_sfall` (0x82C5) | opcode | implemented | P2 | Sets map variable by index via sfall opcode path; delegates to `set_map_var()`. |
+| `get_critter_attack_type_sfall` (0x82C6) | opcode | stub | P3 | Returns 0; no per-weapon attack-type table in browser build. |
+| `get_critter_min_str_sfall` (0x82C7) | opcode | stub | P3 | Returns 0; no equipped-weapon proto lookup for minimum Strength. |
+
+Next available sfall opcode: **0x82C8**

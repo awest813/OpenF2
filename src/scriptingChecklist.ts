@@ -7348,6 +7348,181 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    // ---------------------------------------------------------------------------
+    // Phase 87 — New Reno full-playability hardening: inventory guards, stat guards,
+    //             sfall extended opcodes 0x82C0–0x82C7
+    // ---------------------------------------------------------------------------
+    // BLK-161 — rm_mult_objs_from_inven non-positive/non-finite count guard
+    {
+        id: 'blk_161_rm_mult_objs_non_positive',
+        kind: 'procedure',
+        description:
+            'rm_mult_objs_from_inven(obj, item, count): non-positive or non-finite ' +
+            'count previously caused a NaN return value (NaN - NaN) that propagated ' +
+            'as a corrupt removal count.  Now treated as a no-op with a warning — ' +
+            'mirrors BLK-146 (add_mult_objs_to_inven).  New Reno quest-completion ' +
+            'scripts compute removal counts from combat math that can yield 0/NaN.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-162 — obj_carrying_pid_obj null inventory guard
+    {
+        id: 'blk_162_obj_carrying_null_inventory',
+        kind: 'procedure',
+        description:
+            'obj_carrying_pid_obj(obj, pid): after the equipped-slot scan the function ' +
+            'accessed obj.inventory.length directly without checking whether the ' +
+            'inventory array is defined.  Critters spawned by encounter scripts may ' +
+            'have no inventory array; the direct access threw TypeError.  Now guards ' +
+            'with Array.isArray() and returns 0 safely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-163 — poison() non-finite amount guard
+    {
+        id: 'blk_163_poison_non_finite',
+        kind: 'procedure',
+        description:
+            'poison(obj, amount): non-finite amount (NaN/Infinity) was passed directly ' +
+            'to modifyBase("Poison Level", …), corrupting the stat and breaking all ' +
+            'drug-resistance and addiction checks.  New Reno drug scripts compute ' +
+            'poison doses from formulas that can produce NaN.  Now guards with ' +
+            'isFinite() and returns early.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-164 — radiation_add() non-finite amount guard
+    {
+        id: 'blk_164_radiation_add_non_finite',
+        kind: 'procedure',
+        description:
+            'radiation_add(obj, amount): non-finite amount passed to ' +
+            'modifyBase("Radiation Level", …) corrupted the stat, breaking radiation- ' +
+            'gauge and resistance checks.  New Reno nuclear-area encounter scripts ' +
+            'scale radiation by encounter-intensity values that can be undefined/NaN.  ' +
+            'Now guarded with isFinite(); returns early on non-finite input.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-165 — radiation_dec() non-finite amount guard
+    {
+        id: 'blk_165_radiation_dec_non_finite',
+        kind: 'procedure',
+        description:
+            'radiation_dec(obj, amount): completes the radiation-guard family (see ' +
+            'BLK-163, BLK-164).  Non-finite decrease amounts from cleaner-drug efficacy ' +
+            'formulas corrupted the Radiation Level stat.  Now guarded identically to ' +
+            'radiation_add().',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82C0 — get_critter_active_weapon_sfall
+    {
+        id: 'sfall_get_critter_weapon_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C0: get_critter_active_weapon_sfall(obj) → equipped weapon item or 0. ' +
+            'Returns the weapon in the active hand slot (rightHand for NPCs; ' +
+            'active-hand selection for the player).  New Reno boxing setup scripts ' +
+            'check what weapon a fighter has before choosing combat animations.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C1 — get_critter_base_skill_sfall
+    {
+        id: 'sfall_get_critter_base_skill_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C1: get_critter_base_skill_sfall(obj, skillId) → base skill value. ' +
+            'Returns the raw base skill allocation (without SPECIAL modifier contribution) ' +
+            'by delegating to has_trait(TRAIT_SKILL=3, obj, skillId).  New Reno scripts ' +
+            'read pre-fight base skill values to verify that boosts have taken effect.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C2 — set_critter_base_skill_sfall
+    {
+        id: 'sfall_set_critter_base_skill_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C2: set_critter_base_skill_sfall(obj, skillId, val) → set base skill. ' +
+            'Sets the base skill allocation directly by delegating to ' +
+            'set_critter_skill_points(), inheriting its non-finite guard (BLK-159).  ' +
+            'Used by New Reno boxing scripts to reset skill state after a fight.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C3 — get_critter_in_combat_sfall
+    {
+        id: 'sfall_get_critter_in_combat_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C3: get_critter_in_combat_sfall(obj) → 0|1. ' +
+            'Returns 1 if the critter is a participant in the active combat session, ' +
+            '0 otherwise.  Delegates to the same combat-roster check as metarule3(103).  ' +
+            'New Reno faction-combat scripts skip AI updates for critters already engaged.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C4 — get_map_var_sfall
+    {
+        id: 'sfall_get_map_var_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C4: get_map_var_sfall(mvar) → map variable value. ' +
+            'Reads a map variable by index via the sfall opcode path; delegates to ' +
+            'map_var() so the same _mapScript guard and mapVars state tracking apply.  ' +
+            'New Reno district scripts read faction-control variables via sfall calling convention.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C5 — set_map_var_sfall
+    {
+        id: 'sfall_set_map_var_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C5: set_map_var_sfall(mvar, val) → set map variable. ' +
+            'Writes a map variable by index via the sfall opcode path; delegates to ' +
+            'set_map_var() so the no-map-script guard and mapVars state tracking apply.  ' +
+            'New Reno district scripts update faction-control variables via sfall calling convention.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C6 — get_critter_attack_type_sfall
+    {
+        id: 'sfall_get_critter_attack_type_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C6: get_critter_attack_type_sfall(obj, slot) → 0 (stub). ' +
+            'Browser build: no per-weapon attack-type table; returns 0. ' +
+            'New Reno combat AI uses this to branch on fighter attack styles.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82C7 — get_critter_min_str_sfall
+    {
+        id: 'sfall_get_critter_min_str_87',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C7: get_critter_min_str_sfall(obj) → 0 (stub). ' +
+            'Browser build: no equipped-weapon proto lookup for minimum Strength; returns 0. ' +
+            'New Reno boxing scripts use this to check fighter eligibility.',
+        status: 'stub',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

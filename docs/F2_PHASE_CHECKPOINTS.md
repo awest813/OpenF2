@@ -561,3 +561,25 @@ Gate: **PASS** — all 3910 tests green, tsc clean.
 - [x] phase14.test.ts: stub count upper bound updated to ≤ 17
 
 Gate: **PASS** — all 3964 tests green, tsc clean.
+
+---
+
+## Phase 87 — New Reno full-playability hardening (continued): inventory/stat guards, sfall 0x82C0–0x82C7
+
+- [x] **BLK-161**: `rm_mult_objs_from_inven()` non-positive/non-finite count guard — New Reno quest-completion scripts compute item removal quantities from combat math that can produce NaN or zero; `count - remaining = NaN - NaN = NaN` returned as a corrupt removal count. Now guards with `!isFinite(count) || count <= 0`, returning 0 as a no-op. Mirrors BLK-146 (add_mult_objs_to_inven).
+- [x] **BLK-162**: `obj_carrying_pid_obj()` null inventory guard — After the equipped-slot scan (BLK-066) the function accessed `obj.inventory.length` without checking whether the inventory array is defined. Critters spawned by New Reno encounter scripts may have no inventory array; the access threw TypeError. Now guards with `Array.isArray()` and returns 0 safely.
+- [x] **BLK-163**: `poison()` non-finite amount guard — New Reno drug scripts compute poison doses from encounter formulas (dose × multiplier) that can produce NaN when an unknown drug type yields an undefined dose. Passing NaN to `modifyBase('Poison Level', NaN)` corrupted the stat, breaking all drug-resistance and addiction checks. Now rejects non-finite amounts with a warning.
+- [x] **BLK-164**: `radiation_add()` non-finite amount guard — New Reno nuclear-area encounter scripts scale radiation by encounter-intensity values that can be undefined/NaN. Passing to `modifyBase('Radiation Level', NaN)` corrupted the stat and broke radiation-gauge and resistance checks. Now guards identically to BLK-163.
+- [x] **BLK-165**: `radiation_dec()` non-finite amount guard — Completes the radiation-guard family (BLK-163/164). Non-finite decrease amounts from cleaner-drug efficacy formulas corrupted the Radiation Level stat. Now guarded identically.
+- [x] New sfall opcode 0x82C0: `get_critter_active_weapon_sfall(obj)` → weapon in active hand slot or 0 (rightHand for NPCs; active-hand selection for the player)
+- [x] New sfall opcode 0x82C1: `get_critter_base_skill_sfall(obj, skillId)` → raw base skill allocation without SPECIAL modifier (delegates to `has_trait(TRAIT_SKILL, …)`)
+- [x] New sfall opcode 0x82C2: `set_critter_base_skill_sfall(obj, skillId, val)` → set base skill directly (delegates to `set_critter_skill_points()`, inherits BLK-159 non-finite guard)
+- [x] New sfall opcode 0x82C3: `get_critter_in_combat_sfall(obj)` → 1 if critter is in active combat roster, 0 otherwise (delegates to same check as metarule3(103))
+- [x] New sfall opcode 0x82C4: `get_map_var_sfall(mvar)` → map variable value via sfall opcode path (delegates to `map_var()`)
+- [x] New sfall opcode 0x82C5: `set_map_var_sfall(mvar, val)` → set map variable via sfall opcode path (delegates to `set_map_var()`)
+- [x] New sfall opcode 0x82C6: `get_critter_attack_type_sfall(obj, slot)` → 0 (stub — no per-weapon attack-type table)
+- [x] New sfall opcode 0x82C7: `get_critter_min_str_sfall(obj)` → 0 (stub — no equipped-weapon proto lookup for minimum Strength)
+- [x] phase87.test.ts: 61 regression tests for all BLK items, sfall opcodes, and checklist integrity
+- [x] phase14.test.ts: stub count upper bound updated to ≤ 19
+
+Gate: **PASS** — all 4025 tests green, tsc clean.
