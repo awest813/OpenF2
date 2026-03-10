@@ -1617,6 +1617,35 @@ export namespace ScriptVMBridge {
 
        // 0x82CF — get_weapon_ammo_pid_sfall(obj): required ammo proto PID from proto.
        ,0x82CF: bridged("get_weapon_ammo_pid_sfall", 1) // get_weapon_ammo_pid(obj) → PID|0
+
+       // -----------------------------------------------------------------------
+       // Phase 89 — sfall extended opcodes 0x82D0–0x82D7 (arroyo/temple polish)
+       // Reaction values, difficulty queries, and combat-team helpers.
+       // -----------------------------------------------------------------------
+
+       // 0x82D0 — get_critter_reaction_sfall(npc, pc): NPC reaction toward pc (0–100).
+       ,0x82D0: bridged("get_critter_reaction_sfall", 2) // get_critter_reaction(npc, pc) → 0..100
+
+       // 0x82D1 — set_critter_reaction_sfall(npc, pc, val): set NPC reaction value.
+       ,0x82D1: bridged("set_critter_reaction_sfall", 3, false) // set_critter_reaction(npc, pc, val)
+
+       // 0x82D2 — get_game_difficulty_sfall(): game difficulty (0=easy, 1=normal, 2=hard).
+       ,0x82D2: bridged("get_game_difficulty_sfall", 0) // get_game_difficulty() → 0..2
+
+       // 0x82D3 — set_game_difficulty_sfall(level): set game difficulty (partial).
+       ,0x82D3: bridged("set_game_difficulty_sfall", 1, false) // set_game_difficulty(level)
+
+       // 0x82D4 — get_combat_difficulty_sfall(): combat difficulty (0=wimpy, 1=normal, 2=rough).
+       ,0x82D4: bridged("get_combat_difficulty_sfall", 0) // get_combat_difficulty() → 0..2
+
+       // 0x82D5 — set_combat_difficulty_sfall(level): set combat difficulty (partial).
+       ,0x82D5: bridged("set_combat_difficulty_sfall", 1, false) // set_combat_difficulty(level)
+
+       // 0x82D6 — get_critter_team_sfall(obj): combat team/faction number for critter.
+       ,0x82D6: bridged("get_critter_team_sfall", 1) // get_critter_team(obj) → teamNum
+
+       // 0x82D7 — set_critter_team_sfall(obj, team): set critter's combat team number.
+       ,0x82D7: bridged("set_critter_team_sfall", 2, false) // set_critter_team(obj, team)
     }
     Object.assign(opMap, bridgeOpMap)
 

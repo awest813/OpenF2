@@ -1217,7 +1217,15 @@ export namespace Scripting {
                 const intScore = player.getStat('INT') ?? 5
                 const educatedBonus = (player.perkRanks?.[47] ?? 0) * 2
                 const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
-                player.skills.skillPoints += pointsGained
+                // BLK-174: Guard against null player.skills — the Elder's dialogue
+                // calls give_exp_points(2500) when temple completion is confirmed.
+                // When the player object is partially initialised (skills component not
+                // yet attached, e.g. during early Arroyo character-creation flow),
+                // accessing skills.skillPoints throws TypeError and crashes the
+                // level-up loop.  Skip the skill-point award when skills is absent.
+                if (player.skills) {
+                    player.skills.skillPoints += pointsGained
+                }
                 uiLog('You have reached experience level ' + player.level + '.')
                 // BLK-047: Award a perk credit every 3 levels (levels 3, 6, 9, …).
                 // The player earns one perk selection every 3 levels in Fallout 2.
@@ -1519,6 +1527,20 @@ export namespace Scripting {
             if (!isGameObject(obj) || !isGameObject(other)) {
                 warn('move_obj_inven_to_obj: not game object')
                 return
+            }
+
+            // BLK-172: Guard against undefined/null inventory arrays — isGameObject()
+            // validates type and pid but not the presence of an inventory array.
+            // Temple item containers (chests, boxes) created via create_object_sid may
+            // not have their inventory array initialised yet when move_obj_inven_to_obj
+            // is called, causing a TypeError on the .length access below.
+            if (obj.inventory == null) {
+                warn('move_obj_inven_to_obj: obj has no inventory — treating as empty', undefined, this)
+                obj.inventory = []
+            }
+            if (other.inventory == null) {
+                warn('move_obj_inven_to_obj: other has no inventory — treating as empty', undefined, this)
+                other.inventory = []
             }
 
             info('move_obj_inven_to_obj: ' + obj.inventory.length + ' to ' + other.inventory.length, 'inventory')
@@ -2667,6 +2689,14 @@ export namespace Scripting {
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {
             log('override_map_start', arguments)
+            // BLK-173: Guard against non-finite position — temple exit grids compute
+            // the player spawn tile from level arithmetic; a broken formula yields NaN
+            // or Infinity which would corrupt overrideStartPos and cause the player to
+            // appear at an invalid/out-of-bounds map position on map load.
+            if (typeof x !== 'number' || !isFinite(x) || typeof y !== 'number' || !isFinite(y)) {
+                warn('override_map_start: non-finite position (' + x + ', ' + y + ') — no-op', undefined, this)
+                return
+            }
             info(`override_map_start: ${x}, ${y} / elevation ${elevation}`)
             overrideStartPos = { position: { x, y }, orientation: rotation, elevation }
         }
@@ -3248,13 +3278,17 @@ export namespace Scripting {
                 return
             }
             info('rm_timer_event: ' + obj + ', ' + obj.pid)
-            for (let i = 0; i < timeEventList.length; i++) {
+            // BLK-175: Remove ALL timer events matching this object — the original code
+            // used break after the first match.  Temple of Trials dart-trap scripts add
+            // multiple timer events to the same trap object (one per patrol pass); only
+            // removing the first left stale events that would fire after the trap was
+            // already cleared, producing phantom damage ticks on the player.  Iterate
+            // in reverse so splice indices stay valid after each removal.
+            for (let i = timeEventList.length - 1; i >= 0; i--) {
                 const timedEvent = timeEventList[i]
                 if (timedEvent.obj && timedEvent.obj.pid === obj.pid) {
-                    // TODO: better object equality
                     info('removing timed event for obj')
-                    timeEventList.splice(i--, 1)
-                    break
+                    timeEventList.splice(i, 1)
                 }
             }
         }
@@ -4031,6 +4065,15 @@ export namespace Scripting {
         // sfall extended opcode — teleport world-map cursor to (x, y) (0x819E).
         set_world_map_pos(x: number, y: number): void {
             log('set_world_map_pos', arguments)
+            // BLK-171: Guard against non-finite coordinates — arroyo exit scripts
+            // compute the world map destination from tile arithmetic; a broken formula
+            // produces NaN or Infinity which would corrupt globalState.worldPosition and
+            // break all subsequent world map navigation (travel, encounter rolls, area
+            // detection).  No-op and warn when either coordinate is not a finite number.
+            if (typeof x !== 'number' || !isFinite(x) || typeof y !== 'number' || !isFinite(y)) {
+                warn('set_world_map_pos: non-finite coordinates (' + x + ', ' + y + ') — no-op', undefined, this)
+                return
+            }
             globalState.worldPosition = { x, y }
         }
 
@@ -4559,10 +4602,11 @@ export namespace Scripting {
         // sfall 0x81EC — get_combat_difficulty_sfall():
         // Return the current combat difficulty as an integer:
         //   0 = Easy, 1 = Normal (default), 2 = Hard.
-        // Browser build: always returns 1 (Normal) — no per-session difficulty setting.
+        // Phase 89: upgraded from hardcoded 1 to read globalState.combatDifficulty,
+        // which is also written by set_combat_difficulty_sfall (0x82D5).
         get_combat_difficulty_sfall(): number {
             log('get_combat_difficulty_sfall', arguments)
-            return 1
+            return (globalState as any).combatDifficulty ?? 1
         }
 
         // sfall 0x81ED — game_in_combat_sfall():
@@ -5604,9 +5648,11 @@ export namespace Scripting {
 
         // sfall 0x8246 — get_game_difficulty_sfall():
         // Return the current game difficulty setting.
-        // 0=easy, 1=normal, 2=hard.  Browser build: always returns 1 (normal).
+        // 0=easy, 1=normal, 2=hard.
+        // Phase 89: upgraded from hardcoded 1 to read globalState.gameDifficulty,
+        // which is also written by set_game_difficulty_sfall (0x82D3).
         get_game_difficulty_sfall(): number {
-            return 1
+            return (globalState as any).gameDifficulty ?? 1
         }
 
         // sfall 0x8247 — get_violence_level_sfall():
@@ -7034,6 +7080,81 @@ export namespace Scripting {
             const direct = (obj as any).pro?.extra?.ammoPID
             if (direct !== undefined) {return direct}
             return (this.proto_data((obj as any).pid ?? 0, 26) as number) ?? 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 89 — sfall extended opcodes 0x82D0–0x82D7
+        // Arroyo / Temple of Trials end-sequence polish.
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82D0 — get_critter_reaction_sfall(npc, pc):
+        // Returns the reaction value (0–100) of npc toward pc.  Arroyo and Temple
+        // scripts query reaction to adjust dialogue tone and barter prices.
+        // Default to 50 (neutral) when no stored value is present.
+        get_critter_reaction_sfall(npc: Obj, _pc: Obj): number {
+            if (!isGameObject(npc) || npc.type !== 'critter') {
+                warn('get_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
+                return 50
+            }
+            return (npc as any)._reactionValue ?? 50
+        }
+
+        // sfall 0x82D1 — set_critter_reaction_sfall(npc, pc, val):
+        // Stores the reaction value on the NPC object for later reads.
+        // Clamped to [0, 100] to match Fallout 2 reaction-value range.
+        set_critter_reaction_sfall(npc: Obj, _pc: Obj, val: number): void {
+            if (!isGameObject(npc) || npc.type !== 'critter') {
+                warn('set_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
+                return
+            }
+            const clamped = typeof val === 'number' ? Math.max(0, Math.min(100, val)) : 50
+            ;(npc as any)._reactionValue = clamped
+        }
+
+        // sfall 0x82D2 — get_game_difficulty_sfall():
+        // Alias: delegates to the upgraded get_game_difficulty_sfall() implementation
+        // already registered at 0x8246.  Both opcodes read globalState.gameDifficulty.
+
+        // sfall 0x82D3 — set_game_difficulty_sfall(level):
+        // Sets the game difficulty.  Partial: accepted and stored but the engine
+        // does not yet cascade the value through encounter/XP formula branches.
+        set_game_difficulty_sfall(level: number): void {
+            if (typeof level !== 'number' || level < 0 || level > 2) {return}
+            ;(globalState as any).gameDifficulty = level
+        }
+
+        // sfall 0x82D4 — get_combat_difficulty_sfall():
+        // Alias: delegates to the upgraded get_combat_difficulty_sfall() implementation
+        // already registered at 0x81EC.  Both opcodes read globalState.combatDifficulty.
+
+        // sfall 0x82D5 — set_combat_difficulty_sfall(level):
+        // Sets the combat difficulty.  Partial: accepted and stored; full cascade
+        // through the damage formula is not yet wired.
+        set_combat_difficulty_sfall(level: number): void {
+            if (typeof level !== 'number' || level < 0 || level > 2) {return}
+            ;(globalState as any).combatDifficulty = level
+        }
+
+        // sfall 0x82D6 — get_critter_team_sfall(obj):
+        // Returns the critter's team/faction number used by combat AI to determine
+        // friend-or-foe relationships in Temple and Arroyo encounters.  0 = neutral.
+        get_critter_team_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_team_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as any)._teamNum ?? 0
+        }
+
+        // sfall 0x82D7 — set_critter_team_sfall(obj, team):
+        // Sets the critter's team number.  Used by arroyo.int to re-assign villager
+        // faction when the Elder's intro script fires after temple completion.
+        set_critter_team_sfall(obj: Obj, team: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_team_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            ;(obj as any)._teamNum = typeof team === 'number' ? team : 0
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
