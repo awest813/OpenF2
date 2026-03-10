@@ -7523,6 +7523,182 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 88 — Arroyo full-playability hardening (BLK-166..170) + sfall 0x82C8–0x82CF
+    // -----------------------------------------------------------------------
+
+    // BLK-166 — obj_open/obj_close missing use() method guard
+    {
+        id: 'blk_166_obj_open_close_no_use_method',
+        kind: 'procedure',
+        description:
+            'obj_open(obj) / obj_close(obj): previously called obj.use() unconditionally, ' +
+            'crashing with a TypeError when the object has no use() handler in the browser ' +
+            'build (e.g. wall-less grates, locked containers without an "open" animation). ' +
+            'Temple of Trials doors and grates hit this path in map_enter_p_proc. ' +
+            'Now guards with typeof obj.use === "function" and falls back to setting ' +
+            'obj.open directly.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-167 — critter_dmg non-critter self_obj source guard
+    {
+        id: 'blk_167_critter_dmg_non_critter_source',
+        kind: 'procedure',
+        description:
+            'critter_dmg(obj, damage, type): passes self_obj directly to critterDamage() as ' +
+            'the source/attacker.  When called from a dart-trap timed_event_p_proc (Temple ' +
+            'of Trials), self_obj is the trap object (not a critter).  Passing a non-critter ' +
+            'as source causes XP to be silently skipped even when the player\'s weapon kills ' +
+            'the enemy, and can cause downstream TypeError in critterKill XP attribution. ' +
+            'Now detects non-critter self_obj and passes null instead.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-168 — giq_option non-numeric INT stat guard
+    {
+        id: 'blk_168_giq_option_non_numeric_int',
+        kind: 'procedure',
+        description:
+            'giq_option(iqTest, msgList, msgID, target, reaction): called getStat("INT") ' +
+            'without defensive coercion.  For newly-created player objects whose stat ' +
+            'table is not yet fully initialised (e.g. first map load in Arroyo before ' +
+            'character creation finishes), getStat may return undefined.  ' +
+            'undefined < iqTest is false in JS so the option always appeared, bypassing ' +
+            'the INT gate.  Now defaults to 5 (human baseline INT) when getStat returns ' +
+            'a non-number.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-169 — create_object_sid negative tile guard
+    {
+        id: 'blk_169_create_object_sid_negative_tile',
+        kind: 'procedure',
+        description:
+            'create_object_sid(pid, tile, elev, sid): previously passed any tile number ' +
+            'to fromTileNum() without validation.  Fallout 2 scripts use tile=-1 as a ' +
+            '"not placed yet" sentinel, producing position {x:-1, y:0} which corrupts ' +
+            'pathfinding and LOS.  Temple of Trials item-spawn scripts occasionally emit ' +
+            'tile=-1 for items that should be conditionally placed.  Now returns null ' +
+            'immediately for tile<0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-170 — float_msg null/empty message guard
+    {
+        id: 'blk_170_float_msg_null_msg',
+        kind: 'procedure',
+        description:
+            'float_msg(obj, msg, type): previously stored null/undefined msg values in ' +
+            'globalState.floatMessages.  Arroyo and Temple scripts call float_msg() with ' +
+            'the result of message_str() which returns null for missing message keys. ' +
+            'Storing null causes the renderer to crash when measuring text width with ' +
+            'ctx.measureText(null).  Now returns early when msg is null or empty string.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // sfall 0x82C8 — get_weapon_min_dam_sfall
+    {
+        id: 'sfall_get_weapon_min_dam_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C8: get_weapon_min_dam_sfall(obj) → minimum damage roll from weapon ' +
+            'proto (WEAPON_DATA_MIN_DMG, proto_data field 14).  Used by combat and trade ' +
+            'scripts that query weapon effectiveness without iterating proto_data().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82C9 — get_weapon_max_dam_sfall
+    {
+        id: 'sfall_get_weapon_max_dam_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82C9: get_weapon_max_dam_sfall(obj) → maximum damage roll from weapon ' +
+            'proto (WEAPON_DATA_MAX_DMG, proto_data field 15).  Complements ' +
+            'get_weapon_min_dam_sfall for computing damage ranges.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82CA — get_weapon_dmg_type_sfall
+    {
+        id: 'sfall_get_weapon_dmg_type_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CA: get_weapon_dmg_type_sfall(obj) → damage type index from weapon ' +
+            'proto (WEAPON_DATA_DMG_TYPE, proto_data field 16). 0=Normal, 1=Laser, ' +
+            '2=Fire, 3=Plasma, 4=Electrical, 5=EMP, 6=Explosion.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82CB — get_weapon_ap_cost1_sfall
+    {
+        id: 'sfall_get_weapon_ap_cost1_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CB: get_weapon_ap_cost1_sfall(obj) → AP cost for primary attack ' +
+            'from weapon proto (WEAPON_DATA_AP_COST_1, proto_data field 21). ' +
+            'Used by AI scripts to decide whether a critter has enough AP for an attack.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82CC — get_weapon_ap_cost2_sfall
+    {
+        id: 'sfall_get_weapon_ap_cost2_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CC: get_weapon_ap_cost2_sfall(obj) → AP cost for secondary attack ' +
+            'from weapon proto (WEAPON_DATA_AP_COST_2, proto_data field 22). ' +
+            'Used by AI scripts to compare primary vs secondary attack viability.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82CD — get_weapon_max_range1_sfall
+    {
+        id: 'sfall_get_weapon_max_range1_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CD: get_weapon_max_range1_sfall(obj) → primary-attack maximum range ' +
+            'from weapon proto (WEAPON_DATA_MAX_RANGE_1, proto_data field 23). ' +
+            'Used by AI scripts to determine attack range before moving in.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82CE — get_weapon_max_range2_sfall
+    {
+        id: 'sfall_get_weapon_max_range2_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CE: get_weapon_max_range2_sfall(obj) → secondary-attack maximum range ' +
+            'from weapon proto (WEAPON_DATA_MAX_RANGE_2, proto_data field 24). ' +
+            'Complements get_weapon_max_range1_sfall for burst/aimed attack variants.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82CF — get_weapon_ammo_pid_sfall
+    {
+        id: 'sfall_get_weapon_ammo_pid_88',
+        kind: 'opcode',
+        description:
+            'sfall 0x82CF: get_weapon_ammo_pid_sfall(obj) → required ammo proto PID from ' +
+            'weapon proto (WEAPON_DATA_AMMO_PID, proto_data field 26). 0 for melee/unarmed. ' +
+            'Used by inventory and trade scripts that need to find compatible ammo.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
 ])
 
 // ---------------------------------------------------------------------------
