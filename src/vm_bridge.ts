@@ -1561,6 +1561,34 @@ export namespace ScriptVMBridge {
 
        // 0x82BF — get_critter_combat_data_sfall(obj): combat-session data stub (→ 0).
        ,0x82BF: bridged("get_critter_combat_data_sfall", 1) // get_critter_combat_data(obj) → 0
+
+       // -----------------------------------------------------------------------
+       // Phase 87 — sfall extended opcodes 0x82C0–0x82C7
+       // -----------------------------------------------------------------------
+
+       // 0x82C0 — get_critter_active_weapon_sfall(obj): weapon in active hand slot or 0.
+       ,0x82C0: bridged("get_critter_active_weapon_sfall", 1) // get_critter_active_weapon(obj) → item|0
+
+       // 0x82C1 — get_critter_base_skill_sfall(obj, skillId): raw base skill allocation.
+       ,0x82C1: bridged("get_critter_base_skill_sfall", 2) // get_critter_base_skill(obj, skillId) → value
+
+       // 0x82C2 — set_critter_base_skill_sfall(obj, skillId, val): set base skill directly.
+       ,0x82C2: bridged("set_critter_base_skill_sfall", 3, false) // set_critter_base_skill(obj, skillId, val)
+
+       // 0x82C3 — get_critter_in_combat_sfall(obj): 1 if in combat, 0 otherwise.
+       ,0x82C3: bridged("get_critter_in_combat_sfall", 1) // get_critter_in_combat(obj) → 0|1
+
+       // 0x82C4 — get_map_var_sfall(mvar): map variable by index (sfall opcode alias).
+       ,0x82C4: bridged("get_map_var_sfall", 1) // get_map_var(mvar) → value
+
+       // 0x82C5 — set_map_var_sfall(mvar, val): set map variable (sfall opcode alias).
+       ,0x82C5: bridged("set_map_var_sfall", 2, false) // set_map_var(mvar, val)
+
+       // 0x82C6 — get_critter_attack_type_sfall(obj, slot): attack type or 0 (stub).
+       ,0x82C6: bridged("get_critter_attack_type_sfall", 2) // get_critter_attack_type(obj, slot) → 0
+
+       // 0x82C7 — get_critter_min_str_sfall(obj): minimum Strength for equipped weapon or 0 (stub).
+       ,0x82C7: bridged("get_critter_min_str_sfall", 1) // get_critter_min_str(obj) → 0
     }
     Object.assign(opMap, bridgeOpMap)
 

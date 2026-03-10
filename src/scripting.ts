@@ -1571,6 +1571,17 @@ export namespace Scripting {
                 warn('rm_mult_objs_from_inven: item not a game object: ' + item, undefined, this)
                 return 0
             }
+            // BLK-161: Guard against non-positive/non-finite count — New Reno quest-completion
+            // scripts sometimes compute item removal quantities from combat math that can
+            // produce NaN or a non-positive value.  A non-finite count would leave `remaining`
+            // as NaN; the loop condition `remaining > 0` evaluates to false (no items removed)
+            // but the return value `count - remaining = NaN - NaN = NaN` then propagates as a
+            // corrupt removal count into the caller.  Mirror BLK-146 (add_mult_objs_to_inven):
+            // treat non-positive/non-finite count as a no-op and return 0.
+            if (typeof count !== 'number' || !isFinite(count) || count <= 0) {
+                warn('rm_mult_objs_from_inven: non-positive count (' + count + ') — no-op', undefined, this)
+                return 0
+            }
             let remaining = count
             // Iterate backward so splicing does not skip entries.
             for (let i = obj.inventory.length - 1; i >= 0 && remaining > 0; i--) {
@@ -1608,6 +1619,15 @@ export namespace Scripting {
             ]
             for (const slot of equipped) {
                 if (slot && slot.pid === pid) {return slot}
+            }
+
+            // BLK-162: Guard against null/undefined inventory array — critters created
+            // via create_object_sid() or spawned by encounter scripts may not have an
+            // inventory array initialised (obj.inventory is undefined).  Accessing
+            // obj.inventory.length directly would throw a TypeError.  Return 0 safely.
+            if (!Array.isArray(obj.inventory)) {
+                warn('obj_carrying_pid_obj: object has no inventory array', undefined, this)
+                return 0
             }
 
             for (let i = 0; i < obj.inventory.length; i++) {
@@ -1939,6 +1959,15 @@ export namespace Scripting {
                 warn('poison: not a critter: ' + obj, undefined, this)
                 return
             }
+            // BLK-163: Guard against non-finite poison amounts — New Reno drug scripts
+            // compute poison doses from encounter formulas (poison-per-dose × multipliers)
+            // that can produce NaN when an unknown drug type yields an undefined dose value.
+            // Passing NaN to modifyBase('Poison Level', NaN) corrupts the stat and breaks
+            // all subsequent drug-resistance and addiction checks.  Reject and warn.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('poison: non-finite amount (' + amount + ') — no-op', undefined, this)
+                return
+            }
             (obj as Critter).stats.modifyBase('Poison Level', amount)
         }
         radiation_dec(obj: Obj, amount: number) {
@@ -1946,11 +1975,28 @@ export namespace Scripting {
                 warn('radiation_dec: not a critter: ' + obj, undefined, this)
                 return
             }
+            // BLK-165: Guard against non-finite radiation decrease amounts — mirrors BLK-163/164.
+            // New Reno encounter scripts apply radiation_dec() to decontaminate NPCs using
+            // formulas that can produce NaN (e.g. zero decontamination rate via undefined
+            // cleaner-drug efficacy).  Passing NaN corrupts the Radiation Level stat.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('radiation_dec: non-finite amount (' + amount + ') — no-op', undefined, this)
+                return
+            }
             (obj as Critter).stats.modifyBase('Radiation Level', -amount)
         }
         radiation_add(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('radiation_add: not a critter: ' + obj, undefined, this)
+                return
+            }
+            // BLK-164: Guard against non-finite radiation amounts — New Reno scripts
+            // apply radiation_add() in nuclear-area encounters using level-scaled formulas
+            // that can produce NaN (e.g. undefined radiation intensity for an encounter type).
+            // Passing NaN to modifyBase('Radiation Level', NaN) corrupts the stat and
+            // breaks radiation gauge / resistance checks everywhere.  Reject and warn.
+            if (typeof amount !== 'number' || !isFinite(amount)) {
+                warn('radiation_add: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
             (obj as Critter).stats.modifyBase('Radiation Level', amount)
@@ -6759,6 +6805,93 @@ export namespace Scripting {
         // New Reno combat scripts query this for extended AI state; returning 0
         // causes them to fall through to safe defaults.
         get_critter_combat_data_sfall(_obj: Obj): number {
+            return 0
+        }
+
+        // -----------------------------------------------------------------------
+        // Phase 87 — sfall extended opcodes 0x82C0–0x82C7
+        // -----------------------------------------------------------------------
+
+        // sfall 0x82C0 — get_critter_active_weapon_sfall(obj):
+        // Return the game object that represents the weapon currently held in the
+        // critter's active hand slot, or 0 if no weapon is equipped.
+        // For NPCs, the active slot is always rightHand.  For the player, the
+        // active slot is determined by Player.activeHand (0=left, 1=right).
+        // New Reno boxing setup scripts check what weapon a fighter has before
+        // deciding which combat animations to use.
+        get_critter_active_weapon_sfall(obj: Obj): Obj | number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            const critter = obj as Critter
+            if (critter.isPlayer) {
+                const activeHand = (critter as any).activeHand ?? 0
+                return (activeHand === 1 ? critter.rightHand : critter.leftHand) ?? 0
+            }
+            return critter.rightHand ?? 0
+        }
+
+        // sfall 0x82C1 — get_critter_base_skill_sfall(obj, skillId):
+        // Return the raw base skill allocation for a critter (without SPECIAL
+        // modifier contribution).  Delegates to has_trait(TRAIT_SKILL, …).
+        // New Reno scripts read pre-fight base skill values to verify that
+        // skill boosts applied by critter_add_trait have taken effect.
+        get_critter_base_skill_sfall(obj: Obj, skillId: number): number {
+            return this.has_trait(3 /* TRAIT_SKILL */, obj, skillId) as number
+        }
+
+        // sfall 0x82C2 — set_critter_base_skill_sfall(obj, skillId, val):
+        // Set the base skill point allocation for a critter directly.
+        // Delegates to set_critter_skill_points() so the same non-finite
+        // guard (BLK-159) and skill-name validation apply.
+        // Used by New Reno boxing scripts to reset skill state after a fight.
+        set_critter_base_skill_sfall(obj: Obj, skillId: number, val: number): void {
+            this.set_critter_skill_points(obj, skillId, val)
+        }
+
+        // sfall 0x82C3 — get_critter_in_combat_sfall(obj):
+        // Return 1 if the given critter is currently a participant in the
+        // active combat session, 0 otherwise.  Delegates to the same combat-
+        // roster check used by metarule3(103).
+        // New Reno faction-combat scripts query this to skip AI updates for
+        // critters that are already engaged.
+        get_critter_in_combat_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            if (!globalState.inCombat) {return 0}
+            const active = (globalState.combat as any)?.combatants
+            if (!active) {return 1} // combat active but roster unavailable — assume in combat
+            return (active as Critter[]).includes(obj as Critter) ? 1 : 0
+        }
+
+        // sfall 0x82C4 — get_map_var_sfall(mvar):
+        // Read a map variable by index via the sfall opcode path.
+        // Delegates to map_var() so the same _mapScript guard and mapVars
+        // state tracking apply.  Used by New Reno district scripts that
+        // read faction-control variables via the sfall calling convention.
+        get_map_var_sfall(mvar: number): number {
+            return this.map_var(mvar) as number
+        }
+
+        // sfall 0x82C5 — set_map_var_sfall(mvar, val):
+        // Write a map variable by index via the sfall opcode path.
+        // Delegates to set_map_var() so the no-map-script guard and mapVars
+        // state tracking apply.  Used by New Reno district scripts that
+        // update faction-control variables via the sfall calling convention.
+        set_map_var_sfall(mvar: number, val: number): void {
+            this.set_map_var(mvar, val)
+        }
+
+        // sfall 0x82C6 — get_critter_attack_type_sfall(obj, slot):
+        // Return the attack type for slot 0 (primary) or 1 (secondary).
+        // Browser build: returns 0 (no per-weapon attack type table).
+        // New Reno combat AI uses this to branch on fighter attack styles.
+        get_critter_attack_type_sfall(_obj: Obj, _slot: number): number {
+            return 0
+        }
+
+        // sfall 0x82C7 — get_critter_min_str_sfall(obj):
+        // Return the minimum Strength required for the critter's equipped
+        // weapon.  Browser build: returns 0 (no equipped-weapon proto lookup).
+        // New Reno boxing scripts use this to check fighter eligibility.
+        get_critter_min_str_sfall(_obj: Obj): number {
             return 0
         }
 
