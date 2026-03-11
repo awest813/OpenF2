@@ -8349,6 +8349,168 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+    // -------------------------------------------------------------------------
+    // Phase 93 entries
+    // -------------------------------------------------------------------------
+
+    // BLK-190 — inven_cmds() null inventory guard
+    {
+        id: 'blk_190_inven_cmds_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-190: inven_cmds() guards against critters with no inventory array.  ' +
+            'Arroyo temple critters spawned via create_object_sid() have no inventory ' +
+            'until their map_enter_p_proc runs; accessing obj.inventory.length directly ' +
+            'throws TypeError.  Returns null for all commands when inventory is absent.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-191 — has_skill() missing getSkill() method guard
+    {
+        id: 'blk_191_has_skill_no_getskill',
+        kind: 'procedure',
+        description:
+            'BLK-191: has_skill() guards against critters that lack the getSkill() ' +
+            'method.  Proto-only Arroyo NPC objects may be typed as critter but have ' +
+            'no SkillSet attached; calling a missing method throws TypeError.  ' +
+            'Returns 0 (no skill) instead.  Mirrors BLK-186 for get_critter_skill().',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-192 — critter_attempt_placement() non-finite tile guard
+    {
+        id: 'blk_192_critter_attempt_placement_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-192: critter_attempt_placement() guards against non-finite tile numbers.  ' +
+            'The existing tileNum <= 0 check does NOT catch NaN (NaN <= 0 is false in JS).  ' +
+            'Arroyo encounter initialisation scripts may compute tile positions from ' +
+            'arithmetic that produces NaN; fromTileNum(NaN) then corrupts the critter ' +
+            'position.  Returns -1 for any non-finite tileNum.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-193 — drop_obj() null source inventory guard
+    {
+        id: 'blk_193_drop_obj_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-193: drop_obj() guards against a null/undefined inventory on the source ' +
+            'critter.  Arroyo NPC critters spawned via create_object_sid() may have no ' +
+            'inventory array until their map_enter_p_proc runs; calling indexOf() on ' +
+            'null/undefined throws TypeError.  Skips the inventory-removal step safely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // BLK-194 — pickup_obj() null player inventory guard
+    {
+        id: 'blk_194_pickup_obj_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-194: pickup_obj() guards against a null/undefined player.inventory ' +
+            'array.  In the Arroyo opening sequence the player object may be constructed ' +
+            'before its inventory is initialised; calling push() on null/undefined throws ' +
+            'TypeError.  Returns silently as a no-op when the array is absent.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+    // sfall 0x82F0 — get_critter_hp_sfall2
+    {
+        id: 'sfall_get_critter_hp2_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F0: get_critter_hp_sfall2(obj) → current HP (alias of 0x8297).  ' +
+            'Arroyo and temple encounter scripts compiled against sfall 4.3+ use this ' +
+            'alternate opcode slot to read critter health for kill-condition checks.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82F1 — set_critter_hp_sfall2
+    {
+        id: 'sfall_set_critter_hp2_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F1: set_critter_hp_sfall2(obj, hp) → set current HP.  ' +
+            'Alias of set_critter_hp (0x8297); used by Arroyo scripted encounters to ' +
+            'directly set NPC health after spawning.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+    // sfall 0x82F2 — get_critter_max_hp_sfall2
+    {
+        id: 'sfall_get_critter_max_hp2_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F2: get_critter_max_hp_sfall2(obj) → maximum HP (alias of 0x828F).  ' +
+            'Temple encounter scripts query max HP when calculating damage thresholds.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82F3 — set_critter_max_hp_sfall2
+    {
+        id: 'sfall_set_critter_max_hp2_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F3: set_critter_max_hp_sfall2(obj, hp) → set maximum HP.  ' +
+            'Alias of set_critter_max_hp_sfall (0x81F9).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82F4 — get_critter_melee_dmg_sfall
+    {
+        id: 'sfall_get_critter_melee_dmg_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F4: get_critter_melee_dmg_sfall(obj) → Melee Damage stat value.  ' +
+            'Arroyo rat and guard encounter scripts read melee damage to scale encounter ' +
+            'difficulty.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82F5 — set_critter_melee_dmg_sfall
+    {
+        id: 'sfall_set_critter_melee_dmg_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F5: set_critter_melee_dmg_sfall(obj, val) → set Melee Damage.  ' +
+            'Clamped to [0, ∞); non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82F6 — get_critter_critical_chance_sfall
+    {
+        id: 'sfall_get_critter_critical_chance_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F6: get_critter_critical_chance_sfall(obj) → Critical Chance [0..100].  ' +
+            'Temple boss-encounter scripts read critical chance for combat difficulty scaling.  ' +
+            'Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82F7 — set_critter_critical_chance_sfall
+    {
+        id: 'sfall_set_critter_critical_chance_93',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F7: set_critter_critical_chance_sfall(obj, val) → set Critical Chance.  ' +
+            'Clamped to [0, 100]; non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

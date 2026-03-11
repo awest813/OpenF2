@@ -1733,6 +1733,33 @@ export namespace ScriptVMBridge {
 
        // 0x82EF — get_max_level_sfall(): engine maximum player level (99).
        ,0x82EF: bridged("get_max_level_sfall", 0) // → 99
+
+       // Phase 93 — sfall extended opcodes 0x82F0–0x82F7 (HP aliases, melee dmg,
+       // critical chance).
+
+       // 0x82F0 — get_critter_hp_sfall2(obj): current HP (alias of 0x8297).
+       ,0x82F0: bridged("get_critter_hp_sfall2", 1) // → current HP
+
+       // 0x82F1 — set_critter_hp_sfall2(obj, hp): set current HP.
+       ,0x82F1: bridged("set_critter_hp_sfall2", 2, false) // set current HP
+
+       // 0x82F2 — get_critter_max_hp_sfall2(obj): maximum HP (alias of 0x81F8 / 0x828F).
+       ,0x82F2: bridged("get_critter_max_hp_sfall2", 1) // → max HP
+
+       // 0x82F3 — set_critter_max_hp_sfall2(obj, hp): set maximum HP.
+       ,0x82F3: bridged("set_critter_max_hp_sfall2", 2, false) // set max HP
+
+       // 0x82F4 — get_critter_melee_dmg_sfall(obj): critter Melee Damage stat.
+       ,0x82F4: bridged("get_critter_melee_dmg_sfall", 1) // → Melee Damage
+
+       // 0x82F5 — set_critter_melee_dmg_sfall(obj, val): set Melee Damage stat.
+       ,0x82F5: bridged("set_critter_melee_dmg_sfall", 2, false) // set Melee Damage
+
+       // 0x82F6 — get_critter_critical_chance_sfall(obj): Critical Chance stat.
+       ,0x82F6: bridged("get_critter_critical_chance_sfall", 1) // → Critical Chance [0..100]
+
+       // 0x82F7 — set_critter_critical_chance_sfall(obj, val): set Critical Chance stat.
+       ,0x82F7: bridged("set_critter_critical_chance_sfall", 2, false) // set Critical Chance [0..100]
     }
     Object.assign(opMap, bridgeOpMap)
 
