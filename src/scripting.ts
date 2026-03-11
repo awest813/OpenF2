@@ -1781,6 +1781,14 @@ export namespace Scripting {
                 warn('has_skill: unknown skill number: ' + skill, undefined, this)
                 return 0
             }
+            // BLK-191: Guard against critters that lack the getSkill() method — proto-only
+            // Arroyo NPC objects (spawned via create_object_sid with no SkillSet attached)
+            // have type === 'critter' but no getSkill function.  Calling a missing method
+            // throws TypeError; return 0 (no skill) instead.
+            if (typeof (obj as any).getSkill !== 'function') {
+                warn('has_skill: critter has no getSkill() method — returning 0', undefined, this)
+                return 0
+            }
             return (obj as Critter).getSkill(skillName)
         }
         roll_vs_skill(obj: Obj, skill: number, bonus: number) {
@@ -1832,6 +1840,14 @@ export namespace Scripting {
                 warn('inven_cmds: not a critter: ' + obj, 'inventory', this)
                 return null
             }
+            // BLK-190: Guard against null/undefined inventory array — critters spawned
+            // via create_object_sid() in the Arroyo temple have no inventory until their
+            // map_enter_p_proc runs.  Accessing obj.inventory.length directly on a null
+            // or undefined array throws TypeError.  Return null for all commands.
+            if (!Array.isArray(obj.inventory)) {
+                warn('inven_cmds: critter has no inventory — returning null', 'inventory', this)
+                return null
+            }
 
             switch (invenCmd) {
                 case 0: // INVEN_CMD_FIRST
@@ -1863,7 +1879,11 @@ export namespace Scripting {
             // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
             // Fallout 2 returns -1 when placement fails; we mirror that here so
             // calling scripts can detect and handle the failure gracefully.
-            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= 0) {return -1}
+            // BLK-192: Also guard against non-finite tile numbers — Arroyo encounter
+            // scripts compute tile positions from arithmetic that can yield NaN (e.g.
+            // when a critter's source tile is uninitialised).  tileNum <= 0 does NOT
+            // catch NaN because NaN <= 0 is false in JavaScript.
+            if (!isGameObject(obj) || typeof tileNum !== 'number' || !Number.isFinite(tileNum) || tileNum <= 0) {return -1}
             // BLK-108: Guard against null gMap — critter_attempt_placement delegates
             // to move_to(), which calls gMap.changeElevation() without checking gMap.
             // During map transitions or in test environments this crash is silent and
@@ -2231,6 +2251,14 @@ export namespace Scripting {
                 warn('pickup_obj: no player', undefined, this)
                 return
             }
+            // BLK-194: Guard against null/undefined player.inventory — in the Arroyo
+            // opening sequence the player object may be constructed before its inventory
+            // array is initialised.  Calling push() on null/undefined throws TypeError;
+            // silently no-op so the item-pickup scripted event doesn't crash the map.
+            if (!Array.isArray(player.inventory)) {
+                warn('pickup_obj: player has no inventory array — no-op', undefined, this)
+                return
+            }
             if (globalState.gMap) {globalState.gMap.removeObject(obj)}
             player.inventory.push(obj)
         }
@@ -2258,8 +2286,14 @@ export namespace Scripting {
                 warn('drop_obj: no source critter', undefined, this)
                 return
             }
-            const idx = source.inventory.indexOf(obj)
-            if (idx !== -1) {source.inventory.splice(idx, 1)}
+            // BLK-193: Guard against null/undefined inventory on the source critter —
+            // Arroyo NPC critters spawned via create_object_sid() may have no inventory
+            // array until their map_enter_p_proc runs.  Calling indexOf on null/undefined
+            // throws TypeError; skip the inventory removal step safely.
+            if (Array.isArray(source.inventory)) {
+                const idx = source.inventory.indexOf(obj)
+                if (idx !== -1) {source.inventory.splice(idx, 1)}
+            }
             if (globalState.gMap && source.position) {
                 obj.position = { ...source.position }
                 globalState.gMap.addObject(obj)
@@ -7483,6 +7517,81 @@ export namespace Scripting {
         // Return the engine's maximum player level cap (99 in Fallout 2).
         get_max_level_sfall(): number {
             return 99
+        }
+
+        // -------------------------------------------------------------------------
+        // Phase 93 — sfall extended opcodes 0x82F0–0x82F7 (HP aliases, melee dmg,
+        // critical chance).
+        // -------------------------------------------------------------------------
+
+        // sfall 0x82F0 — get_critter_hp_sfall2(obj): current HP (alias of existing
+        // get_critter_hp).  Arroyo and temple encounter scripts compiled against
+        // sfall 4.3+ may use this alternate slot to read critter health.
+        get_critter_hp_sfall2(obj: Obj): number {
+            return this.get_critter_hp(obj)
+        }
+
+        // sfall 0x82F1 — set_critter_hp_sfall2(obj, hp): set current HP.
+        // Alias of set_critter_hp (0x8297).  Clamps to [0, Max HP].
+        set_critter_hp_sfall2(obj: Obj, hp: number): void {
+            this.set_critter_hp(obj, hp)
+        }
+
+        // sfall 0x82F2 — get_critter_max_hp_sfall2(obj): maximum HP.
+        // Alias of get_critter_max_hp_sfall (0x81F8 / 0x828F).
+        get_critter_max_hp_sfall2(obj: Obj): number {
+            return this.get_critter_max_hp_sfall(obj)
+        }
+
+        // sfall 0x82F3 — set_critter_max_hp_sfall2(obj, hp): set maximum HP.
+        // Alias of set_critter_max_hp_sfall (0x81F9).
+        set_critter_max_hp_sfall2(obj: Obj, hp: number): void {
+            this.set_critter_max_hp_sfall(obj, hp)
+        }
+
+        // sfall 0x82F4 — get_critter_melee_dmg_sfall(obj): critter Melee Damage stat.
+        // Returns the critter's base Melee Damage value (used for unarmed/melee
+        // attacks).  Returns 0 for non-critters or if the stat is unavailable.
+        get_critter_melee_dmg_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_melee_dmg_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Melee Damage') ?? 0
+        }
+
+        // sfall 0x82F5 — set_critter_melee_dmg_sfall(obj, val): set Melee Damage stat.
+        // Clamps to [0, ∞) and coerces non-finite to 0.
+        set_critter_melee_dmg_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_melee_dmg_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            ;(obj as Critter).stats.setBase('Melee Damage', v)
+        }
+
+        // sfall 0x82F6 — get_critter_critical_chance_sfall(obj): Critical Chance stat.
+        // Returns the critter's base Critical Chance value.  Returns 0 for
+        // non-critters or if the stat is unavailable.
+        get_critter_critical_chance_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_critical_chance_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Critical Chance') ?? 0
+        }
+
+        // sfall 0x82F7 — set_critter_critical_chance_sfall(obj, val): set Critical Chance.
+        // Clamps to [0, 100] and coerces non-finite to 0.
+        set_critter_critical_chance_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_critical_chance_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(0, Math.min(100, Math.trunc(val))) : 0
+            ;(obj as Critter).stats.setBase('Critical Chance', v)
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
