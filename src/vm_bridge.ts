@@ -1760,6 +1760,33 @@ export namespace ScriptVMBridge {
 
        // 0x82F7 — set_critter_critical_chance_sfall(obj, val): set Critical Chance stat.
        ,0x82F7: bridged("set_critter_critical_chance_sfall", 2, false) // set Critical Chance [0..100]
+
+       // Phase 94 — sfall extended opcodes 0x82F8–0x82FF (armor class, damage
+       // resist/thresh, action points).
+
+       // 0x82F8 — get_critter_armor_class_sfall(obj): Armor Class stat.
+       ,0x82F8: bridged("get_critter_armor_class_sfall", 1) // → Armor Class
+
+       // 0x82F9 — set_critter_armor_class_sfall(obj, val): set Armor Class.
+       ,0x82F9: bridged("set_critter_armor_class_sfall", 2, false) // set Armor Class
+
+       // 0x82FA — get_critter_damage_resist_sfall(obj, damType): Damage Resistance.
+       ,0x82FA: bridged("get_critter_damage_resist_sfall", 2) // → DR for damage type
+
+       // 0x82FB — set_critter_damage_resist_sfall(obj, damType, val): set DR.
+       ,0x82FB: bridged("set_critter_damage_resist_sfall", 3, false) // set DR [0..100]
+
+       // 0x82FC — get_critter_damage_thresh_sfall(obj, damType): Damage Threshold.
+       ,0x82FC: bridged("get_critter_damage_thresh_sfall", 2) // → DT for damage type
+
+       // 0x82FD — set_critter_damage_thresh_sfall(obj, damType, val): set DT.
+       ,0x82FD: bridged("set_critter_damage_thresh_sfall", 3, false) // set DT [0..∞)
+
+       // 0x82FE — get_critter_action_points_sfall2(obj): current Action Points (alias).
+       ,0x82FE: bridged("get_critter_action_points_sfall2", 1) // → current AP
+
+       // 0x82FF — set_critter_action_points_sfall2(obj, val): set current Action Points (alias).
+       ,0x82FF: bridged("set_critter_action_points_sfall2", 2, false) // set current AP
     }
     Object.assign(opMap, bridgeOpMap)
 
