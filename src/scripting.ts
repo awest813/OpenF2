@@ -742,6 +742,16 @@ export namespace Scripting {
                 warn('map_var: map script has no name')
                 return
             }
+            // BLK-202: Guard against non-finite numeric values — Arroyo and Temple
+            // quest-tracking scripts compute map-variable values from arithmetic that can
+            // yield NaN (e.g. when a quest-stage count is divided by an uninitialised
+            // multiplier).  Storing NaN in mapVars corrupts downstream map_var() reads and
+            // can break quest-gating conditions.  Mirror BLK-147 (set_local_var) and
+            // BLK-129 (set_global_var): clamp to 0 and warn so the issue is traceable.
+            if (typeof value === 'number' && !isFinite(value)) {
+                warn('set_map_var: non-finite value (' + value + ') for mvar ' + mvar + ' — clamping to 0', 'mvars')
+                value = 0
+            }
             info('set_map_var: ' + mvar + ' = ' + value, 'mvars')
             if (mapVars[scriptName] === undefined) {mapVars[scriptName] = {}}
             mapVars[scriptName][mvar] = value
@@ -1587,8 +1597,14 @@ export namespace Scripting {
             if (!isGameObject(obj)) {
                 warn('obj_is_carrying_obj_pid: not a game object')
                 return 0
-            } else if (obj.inventory === undefined) {
-                warn('obj_is_carrying_obj_pid: object has no inventory!')
+            }
+            // BLK-200: Guard against null/undefined inventory — Arroyo character-creation
+            // scripts may create critters with `inventory: null` rather than omitting the
+            // field entirely.  The old guard (`=== undefined`) did not catch `null`, so
+            // null.length on the for-loop condition threw a TypeError.  Use Array.isArray()
+            // to guard both null and undefined, consistent with BLK-162 and BLK-188.
+            if (!Array.isArray(obj.inventory)) {
+                warn('obj_is_carrying_obj_pid: object has no inventory array', undefined, this)
                 return 0
             }
 
@@ -1607,8 +1623,17 @@ export namespace Scripting {
             } else if (!isGameObject(item)) {
                 warn('add_mult_objs_to_inven: item not a game object: ' + item)
                 return
-            } else if (obj.inventory === undefined) {
-                warn('add_mult_objs_to_inven: object has no inventory!')
+            }
+            // BLK-201: Guard against null/undefined inventory — Arroyo start-sequence
+            // scripts (e.g. tribal equipment distribution) call add_mult_objs_to_inven()
+            // on freshly created critters that may have `inventory: null`.  The old guard
+            // (`=== undefined`) silently passed null inventory, which then caused
+            // addInventoryItem() to crash when it accessed this.inventory.push().
+            // Use Array.isArray() to catch both null and undefined, consistent with
+            // BLK-162 (obj_carrying_pid_obj), BLK-188 (rm_mult_objs_from_inven), and
+            // BLK-200 (obj_is_carrying_obj_pid).
+            if (!Array.isArray(obj.inventory)) {
+                warn('add_mult_objs_to_inven: object has no inventory array', undefined, this)
                 return
             }
             // BLK-146: Guard against non-positive counts — New Reno reward scripts
@@ -2710,6 +2735,17 @@ export namespace Scripting {
                 warn('set_obj_visibility: not a game object: ' + obj)
                 return
             }
+            // BLK-203: Guard against non-numeric/non-finite visibility values — Arroyo
+            // NPC init scripts sometimes pass the result of a Fallout 2 conditional
+            // expression (e.g. `local_var(0) == 0`) that can resolve to null or NaN
+            // when the variable is uninitialised.  `!NaN` and `!null` both evaluate to
+            // `true`, so the object would be shown (visible=true) regardless of intent.
+            // When the argument is not a finite number, treat as 0 (show the object)
+            // to preserve the default-visible semantics and emit a warning.
+            if (typeof visibility !== 'number' || !isFinite(visibility)) {
+                warn('set_obj_visibility: non-numeric visibility (' + visibility + ') — treating as 0 (visible)', undefined, this)
+                visibility = 0
+            }
 
             obj.visible = !visibility
         }
@@ -3157,8 +3193,14 @@ export namespace Scripting {
         giq_option(iqTest: number, msgList: number, msgID: string | number, target: any, reaction: number) {
             log('giQ_Option', arguments)
             const msg = getScriptMessage(msgList, msgID)
-            if (msg === null) {
-                console.warn('giq_option: msg is null')
+            // BLK-204: Guard against null/empty message — mirrors the same guard in
+            // gsay_option() (BLK-107/BLK-156).  Arroyo character-creation dialogue
+            // scripts use giq_option() for INT-gated options; if a message key is
+            // missing from the loaded .msg file, getScriptMessage() returns null and
+            // an empty-string message would render as a blank option in the UI.
+            // Skip silently so the player never sees a blank IQ-gated option.
+            if (msg === null || msg === '') {
+                warn('giq_option: msg is null/empty — option skipped', undefined, this)
                 return
             }
             info(
@@ -7760,6 +7802,110 @@ export namespace Scripting {
             const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
             this.set_critter_action_points_sfall(obj, v)
         }
+
+        // -------------------------------------------------------------------------
+        // Phase 95 — sfall extended opcodes 0x8300–0x8307 (critter SPECIAL stats:
+        // Perception, Luck, Agility, Charisma — used by Arroyo guard-AI detection
+        // scripts and character-creation validation at game start).
+        // -------------------------------------------------------------------------
+
+        // sfall 0x8300 — get_critter_perception_sfall(obj): Perception stat.
+        // Returns the critter's Perception value used by guard scripts to scale
+        // detection range and awareness.  Arroyo guard and Elder scripts read PE
+        // to determine whether the player is spotted during the opening sequence.
+        // Returns 0 for non-critters.
+        get_critter_perception_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_perception_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Perception') ?? 0
+        }
+
+        // sfall 0x8301 — set_critter_perception_sfall(obj, val): set Perception.
+        // Clamps to [1, 10] and coerces non-finite to 1 (minimum valid SPECIAL stat).
+        set_critter_perception_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_perception_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Perception', v)
+        }
+
+        // sfall 0x8302 — get_critter_luck_sfall(obj): Luck stat.
+        // Returns the critter's Luck stat used by critical-hit and random-event
+        // scripts during Arroyo's opening and Temple of Trials encounters.
+        // Returns 0 for non-critters.
+        get_critter_luck_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_luck_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Luck') ?? 0
+        }
+
+        // sfall 0x8303 — set_critter_luck_sfall(obj, val): set Luck.
+        // Clamps to [1, 10].
+        set_critter_luck_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_luck_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Luck', v)
+        }
+
+        // sfall 0x8304 — get_critter_agility_sfall(obj): Agility stat.
+        // Returns the critter's Agility stat used for AP calculation and dodge
+        // chance during Arroyo's NPC init and Temple combat sequences.
+        // Returns 0 for non-critters.
+        get_critter_agility_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_agility_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Agility') ?? 0
+        }
+
+        // sfall 0x8305 — set_critter_agility_sfall(obj, val): set Agility.
+        // Clamps to [1, 10].
+        set_critter_agility_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_agility_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Agility', v)
+        }
+
+        // sfall 0x8306 — get_critter_charisma_sfall(obj): Charisma stat.
+        // Returns the critter's Charisma stat used by party-size and NPC-reaction
+        // scripts in Arroyo village dialogue (Elder, tribesman greeting).
+        // Returns 0 for non-critters.
+        get_critter_charisma_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_charisma_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Charisma') ?? 0
+        }
+
+        // sfall 0x8307 — set_critter_charisma_sfall(obj, val): set Charisma.
+        // Clamps to [1, 10].
+        set_critter_charisma_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_charisma_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Charisma', v)
+        }
+
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
             if (!isGameObject(obj)) {
