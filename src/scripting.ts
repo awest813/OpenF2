@@ -274,6 +274,14 @@ export namespace Scripting {
         17: 'Outdoorsman',
     }
 
+    // Ordered damage-type name table shared by the get/set damage-resist/thresh sfall
+    // opcodes (0x82FA–0x82FD).  Index matches the DAMAGE_TYPE_* constants used by
+    // Fallout 2 scripts: 0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP,
+    // 6=Explosion.
+    const damageTypeNames: readonly string[] = [
+        'Normal', 'Laser', 'Fire', 'Plasma', 'Electrical', 'EMP', 'Explosion',
+    ]
+
     type DebugLogShowType = keyof typeof Config.scripting.debugLogShowType
 
     function stub(name: string, args: IArguments, type?: DebugLogShowType) {
@@ -1793,7 +1801,13 @@ export namespace Scripting {
         }
         roll_vs_skill(obj: Obj, skill: number, bonus: number) {
             const skillValue = this.has_skill(obj, skill)
-            return toRollResult(rollSkillCheck(skillValue, bonus))
+            // BLK-197: Guard against non-finite bonus — Arroyo and Temple encounter
+            // scripts compute the bonus from arithmetic that can yield NaN (e.g.
+            // when a critter's stat is uninitialised).  rollSkillCheck(v, NaN) computes
+            // v + NaN = NaN, and NaN < roll is always false, making every check fail.
+            // Coerce non-finite bonus to 0 so the roll is made against the raw skill.
+            const safeBonus = (typeof bonus === 'number' && isFinite(bonus)) ? bonus : 0
+            return toRollResult(rollSkillCheck(skillValue, safeBonus))
         }
         do_check(obj: Obj, check: number, modifier: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -2797,8 +2811,17 @@ export namespace Scripting {
                 warn('obj_set_light_level: not a game object: ' + obj)
                 return
             }
-            obj.lightIntensity = Math.max(0, Math.min(65536, intensity))
-            obj.lightRadius = Math.max(0, distance)
+            // BLK-199: Guard against non-finite intensity and distance — Arroyo and
+            // Temple torch/fire barrel scripts compute intensity from tile index or
+            // time-of-day arithmetic that can yield NaN.  Math.max(0, Math.min(65536,
+            // NaN)) = NaN, which would store NaN on obj.lightIntensity and corrupt
+            // the lighting pipeline.  Clamp non-finite values to 0.
+            const safeIntensity = (typeof intensity === 'number' && isFinite(intensity))
+                ? Math.max(0, Math.min(65536, intensity)) : 0
+            const safeDistance = (typeof distance === 'number' && isFinite(distance))
+                ? Math.max(0, distance) : 0
+            obj.lightIntensity = safeIntensity
+            obj.lightRadius = safeDistance
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {
             log('override_map_start', arguments)
@@ -2945,6 +2968,13 @@ export namespace Scripting {
             return 0 // it's not there
         }
         tile_is_visible(tile: number) {
+            // BLK-198: Guard against non-finite tile numbers — Arroyo ceremony scripts
+            // compute the reference tile from arithmetic that can yield NaN when a
+            // critter's starting tile is uninitialised.  fromTileNum(NaN) returns
+            // {x:NaN, y:NaN} and hexDistance returns NaN, so NaN <= 14 is false and
+            // the tile is incorrectly reported as not visible.  Return 1 (visible) for
+            // non-finite tile numbers so dependent script branches can still execute.
+            if (typeof tile !== 'number' || !isFinite(tile)) {return 1}
             // A tile is considered visible if the player exists and the tile is within
             // the Fallout 2 standard view radius of 14 hexes.  When the player is not
             // available (e.g. scripts run at startup), fall back to returning 1 so that
@@ -3592,7 +3622,12 @@ export namespace Scripting {
             if (!globalState.critterKillCounts) {
                 (globalState as any).critterKillCounts = {}
             }
-            globalState.critterKillCounts[killType] = Math.max(0, amount)
+            // BLK-196: Guard against non-finite amount — Math.max(0, NaN) = NaN, which
+            // would store NaN in the kill-count table and corrupt subsequent comparisons.
+            // Arroyo temple completion scripts call set_critter_kills to award kill-type
+            // credit after boss encounters; a broken formula can yield NaN.  Clamp to 0.
+            const safeAmount = (typeof amount === 'number' && isFinite(amount)) ? Math.max(0, Math.trunc(amount)) : 0
+            globalState.critterKillCounts[killType] = safeAmount
         }
 
         // sfall extended opcodes — critter body type (0x8172)
@@ -4387,6 +4422,16 @@ export namespace Scripting {
             }
             switch (pcstat) {
                 case 0: // PCSTAT_unspent_skill_points
+                    // BLK-195: Guard against null player.skills — Arroyo Elder scripts
+                    // call set_pc_stat(0, points) to assign skill points after awarding
+                    // XP.  When the skills component has not yet been attached to a
+                    // partially-initialised player object, player.skills is null and
+                    // .skillPoints throws TypeError.  Mirror BLK-185 (get_pc_stat guard):
+                    // treat it as a no-op with a warning so the script can continue.
+                    if (!player.skills) {
+                        warn('set_pc_stat(0): player.skills is null — no-op', undefined, this)
+                        return
+                    }
                     player.skills.skillPoints = Math.max(0, val)
                     return
                 case 1: // PCSTAT_level
@@ -7592,6 +7637,128 @@ export namespace Scripting {
             const v = (typeof val === 'number' && isFinite(val))
                 ? Math.max(0, Math.min(100, Math.trunc(val))) : 0
             ;(obj as Critter).stats.setBase('Critical Chance', v)
+        }
+
+        // -------------------------------------------------------------------------
+        // Phase 94 — sfall extended opcodes 0x82F8–0x82FF (armor class, damage
+        // resist/thresh, action points).
+        // -------------------------------------------------------------------------
+
+        // sfall 0x82F8 — get_critter_armor_class_sfall(obj): Armor Class stat.
+        // Returns the critter's base Armor Class value used by combat to-hit
+        // calculations.  Arroyo guard and temple encounter scripts read AC to
+        // scale difficulty.  Returns 0 for non-critters.
+        get_critter_armor_class_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_armor_class_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Armor Class') ?? 0
+        }
+
+        // sfall 0x82F9 — set_critter_armor_class_sfall(obj, val): set Armor Class.
+        // Clamps to [0, ∞) and coerces non-finite to 0.
+        set_critter_armor_class_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_armor_class_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            ;(obj as Critter).stats.setBase('Armor Class', v)
+        }
+
+        // sfall 0x82FA — get_critter_damage_resist_sfall(obj, damType): Damage Resistance.
+        // Returns the critter's DR value for the given damage type index (0 = Normal,
+        // 1 = Laser, 2 = Fire, 3 = Plasma, 4 = Electrical, 5 = EMP, 6 = Explosion).
+        // Used by Temple of Trials dart-trap and boss scripts.  Returns 0 for invalid
+        // inputs.
+        get_critter_damage_resist_sfall(obj: Obj, damType: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_damage_resist_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            // DR stat names follow the pattern "Damage Resistance: Normal", etc.
+            const typeName = damageTypeNames[damType]
+            if (!typeName) {
+                warn('get_critter_damage_resist_sfall: unknown damage type: ' + damType, undefined, this)
+                return 0
+            }
+            return critter.getStat('Damage Resistance: ' + typeName) ?? 0
+        }
+
+        // sfall 0x82FB — set_critter_damage_resist_sfall(obj, damType, val): set DR.
+        // Clamps to [0, 100] and coerces non-finite to 0.
+        set_critter_damage_resist_sfall(obj: Obj, damType: number, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_damage_resist_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const typeName = damageTypeNames[damType]
+            if (!typeName) {
+                warn('set_critter_damage_resist_sfall: unknown damage type: ' + damType, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(0, Math.min(100, Math.trunc(val))) : 0
+            ;(obj as Critter).stats.setBase('Damage Resistance: ' + typeName, v)
+        }
+
+        // sfall 0x82FC — get_critter_damage_thresh_sfall(obj, damType): Damage Threshold.
+        // Returns the critter's DT value for the given damage type index.
+        // Returns 0 for invalid inputs or non-critters.
+        get_critter_damage_thresh_sfall(obj: Obj, damType: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_damage_thresh_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as Critter
+            const typeName = damageTypeNames[damType]
+            if (!typeName) {
+                warn('get_critter_damage_thresh_sfall: unknown damage type: ' + damType, undefined, this)
+                return 0
+            }
+            return critter.getStat('Damage Threshold: ' + typeName) ?? 0
+        }
+
+        // sfall 0x82FD — set_critter_damage_thresh_sfall(obj, damType, val): set DT.
+        // Clamps to [0, ∞) and coerces non-finite to 0.
+        set_critter_damage_thresh_sfall(obj: Obj, damType: number, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_damage_thresh_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const typeName = damageTypeNames[damType]
+            if (!typeName) {
+                warn('set_critter_damage_thresh_sfall: unknown damage type: ' + damType, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            ;(obj as Critter).stats.setBase('Damage Threshold: ' + typeName, v)
+        }
+
+        // sfall 0x82FE — get_critter_action_points_sfall2(obj): current AP (alias).
+        // Returns the critter's current Action Points in combat.  Arroyo combat
+        // scripts read AP to determine if an NPC can take an extra action at the
+        // end of the turn.  Returns 0 outside combat or for non-critters.
+        get_critter_action_points_sfall2(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_action_points_sfall2: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return this.get_critter_action_points_sfall(obj)
+        }
+
+        // sfall 0x82FF — set_critter_action_points_sfall2(obj, val): set current AP (alias).
+        // Sets the critter's current Action Points for the active combat turn.
+        // Clamped to [0, ∞) and coerces non-finite to 0.
+        set_critter_action_points_sfall2(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_action_points_sfall2: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            this.set_critter_action_points_sfall(obj, v)
         }
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {

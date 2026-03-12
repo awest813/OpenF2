@@ -8511,6 +8511,178 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -------------------------------------------------------------------------
+    // Phase 94 entries
+    // -------------------------------------------------------------------------
+
+    // BLK-195 — set_pc_stat() null skills guard
+    {
+        id: 'blk_195_set_pc_stat_null_skills',
+        kind: 'procedure',
+        description:
+            'BLK-195: set_pc_stat(0, …) guards against null player.skills.  Arroyo Elder ' +
+            'scripts call set_pc_stat(0, points) to assign skill points after awarding XP. ' +
+            'When the skills component is not yet attached, player.skills is null and ' +
+            '.skillPoints = … throws TypeError.  Now returns a warning and no-ops safely.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-196 — set_critter_kills() non-finite amount guard
+    {
+        id: 'blk_196_set_critter_kills_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-196: set_critter_kills() guards against non-finite amount.  ' +
+            'Math.max(0, NaN) = NaN, which would store NaN in the kill-count table and ' +
+            'corrupt subsequent comparisons.  Arroyo temple completion scripts award ' +
+            'kill-type credit after boss encounters; a broken formula can yield NaN.  ' +
+            'Non-finite amounts are now coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // BLK-197 — roll_vs_skill() non-finite bonus guard
+    {
+        id: 'blk_197_roll_vs_skill_non_finite_bonus',
+        kind: 'procedure',
+        description:
+            'BLK-197: roll_vs_skill() guards against non-finite bonus.  ' +
+            'rollSkillCheck(v, NaN) computes v + NaN = NaN; NaN < roll is always false, ' +
+            'making every skill check fail.  Arroyo and Temple encounter scripts compute ' +
+            'the bonus from arithmetic that can yield NaN.  Non-finite bonus now coerced to 0.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-198 — tile_is_visible() non-finite tile guard
+    {
+        id: 'blk_198_tile_is_visible_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-198: tile_is_visible() guards against non-finite tile numbers.  ' +
+            'fromTileNum(NaN) returns {x:NaN, y:NaN}; hexDistance returns NaN; ' +
+            'NaN <= 14 is false so the tile is incorrectly reported as not visible.  ' +
+            'Arroyo ceremony scripts use tile_is_visible() as a branch condition.  ' +
+            'Non-finite tile now returns 1 (visible) as a safe fallback.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // BLK-199 — obj_set_light_level() non-finite intensity/distance guard
+    {
+        id: 'blk_199_obj_set_light_level_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-199: obj_set_light_level() guards against non-finite intensity and ' +
+            'distance.  Math.max(0, Math.min(65536, NaN)) = NaN, which stores NaN on ' +
+            'obj.lightIntensity and corrupts the lighting pipeline.  Arroyo and Temple ' +
+            'torch/fire barrel scripts compute intensity from tile index or time-of-day ' +
+            'arithmetic that can yield NaN.  Non-finite values are now coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x82F8 — get_critter_armor_class_sfall
+    {
+        id: 'sfall_get_critter_armor_class_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F8: get_critter_armor_class_sfall(obj) → Armor Class stat value.  ' +
+            'Arroyo guard and Temple encounter scripts read AC to scale combat difficulty.  ' +
+            'Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82F9 — set_critter_armor_class_sfall
+    {
+        id: 'sfall_set_critter_armor_class_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82F9: set_critter_armor_class_sfall(obj, val) → set Armor Class.  ' +
+            'Clamped to [0, ∞); non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82FA — get_critter_damage_resist_sfall
+    {
+        id: 'sfall_get_critter_damage_resist_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FA: get_critter_damage_resist_sfall(obj, damType) → DR for the ' +
+            'given damage type (0=Normal … 6=Explosion).  Temple dart-trap and boss ' +
+            'scripts read DR to determine if an attack bypasses armor.  Returns 0 for ' +
+            'invalid inputs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82FB — set_critter_damage_resist_sfall
+    {
+        id: 'sfall_set_critter_damage_resist_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FB: set_critter_damage_resist_sfall(obj, damType, val) → set DR.  ' +
+            'Clamped to [0, 100]; non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82FC — get_critter_damage_thresh_sfall
+    {
+        id: 'sfall_get_critter_damage_thresh_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FC: get_critter_damage_thresh_sfall(obj, damType) → DT for the ' +
+            'given damage type.  Returns 0 for invalid inputs.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82FD — set_critter_damage_thresh_sfall
+    {
+        id: 'sfall_set_critter_damage_thresh_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FD: set_critter_damage_thresh_sfall(obj, damType, val) → set DT.  ' +
+            'Clamped to [0, ∞); non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x82FE — get_critter_action_points_sfall2
+    {
+        id: 'sfall_get_critter_action_points_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FE: get_critter_action_points_sfall2(obj) → current AP in combat ' +
+            '(alias of 0x8233 get_critter_action_points_sfall).  Arroyo combat scripts ' +
+            'compiled against sfall 4.3+ may use this alternate slot.  Returns 0 for ' +
+            'non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x82FF — set_critter_action_points_sfall2
+    {
+        id: 'sfall_set_critter_action_points_94',
+        kind: 'opcode',
+        description:
+            'sfall 0x82FF: set_critter_action_points_sfall2(obj, val) → set current AP ' +
+            '(alias of 0x8234 set_critter_action_points_sfall).  Clamped to [0, ∞); ' +
+            'non-finite values are coerced to 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
