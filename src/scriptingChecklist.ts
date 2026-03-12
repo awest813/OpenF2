@@ -8683,6 +8683,178 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // BLK-200 — obj_is_carrying_obj_pid() null-inventory guard
+    {
+        id: 'blk_200_obj_is_carrying_obj_pid_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-200: obj_is_carrying_obj_pid() guards against null inventory array.  ' +
+            'The previous guard checked `obj.inventory === undefined` but did not handle ' +
+            '`obj.inventory === null`.  Arroyo character-creation scripts may create ' +
+            'critters with `inventory: null`; the for-loop condition `null.length` threw ' +
+            'a TypeError.  Now uses Array.isArray() consistent with BLK-162 and BLK-188.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-201 — add_mult_objs_to_inven() null-inventory guard
+    {
+        id: 'blk_201_add_mult_objs_to_inven_null_inventory',
+        kind: 'procedure',
+        description:
+            'BLK-201: add_mult_objs_to_inven() guards against null inventory array.  ' +
+            'Same root cause as BLK-200: the old guard (`=== undefined`) passed null ' +
+            'inventory, allowing execution to reach addInventoryItem() which then crashed ' +
+            'accessing this.inventory.push().  Arroyo start-sequence tribal equipment ' +
+            'distribution scripts trigger this path.  Now uses Array.isArray() consistent ' +
+            'with BLK-162, BLK-188, and BLK-200.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-202 — set_map_var() non-finite value guard
+    {
+        id: 'blk_202_set_map_var_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-202: set_map_var() guards against non-finite numeric values.  ' +
+            'Arroyo and Temple quest-tracking scripts compute map-variable values from ' +
+            'arithmetic that can yield NaN when a quest-stage count is divided by an ' +
+            'uninitialised multiplier.  Storing NaN in mapVars corrupted downstream ' +
+            'map_var() reads and broke quest-gating conditions.  Non-finite values are ' +
+            'now clamped to 0, mirroring BLK-147 (set_local_var) and BLK-129 (set_global_var).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-203 — set_obj_visibility() non-numeric visibility guard
+    {
+        id: 'blk_203_set_obj_visibility_non_numeric',
+        kind: 'procedure',
+        description:
+            'BLK-203: set_obj_visibility() guards against non-numeric visibility values.  ' +
+            'Arroyo NPC init scripts sometimes pass the result of a Fallout 2 conditional ' +
+            'expression that resolves to null or NaN when a local variable is uninitialised.  ' +
+            '`!NaN` and `!null` both evaluate to true, causing objects to appear visible ' +
+            'regardless of intent.  Non-numeric values are now treated as 0 (show) with a ' +
+            'warning so the default-visible semantics are preserved and the issue is traceable.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // BLK-204 — giq_option() empty-string message guard
+    {
+        id: 'blk_204_giq_option_empty_string_guard',
+        kind: 'procedure',
+        description:
+            'BLK-204: giq_option() guards against empty-string messages.  ' +
+            'The previous guard only checked `msg === null`, not `msg === ""`.  ' +
+            'Arroyo character-creation dialogue scripts use giq_option() for INT-gated ' +
+            'options; a missing message key returns "" from getScriptMessage(), which ' +
+            'would render as a blank option in the UI.  Now guards with `|| msg === ""` ' +
+            'consistent with gsay_option() (BLK-107/BLK-156).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // sfall 0x8300 — get_critter_perception_sfall
+    {
+        id: 'sfall_get_critter_perception_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8300: get_critter_perception_sfall(obj) → Perception stat value [1..10].  ' +
+            'Arroyo guard and Elder scripts read PE to scale detection range in the opening ' +
+            'sequence.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x8301 — set_critter_perception_sfall
+    {
+        id: 'sfall_set_critter_perception_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8301: set_critter_perception_sfall(obj, val) → set Perception.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x8302 — get_critter_luck_sfall
+    {
+        id: 'sfall_get_critter_luck_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8302: get_critter_luck_sfall(obj) → Luck stat value [1..10].  ' +
+            'Used by critical-hit and random-event scripts during Arroyo opening and ' +
+            'Temple of Trials encounters.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x8303 — set_critter_luck_sfall
+    {
+        id: 'sfall_set_critter_luck_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8303: set_critter_luck_sfall(obj, val) → set Luck.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x8304 — get_critter_agility_sfall
+    {
+        id: 'sfall_get_critter_agility_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8304: get_critter_agility_sfall(obj) → Agility stat value [1..10].  ' +
+            'Used for AP calculation and dodge chance during Arroyo NPC init and Temple ' +
+            'combat sequences.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x8305 — set_critter_agility_sfall
+    {
+        id: 'sfall_set_critter_agility_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8305: set_critter_agility_sfall(obj, val) → set Agility.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x8306 — get_critter_charisma_sfall
+    {
+        id: 'sfall_get_critter_charisma_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8306: get_critter_charisma_sfall(obj) → Charisma stat value [1..10].  ' +
+            'Used by party-size and NPC-reaction scripts in Arroyo village dialogue ' +
+            '(Elder and tribesman greeting sequences).  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x8307 — set_critter_charisma_sfall
+    {
+        id: 'sfall_set_critter_charisma_95',
+        kind: 'opcode',
+        description:
+            'sfall 0x8307: set_critter_charisma_sfall(obj, val) → set Charisma.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

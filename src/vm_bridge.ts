@@ -1787,6 +1787,36 @@ export namespace ScriptVMBridge {
 
        // 0x82FF — set_critter_action_points_sfall2(obj, val): set current Action Points (alias).
        ,0x82FF: bridged("set_critter_action_points_sfall2", 2, false) // set current AP
+
+       // -----------------------------------------------------------------------
+       // Phase 95 — sfall extended opcodes 0x8300–0x8307 (critter SPECIAL stats:
+       // Perception, Luck, Agility, Charisma — for Arroyo guard AI and
+       // character-creation validation at game start).
+       // -----------------------------------------------------------------------
+
+       // 0x8300 — get_critter_perception_sfall(obj): Perception stat.
+       ,0x8300: bridged("get_critter_perception_sfall", 1) // → Perception [1..10]
+
+       // 0x8301 — set_critter_perception_sfall(obj, val): set Perception.
+       ,0x8301: bridged("set_critter_perception_sfall", 2, false) // set Perception [1..10]
+
+       // 0x8302 — get_critter_luck_sfall(obj): Luck stat.
+       ,0x8302: bridged("get_critter_luck_sfall", 1) // → Luck [1..10]
+
+       // 0x8303 — set_critter_luck_sfall(obj, val): set Luck.
+       ,0x8303: bridged("set_critter_luck_sfall", 2, false) // set Luck [1..10]
+
+       // 0x8304 — get_critter_agility_sfall(obj): Agility stat.
+       ,0x8304: bridged("get_critter_agility_sfall", 1) // → Agility [1..10]
+
+       // 0x8305 — set_critter_agility_sfall(obj, val): set Agility.
+       ,0x8305: bridged("set_critter_agility_sfall", 2, false) // set Agility [1..10]
+
+       // 0x8306 — get_critter_charisma_sfall(obj): Charisma stat.
+       ,0x8306: bridged("get_critter_charisma_sfall", 1) // → Charisma [1..10]
+
+       // 0x8307 — set_critter_charisma_sfall(obj, val): set Charisma.
+       ,0x8307: bridged("set_critter_charisma_sfall", 2, false) // set Charisma [1..10]
     }
     Object.assign(opMap, bridgeOpMap)
 

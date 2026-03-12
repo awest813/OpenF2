@@ -659,3 +659,46 @@ Gate: **PASS** — all 4281 tests green, tsc clean.
 - [x] phase92.test.ts: 44 regression tests for all BLK items, sfall opcodes, arroyo end-sequence smoke tests, and checklist integrity.
 
 Gate: **PASS** — all 4325 tests green, tsc clean.
+
+
+---
+
+## Phase 93 --- Arroyo debug and polish (continued): inventory/dialogue guards, sfall 0x82F0-0x82F7
+
+- [x] **BLK-190**: inven_cmds() null inventory guard
+- [x] **BLK-191**: has_skill() missing getSkill() method guard
+- [x] **BLK-192**: critter_attempt_placement() non-finite tile guard
+- [x] **BLK-193**: drop_obj() null source inventory guard
+- [x] **BLK-194**: pickup_obj() null player inventory guard
+- [x] New sfall opcodes 0x82F0-0x82F7: HP aliases, melee dmg, critical chance.
+- [x] phase93.test.ts: regression tests for all BLK items, sfall opcodes, arroyo end-sequence smoke tests, and checklist integrity.
+
+Gate: **PASS** --- all 4392 tests green, tsc clean.
+
+---
+
+## Phase 94 --- Arroyo debug and polish (continued): stat/skill/lighting guards, sfall 0x82F8-0x82FF
+
+- [x] **BLK-195**: set_pc_stat(0) null player.skills guard
+- [x] **BLK-196**: set_critter_kills() non-finite amount guard
+- [x] **BLK-197**: roll_vs_skill() non-finite bonus guard
+- [x] **BLK-198**: tile_is_visible() non-finite tile guard
+- [x] **BLK-199**: obj_set_light_level() non-finite intensity/distance guard
+- [x] New sfall opcodes 0x82F8-0x82FF: armor class, damage resist/thresh, action points.
+- [x] phase94.test.ts: regression tests for all BLK items, sfall opcodes, arroyo smoke tests, and checklist integrity.
+
+Gate: **PASS** --- all 4459 tests green, tsc clean.
+
+---
+
+## Phase 95 --- Debug and polish: start menu to end of Arroyo (inventory/visibility/var guards, sfall 0x8300-0x8307)
+
+- [x] **BLK-200**: obj_is_carrying_obj_pid() null-inventory guard
+- [x] **BLK-201**: add_mult_objs_to_inven() null-inventory guard
+- [x] **BLK-202**: set_map_var() non-finite value guard
+- [x] **BLK-203**: set_obj_visibility() non-numeric visibility guard
+- [x] **BLK-204**: giq_option() empty-string message guard
+- [x] New sfall opcodes 0x8300-0x8307: critter SPECIAL stats (Perception, Luck, Agility, Charisma).
+- [x] phase95.test.ts: regression tests for all BLK items, sfall opcodes, arroyo start-to-end smoke tests, and checklist integrity.
+
+Gate: **PASS** --- all 4527 tests green, tsc clean.
