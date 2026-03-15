@@ -765,6 +765,21 @@ export namespace Scripting {
         }
         random(min: number, max: number) {
             log('random', arguments)
+            // BLK-209: Guard against non-finite bounds — Arroyo encounter scripts
+            // compute random ranges from character stats and map-var-driven formulas
+            // that can yield NaN when uninitialised stat fields are used (e.g.
+            // random(0, critter_stat(obj, STAT_ST) - 2) where STAT_ST returns NaN
+            // for a partially-initialised critter).  getRandomInt(NaN, NaN) returns
+            // NaN which propagates into downstream stat checks and corrupts combat
+            // results.  Clamp both bounds to 0 so the call returns 0 safely.
+            if (typeof min !== 'number' || !isFinite(min)) {
+                warn('random: non-finite min (' + min + ') — clamping to 0', undefined, this)
+                min = 0
+            }
+            if (typeof max !== 'number' || !isFinite(max)) {
+                warn('random: non-finite max (' + max + ') — clamping to 0', undefined, this)
+                max = 0
+            }
             return getRandomInt(min, max)
         }
         abs_value(x: number): number {
@@ -2112,6 +2127,16 @@ export namespace Scripting {
                 return
             }
             const critter = obj as Critter
+            // BLK-208: Guard against partially-initialised critters that lack a
+            // getStat() method — Temple of Trials combat-result scripts sometimes
+            // call critter_heal() on NPCs spawned via create_object_sid() before
+            // their stat component is attached.  Without this guard,
+            // critter.getStat('Max HP') throws TypeError and aborts the heal
+            // sequence.  Skip silently so the critter simply retains its current HP.
+            if (typeof critter.getStat !== 'function') {
+                warn('critter_heal: critter has no getStat() method — no-op', undefined, this)
+                return
+            }
             const maxHP = critter.getStat('Max HP')
             const currentHP = critter.getStat('HP')
             const healAmount = Math.min(amount, maxHP - currentHP)
@@ -3156,8 +3181,14 @@ export namespace Scripting {
         gsay_message(msgList: number, msgID: string | number, reaction: number) {
             log('gsay_message', arguments)
             const msg = getScriptMessage(msgList, msgID)
-            if (msg === null) {
-                warn('gsay_message: msg is null', undefined, this)
+            // BLK-207: Guard against null/empty message — mirrors the same guard in
+            // gsay_reply, gsay_option (BLK-107), and giq_option (BLK-204).  Arroyo
+            // Elder ceremony scripts use gsay_message() for scripted narration beats;
+            // a missing message key returns '' from getScriptMessage(), which would
+            // pass the null-only check and reach uiSetDialogueReply with an empty
+            // string, rendering a blank reply in the dialogue panel.  Skip silently.
+            if (msg === null || msg === '') {
+                warn('gsay_message: msg is null/empty — reply skipped', undefined, this)
                 return
             }
             info('GSAY MESSAGE: ' + msg, 'dialogue')
@@ -3559,6 +3590,16 @@ export namespace Scripting {
             if (!statName) {
                 warn('set_pc_base_stat: unknown stat number: ' + stat, undefined, this)
                 return
+            }
+            // BLK-205: Guard against non-finite values — Arroyo character-creation
+            // scripts compute SPECIAL stat values from formulas that can yield NaN
+            // when an uninitialised multiplier or divisor is used.  Storing NaN via
+            // setBase() corrupts the player's stat table and makes all derived stats
+            // (AC, AP, carry weight, …) return NaN for the rest of the session.
+            // Clamp to 0 and warn so the underlying script bug is visible in logs.
+            if (typeof value !== 'number' || !isFinite(value)) {
+                warn('set_pc_base_stat: non-finite value (' + value + ') for stat ' + statName + ' — clamping to 0', undefined, this)
+                value = 0
             }
             player.stats.setBase(statName, value)
         }
@@ -4092,6 +4133,20 @@ export namespace Scripting {
         // the input is out of range (count <= 0 or bad tile).
         tile_num_in_direction(tile: number, dir: number, count: number): number {
             if (typeof tile !== 'number' || typeof dir !== 'number' || typeof count !== 'number') {return tile ?? 0}
+            // BLK-206: Guard against non-finite direction or count — Arroyo NPC
+            // patrol-point and Temple trigger-zone scripts compute direction values
+            // from arithmetic on uninitialised critter orientation fields that can
+            // yield NaN.  NaN % 6 === NaN, which breaks hexInDirectionDistance and
+            // returns a garbage tile number.  Return the original tile unchanged as
+            // a safe no-movement fallback.
+            if (!isFinite(tile) || !isFinite(dir) || !isFinite(count)) {
+                warn(
+                    'tile_num_in_direction: non-finite arg (tile=' + tile +
+                    ', dir=' + dir + ', count=' + count + ') — returning tile',
+                    undefined, this
+                )
+                return isFinite(tile) ? Math.trunc(tile) : 0
+            }
             if (count <= 0) {return tile}
             const start = fromTileNum(tile)
             if (!start) {return tile}
@@ -7904,6 +7959,118 @@ export namespace Scripting {
             const v = (typeof val === 'number' && isFinite(val))
                 ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
             ;(obj as Critter).stats.setBase('Charisma', v)
+        }
+
+        // -------------------------------------------------------------------------
+        // Phase 96 — sfall extended opcodes 0x8308–0x830F (critter SPECIAL stats:
+        // Strength, Endurance, Intelligence — completing the full S.P.E.C.I.A.L.
+        // setter/getter suite — plus critter level; used by Arroyo village NPC
+        // level-scaling and Temple of Trials encounter-balance scripts).
+        // -------------------------------------------------------------------------
+
+        // sfall 0x8308 — get_critter_strength_sfall(obj): Strength stat.
+        // Returns the critter's Strength value used by carry-weight, melee-damage,
+        // and weapon-strength-requirement scripts in Arroyo tribal equipment
+        // distribution.  Returns 0 for non-critters.
+        get_critter_strength_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_strength_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Strength') ?? 0
+        }
+
+        // sfall 0x8309 — set_critter_strength_sfall(obj, val): set Strength.
+        // Clamps to [1, 10]; non-finite values are coerced to 1.
+        set_critter_strength_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_strength_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Strength', v)
+        }
+
+        // sfall 0x830A — get_critter_endurance_sfall(obj): Endurance stat.
+        // Returns the critter's Endurance value used by HP-maximum, hit-point-per-
+        // level, and poison/radiation-resistance scripts in Arroyo NPC initialisation
+        // and Temple of Trials survival checks.  Returns 0 for non-critters.
+        get_critter_endurance_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_endurance_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('Endurance') ?? 0
+        }
+
+        // sfall 0x830B — set_critter_endurance_sfall(obj, val): set Endurance.
+        // Clamps to [1, 10]; non-finite values are coerced to 1.
+        set_critter_endurance_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_endurance_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('Endurance', v)
+        }
+
+        // sfall 0x830C — get_critter_intelligence_sfall(obj): Intelligence stat.
+        // Returns the critter's Intelligence value used by dialogue-option filtering
+        // (giq_option IQ gates), skill-point-per-level calculation, and Arroyo
+        // Elder conversation branching.  Returns 0 for non-critters.
+        get_critter_intelligence_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_intelligence_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            return (obj as Critter).getStat('INT') ?? 0
+        }
+
+        // sfall 0x830D — set_critter_intelligence_sfall(obj, val): set Intelligence.
+        // Clamps to [1, 10]; non-finite values are coerced to 1.
+        set_critter_intelligence_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_intelligence_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val))
+                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
+            ;(obj as Critter).stats.setBase('INT', v)
+        }
+
+        // sfall 0x830E — get_critter_sneak_state_sfall(obj): sneak-mode state.
+        // Returns 1 if the critter has sneak mode active (pcFlags bit 3 = SNK_MODE),
+        // 0 otherwise.  Used by Arroyo guard-AI detection scripts to reduce the
+        // critter perception radius when the player is sneaking through the village.
+        // Non-player critters that lack pcFlags always return 0.
+        get_critter_sneak_state_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const flags = (obj as any).pcFlags ?? 0
+            return (flags & 0x8) !== 0 ? 1 : 0
+        }
+
+        // sfall 0x830F — set_critter_sneak_state_sfall(obj, val): set sneak-mode.
+        // Sets (val !== 0) or clears (val === 0) SNK_MODE (bit 3) in pcFlags.
+        // Arroyo stealth scripts use this to simulate or cancel sneak attempts for
+        // the player and companion critters.
+        set_critter_sneak_state_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if ((obj as any).pcFlags === undefined) {
+                (obj as any).pcFlags = 0
+            }
+            if (val) {
+                ;(obj as any).pcFlags |= 0x8  // set SNK_MODE bit 3
+            } else {
+                ;(obj as any).pcFlags &= ~0x8  // clear SNK_MODE bit 3
+            }
         }
 
 

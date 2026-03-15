@@ -1817,6 +1817,37 @@ export namespace ScriptVMBridge {
 
        // 0x8307 — set_critter_charisma_sfall(obj, val): set Charisma.
        ,0x8307: bridged("set_critter_charisma_sfall", 2, false) // set Charisma [1..10]
+
+       // -----------------------------------------------------------------------
+       // Phase 96 — sfall extended opcodes 0x8308–0x830F (critter SPECIAL stats:
+       // Strength, Endurance, Intelligence — completing the full S.P.E.C.I.A.L.
+       // getter/setter suite — plus critter level; used by Arroyo village NPC
+       // level-scaling and Temple of Trials encounter-balance scripts).
+       // -----------------------------------------------------------------------
+
+       // 0x8308 — get_critter_strength_sfall(obj): Strength stat.
+       ,0x8308: bridged("get_critter_strength_sfall", 1) // → Strength [1..10]
+
+       // 0x8309 — set_critter_strength_sfall(obj, val): set Strength.
+       ,0x8309: bridged("set_critter_strength_sfall", 2, false) // set Strength [1..10]
+
+       // 0x830A — get_critter_endurance_sfall(obj): Endurance stat.
+       ,0x830A: bridged("get_critter_endurance_sfall", 1) // → Endurance [1..10]
+
+       // 0x830B — set_critter_endurance_sfall(obj, val): set Endurance.
+       ,0x830B: bridged("set_critter_endurance_sfall", 2, false) // set Endurance [1..10]
+
+       // 0x830C — get_critter_intelligence_sfall(obj): Intelligence stat.
+       ,0x830C: bridged("get_critter_intelligence_sfall", 1) // → Intelligence [1..10]
+
+       // 0x830D — set_critter_intelligence_sfall(obj, val): set Intelligence.
+       ,0x830D: bridged("set_critter_intelligence_sfall", 2, false) // set Intelligence [1..10]
+
+       // 0x830E — get_critter_sneak_state_sfall(obj): sneak-mode state.
+       ,0x830E: bridged("get_critter_sneak_state_sfall", 1) // → 1 if SNK_MODE active, 0 otherwise
+
+       // 0x830F — set_critter_sneak_state_sfall(obj, val): set sneak-mode.
+       ,0x830F: bridged("set_critter_sneak_state_sfall", 2, false) // set/clear SNK_MODE bit
     }
     Object.assign(opMap, bridgeOpMap)
 
