@@ -9032,6 +9032,185 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 97 — BLK hardening: isWithinPerception getStat/getSkill null guard,
+    // rotation_to_tile non-finite guard, wm_area_set_pos non-finite guard,
+    // mark_area_known non-finite area ID guard, critter_inven_obj hand-slot
+    // undefined coercion; plus sfall extended opcodes 0x8310–0x8317.
+    // -----------------------------------------------------------------------
+
+    // BLK-210 — isWithinPerception getStat/getSkill null guard
+    {
+        id: 'blk_210_iswithinperception_null_getstat_guard',
+        kind: 'bug',
+        description:
+            'BLK-210: isWithinPerception() now guards against missing getStat/getSkill methods.  ' +
+            'Critters spawned via create_object_sid() during Arroyo temple scripts may lack a ' +
+            'full stats/skills component.  Calling getStat/getSkill on such objects throws ' +
+            'TypeError; the function now returns false (not within perception) instead.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-211 — rotation_to_tile non-finite tile guard
+    {
+        id: 'blk_211_rotation_to_tile_non_finite_guard',
+        kind: 'bug',
+        description:
+            'BLK-211: rotation_to_tile() now explicitly guards against non-finite srcTile/destTile.  ' +
+            'Arroyo NPC patrol and escort scripts compute tile positions from arithmetic that can ' +
+            'yield NaN; returns -1 with a warning instead of silently computing a bad direction.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // BLK-212 — wm_area_set_pos non-finite coordinates guard
+    {
+        id: 'blk_212_wm_area_set_pos_non_finite_guard',
+        kind: 'bug',
+        description:
+            'BLK-212: wm_area_set_pos() now guards against non-finite x/y coordinates.  ' +
+            'End-of-Arroyo scripts compute world-map position offsets from arithmetic that can ' +
+            'yield NaN; the call is now a no-op with a warning when coordinates are non-finite.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // BLK-213 — mark_area_known non-finite area ID guard
+    {
+        id: 'blk_213_mark_area_known_non_finite_area_guard',
+        kind: 'bug',
+        description:
+            'BLK-213: mark_area_known() now guards against non-finite area IDs.  ' +
+            'Arroyo and Temple completion scripts compute the area index from quest-flag ' +
+            'arithmetic that can yield NaN.  Passing NaN to globalState.markAreaKnown() ' +
+            'creates a mapAreas[NaN] entry; the call is now dropped with a warning.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-214 — critter_inven_obj undefined hand-slot guard
+    {
+        id: 'blk_214_critter_inven_obj_undefined_hand_slot',
+        kind: 'bug',
+        description:
+            'BLK-214: critter_inven_obj() now returns null (not undefined) for uninitialized ' +
+            'rightHand/leftHand fields.  Critters created via create_object_sid() may lack these ' +
+            'properties; undefined is falsy but undefined == 0 is false in JavaScript, causing ' +
+            'scripts that compare with == 0 to get incorrect results.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // sfall 0x8310 — get_critter_orientation_sfall
+    {
+        id: 'sfall_get_critter_orientation_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8310: get_critter_orientation_sfall(obj) → critter facing direction [0–5].  ' +
+            'Used by Arroyo guard-placement scripts to verify NPC facing after map_enter_p_proc ' +
+            'positions them at their starting tiles.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8311 — set_critter_orientation_sfall
+    {
+        id: 'sfall_set_critter_orientation_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8311: set_critter_orientation_sfall(obj, dir) → set facing direction [0–5].  ' +
+            'Setter companion to get_critter_orientation_sfall; direction is wrapped with ' +
+            'modulo-6 arithmetic.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8312 — get_critter_tile_num_sfall
+    {
+        id: 'sfall_get_critter_tile_num_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8312: get_critter_tile_num_sfall(obj) → critter tile number or -1.  ' +
+            'Returns -1 when the critter has no position (inventory or mid-transition), ' +
+            'matching the FO2 engine convention used by placement-validation scripts.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8313 — get_critter_elevation_sfall
+    {
+        id: 'sfall_get_critter_elevation_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8313: get_critter_elevation_sfall(obj) → critter elevation [0–2].  ' +
+            'Per-critter version; falls back to global current elevation when the object ' +
+            'does not carry its own elevation field.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8314 — set_critter_base_ap_sfall
+    {
+        id: 'sfall_set_critter_base_ap_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8314: set_critter_base_ap_sfall(obj, val) → set base Action Points stat.  ' +
+            'Setter companion to get_critter_base_ap_sfall (0x82B1).  Used by Arroyo elder ' +
+            'end-sequence scripts that scale NPC combat AP with player progress.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8315 — get_critter_xp_for_level_sfall
+    {
+        id: 'sfall_get_critter_xp_for_level_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8315: get_critter_xp_for_level_sfall(level) → XP threshold for level n.  ' +
+            'Uses Fallout 2 formula: XP(n) = 500 × n × (n − 1).  Used by end-of-arroyo ' +
+            'reward scripts that award the player enough XP to reach level 2.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8316 — get_critter_base_hp_sfall
+    {
+        id: 'sfall_get_critter_base_hp_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8316: get_critter_base_hp_sfall(obj) → critter base Max HP.  ' +
+            'Reads stats.getBase("Max HP") when available; falls back to the proto-derived ' +
+            'default.  Used by Arroyo temple scripts that check boss HP thresholds.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+
+    // sfall 0x8317 — set_critter_base_hp_sfall
+    {
+        id: 'sfall_set_critter_base_hp_97',
+        kind: 'opcode',
+        description:
+            'sfall 0x8317: set_critter_base_hp_sfall(obj, val) → set critter base Max HP.  ' +
+            'Setter companion to get_critter_base_hp_sfall (0x8316).  Non-finite or negative ' +
+            'values are clamped to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
