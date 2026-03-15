@@ -1848,6 +1848,36 @@ export namespace ScriptVMBridge {
 
        // 0x830F — set_critter_sneak_state_sfall(obj, val): set sneak-mode.
        ,0x830F: bridged("set_critter_sneak_state_sfall", 2, false) // set/clear SNK_MODE bit
+
+       // -----------------------------------------------------------------------
+       // Phase 97 — sfall extended opcodes 0x8310–0x8317 (critter orientation,
+       // tile/elevation queries, base-AP setter, XP-level formula, base-HP
+       // get/set — for Arroyo NPC placement and end-sequence reward scripts).
+       // -----------------------------------------------------------------------
+
+       // 0x8310 — get_critter_orientation_sfall(obj): facing direction [0–5].
+       ,0x8310: bridged("get_critter_orientation_sfall", 1) // → orientation [0..5]
+
+       // 0x8311 — set_critter_orientation_sfall(obj, dir): set facing direction.
+       ,0x8311: bridged("set_critter_orientation_sfall", 2, false) // set orientation [0..5]
+
+       // 0x8312 — get_critter_tile_num_sfall(obj): per-critter tile number.
+       ,0x8312: bridged("get_critter_tile_num_sfall", 1) // → tile|-1
+
+       // 0x8313 — get_critter_elevation_sfall(obj): critter's current elevation.
+       ,0x8313: bridged("get_critter_elevation_sfall", 1) // → elevation [0..2]
+
+       // 0x8314 — set_critter_base_ap_sfall(obj, val): set base Action Points stat.
+       ,0x8314: bridged("set_critter_base_ap_sfall", 2, false) // set base AP [0..∞)
+
+       // 0x8315 — get_critter_xp_for_level_sfall(level): XP threshold for level n.
+       ,0x8315: bridged("get_critter_xp_for_level_sfall", 1) // → XP [0..∞)
+
+       // 0x8316 — get_critter_base_hp_sfall(obj): critter's base Max HP stat.
+       ,0x8316: bridged("get_critter_base_hp_sfall", 1) // → base Max HP [1..∞)
+
+       // 0x8317 — set_critter_base_hp_sfall(obj, val): set critter base Max HP.
+       ,0x8317: bridged("set_critter_base_hp_sfall", 2, false) // set base Max HP [1..∞)
     }
     Object.assign(opMap, bridgeOpMap)
 

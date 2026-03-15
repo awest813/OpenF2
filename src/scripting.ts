@@ -525,6 +525,14 @@ export namespace Scripting {
         // BLK-087: Guard against null positions — critters without positions cannot
         // perceive or be perceived.  Return false (not within perception) rather than crash.
         if (!obj.position || !target.position) {return false}
+        // BLK-210: Guard against missing getStat/getSkill methods — critters spawned
+        // via create_object_sid() during Arroyo temple and end-of-arroyo scripts may
+        // not have a full stats/skills component initialized.  Calling getStat/getSkill
+        // on such objects throws TypeError and halts the VM.  Fall back to returning
+        // false (not within perception) so the calling script can continue safely.
+        if (typeof (obj as any).getStat !== 'function' || typeof (target as any).getSkill !== 'function') {
+            return false
+        }
         const dist = hexDistance(obj.position, target.position)
         const perception = obj.getStat('PER')
         const sneakSkill = target.getSkill('Sneak')
@@ -1877,8 +1885,15 @@ export namespace Scripting {
                 return null
             }
             if (where === 0) {return obj.equippedArmor ?? null} // INVEN_TYPE_WORN
-            else if (where === 1) {return obj.rightHand} // INVEN_TYPE_RIGHT_HAND
-            else if (where === 2) {return obj.leftHand} // INVEN_TYPE_LEFT_HAND
+            // BLK-214: Coerce undefined to null for hand slots — critters spawned via
+            // create_object_sid() during Arroyo temple initialisation may not have
+            // rightHand / leftHand properties initialised.  The existing code returns
+            // undefined when the property doesn't exist, which is falsy but not strictly
+            // null.  Scripts that compare with `== 0` receive a false negative because
+            // undefined == 0 is false in JavaScript.  Coerce to null so the result is
+            // consistent with the FO2 convention that an empty hand slot is null/0.
+            else if (where === 1) {return (obj.rightHand) ?? null} // INVEN_TYPE_RIGHT_HAND
+            else if (where === 2) {return (obj.leftHand) ?? null} // INVEN_TYPE_LEFT_HAND
             else if (where === -2) {
                 // INVEN_TYPE_INV_COUNT — return the number of items in the critter's inventory
                 return obj.inventory ? obj.inventory.length : 0
@@ -3078,6 +3093,18 @@ export namespace Scripting {
             return 0
         }
         rotation_to_tile(srcTile: number, destTile: number) {
+            // BLK-211: Guard against non-finite tile numbers — Arroyo NPC patrol and
+            // escort scripts compute tile positions from critter.position arithmetic
+            // that can yield NaN when a critter's starting tile is uninitialised.
+            // fromTileNum(NaN) returns {x:NaN,y:NaN} and hexNearestNeighbor silently
+            // returns null (minIdx never updates from -1 against NaN distances), so
+            // rotation_to_tile would return -1 without any diagnostic.  Emit an
+            // explicit warning for traceability and return -1 immediately.
+            if (typeof srcTile !== 'number' || !isFinite(srcTile) ||
+                typeof destTile !== 'number' || !isFinite(destTile)) {
+                warn('rotation_to_tile: non-finite tile (src=' + srcTile + ' dest=' + destTile + ') — returning -1', undefined, this)
+                return -1
+            }
             const src = fromTileNum(srcTile),
                 dest = fromTileNum(destTile)
             const hex = hexNearestNeighbor(src, dest)
@@ -4236,6 +4263,16 @@ export namespace Scripting {
             log('play_gmovie', arguments)
         }
         mark_area_known(areaType: number, area: number, markState: number) {
+            // BLK-213: Guard against non-finite area ID — Arroyo and Temple completion
+            // scripts compute the area index from quest-flag arithmetic that can yield
+            // NaN when a prerequisite global variable was never initialised.  Passing
+            // NaN to globalState.markAreaKnown() would create a mapAreas[NaN] entry,
+            // silently corrupting the world-map discovery state.  Drop the call and
+            // warn so the underlying script bug is visible in logs.
+            if (typeof area !== 'number' || !isFinite(area)) {
+                warn('mark_area_known: non-finite area ID (' + area + ') — no-op', undefined, this)
+                return
+            }
             if (areaType === 0) {
                 // MARK_TYPE_TOWN
                 if (markState === -66) {
@@ -4260,6 +4297,15 @@ export namespace Scripting {
         }
         wm_area_set_pos(area: number, x: number, y: number) {
             log('wm_area_set_pos', arguments)
+            // BLK-212: Guard against non-finite coordinates — end-of-Arroyo scripts
+            // compute world-map position offsets from arithmetic that can yield NaN
+            // when prerequisite values are uninitialised.  Passing NaN to a future
+            // implementation of wm_area_set_pos would corrupt the world-map area
+            // positions.  No-op silently for non-finite values.
+            if (typeof x !== 'number' || !isFinite(x) || typeof y !== 'number' || !isFinite(y)) {
+                warn('wm_area_set_pos: non-finite coordinate (x=' + x + ' y=' + y + ') — no-op', undefined, this)
+                return
+            }
         }
         game_ui_disable() {
             log('game_ui_disable', arguments)
@@ -8070,6 +8116,148 @@ export namespace Scripting {
                 ;(obj as any).pcFlags |= 0x8  // set SNK_MODE bit 3
             } else {
                 ;(obj as any).pcFlags &= ~0x8  // clear SNK_MODE bit 3
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        // Phase 97 — sfall extended opcodes 0x8310–0x8317 (critter orientation,
+        // tile/elevation queries, base-AP setter, XP-level formula, and base-HP
+        // get/set — used by Arroyo NPC placement, end-sequence reward scripts, and
+        // the Temple of Trials encounter-balance calculations).
+        // -------------------------------------------------------------------------
+
+        // sfall 0x8310 — get_critter_orientation_sfall(obj): critter facing direction.
+        // Returns the critter's current facing direction in [0, 5], where
+        // 0=north-east, 1=east, 2=south-east, 3=south-west, 4=west, 5=north-west.
+        // Used by Arroyo guard-placement scripts to verify or override NPC facing
+        // after map_enter_p_proc positions them at their starting tiles.
+        // Returns 0 for non-critter objects (matches sfall convention).
+        get_critter_orientation_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_orientation_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const dir = (obj as any).orientation
+            return (typeof dir === 'number' && isFinite(dir)) ? ((Math.trunc(dir) % 6 + 6) % 6) : 0
+        }
+
+        // sfall 0x8311 — set_critter_orientation_sfall(obj, dir): set facing direction.
+        // Sets the critter's orientation to dir [0, 5]; values outside this range are
+        // wrapped with modulo-6 arithmetic, matching the behaviour of set_obj_rotation.
+        set_critter_orientation_sfall(obj: Obj, dir: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_orientation_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            if (typeof dir !== 'number' || !isFinite(dir)) {
+                warn('set_critter_orientation_sfall: non-finite dir (' + dir + ') — no-op', undefined, this)
+                return
+            }
+            ;(obj as any).orientation = ((Math.trunc(dir) % 6) + 6) % 6
+        }
+
+        // sfall 0x8312 — get_critter_tile_num_sfall(obj): per-critter tile number.
+        // Returns the critter's current tile number, or -1 when the critter has no
+        // position (e.g. in inventory or mid-map-transition).  Distinct from the
+        // general-purpose get_tile_at_object_sfall (0x8270) which returns 0 on
+        // failure; this variant returns -1 to match the Fallout 2 engine convention
+        // for "no tile" used by placement-validation scripts.
+        get_critter_tile_num_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_critter_tile_num_sfall: not a game object: ' + obj, undefined, this)
+                return -1
+            }
+            const pos = (obj as any).position
+            if (!pos || typeof pos.x !== 'number' || !isFinite(pos.x) ||
+                typeof pos.y !== 'number' || !isFinite(pos.y)) {return -1}
+            return pos.y * 200 + pos.x
+        }
+
+        // sfall 0x8313 — get_critter_elevation_sfall(obj): critter's current elevation.
+        // Returns the critter's current elevation index (0–2).  Arroyo multi-level
+        // scripts use this to verify that an NPC is on the correct elevation before
+        // performing tile-distance or LOS calculations.  Falls back to the global
+        // current elevation when the critter does not carry its own elevation field.
+        get_critter_elevation_sfall(obj: Obj): number {
+            if (!isGameObject(obj)) {
+                warn('get_critter_elevation_sfall: not a game object: ' + obj, undefined, this)
+                return globalState.currentElevation ?? 0
+            }
+            const elev = (obj as any).elevation
+            if (typeof elev === 'number' && isFinite(elev)) {return Math.max(0, Math.min(2, Math.trunc(elev)))}
+            return globalState.currentElevation ?? 0
+        }
+
+        // sfall 0x8314 — set_critter_base_ap_sfall(obj, val): set critter base AP.
+        // Setter companion to get_critter_base_ap_sfall (0x82B1).  Sets the critter's
+        // base Action Points stat directly via stats.setBase so the change persists
+        // across level-ups and drug wears-off.  Non-finite or negative values are
+        // clamped to 0.  Used by Arroyo elder end-sequence scripts that scale NPC
+        // combat AP with player progress.
+        set_critter_base_ap_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_ap_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.setBase === 'function') {
+                critter.stats.setBase('AP', v)
+            } else {
+                critter.AP = v
+            }
+        }
+
+        // sfall 0x8315 — get_critter_xp_for_level_sfall(level): XP threshold.
+        // Returns the total accumulated XP required to reach the given player level
+        // using the Fallout 2 formula: XP(n) = 500 × n × (n − 1).
+        //   Level 1 →       0 XP
+        //   Level 2 →    1000 XP
+        //   Level 3 →    3000 XP
+        //   Level 4 →    6000 XP
+        // Returns 0 for levels ≤ 1 or non-finite inputs.  Used by end-of-arroyo
+        // reward scripts that award the player enough XP to reach level 2.
+        get_critter_xp_for_level_sfall(level: number): number {
+            if (typeof level !== 'number' || !isFinite(level) || level <= 1) {return 0}
+            const n = Math.trunc(level)
+            return 500 * n * (n - 1)
+        }
+
+        // sfall 0x8316 — get_critter_base_hp_sfall(obj): critter's base Max HP.
+        // Returns the critter's base Max HP stat before any equipment or drug
+        // modifiers are applied.  Reads stats.getBase('Max HP') when available;
+        // falls back to the proto XPValue-derived default (10) used by Arroyo
+        // tribesman template objects.
+        get_critter_base_hp_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_base_hp_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.getBase === 'function') {
+                const base = critter.stats.getBase('Max HP')
+                if (typeof base === 'number' && isFinite(base)) {return base}
+            }
+            return critter.maxHP ?? 10
+        }
+
+        // sfall 0x8317 — set_critter_base_hp_sfall(obj, val): set base Max HP.
+        // Setter companion to get_critter_base_hp_sfall (0x8316).  Writes the
+        // critter's base Max HP directly via stats.setBase so the value persists
+        // across healing and level-up recalculations.  Non-finite or negative
+        // values are clamped to 1 (minimum viable HP).  Used by Arroyo temple
+        // scripts that set boss HP based on difficulty configuration.
+        set_critter_base_hp_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_hp_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(1, Math.trunc(val)) : 1
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.setBase === 'function') {
+                critter.stats.setBase('Max HP', v)
+            } else {
+                critter.maxHP = v
             }
         }
 
