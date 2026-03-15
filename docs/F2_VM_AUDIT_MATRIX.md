@@ -137,3 +137,23 @@ Next available sfall opcode: **0x8250**
 | `get_critter_min_str_sfall` (0x82C7) | opcode | stub | P3 | Returns 0; no equipped-weapon proto lookup for minimum Strength. |
 
 Next available sfall opcode: **0x82C8**
+
+## Phase 96 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `set_pc_base_stat non-finite value` (BLK-205) | procedure | implemented | P0 | Non-finite values (NaN/Infinity) now clamped to 0 before setBase(); mirrors BLK-133 (set_critter_stat). |
+| `tile_num_in_direction non-finite dir/count` (BLK-206) | procedure | implemented | P1 | Non-finite dir or count now returns source tile unchanged; NaN%6===NaN broke hexInDirectionDistance. |
+| `gsay_message empty-string guard` (BLK-207) | procedure | implemented | P1 | Guard now checks `msg === null || msg === ''`; mirrors BLK-204 (giq_option) and gsay_reply. |
+| `critter_heal null getStat guard` (BLK-208) | procedure | implemented | P1 | Guard against partially-initialised critters lacking getStat() method; skips heal silently. |
+| `random non-finite bounds guard` (BLK-209) | procedure | implemented | P1 | Non-finite min/max values each clamped to 0; getRandomInt(NaN,NaN) would return NaN and corrupt combat. |
+| `get_critter_strength_sfall` (0x8308) | opcode | implemented | P2 | Returns Strength stat; used by carry-weight and weapon-strength-req scripts in Arroyo equipment distribution. |
+| `set_critter_strength_sfall` (0x8309) | opcode | implemented | P2 | Sets Strength stat; clamped [1, 10]; non-finite coerced to 1. |
+| `get_critter_endurance_sfall` (0x830A) | opcode | implemented | P2 | Returns Endurance stat; used by HP-max and radiation-resistance scripts in Arroyo/Temple. |
+| `set_critter_endurance_sfall` (0x830B) | opcode | implemented | P2 | Sets Endurance stat; clamped [1, 10]; non-finite coerced to 1. |
+| `get_critter_intelligence_sfall` (0x830C) | opcode | implemented | P1 | Returns Intelligence (INT) stat; used by giq_option IQ-gate checks and Arroyo Elder branching. |
+| `set_critter_intelligence_sfall` (0x830D) | opcode | implemented | P1 | Sets Intelligence (INT) stat; clamped [1, 10]; non-finite coerced to 1. |
+| `get_critter_sneak_state_sfall` (0x830E) | opcode | implemented | P2 | Returns 1 if SNK_MODE (pcFlags bit 3) is active; used by guard-AI detection in Arroyo village. |
+| `set_critter_sneak_state_sfall` (0x830F) | opcode | implemented | P2 | Sets/clears SNK_MODE (pcFlags bit 3); enables sneak simulation for Arroyo stealth scripts. |
+
+Next available sfall opcode: **0x8310**

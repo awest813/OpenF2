@@ -8855,6 +8855,183 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // BLK-205 — set_pc_base_stat() non-finite value guard
+    {
+        id: 'blk_205_set_pc_base_stat_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-205: set_pc_base_stat() guards against non-finite numeric values.  ' +
+            'Arroyo character-creation scripts compute SPECIAL stat values from formulas ' +
+            'that can yield NaN when an uninitialised multiplier or divisor is used.  ' +
+            'Storing NaN via setBase() corrupts the player\'s stat table and makes all ' +
+            'derived stats (AC, AP, carry weight) return NaN for the rest of the session.  ' +
+            'Non-finite values are now clamped to 0, mirroring BLK-133 (set_critter_stat) ' +
+            'and BLK-129 (set_global_var).',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // BLK-206 — tile_num_in_direction() non-finite dir/count guard
+    {
+        id: 'blk_206_tile_num_in_direction_non_finite',
+        kind: 'procedure',
+        description:
+            'BLK-206: tile_num_in_direction() guards against non-finite direction or ' +
+            'count values.  Arroyo NPC patrol-point and Temple trigger-zone scripts ' +
+            'compute direction values from arithmetic on uninitialised critter orientation ' +
+            'fields that can yield NaN.  NaN % 6 === NaN, which breaks hexInDirectionDistance ' +
+            'and returns a garbage tile number.  Returns the original tile unchanged as a ' +
+            'safe no-movement fallback.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+
+    // BLK-207 — gsay_message() empty-string message guard
+    {
+        id: 'blk_207_gsay_message_empty_string_guard',
+        kind: 'procedure',
+        description:
+            'BLK-207: gsay_message() guards against empty-string messages.  ' +
+            'The previous guard only checked msg === null, not msg === "".  ' +
+            'Arroyo Elder ceremony scripts use gsay_message() for scripted narration beats; ' +
+            'a missing message key returns "" from getScriptMessage(), which would pass ' +
+            'the null-only check and reach uiSetDialogueReply with an empty string, ' +
+            'rendering a blank reply in the dialogue panel.  Now guards with || msg === "" ' +
+            'consistent with gsay_reply and giq_option (BLK-204).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // BLK-208 — critter_heal() null getStat guard
+    {
+        id: 'blk_208_critter_heal_null_getstat_guard',
+        kind: 'procedure',
+        description:
+            'BLK-208: critter_heal() guards against partially-initialised critters that ' +
+            'lack a getStat() method.  Temple of Trials combat-result scripts sometimes ' +
+            'call critter_heal() on NPCs spawned via create_object_sid() before their ' +
+            'stat component is attached.  Without this guard, critter.getStat("Max HP") ' +
+            'throws TypeError and aborts the heal sequence.  Skips silently so the critter ' +
+            'retains its current HP without crashing the script.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'medium',
+    },
+
+    // BLK-209 — random() non-finite bounds guard
+    {
+        id: 'blk_209_random_non_finite_bounds_guard',
+        kind: 'procedure',
+        description:
+            'BLK-209: random() guards against non-finite bounds.  Arroyo encounter ' +
+            'scripts compute random ranges from character stats and map-var-driven formulas ' +
+            'that can yield NaN when uninitialised stat fields are used.  ' +
+            'getRandomInt(NaN, NaN) returns NaN which propagates into downstream stat ' +
+            'checks and corrupts combat results.  Non-finite min/max are each clamped to ' +
+            '0 so the call returns 0 safely without crashing.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'high',
+    },
+
+    // sfall 0x8308 — get_critter_strength_sfall
+    {
+        id: 'sfall_get_critter_strength_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x8308: get_critter_strength_sfall(obj) → Strength stat value [1..10].  ' +
+            'Used by carry-weight, melee-damage, and weapon-strength-requirement scripts ' +
+            'in Arroyo tribal equipment distribution.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x8309 — set_critter_strength_sfall
+    {
+        id: 'sfall_set_critter_strength_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x8309: set_critter_strength_sfall(obj, val) → set Strength.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x830A — get_critter_endurance_sfall
+    {
+        id: 'sfall_get_critter_endurance_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830A: get_critter_endurance_sfall(obj) → Endurance stat value [1..10].  ' +
+            'Used by HP-maximum, hit-point-per-level, and poison/radiation-resistance scripts ' +
+            'in Arroyo NPC initialisation and Temple of Trials survival checks.  ' +
+            'Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x830B — set_critter_endurance_sfall
+    {
+        id: 'sfall_set_critter_endurance_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830B: set_critter_endurance_sfall(obj, val) → set Endurance.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x830C — get_critter_intelligence_sfall
+    {
+        id: 'sfall_get_critter_intelligence_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830C: get_critter_intelligence_sfall(obj) → Intelligence stat value [1..10].  ' +
+            'Used by dialogue-option filtering (giq_option IQ gates), skill-point-per-level ' +
+            'calculation, and Arroyo Elder conversation branching.  Returns 0 for non-critters.',
+        status: 'implemented',
+        frequency: 'high',
+        impact: 'high',
+    },
+    // sfall 0x830D — set_critter_intelligence_sfall
+    {
+        id: 'sfall_set_critter_intelligence_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830D: set_critter_intelligence_sfall(obj, val) → set Intelligence.  ' +
+            'Clamped to [1, 10]; non-finite values are coerced to 1.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x830E — get_critter_sneak_state_sfall
+    {
+        id: 'sfall_get_critter_sneak_state_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830E: get_critter_sneak_state_sfall(obj) → 1 if SNK_MODE (pcFlags bit 3) is active, 0 otherwise.  ' +
+            'Used by Arroyo guard-AI detection scripts to reduce perception radius when ' +
+            'the player is sneaking through the village.  Returns 0 for non-player critters.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // sfall 0x830F — set_critter_sneak_state_sfall
+    {
+        id: 'sfall_set_critter_sneak_state_96',
+        kind: 'opcode',
+        description:
+            'sfall 0x830F: set_critter_sneak_state_sfall(obj, val) → set/clear SNK_MODE (pcFlags bit 3).  ' +
+            'Arroyo stealth scripts use this to simulate or cancel sneak attempts for the ' +
+            'player and companion critters.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------
