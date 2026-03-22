@@ -29,8 +29,11 @@ const ENTRANCE_ROW_H = 24
 const LIST_X       = 16
 const LIST_Y       = 48
 const LIST_W       = 200
+const LIST_BOTTOM_MARGIN = 56
 const BTN_W        = 60
 const BTN_H        = 22
+const WORLD_VISIBLE_ROWS = Math.floor((PANEL_HEIGHT - LIST_Y - LIST_BOTTOM_MARGIN) / AREA_ROW_H)
+const ENTRANCE_VISIBLE_ROWS = Math.floor((PANEL_HEIGHT - LIST_Y - LIST_BOTTOM_MARGIN) / ENTRANCE_ROW_H)
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +63,8 @@ export class WorldMapPanel extends UIPanel {
     private _isTransitionLocked = false
     /** Index of the keyboard-highlighted area row (-1 = none). */
     private _keyboardSelectedIndex = -1
+    /** Index of the keyboard-highlighted entrance row in area view (-1 = none). */
+    private _keyboardSelectedEntranceIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('worldMap', {
@@ -77,6 +82,7 @@ export class WorldMapPanel extends UIPanel {
         this._scrollOffset = 0
         this._isTransitionLocked = false
         this._keyboardSelectedIndex = -1
+        this._keyboardSelectedEntranceIndex = -1
     }
 
     /** Switch to area view for the given area. */
@@ -85,7 +91,7 @@ export class WorldMapPanel extends UIPanel {
         this.currentView   = 'area'
         this._scrollOffset = 0
         this._isTransitionLocked = false
-        this._keyboardSelectedIndex = -1
+        this._keyboardSelectedEntranceIndex = -1
     }
 
 
@@ -133,12 +139,15 @@ export class WorldMapPanel extends UIPanel {
         ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
         ctx.fillText('Select a destination:', LIST_X, LIST_Y - 6)
 
-        strokeRect(ctx, LIST_X, LIST_Y, LIST_W, this.areas.length * AREA_ROW_H + 8, FALLOUT_DARK_GRAY, 1)
+        const worldRows = Math.min(this.areas.length, WORLD_VISIBLE_ROWS)
+        strokeRect(ctx, LIST_X, LIST_Y, LIST_W, worldRows * AREA_ROW_H + 8, FALLOUT_DARK_GRAY, 1)
 
-        for (let i = 0; i < this.areas.length; i++) {
-            const area = this.areas[i]
+        const visibleAreas = this.areas.slice(this._scrollOffset, this._scrollOffset + WORLD_VISIBLE_ROWS)
+        for (let i = 0; i < visibleAreas.length; i++) {
+            const area = visibleAreas[i]
+            const absIdx = this._scrollOffset + i
             const ry = LIST_Y + 4 + i * AREA_ROW_H
-            const isKeySelected = i === this._keyboardSelectedIndex
+            const isKeySelected = absIdx === this._keyboardSelectedIndex
             // Highlight the keyboard-selected row.
             if (isKeySelected) {
                 fillRect(ctx, LIST_X + 2, ry - 2, LIST_W - 4, AREA_ROW_H, FALLOUT_DARK_GRAY)
@@ -147,6 +156,8 @@ export class WorldMapPanel extends UIPanel {
             ctx.fillStyle = cssColor(isKeySelected ? FALLOUT_GREEN : FALLOUT_AMBER)
             ctx.fillText('▶ ' + area.name, LIST_X + 8, ry + 15)
         }
+
+        drawScrollIndicator(ctx, this._scrollOffset, this.areas.length, WORLD_VISIBLE_ROWS)
     }
 
     private _renderAreaView(
@@ -174,11 +185,20 @@ export class WorldMapPanel extends UIPanel {
         ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
         ctx.fillText('Entrances:', LIST_X, LIST_Y - 4)
 
-        for (let i = 0; i < area.entrances.length; i++) {
-            const entrance = area.entrances[i]
+        const entranceRows = Math.min(area.entrances.length, ENTRANCE_VISIBLE_ROWS)
+        strokeRect(ctx, LIST_X, LIST_Y, LIST_W, entranceRows * ENTRANCE_ROW_H + 8, FALLOUT_DARK_GRAY, 1)
+
+        const visibleEntrances = area.entrances.slice(this._scrollOffset, this._scrollOffset + ENTRANCE_VISIBLE_ROWS)
+        for (let i = 0; i < visibleEntrances.length; i++) {
+            const entrance = visibleEntrances[i]
+            const absIdx = this._scrollOffset + i
             const ey = LIST_Y + i * ENTRANCE_ROW_H
+            const isSelected = absIdx === this._keyboardSelectedEntranceIndex
+            if (isSelected) {
+                fillRect(ctx, LIST_X + 2, ey + 2, LIST_W - 4, ENTRANCE_ROW_H - 2, FALLOUT_DARK_GRAY)
+            }
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(isSelected ? FALLOUT_AMBER : FALLOUT_GREEN)
             ctx.fillText(`▶ ${entrance.mapLookupName}`, LIST_X + 8, ey + 15)
         }
 
@@ -187,6 +207,8 @@ export class WorldMapPanel extends UIPanel {
             ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
             ctx.fillText('[No entrances]', LIST_X, LIST_Y + 20)
         }
+
+        drawScrollIndicator(ctx, this._scrollOffset, area.entrances.length, ENTRANCE_VISIBLE_ROWS)
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
@@ -204,10 +226,12 @@ export class WorldMapPanel extends UIPanel {
 
         if (this.currentView === 'world') {
             // Area list clicks
-            if (x >= LIST_X && x < LIST_X + LIST_W && y >= LIST_Y) {
+            if (x >= LIST_X && x < LIST_X + LIST_W && y >= LIST_Y && y < LIST_Y + WORLD_VISIBLE_ROWS * AREA_ROW_H) {
                 const idx = Math.floor((y - LIST_Y - 4) / AREA_ROW_H)
-                if (idx >= 0 && idx < this.areas.length) {
-                    this.showArea(this.areas[idx])
+                const absIdx = idx + this._scrollOffset
+                if (idx >= 0 && absIdx < this.areas.length) {
+                    this._keyboardSelectedIndex = absIdx
+                    this.showArea(this.areas[absIdx])
                 }
             }
         } else {
@@ -218,14 +242,19 @@ export class WorldMapPanel extends UIPanel {
             if (x >= LIST_X && x < LIST_X + 50 && y >= LIST_Y - 26 && y < LIST_Y - 8) {
                 this.currentView   = 'world'
                 this._currentArea  = null
+                this._keyboardSelectedIndex = -1
+                this._keyboardSelectedEntranceIndex = -1
+                this._scrollOffset = 0
                 return true
             }
 
             // Entrance clicks
-            for (let i = 0; i < area.entrances.length; i++) {
+            for (let i = 0; i < Math.min(area.entrances.length, ENTRANCE_VISIBLE_ROWS); i++) {
                 const ey = LIST_Y + i * ENTRANCE_ROW_H
                 if (y >= ey && y < ey + ENTRANCE_ROW_H && x >= LIST_X && x < LIST_X + LIST_W) {
-                    EventBus.emit('worldMap:travelTo', { mapLookupName: area.entrances[i].mapLookupName })
+                    const absIdx = this._scrollOffset + i
+                    this._keyboardSelectedEntranceIndex = absIdx
+                    EventBus.emit('worldMap:travelTo', { mapLookupName: area.entrances[absIdx].mapLookupName })
                     this.hide()
                     return true
                 }
@@ -242,6 +271,8 @@ export class WorldMapPanel extends UIPanel {
                 this.currentView  = 'world'
                 this._currentArea = null
                 this._keyboardSelectedIndex = -1
+                this._keyboardSelectedEntranceIndex = -1
+                this._scrollOffset = 0
             } else {
                 EventBus.emit('worldMap:closed', {})
                 this.hide()
@@ -255,17 +286,57 @@ export class WorldMapPanel extends UIPanel {
                     this._keyboardSelectedIndex = this._keyboardSelectedIndex < 0
                         ? 0
                         : Math.min(this._keyboardSelectedIndex + 1, this.areas.length - 1)
+                    this._scrollOffset = clampListOffset(this._keyboardSelectedIndex, this._scrollOffset, WORLD_VISIBLE_ROWS)
                 }
                 return true
             }
             if (key === 'ArrowUp') {
                 if (this._keyboardSelectedIndex > 0) {
                     this._keyboardSelectedIndex--
+                    this._scrollOffset = clampListOffset(this._keyboardSelectedIndex, this._scrollOffset, WORLD_VISIBLE_ROWS)
                 }
                 return true
             }
             if (key === 'Enter' && this._keyboardSelectedIndex >= 0 && this._keyboardSelectedIndex < this.areas.length) {
                 this.showArea(this.areas[this._keyboardSelectedIndex])
+                return true
+            }
+        } else {
+            const area = this._currentArea
+            if (!area) {return true}
+            if (key === 'ArrowDown') {
+                if (area.entrances.length > 0) {
+                    this._keyboardSelectedEntranceIndex = this._keyboardSelectedEntranceIndex < 0
+                        ? 0
+                        : Math.min(this._keyboardSelectedEntranceIndex + 1, area.entrances.length - 1)
+                    this._scrollOffset = clampListOffset(
+                        this._keyboardSelectedEntranceIndex,
+                        this._scrollOffset,
+                        ENTRANCE_VISIBLE_ROWS,
+                    )
+                }
+                return true
+            }
+            if (key === 'ArrowUp') {
+                if (this._keyboardSelectedEntranceIndex > 0) {
+                    this._keyboardSelectedEntranceIndex--
+                    this._scrollOffset = clampListOffset(
+                        this._keyboardSelectedEntranceIndex,
+                        this._scrollOffset,
+                        ENTRANCE_VISIBLE_ROWS,
+                    )
+                }
+                return true
+            }
+            if (
+                key === 'Enter' &&
+                this._keyboardSelectedEntranceIndex >= 0 &&
+                this._keyboardSelectedEntranceIndex < area.entrances.length
+            ) {
+                EventBus.emit('worldMap:travelTo', {
+                    mapLookupName: area.entrances[this._keyboardSelectedEntranceIndex].mapLookupName,
+                })
+                this.hide()
                 return true
             }
         }
@@ -299,4 +370,26 @@ function strokeRect(
     ctx.strokeStyle = cssColor(color)
     ctx.lineWidth = lineWidth
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+}
+
+function clampListOffset(selectedIndex: number, currentOffset: number, visibleRows: number): number {
+    if (selectedIndex < currentOffset) {return selectedIndex}
+    if (selectedIndex >= currentOffset + visibleRows) {return selectedIndex - visibleRows + 1}
+    return currentOffset
+}
+
+function drawScrollIndicator(
+    ctx: OffscreenCanvasRenderingContext2D,
+    scrollOffset: number,
+    totalRows: number,
+    visibleRows: number,
+): void {
+    if (totalRows <= visibleRows || visibleRows <= 0) {return}
+    ctx.font = '9px monospace'
+    ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+    ctx.fillText(
+        `↑↓ ${scrollOffset + 1}-${Math.min(scrollOffset + visibleRows, totalRows)}/${totalRows}`,
+        LIST_X,
+        LIST_Y + visibleRows * AREA_ROW_H + 12,
+    )
 }

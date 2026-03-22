@@ -375,6 +375,14 @@ describe('Phase 85-G — WorldMapPanel keyboard navigation', () => {
         }))
     }
 
+    function makeEntrances(count: number) {
+        return Array.from({ length: count }, (_, i) => ({
+            mapLookupName: `entrance_${i + 1}`,
+            x: 0,
+            y: 0,
+        }))
+    }
+
     it('ArrowDown is consumed in world view', () => {
         const panel = new WorldMapPanel(800, 600)
         panel.areas = makeAreas(3)
@@ -472,6 +480,52 @@ describe('Phase 85-G — WorldMapPanel keyboard navigation', () => {
         panel.areas = makeAreas(4)
         panel.show()
         panel.onKeyDown('ArrowDown')
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('ArrowDown scrolls long world lists without throwing', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new WorldMapPanel(800, 600)
+        mgr.register(panel)
+        panel.areas = makeAreas(14)
+        panel.show()
+        for (let i = 0; i < 13; i++) {panel.onKeyDown('ArrowDown')}
+        expect(() => mgr.render()).not.toThrow()
+        expect(panel.onKeyDown('Enter')).toBe(true)
+        expect(panel.currentView).toBe('area')
+    })
+
+    it('area view supports keyboard navigation to entrances', () => {
+        const panel = new WorldMapPanel(800, 600)
+        const travelSpy = vi.fn()
+        EventBus.on('worldMap:travelTo', travelSpy)
+        panel.areas = [{
+            name: 'New Reno',
+            id: 8,
+            entrances: makeEntrances(3),
+        }]
+        panel.show()
+        panel.onKeyDown('ArrowDown')
+        panel.onKeyDown('Enter')
+        expect(panel.currentView).toBe('area')
+        panel.onKeyDown('ArrowDown')
+        panel.onKeyDown('ArrowDown')
+        expect(panel.onKeyDown('Enter')).toBe(true)
+        expect(travelSpy).toHaveBeenCalledWith({ mapLookupName: 'entrance_2' })
+        EventBus.clear('worldMap:travelTo')
+    })
+
+    it('render() does not throw for long entrance lists in area view', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        const panel = new WorldMapPanel(800, 600)
+        mgr.register(panel)
+        panel.show()
+        panel.showArea({
+            name: 'New Reno',
+            id: 8,
+            entrances: makeEntrances(14),
+        })
+        for (let i = 0; i < 13; i++) {panel.onKeyDown('ArrowDown')}
         expect(() => mgr.render()).not.toThrow()
     })
 })
