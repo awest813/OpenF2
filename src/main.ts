@@ -15,7 +15,7 @@
 import { HTMLAudioEngine, NullAudioEngine } from './audio.js'
 import { Combat } from './combat.js'
 import { critterKill } from './critter.js'
-import { getElevator } from './data.js'
+import { getElevator, lookupMapNameFromLookup } from './data.js'
 import { heart } from './heart.js'
 import { hexesInRadius, hexFromScreen } from './geometry.js'
 import globalState from './globalState.js'
@@ -156,16 +156,20 @@ export function playerUse() {
                 return
             }
 
-            if (globalState.player.AP!.getAvailableCombatAP() < 4) {
-                uiLog(getProtoMsg(700)!) // "You don't have enough action points."
-                return
-            }
-
             // TODO: move within range of target
 
             const weapon = globalState.player.equippedWeapon
             if (weapon === null) {
                 console.log('You have no weapon equipped!')
+                return
+            }
+
+            // C2 FIX: use weapon-specific AP cost (APCost1 = primary attack mode)
+            const attackCost: number = weapon.weapon?.getAPCost?.(1) ??
+                weapon.weapon?.weapon?.pro?.extra?.APCost1 ?? 4
+
+            if (globalState.player.AP!.getAvailableCombatAP() < attackCost) {
+                uiLog(getProtoMsg(700)!) // "You don't have enough action points."
                 return
             }
 
@@ -178,13 +182,13 @@ export function playerUse() {
                 console.log('art: %s', art)
 
                 uiCalledShot(art, who, (region: string) => {
-                    globalState.player.AP!.subtractCombatAP(4)
+                    globalState.player.AP!.subtractCombatAP(attackCost)
                     console.log('Attacking %s...', region)
                     globalState.combat!.attack(globalState.player, <Critter>obj, region)
                     uiCloseCalledShot()
                 })
             } else {
-                globalState.player.AP!.subtractCombatAP(4)
+                globalState.player.AP!.subtractCombatAP(attackCost)
                 console.log('Attacking the torso...')
                 globalState.combat!.attack(globalState.player, <Critter>obj, 'torso')
             }
@@ -265,6 +269,19 @@ function initUIManager(): void {
     debugOverlayPanel.setScriptRuntimeProvider(() => scriptDebuggerPanel.getRuntimeSnapshot())
     EventBus.on('map:loaded', ({ mapName }) => {
         debugOverlayPanel.mapName = mapName
+    })
+
+    EventBus.on('worldMap:travelTo', ({ mapLookupName }) => {
+        const mapName = lookupMapNameFromLookup(mapLookupName)
+        if (mapName) {
+            console.log('worldMap:travelTo -> ' + mapName + ' (via ' + mapLookupName + ')')
+            globalState.gMap.loadMap(mapName)
+            globalState.uiMode = UIMode.none
+        }
+    })
+
+    EventBus.on('worldMap:closed', () => {
+        globalState.uiMode = UIMode.none
     })
 
     mgr.connectEventBus()
@@ -457,7 +474,12 @@ heart.keydown = (k: string) => {
             return
         }
 
-        if (globalState.player.AP.getAvailableCombatAP() < 4) {
+        // C2 FIX: use weapon-specific AP cost
+        const kbWeapon = globalState.player.equippedWeapon
+        const kbAttackCost: number = kbWeapon?.weapon?.getAPCost?.(1) ??
+            kbWeapon?.weapon?.weapon?.pro?.extra?.APCost1 ?? 4
+
+        if (globalState.player.AP.getAvailableCombatAP() < kbAttackCost) {
             uiLog(getProtoMsg(700))
             return
         }
@@ -474,7 +496,7 @@ heart.keydown = (k: string) => {
                 combatant.position.y === mouseHex.y &&
                 !combatant.dead
             ) {
-                globalState.player.AP.subtractCombatAP(4)
+                globalState.player.AP.subtractCombatAP(kbAttackCost)
                 console.log('Attacking...')
                 globalState.combat.attack(globalState.player, combatant)
                 break
@@ -493,9 +515,7 @@ heart.keydown = (k: string) => {
             console.log('Wait your turn...')
         } else {
             console.log('[COMBAT BEGIN]')
-            globalState.inCombat = true
-            globalState.combat = new Combat(globalState.gMap.getObjects())
-            globalState.combat.nextTurn()
+            Combat.start()
         }
     }
 
@@ -538,7 +558,11 @@ heart.keydown = (k: string) => {
     }
 
     if (k === Config.controls.worldmap) {
-        uiWorldMap()
+        if (Config.ui.forceUI2OnlyGameplayPanels) {
+            EventBus.emit('ui:openPanel', { panelName: 'worldMap' })
+        } else {
+            uiWorldMap()
+        }
     }
 
     if (k === Config.controls.saveKey) {

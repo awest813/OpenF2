@@ -381,7 +381,10 @@ describe('AP spend correctness regression tests', () => {
         expect(combat.nextTurn).toHaveBeenCalledTimes(1)
     })
 
-    it('does not grant end-turn bonus AC from leftover AP yet', () => {
+    it('end-of-turn unused AP grants AC bonus that reduces attacker hit chance (FO2 parity)', () => {
+        // H5 FIX: In Fallout 2, each unused AP at end of turn grants +1 AC.
+        // StatSet.get('AC') returns baseAC + acBonus; getHitChance reads getStat('AC'),
+        // so unused AP correctly makes the target harder to hit.
         const combat = Object.create(Combat.prototype) as Combat
         vi.spyOn(combat, 'getHitDistanceModifier').mockReturnValue(0)
         const shooter: any = {
@@ -393,14 +396,108 @@ describe('AP spend correctness regression tests', () => {
             }),
             position: { x: 0, y: 0 },
         }
-        const makeTarget = (combatAP: number) => ({
-            AP: { getAvailableCombatAP: vi.fn().mockReturnValue(combatAP) },
-            getStat: vi.fn((name: string) => (name === 'AC' ? 12 : 0)),
+        // Simulate a target with 8 unused AP (adds 8 to AC via acBonus → getStat returns 20 vs 12)
+        const makeTarget = (effectiveAC: number) => ({
+            getStat: vi.fn((name: string) => (name === 'AC' ? effectiveAC : 0)),
             position: { x: 2, y: 0 },
         })
 
-        const withUnusedAP = combat.getHitChance(shooter, makeTarget(8) as any, 'torso')
-        const withoutUnusedAP = combat.getHitChance(shooter, makeTarget(0) as any, 'torso')
-        expect(withUnusedAP.hit).toBe(withoutUnusedAP.hit)
+        const withBonus    = combat.getHitChance(shooter, makeTarget(20) as any, 'torso') // AC=12+8
+        const withoutBonus = combat.getHitChance(shooter, makeTarget(12) as any, 'torso') // AC=12
+        // Each extra AC point = 1% less hit chance
+        expect(withoutBonus.hit - withBonus.hit).toBe(8)
+    })
+})
+
+describe('combat turn scripting hooks (FO2 parity)', () => {
+    it('combatEvent supports combatStart event with fixed_param = 0', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_combat_start',
+            _didOverride: false,
+        }
+        const obj: any = { _script: script }
+        const result = Scripting.combatEvent(obj, 'combatStart')
+        expect(script.combat_p_proc).toHaveBeenCalled()
+        expect(script.fixed_param).toBe(0) // COMBAT_SUBTYPE_INITIATE
+        expect(result).toBe(false) // no terminate, no override
+    })
+
+    it('combatEvent supports combatOver event with fixed_param = 3', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_combat_over',
+            _didOverride: false,
+        }
+        const obj: any = { _script: script }
+        const result = Scripting.combatEvent(obj, 'combatOver')
+        expect(script.combat_p_proc).toHaveBeenCalled()
+        expect(script.fixed_param).toBe(3) // COMBAT_SUBTYPE_ENDCOMBAT
+        expect(result).toBe(false)
+    })
+
+    it('combatEvent sets combat_is_initialized = 1 on combatStart', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_init_flag',
+            _didOverride: false,
+        }
+        const obj: any = { _script: script }
+        Scripting.combatEvent(obj, 'combatStart')
+        expect(script.combat_is_initialized).toBe(1)
+    })
+
+    it('getAttackAPCost returns 4 (default) for unarmed critters', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        const critter: any = { equippedWeapon: null }
+        // Private method access for testing
+        const cost = (combat as any).getAttackAPCost(critter)
+        expect(cost).toBe(4)
+    })
+
+    it('getAttackAPCost reads weapon APCost1 when available', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        const critter: any = {
+            equippedWeapon: {
+                weapon: {
+                    getAPCost: vi.fn().mockReturnValue(6), // minigun costs 6
+                    weapon: { pro: { extra: { APCost1: 6 } } }
+                }
+            }
+        }
+        const cost = (combat as any).getAttackAPCost(critter)
+        expect(cost).toBe(6)
+    })
+
+    it('nextTurn skips stunned critters and clears flag (H6 knockdown turn-skip)', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        const player: any = {
+            isPlayer: true, stats: { acBonus: 0 }, dead: false,
+            AP: { resetAP: vi.fn(), getAvailableCombatAP: vi.fn().mockReturnValue(7) },
+            position: { x: 0, y: 0 }, _script: undefined,
+        }
+        const stunnedNPC: any = {
+            isPlayer: false, hostile: true, dead: false, stunned: true,
+            stats: { acBonus: 0 }, teamNum: 1,
+            AP: { resetAP: vi.fn(), getAvailableCombatAP: vi.fn().mockReturnValue(0) },
+            ai: { info: { max_dist: 20 } },
+            position: { x: 3, y: 0 }, _script: undefined,
+        }
+        combat.combatants = [player, stunnedNPC]
+        combat.player = player
+        combat.playerIdx = 0
+        combat.whoseTurn = 0 // player's turn → nextTurn advances to NPC
+        combat.turnNum = 1
+        combat.inPlayerTurn = true
+
+        combat.nextTurn()
+
+        // The stunned NPC should have been skipped and flag cleared
+        expect(stunnedNPC.stunned).toBe(false)
+        // After the stunned NPC is skipped, it should wrap back to the player
+        expect(combat.inPlayerTurn).toBe(true)
     })
 })

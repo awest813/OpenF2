@@ -8646,14 +8646,24 @@ export namespace Scripting {
         return obj._script._didOverride
     }
 
-    export function combatEvent(obj: Obj, event: 'turnBegin'): boolean {
+    export function combatEvent(obj: Obj, event: 'turnBegin' | 'combatStart' | 'combatOver'): boolean {
         if (!obj._script) {return false} // no script — not a bug; many map objects lack one
 
-        let fixed_param: number | null = null
+        // FO2 combat_p_proc fixed_param values (COMBAT_SUBTYPE):
+        //   0 = COMBAT_SUBTYPE_INITIATE  — combat just started
+        //   4 = COMBAT_SUBTYPE_TURN      — start of critter's turn
+        //   3 = COMBAT_SUBTYPE_ENDCOMBAT — combat is ending
+        let fixed_param: number
         switch (event) {
+            case 'combatStart':
+                fixed_param = 0
+                break // COMBAT_SUBTYPE_INITIATE
             case 'turnBegin':
                 fixed_param = 4
                 break // COMBAT_SUBTYPE_TURN
+            case 'combatOver':
+                fixed_param = 3
+                break // COMBAT_SUBTYPE_ENDCOMBAT
             default:
                 console.warn('combatEvent: unknown event ' + event + ' — ignoring')
                 return false
@@ -8661,7 +8671,7 @@ export namespace Scripting {
 
         if (!obj._script.combat_p_proc) {return false}
 
-        info('[COMBAT EVENT ' + event + ']')
+        info('[COMBAT EVENT ' + event + ' (fixed_param=' + fixed_param + ')]')
 
         obj._script.combat_is_initialized = 1
         obj._script.fixed_param = fixed_param

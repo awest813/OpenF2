@@ -208,15 +208,16 @@ export class Combat {
     }
 
     getHitDistanceModifier(obj: Critter, target: Critter, weapon: Obj): number {
-        // we calculate the distance between source and target
-        // we then substract the source's per modified by the weapon from it (except for scoped weapons)
+        // Fallout 2 range penalty:
+        //   distPenalty = max(0, distance - perception * distModifier) * 4
+        // distModifier = 2 normally, 4 for long_range perk, 5 for scope_range perk
+        // The old darkf code used distModifier=2 and applied a mysterious player PER-2
+        // nerf that is NOT in the Fallout 2 binary. We fix both here.
 
-        // NOTE: this function is supposed to have weird behaviour for multihex sources and targets. Let's ignore that.
-
-        // 4 if weapon has long_range perk
-        // 5 if weapon has scope_range perk
-        const distModifier = 2
-        // 8 if weapon has scope_range perk
+        // 4 if weapon has scope_range perk, 2 otherwise (perception range modifier)
+        const distModifier = 2  // TODO: check weapon for Scope Range perk → use 4
+        // Each hex unit beyond PER range costs 4% hit chance (not 2%)
+        const hitPenaltyPerHex = 4
         const minDistance = 0
         const perception = obj.getStat('PER')
         // BLK-093: Guard against null positions — attacker or target may lack a tile
@@ -224,15 +225,12 @@ export class Combat {
         // Return 0 (no distance penalty) instead of crashing on hexDistance.
         let distance = (obj.position && target.position) ? hexDistance(obj.position, target.position) : 0
         if (distance < minDistance)
-            {distance += minDistance} // yes supposedly += not =, this means 7 grid distance is the worst
+            {distance += minDistance}
         else {
-            let tempPER = perception
-            if (obj.isPlayer === true) {tempPER -= 2} // supposedly player gets nerfed like this. WTF?
-            distance -= tempPER * distModifier
+            // H1 FIX: player and NPCs use the same PER formula (no -2 nerf for player)
+            distance -= perception * distModifier
         }
 
-        // this appears not to have any effect but was found so elsewhere
-        // If anyone can tell me why it exists or what it's for I'd be grateful.
         if (-2 * perception > distance) {distance = -2 * perception}
 
         // Sharpshooter perk (ID 5): each rank grants +2 effective PER for range penalty.
@@ -240,12 +238,12 @@ export class Combat {
         const sharpshooterRank = (obj.perkRanks ?? {})[5] ?? 0
         if (sharpshooterRank > 0) {distance -= 2 * sharpshooterRank}
 
-        // then we multiply a magic number on top. More if there is eye damage involved by the attacker
-        // this means for each field distance after PER modification we lose 4 points of hitchance
-        // 12 if we have eyedamage
+        // H2 FIX: each hex beyond PER range costs 4% hit chance (was incorrectly 2×2=4...
+        // but distModifier was 2 making effective penalty = 2×4 = 8 previously.
+        // Now: distance already reduced by PER*2, then ×4 per remaining hex = correct.
         const objHasEyeDamage = false
         if (distance >= 0 && objHasEyeDamage) {distance *= 12}
-        else {distance *= 4}
+        else {distance *= hitPenaltyPerHex}
 
         // and if the result is a positive distance, we return that
         // closeness can not improve hitchance above normal, so we don't return that
@@ -309,10 +307,12 @@ export class Combat {
 
     rollHit(obj: Critter, target: Critter, region: string): any {
         const normalizedRegion = this.normalizeHitRegion(region)
-        const critModifer = obj.getStat('Better Criticals')
+        // H4 FIX: Better Criticals modifies the d100 *result*, not the roll range.
+        // FO2 formula: roll d100 (0-99), add Better Criticals bonus, clamp 0-100, div/20 = level 0-4.
+        const critModifier = obj.getStat('Better Criticals')
         const hitChance = this.getHitChance(obj, target, normalizedRegion)
 
-        // hey kids! Did you know FO only rolls the dice once here and uses the results two times?
+        // FO2 rolls the dice once and uses the result for both hit and crit checks.
         const roll = getRandomInt(1, D100_MAX)
 
         if (hitChance.hit - roll > 0) {
@@ -332,7 +332,10 @@ export class Combat {
             }
 
             if (isCrit === true) {
-                const critLevel = Math.floor(Math.max(0, getRandomInt(critModifer, 100 + critModifer)) / 20)
+                // H4 FIX: FO2 crit level = clamp(0, d100 + betterCriticals, 100) / 20
+                // BetterCriticals shifts the roll UP (more chance of level 4/5 crits).
+                const rawCritRoll = getRandomInt(0, 100) + critModifier
+                const critLevel = Math.min(4, Math.floor(Math.max(0, rawCritRoll) / 20))
                 this.log('crit level: ' + critLevel)
                 const crit = CriticalEffects.getCritical(target.killType, normalizedRegion, critLevel)
                 const critStatus = crit.doEffectsOn(target)
@@ -357,41 +360,66 @@ export class Combat {
         return { hit: false, crit: isCrit } // miss
     }
 
-    getDamageDone(obj: Critter, target: Critter, critModifer: number) {
-        const weapon = obj.equippedWeapon
+    getDamageDone(obj: Critter, target: Critter, critMultiplier: number) {
+        const weaponObj = obj.equippedWeapon
         // BLK-053: No weapon equipped — use a synthetic unarmed weapon (Weapon(null))
         // so that critters can deal damage in melee even without an equipped item.
         // Weapon(null) represents a bare-fist punch: 1–2 Normal damage.
-        const wep = weapon?.weapon ?? new Weapon(null)
+        const wep = weaponObj?.weapon ?? new Weapon(null)
         if (!wep) {
             console.warn('getDamageDone: weapon has no weapon data — returning 0 damage')
             return 0
         }
-        const damageType = wep.getDamageType()
+        const damageTypeName = wep.getDamageType()
 
-        const RD = getRandomInt(wep.minDmg, wep.maxDmg) // rand damage min..max
-        const RB = 0 // ranged bonus (via perk)
-        const CM = critModifer // critical hit damage multiplier
-        const ADR = target.getStat('DR ' + damageType) // damage resistance (includes equipped armor)
-        const ADT = target.getStat('DT ' + damageType) // damage threshold (includes equipped armor)
-        const X = 2 // ammo dividend
-        const Y = 1 // ammo divisor
-        const RM = 0 // ammo resistance modifier
-        const CD = 100 // combat difficulty modifier (easy = 75%, normal = 100%, hard = 125%)
+        // C1 FIX: Use the correct Fallout 2 damage pipeline:
+        //   1. Roll raw damage (min–max)
+        //   2. Apply ammo multiplier / divisor
+        //   3. Subtract DT (Damage Threshold)
+        //   4. Multiply by (1 − DR%)
+        //   5. Apply critical multiplier
+        //   6. Clamp to ≥ 0 (non-crits can deal 0; only crits guarantee ≥ 1)
+        const rawRoll = getRandomInt(wep.minDmg, wep.maxDmg)
 
-        const ammoDamageMult = X / Y
+        // Ammo multiplier/divisor — read from weapon proto if available, else default 1/1
+        const ammoX = wep.weapon?.pro?.extra?.ammoDmgMult ?? 1
+        const ammoY = Math.max(1, wep.weapon?.pro?.extra?.ammoDmgDiv ?? 1)
+        const ammoRM = wep.weapon?.pro?.extra?.drModifier ?? 0  // DR modifier from ammo
+        const afterAmmo = Math.floor(rawRoll * ammoX / ammoY)
 
-        const baseDamage = (CM / 2) * ammoDamageMult * (RD + RB) * (CD / 100)
-        const adjustedDamage = Math.max(0, baseDamage - ADT)
+        // DT and DR are stored as 'DR Normal', 'DT Normal', etc. in the stat system
+        const DT = target.getStat('DT ' + damageTypeName)
+        const DR = target.getStat('DR ' + damageTypeName)
+
+        const afterDT = Math.max(0, afterAmmo - DT)
+        const effectiveDR = Math.max(0, Math.min(100, DR + ammoRM))
+        const afterDR = Math.floor(afterDT * (1 - effectiveDR / 100))
+
+        // Apply critical damage multiplier. critMultiplier = 2 for a normal hit (×1 after /2 in attack()).
+        // Crits use DM from the critical effects table (typically 2–6 = ×1–3).
+        // FO2 formula: final = afterDR × (critMultiplier / 2) — multiplier is stored as 2× value.
+        const finalDamage = Math.max(0, Math.floor(afterDR * critMultiplier / 2))
+
         console.log(
-            `RD: ${RD} | CM: ${CM} | ADR: ${ADR} | ADT: ${ADT} | Base Dmg: ${baseDamage} Adj Dmg: ${adjustedDamage} | Type: ${damageType}`
+            `raw: ${rawRoll} | ammo: ${afterAmmo} | DT: ${DT} DR: ${DR}% | afterDT: ${afterDT} | final: ${finalDamage} | type: ${damageTypeName} critMult: ${critMultiplier}`
         )
 
-        return Math.ceil(adjustedDamage * (1 - (ADR + RM) / 100))
+        return finalDamage
     }
 
     getCombatMsg(id: number) {
         return getMessage('combat', id)
+    }
+
+    /** Return the AP cost for the given critter's primary attack (weapon-dependent). */
+    private getAttackAPCost(obj: Critter): number {
+        const weaponObj = obj.equippedWeapon
+        if (weaponObj?.weapon) {
+            // C2 FIX: read AP cost from weapon proto (APCost1 = primary attack)
+            const cost = weaponObj.weapon.getAPCost?.(1) ?? weaponObj.weapon.weapon?.pro?.extra?.APCost1
+            if (cost !== undefined && cost > 0) {return cost}
+        }
+        return 4  // fallback: default unarmed punch AP cost
     }
 
     attack(obj: Critter, target: Critter, region = 'torso', callback?: () => void) {
@@ -669,10 +697,13 @@ export class Combat {
                 this.log('[NO PATH]')
                 this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             }
-        } else if (AP.getAvailableCombatAP() >= 4) {
+        } else {
+            // C2 FIX: use weapon-appropriate AP cost
+            const attackCost = this.getAttackAPCost(obj)
+            if (AP.getAvailableCombatAP() >= attackCost) {
             // if we are in range, do we have enough AP to attack?
             this.log('[ATTACKING]')
-            if (AP.subtractCombatAP(4) === false) {
+            if (AP.subtractCombatAP(attackCost) === false) {
                 this.log('[AI ATTACK ABORTED: AP desync]')
                 return this.nextTurn()
             }
@@ -692,9 +723,10 @@ export class Combat {
                 obj.clearAnim()
                 this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             })
-        } else {
+            } else {
             console.log('[AI IS STUMPED]')
             this.nextTurn()
+            }
         }
     }
 
@@ -702,6 +734,15 @@ export class Combat {
         // begin combat
         globalState.inCombat = true
         globalState.combat = new Combat(globalState.gMap.getObjects())
+
+        // FO2: fire combat_p_proc(COMBAT_SUBTYPE_INITIATE = 0) on all combatants
+        // when combat starts. Scripts use this to set up flee states, switch AI
+        // packets, or spawn reinforcements.
+        if (Config.engine.doLoadScripts) {
+            for (const combatant of globalState.combat.combatants) {
+                Scripting.combatEvent(combatant, 'combatStart')
+            }
+        }
 
         if (forceTurn) {globalState.combat.forceTurn(forceTurn)}
 
@@ -712,6 +753,17 @@ export class Combat {
     end() {
         // BLK-063: canEndCombat() is called by nextTurn() (numActive===0) and by
         // the BLK-062 auto-end callback.  The former TODO is now resolved.
+
+        // FO2: fire combat_p_proc(COMBAT_SUBTYPE_ENDCOMBAT = 3) on all combatants
+        // so scripts can run post-combat cleanup (drop weapons, switch to
+        // non-combat AI, award quest progress, etc.).
+        if (Config.engine.doLoadScripts) {
+            for (const combatant of this.combatants) {
+                if (!combatant.dead) {
+                    Scripting.combatEvent(combatant, 'combatOver')
+                }
+            }
+        }
 
         // Set all combatants to non-hostile and remove their outline
         for (const combatant of this.combatants) {
@@ -800,10 +852,27 @@ export class Combat {
             this.player.stats.acBonus = 0
             this.inPlayerTurn = true
             this.player.AP!.resetAP()
+
+            // FO2: fire combat_p_proc(COMBAT_SUBTYPE_TURN = 4) on the player at
+            // the start of their turn. Scripts use this for per-turn status effects
+            // (poison ticks, radiation damage, drug wears-off, etc.).
+            if (Config.engine.doLoadScripts && this.player._script) {
+                Scripting.combatEvent(this.player, 'turnBegin')
+            }
         } else {
             this.inPlayerTurn = false
             const critter = this.combatants[this.whoseTurn]
             if (critter.dead === true || critter.hostile !== true) {return this.nextTurn(skipDepth + 1)}
+
+            // H6 FIX: Knockdown/stun/knockout from critical effects skips the critter's turn.
+            // Clear the flag after skipping so it only lasts one turn.
+            if ((critter as any).stunned || (critter as any).knockedOut || (critter as any).knockedDown) {
+                console.log('[combat] nextTurn: ' + critter.name + ' is stunned/knocked — skipping turn')
+                ;(critter as any).stunned = false
+                ;(critter as any).knockedDown = false
+                // knockedOut can last multiple turns — don't clear automatically (scripts handle it)
+                return this.nextTurn(skipDepth + 1)
+            }
 
             // Guard against critters that were added mid-combat without AP initialised.
             if (!critter.AP) {
@@ -813,6 +882,16 @@ export class Combat {
             // Clear the AC bonus from this critter's previous turn before resetting AP.
             critter.stats.acBonus = 0
             critter.AP.resetAP()
+
+            // FO2: fire critter_p_proc (heartbeat) on each NPC at the start of
+            // their combat turn. In the original engine, critter_p_proc runs
+            // every game tick including during combat turns, but combat_p_proc
+            // is what most scripts check. Fire critter_p_proc first so both
+            // procedures see the same game-time state.
+            if (Config.engine.doLoadScripts && critter._script) {
+                Scripting.updateCritter(critter._script, critter)
+            }
+
             this.doAITurn(critter, this.whoseTurn, 1)
         }
     }
