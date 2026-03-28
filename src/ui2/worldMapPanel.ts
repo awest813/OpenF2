@@ -17,6 +17,8 @@
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, UIColor } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
+import globalState from '../globalState.js'
+import { loadAreas } from '../data.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -83,6 +85,33 @@ export class WorldMapPanel extends UIPanel {
         this._isTransitionLocked = false
         this._keyboardSelectedIndex = -1
         this._keyboardSelectedEntranceIndex = -1
+
+        if (!globalState.mapAreas) {
+            try {
+                globalState.mapAreas = loadAreas()
+            } catch (e) {
+                console.warn('worldMapPanel: loadAreas failed, skipping dynamic area population.')
+            }
+        }
+
+        if (globalState.mapAreas) {
+            // Apply save-loaded discovery overrides (if any)
+            if (globalState.mapAreaStates) {
+                for (const areaID in globalState.mapAreaStates) {
+                    if (globalState.mapAreas[areaID]) {
+                        globalState.mapAreas[areaID].state = globalState.mapAreaStates[areaID] === true
+                    }
+                }
+            }
+
+            this.areas = []
+            for (const areaID in globalState.mapAreas) {
+                const area = globalState.mapAreas[areaID]
+                if (area.state === true) {
+                    this.areas.push(area)
+                }
+            }
+        }
     }
 
     /** Switch to area view for the given area. */

@@ -22,6 +22,8 @@ import { Critter, createObjectWithPID, WeaponObj } from './object.js'
 import { centerCamera } from './renderer.js'
 import { fromTileNum } from './tile.js'
 import { uiWorldMap } from './ui.js'
+import { Config } from './config.js'
+import { EventBus } from './eventBus.js'
 
 // Contains the Player class and relevant initialization logic
 
@@ -110,7 +112,11 @@ export class Player extends Critter {
                 if (startingPosition.x === -1 || startingPosition.y === -1 || exitMapID < 0) {
                     // world map
                     console.log('exit grid -> worldmap')
-                    uiWorldMap()
+                    if (Config.ui.forceUI2OnlyGameplayPanels) {
+                        EventBus.emit('ui:openPanel', { panelName: 'worldMap' })
+                    } else {
+                        uiWorldMap()
+                    }
                 } else {
                     // another map
                     console.log(
