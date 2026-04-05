@@ -10,6 +10,7 @@ import { ActionPoints, Combat } from './combat.js'
 import { Config } from './config.js'
 import { CriticalEffects } from './criticalEffects.js'
 import { EventBus } from './eventBus.js'
+import { Critter } from './object.js'
 import { CalledShotPanel } from './ui2/calledShotPanel.js'
 import * as util from './util.js'
 
@@ -167,6 +168,18 @@ describe('called-shot combat + UI integration', () => {
         expect(ap.combat).toBe(4)
         expect(ap.move).toBe(0)
     })
+
+    it('ActionPoints grants Bonus Move AP as move-only budget', () => {
+        const critter: any = {
+            getStat: vi.fn().mockReturnValue(6),
+            stats: {},
+            perkRanks: { 1: 2 }, // Bonus Move rank 2 => +4 move AP
+        }
+        const ap = new ActionPoints(critter)
+        const max = ap.getMaxAP()
+        expect(max.move).toBe(4)
+        expect(max.combat).toBe(5 + Math.ceil(6 / 2))
+    })
 })
 
 describe('hit-chance fidelity regression tests', () => {
@@ -270,6 +283,73 @@ describe('hit-chance fidelity regression tests', () => {
         expect(() => combat.getHitChance(shooter, target, 'torso')).not.toThrow()
         const result = combat.getHitChance(shooter, target, 'torso')
         expect(result.hit).toBe(0)
+    })
+
+    it('applies -10 hit chance per intervening critter as partial cover', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        vi.spyOn(combat, 'getHitDistanceModifier').mockReturnValue(0)
+
+        const shooter: any = {
+            equippedWeapon: { weapon: { weaponSkillType: 'Small Guns' } },
+            getSkill: vi.fn().mockReturnValue(80),
+            getStat: vi.fn((name: string) => (name === 'Critical Chance' ? 5 : name === 'PER' ? 8 : 0)),
+            position: { x: 0, y: 0 },
+        }
+        const target: any = {
+            getStat: vi.fn((name: string) => (name === 'AC' ? 10 : 0)),
+            position: { x: 2, y: 0 },
+        }
+        const blocker: any = { dead: false, position: { x: 1, y: 0 } }
+
+        ;(combat as any).combatants = [shooter, target]
+        const clearShot = combat.getHitChance(shooter, target, 'torso')
+
+        ;(combat as any).combatants = [shooter, blocker, target]
+        const blockedShot = combat.getHitChance(shooter, target, 'torso')
+
+        expect(clearShot.hit - blockedShot.hit).toBe(10)
+    })
+
+    it('weapon range perks adjust distance penalty (normal/long/scope)', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        const shooter: any = { getStat: vi.fn().mockReturnValue(5), position: { x: 0, y: 0 }, perkRanks: {} }
+        const farTarget: any = { position: { x: 30, y: 0 } }
+
+        const normalWeapon: any = {}
+        const longRangeWeapon: any = { pro: { extra: { perk: 1 } } } // long_range
+        const scopeWeapon: any = { pro: { extra: { perk: 5 } } } // scope_range
+
+        expect(combat.getHitDistanceModifier(shooter, farTarget, normalWeapon)).toBe(80)
+        expect(combat.getHitDistanceModifier(shooter, farTarget, longRangeWeapon)).toBe(40)
+        expect(combat.getHitDistanceModifier(shooter, farTarget, scopeWeapon)).toBe(20)
+    })
+
+    it('Fast Shot trait disables called-shot region penalties for ranged attacks', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        vi.spyOn(combat, 'getHitDistanceModifier').mockReturnValue(0)
+
+        const shooter: any = {
+            equippedWeapon: {
+                pro: { extra: { attackMode: 6 } }, // fire single
+                weapon: { weaponSkillType: 'Small Guns' },
+            },
+            charTraits: new Set([7]), // Fast Shot
+            getSkill: vi.fn().mockReturnValue(90),
+            getStat: vi.fn((name: string) => {
+                if (name === 'PER') {return 8}
+                if (name === 'Critical Chance') {return 5}
+                return 0
+            }),
+            position: { x: 0, y: 0 },
+        }
+        const target: any = {
+            getStat: vi.fn((name: string) => (name === 'AC' ? 10 : 0)),
+            position: { x: 5, y: 0 },
+        }
+
+        const torso = combat.getHitChance(shooter, target, 'torso')
+        const eyes = combat.getHitChance(shooter, target, 'eyes')
+        expect(eyes).toEqual(torso)
     })
 })
 
@@ -470,6 +550,47 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
         }
         const cost = (combat as any).getAttackAPCost(critter)
         expect(cost).toBe(6)
+    })
+
+    it('getAttackAPCost applies Fast Shot -1 AP for ranged attacks', () => {
+        const combat = Object.create(Combat.prototype) as Combat
+        const critter: any = {
+            charTraits: new Set([7]), // Fast Shot
+            equippedWeapon: {
+                pro: { extra: { attackMode: 6 } }, // fire single
+                weapon: {
+                    getAPCost: vi.fn().mockReturnValue(5),
+                    weapon: { pro: { extra: { APCost1: 5 } } },
+                },
+            },
+        }
+        const cost = (combat as any).getAttackAPCost(critter)
+        expect(cost).toBe(4)
+    })
+
+    it('constructor sorts combatants by Sequence for initiative order', () => {
+        const makeCritter = (name: string, sequence: number, isPlayer = false): Critter => {
+            const c = Object.create(Critter.prototype) as Critter
+            ;(c as any).name = name
+            ;(c as any).isPlayer = isPlayer
+            ;(c as any).dead = false
+            ;(c as any).visible = true
+            ;(c as any).ai = isPlayer ? null : { info: { max_dist: 20 } }
+            ;(c as any).stats = { apBonus: 0 }
+            ;(c as any).position = { x: 0, y: 0 }
+            ;(c as any).perkRanks = {}
+            ;(c as any).charTraits = new Set()
+            ;(c as any).getStat = vi.fn((stat: string) => (stat === 'Sequence' ? sequence : stat === 'AGI' ? 6 : 0))
+            ;(c as any).clearAnim = vi.fn()
+            return c
+        }
+
+        const low = makeCritter('low', 4, false)
+        const player = makeCritter('player', 8, true)
+        const high = makeCritter('high', 10, false)
+
+        const combat = new Combat([low, player, high] as any)
+        expect(combat.combatants.map((c) => c.name)).toEqual(['high', 'player', 'low'])
     })
 
     it('nextTurn skips stunned critters and clears flag (H6 knockdown turn-skip)', () => {
