@@ -18,7 +18,7 @@ limitations under the License.
 import { Config } from './config.js'
 import { CriticalEffects } from './criticalEffects.js'
 import { critterDamage, Weapon } from './critter.js'
-import { hexDistance, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
+import { hexDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
 import globalState from './globalState.js'
 import { Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
@@ -47,7 +47,8 @@ export class ActionPoints {
     getMaxAP(): { combat: number; move: number } {
         // Get bonus AP from critter's stats (perks/traits)
         const bonusCombatAP = this.attachedCritter.stats.apBonus || 0
-        const bonusMoveAP = 0 // Move AP is typically 0 in Fallout
+        // Bonus Move perk (ID 1): +2 move-only AP per rank.
+        const bonusMoveAP = ((this.attachedCritter.perkRanks ?? {})[BONUS_MOVE_PERK_ID] ?? 0) * 2
 
         return { combat: 5 + Math.ceil(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
     }
@@ -137,6 +138,16 @@ const D100_MAX = 101
 /** Jinxed trait (charTraits ID 9): percent chance of forcing a critical miss on any miss. */
 const JINXED_CRIT_MISS_CHANCE = 50
 
+/** Fast Shot trait (charTraits ID 7): no called shots and -1 AP for ranged attacks. */
+const FAST_SHOT_TRAIT_ID = 7
+
+/** Bonus Move perk (ID 1): +2 move-only AP per rank. */
+const BONUS_MOVE_PERK_ID = 1
+
+/** Weapon perk IDs used by Fallout 2 range penalty logic. */
+const WEAPON_PERK_LONG_RANGE = 1
+const WEAPON_PERK_SCOPE_RANGE = 5
+
 export class Combat {
     combatants: Critter[]
     playerIdx: number
@@ -170,6 +181,19 @@ export class Combat {
             return false
         }) as Critter[]
 
+        // Fallout 2 initiative order: descending Sequence (2×PER + modifiers).
+        // Tie-breaker keeps player ahead of NPCs at identical Sequence.
+        this.combatants.sort((a, b) => {
+            const rawA = a.getStat('Sequence')
+            const rawB = b.getStat('Sequence')
+            const aSeq = Number.isFinite(rawA) ? rawA : 0
+            const bSeq = Number.isFinite(rawB) ? rawB : 0
+            if (bSeq !== aSeq) {return bSeq - aSeq}
+            if (a.isPlayer && !b.isPlayer) {return -1}
+            if (!a.isPlayer && b.isPlayer) {return 1}
+            return 0
+        })
+
         this.playerIdx = this.combatants.findIndex((x) => x.isPlayer)
         if (this.playerIdx === -1) {
             // Player not found among live combatants — bail out gracefully.
@@ -183,8 +207,8 @@ export class Combat {
 
         this.player = this.combatants[this.playerIdx] as Player
         this.turnNum = 1
-        this.whoseTurn = this.playerIdx - 1
-        this.inPlayerTurn = true
+        this.whoseTurn = -1
+        this.inPlayerTurn = false
 
         // Stop the player from walking combat is initiating
         this.player.clearAnim()
@@ -202,9 +226,51 @@ export class Combat {
         return 'torso'
     }
 
+    private hasFastShotTrait(obj: Critter): boolean {
+        return obj.charTraits?.has(FAST_SHOT_TRAIT_ID) ?? false
+    }
+
+    private isRangedPrimaryAttack(obj: Critter): boolean {
+        const weaponObj = obj.equippedWeapon
+        const attackMode = weaponObj?.pro?.extra?.attackMode ?? weaponObj?.weapon?.weapon?.pro?.extra?.attackMode
+        if (typeof attackMode !== 'number') {return false}
+        const primaryMode = attackMode & 0x0f
+        // 6 = fire single, 7 = fire burst, 8 = flame
+        return primaryMode === 6 || primaryMode === 7 || primaryMode === 8
+    }
+
+    private normalizeAttackRegionForAttacker(obj: Critter, region: string): string {
+        const normalized = this.normalizeHitRegion(region)
+        if (!this.hasFastShotTrait(obj)) {return normalized}
+        if (!this.isRangedPrimaryAttack(obj)) {return normalized}
+        // Fast Shot disables aimed/called shots for ranged attacks.
+        return 'torso'
+    }
+
+    private getWeaponRangePerceptionModifier(weapon: Obj): number {
+        // Fallout 2 range modifiers:
+        // 2 = normal, 4 = long_range weapon perk, 5 = scope_range weapon perk.
+        const perk = (weapon as any)?.pro?.extra?.perk ?? (weapon as any)?.weapon?.weapon?.pro?.extra?.perk
+        if (perk === WEAPON_PERK_SCOPE_RANGE) {return 5}
+        if (perk === WEAPON_PERK_LONG_RANGE) {return 4}
+        return 2
+    }
+
     accountForPartialCover(obj: Critter, target: Critter): number {
-        // TODO: get list of intervening critters. Substract 10 for each one in the way
-        return 0
+        // Fallout 2: each intervening critter on the attack line applies -10% hit chance.
+        if (!obj.position || !target.position) {return 0}
+        if (!Array.isArray(this.combatants) || this.combatants.length === 0) {return 0}
+
+        const path = hexLine(obj.position, target.position)
+        if (path.length <= 2) {return 0}
+        const between = new Set(path.slice(1, -1).map((p) => `${p.x},${p.y}`))
+
+        let blockers = 0
+        for (const c of this.combatants) {
+            if (c === obj || c === target || c.dead || !c.position) {continue}
+            if (between.has(`${c.position.x},${c.position.y}`)) {blockers++}
+        }
+        return blockers * 10
     }
 
     getHitDistanceModifier(obj: Critter, target: Critter, weapon: Obj): number {
@@ -214,8 +280,7 @@ export class Combat {
         // The old darkf code used distModifier=2 and applied a mysterious player PER-2
         // nerf that is NOT in the Fallout 2 binary. We fix both here.
 
-        // 4 if weapon has scope_range perk, 2 otherwise (perception range modifier)
-        const distModifier = 2  // TODO: check weapon for Scope Range perk → use 4
+        const distModifier = this.getWeaponRangePerceptionModifier(weapon)
         // Each hex unit beyond PER range costs 4% hit chance (not 2%)
         const hitPenaltyPerHex = 4
         const minDistance = 0
@@ -252,7 +317,7 @@ export class Combat {
     }
 
     getHitChance(obj: Critter, target: Critter, region: string) {
-        const normalizedRegion = this.normalizeHitRegion(region)
+        const normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
         // TODO: visibility (= light conditions) and distance
 
         // BLK-053: Build a resolved weapon and skill, falling back to unarmed when
@@ -286,12 +351,13 @@ export class Combat {
         }
 
         const hitDistanceModifier = this.getHitDistanceModifier(obj, target, effectiveWeaponObj)
+        const partialCoverModifier = this.accountForPartialCover(obj, target)
         // AC now includes any temporary end-of-turn AP bonus via StatSet.acBonus
         const AC = target.getStat('AC')
         const bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
         const baseCrit = obj.getStat('Critical Chance') + bonusCrit
         const regionPenalty = CriticalEffects.regionHitChanceDecTable[normalizedRegion] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
-        let hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier
+        let hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier - partialCoverModifier
         const critChance = baseCrit + regionPenalty
 
         if (isNaN(hitChance)) {
@@ -306,7 +372,7 @@ export class Combat {
     }
 
     rollHit(obj: Critter, target: Critter, region: string): any {
-        const normalizedRegion = this.normalizeHitRegion(region)
+        const normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
         // H4 FIX: Better Criticals modifies the d100 *result*, not the roll range.
         // FO2 formula: roll d100 (0-99), add Better Criticals bonus, clamp 0-100, div/20 = level 0-4.
         const critModifier = obj.getStat('Better Criticals')
@@ -414,12 +480,19 @@ export class Combat {
     /** Return the AP cost for the given critter's primary attack (weapon-dependent). */
     private getAttackAPCost(obj: Critter): number {
         const weaponObj = obj.equippedWeapon
+        let attackCost = 4
         if (weaponObj?.weapon) {
             // C2 FIX: read AP cost from weapon proto (APCost1 = primary attack)
             const cost = weaponObj.weapon.getAPCost?.(1) ?? weaponObj.weapon.weapon?.pro?.extra?.APCost1
-            if (cost !== undefined && cost > 0) {return cost}
+            if (cost !== undefined && cost > 0) {attackCost = cost}
         }
-        return 4  // fallback: default unarmed punch AP cost
+
+        // Fast Shot trait: -1 AP for ranged attacks (minimum 1 AP).
+        if (this.hasFastShotTrait(obj) && this.isRangedPrimaryAttack(obj)) {
+            attackCost = Math.max(1, attackCost - 1)
+        }
+
+        return attackCost
     }
 
     attack(obj: Critter, target: Critter, region = 'torso', callback?: () => void) {
