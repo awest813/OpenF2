@@ -9,6 +9,7 @@ import { UIPanel, Rect, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { spendSkillPoint, getSkillPointCost } from '../character/leveling.js'
+import { getAvailablePerks, grantPerk, PERK_MAP, PERKS, Perk } from '../character/perks.js'
 
 type TabName = 'stats' | 'skills' | 'perks'
 
@@ -47,6 +48,8 @@ export class CharacterScreen extends UIPanel {
     private playerEntityId: number
     private activeTab: TabName = 'stats'
     private hoveredSkill: string | null = null
+    private selectedPerkId: number | null = null
+    private perkScrollOffset: number = 0
 
     constructor(screenWidth: number, screenHeight: number, playerEntityId: number) {
         const W = 380
@@ -200,10 +203,157 @@ export class CharacterScreen extends UIPanel {
     }
 
     private renderPerks(ctx: OffscreenCanvasRenderingContext2D): void {
-        ctx.font = '12px monospace'
-        ctx.fillStyle = '#888'
-        ctx.fillText('Perk selection coming soon.', 14, 40)
-        ctx.fillText('(Phase 1 — perks.ts is defined)', 14, 60)
+        const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
+        const skills = EntityManager.get<'skills'>(this.playerEntityId, 'skills')
+        const player = EntityManager.get<'player'>(this.playerEntityId, 'player')
+
+        if (!stats || !skills || !player) {
+            ctx.fillStyle = cssColor(FALLOUT_RED)
+            ctx.font = '12px monospace'
+            ctx.fillText('Player components missing.', 14, 40)
+            return
+        }
+
+        const currentPerks = new Map<number, number>()
+        for (const perkId of player.acquiredPerks) {
+            currentPerks.set(perkId, (currentPerks.get(perkId) ?? 0) + 1)
+        }
+
+        const available = player.perksAvailable > 0
+            ? getAvailablePerks(stats, skills, currentPerks)
+            : []
+        
+        const acquired = PERKS.filter((p) => (currentPerks.get(p.id) ?? 0) > 0)
+
+        // Compile single flat list of items to render
+        type ListItem =
+            | { type: 'header'; label: string }
+            | { type: 'available'; perk: Perk; rank: number }
+            | { type: 'acquired'; perk: Perk; rank: number }
+
+        const listItems: ListItem[] = []
+        if (player.perksAvailable > 0) {
+            listItems.push({ type: 'header', label: `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
+            if (available.length === 0) {
+                listItems.push({ type: 'header', label: '  No perks available' })
+            } else {
+                for (const perk of available) {
+                    const rank = currentPerks.get(perk.id) ?? 0
+                    listItems.push({ type: 'available', perk, rank })
+                }
+            }
+        }
+
+        if (acquired.length > 0) {
+            listItems.push({ type: 'header', label: 'ACQUIRED PERKS' })
+            for (const perk of acquired) {
+                const rank = currentPerks.get(perk.id) ?? 0
+                listItems.push({ type: 'acquired', perk, rank })
+            }
+        } else if (player.perksAvailable === 0) {
+            listItems.push({ type: 'header', label: 'NO PERKS ACQUIRED YET' })
+        }
+
+        // Clamp scroll offset
+        const maxVisible = 7
+        const maxScroll = Math.max(0, listItems.length - maxVisible)
+        this.perkScrollOffset = Math.max(0, Math.min(this.perkScrollOffset, maxScroll))
+
+        // Set default selected perk if none is selected
+        if (this.selectedPerkId === null || !PERK_MAP.has(this.selectedPerkId)) {
+            const firstPerk = listItems.find(item => item.type === 'available' || item.type === 'acquired') as { perk: Perk } | undefined
+            if (firstPerk) {
+                this.selectedPerkId = firstPerk.perk.id
+            }
+        }
+
+        // Render List Box
+        ctx.fillStyle = '#0a0a0a'
+        ctx.fillRect(10, 10, 360, 185)
+        ctx.strokeStyle = cssColor(FALLOUT_GREEN)
+        ctx.lineWidth = 1
+        ctx.strokeRect(10, 10, 360, 185)
+
+        // Render items
+        for (let i = this.perkScrollOffset; i < Math.min(listItems.length, this.perkScrollOffset + maxVisible); i++) {
+            const item = listItems[i]
+            const itemY = 10 + (i - this.perkScrollOffset) * 26 + 3
+
+            if (item.type === 'header') {
+                ctx.font = 'bold 11px monospace'
+                ctx.fillStyle = cssColor(FALLOUT_AMBER)
+                ctx.fillText(item.label, 20, itemY + 15)
+            } else {
+                const isSelected = this.selectedPerkId === item.perk.id
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(0, 100, 0, 0.2)'
+                    ctx.fillRect(12, itemY, 356, 24)
+                }
+
+                ctx.font = '12px monospace'
+                ctx.fillStyle = isSelected ? cssColor(FALLOUT_AMBER) : cssColor(FALLOUT_GREEN)
+
+                let displayName = item.perk.name
+                if (item.perk.ranks > 1) {
+                    displayName += ` (${item.rank}/${item.perk.ranks})`
+                }
+                ctx.fillText(displayName, 20, itemY + 16)
+
+                if (item.type === 'available') {
+                    ctx.fillStyle = cssColor(FALLOUT_AMBER)
+                    ctx.font = 'bold 11px monospace'
+                    ctx.fillText('[CHOOSE]', 290, itemY + 16)
+                }
+            }
+        }
+
+        // Scroll indicator
+        if (maxScroll > 0) {
+            ctx.font = '10px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillText(`↑↓ scroll (${this.perkScrollOffset + 1}/${maxScroll + 1})`, 250, 8)
+        }
+
+        // Description Box
+        ctx.fillStyle = '#0f0f0f'
+        ctx.fillRect(10, 210, 360, 140)
+        ctx.strokeStyle = cssColor(FALLOUT_DARK_GRAY)
+        ctx.strokeRect(10, 210, 360, 140)
+
+        const selectedPerk = this.selectedPerkId !== null ? PERK_MAP.get(this.selectedPerkId) : null
+        if (selectedPerk) {
+            ctx.font = 'bold 12px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_AMBER)
+            ctx.fillText(selectedPerk.name.toUpperCase(), 20, 230)
+
+            // Prerequisites
+            let prereqStr = `Req: Level ${selectedPerk.prerequisites.minLevel ?? 1}`
+            if (selectedPerk.prerequisites.minStrength) prereqStr += `, STR ${selectedPerk.prerequisites.minStrength}`
+            if (selectedPerk.prerequisites.minPerception) prereqStr += `, PER ${selectedPerk.prerequisites.minPerception}`
+            if (selectedPerk.prerequisites.minEndurance) prereqStr += `, END ${selectedPerk.prerequisites.minEndurance}`
+            if (selectedPerk.prerequisites.minCharisma) prereqStr += `, CHA ${selectedPerk.prerequisites.minCharisma}`
+            if (selectedPerk.prerequisites.minIntelligence) prereqStr += `, INT ${selectedPerk.prerequisites.minIntelligence}`
+            if (selectedPerk.prerequisites.minAgility) prereqStr += `, AGI ${selectedPerk.prerequisites.minAgility}`
+            if (selectedPerk.prerequisites.minLuck) prereqStr += `, LCK ${selectedPerk.prerequisites.minLuck}`
+            if (selectedPerk.prerequisites.minSkill) {
+                prereqStr += `, ${selectedPerk.prerequisites.minSkill.skill} ${selectedPerk.prerequisites.minSkill.value}%`
+            }
+            ctx.font = '11px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillText(prereqStr, 20, 246)
+
+            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            const wrapped = wrapText(ctx, selectedPerk.description, 340)
+            let descY = 264
+            for (const line of wrapped) {
+                ctx.fillText(line, 20, descY)
+                descY += 15
+            }
+        } else {
+            ctx.font = 'italic 11px monospace'
+            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+            ctx.fillText('Select a perk to view details.', 20, 240)
+        }
     }
 
     override onMouseDown(x: number, y: number, btn: 'l' | 'r'): boolean {
@@ -241,7 +391,98 @@ export class CharacterScreen extends UIPanel {
             }
         }
 
+        // Perks selection tab interaction
+        if (this.activeTab === 'perks') {
+            const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
+            const skills = EntityManager.get<'skills'>(this.playerEntityId, 'skills')
+            const player = EntityManager.get<'player'>(this.playerEntityId, 'player')
+
+            if (stats && skills && player) {
+                const currentPerks = new Map<number, number>()
+                for (const perkId of player.acquiredPerks) {
+                    currentPerks.set(perkId, (currentPerks.get(perkId) ?? 0) + 1)
+                }
+
+                const available = player.perksAvailable > 0
+                    ? getAvailablePerks(stats, skills, currentPerks)
+                    : []
+                const acquired = PERKS.filter((p) => (currentPerks.get(p.id) ?? 0) > 0)
+
+                type ListItem =
+                    | { type: 'header'; label: string }
+                    | { type: 'available'; perk: Perk; rank: number }
+                    | { type: 'acquired'; perk: Perk; rank: number }
+
+                const listItems: ListItem[] = []
+                if (player.perksAvailable > 0) {
+                    listItems.push({ type: 'header', label: `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
+                    if (available.length === 0) {
+                        listItems.push({ type: 'header', label: '  No perks available' })
+                    } else {
+                        for (const perk of available) {
+                            const rank = currentPerks.get(perk.id) ?? 0
+                            listItems.push({ type: 'available', perk, rank })
+                        }
+                    }
+                }
+
+                if (acquired.length > 0) {
+                    listItems.push({ type: 'header', label: 'ACQUIRED PERKS' })
+                    for (const perk of acquired) {
+                        const rank = currentPerks.get(perk.id) ?? 0
+                        listItems.push({ type: 'acquired', perk, rank })
+                    }
+                } else if (player.perksAvailable === 0) {
+                    listItems.push({ type: 'header', label: 'NO PERKS ACQUIRED YET' })
+                }
+
+                // Clicks inside the list box relative to y=60
+                if (x >= 10 && x < 370 && y >= 70 && y < 255) {
+                    const relativeY = y - 60
+                    const rowIdx = Math.floor((relativeY - 13) / 26)
+                    const maxVisible = 7
+                    if (rowIdx >= 0 && rowIdx < maxVisible) {
+                        const itemIdx = rowIdx + this.perkScrollOffset
+                        if (itemIdx >= 0 && itemIdx < listItems.length) {
+                            const item = listItems[itemIdx]
+                            if (item.type === 'available' || item.type === 'acquired') {
+                                this.selectedPerkId = item.perk.id
+
+                                // Check if click is on [CHOOSE] button region
+                                if (item.type === 'available' && x >= 280 && x < 360) {
+                                    const success = grantPerk(item.perk.id, stats, skills, currentPerks)
+                                    if (success) {
+                                        player.acquiredPerks.push(item.perk.id)
+                                        player.perksAvailable = Math.max(0, player.perksAvailable - 1)
+                                    }
+                                }
+                                return true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return true  // consume all clicks within the panel
+    }
+
+    override onKeyDown(key: string): boolean {
+        if (key === 'Escape') {
+            this.hide()
+            return true
+        }
+        if (this.activeTab === 'perks') {
+            if (key === 'ArrowDown') {
+                this.perkScrollOffset++
+                return true
+            }
+            if (key === 'ArrowUp') {
+                this.perkScrollOffset = Math.max(0, this.perkScrollOffset - 1)
+                return true
+            }
+        }
+        return false
     }
 
     override onMouseMove(x: number, y: number): void {
@@ -260,4 +501,25 @@ export class CharacterScreen extends UIPanel {
 
 function cssColor(c: UIColor): string {
     return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
+}
+
+function wrapText(ctx: OffscreenCanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const words = text.split(' ')
+    const lines: string[] = []
+    let currentLine = ''
+
+    for (const word of words) {
+        const testLine = currentLine ? currentLine + ' ' + word : word
+        const metrics = ctx.measureText(testLine)
+        if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine)
+            currentLine = word
+        } else {
+            currentLine = testLine
+        }
+    }
+    if (currentLine) {
+        lines.push(currentLine)
+    }
+    return lines
 }

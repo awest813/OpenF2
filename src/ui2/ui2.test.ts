@@ -1875,3 +1875,94 @@ describe('CalledShotPanel', () => {
         expect(() => mgr.render()).not.toThrow()
     })
 })
+
+describe('CharacterScreen Perks Tab', () => {
+    let mgr: UIManagerImpl
+    let pid: number
+
+    beforeEach(() => {
+        pid = createPlayerEntity({ name: 'PERK TEST DWELLER' })
+        mgr = new UIManagerImpl(800, 600)
+        mgr.register(new CharacterScreen(800, 600, pid))
+    })
+
+    it('renders Perks tab successfully without throwing', () => {
+        const screen = mgr.get<CharacterScreen>('characterScreen')
+        screen.show()
+        screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('displays available perks when player has perksAvailable > 0', () => {
+        const stats = EntityManager.get<'stats'>(pid, 'stats')!
+        const player = EntityManager.get<'player'>(pid, 'player')!
+
+        stats.level = 3
+        stats.perception = 6
+        player.perksAvailable = 1
+
+        const screen = mgr.get<CharacterScreen>('characterScreen')
+        screen.show()
+        screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
+        mgr.render()
+
+        expect(screen['selectedPerkId']).toBe(0)
+    })
+
+    it('clicking on a perk selects it and shows description', () => {
+        const stats = EntityManager.get<'stats'>(pid, 'stats')!
+        const player = EntityManager.get<'player'>(pid, 'player')!
+
+        stats.level = 3
+        player.perksAvailable = 1
+
+        const screen = mgr.get<CharacterScreen>('characterScreen')
+        screen.show()
+        screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
+
+        // Click second perk (Bonus Move, ID 1) in list.
+        // Row 0: header
+        // Row 1: Awareness
+        // Row 2: Bonus Move
+        screen.onMouseDown(50, 60 + 13 + 2 * 26 + 5, 'l')
+
+        expect(screen['selectedPerkId']).toBe(1)
+    })
+
+    it('clicking [CHOOSE] button grants the perk and consumes a perk point', () => {
+        const stats = EntityManager.get<'stats'>(pid, 'stats')!
+        const player = EntityManager.get<'player'>(pid, 'player')!
+
+        stats.level = 3
+        player.perksAvailable = 1
+        player.acquiredPerks = []
+
+        const screen = mgr.get<CharacterScreen>('characterScreen')
+        screen.show()
+        screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
+
+        // Awareness is Row 1.
+        screen.onMouseDown(300, 60 + 13 + 1 * 26 + 5, 'l')
+
+        expect(player.acquiredPerks).toContain(0)
+        expect(player.perksAvailable).toBe(0)
+    })
+
+    it('ArrowDown and ArrowUp keyboards scroll the list box', () => {
+        const stats = EntityManager.get<'stats'>(pid, 'stats')!
+        const player = EntityManager.get<'player'>(pid, 'player')!
+
+        stats.level = 12
+        player.perksAvailable = 1
+
+        const screen = mgr.get<CharacterScreen>('characterScreen')
+        screen.show()
+        screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
+
+        expect(screen['perkScrollOffset']).toBe(0)
+        screen.onKeyDown('ArrowDown')
+        expect(screen['perkScrollOffset']).toBe(1)
+        screen.onKeyDown('ArrowUp')
+        expect(screen['perkScrollOffset']).toBe(0)
+    })
+})
