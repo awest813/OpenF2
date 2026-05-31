@@ -48,6 +48,7 @@ import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 import { EventBus } from './eventBus.js'
 import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
+import { save, load, saveList } from './saveload.js'
 
 // Return the skill ID used by the Fallout 2 engine
 function getSkillID(skill: Skills): number {
@@ -282,6 +283,29 @@ function initUIManager(): void {
 
     EventBus.on('worldMap:closed', () => {
         globalState.uiMode = UIMode.none
+    })
+
+    EventBus.on('game:saveToSlot', ({ slot }) => {
+        const defaultName = 'Save Slot ' + (slot + 1)
+        const name = typeof window !== 'undefined' && typeof window.prompt === 'function'
+            ? window.prompt('Save Name?', defaultName)
+            : defaultName
+
+        if (name) {
+            saveList((saves) => {
+                const existing = saves.find(s => s.id === slot)
+                if (existing && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+                    if (!window.confirm('Are you sure you want to overwrite that save slot?')) {
+                        return
+                    }
+                }
+                save(name, slot)
+            })
+        }
+    })
+
+    EventBus.on('game:loadFromSlot', ({ slot }) => {
+        load(slot)
     })
 
     mgr.connectEventBus()

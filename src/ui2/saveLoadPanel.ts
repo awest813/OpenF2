@@ -9,8 +9,9 @@
  * Panel name: 'saveLoad' (matches the HUD_BUTTONS entry in gamePanel.ts).
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
+import { saveList, formatSaveDate, SaveGame } from '../saveload.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -35,6 +36,7 @@ export class SaveLoadPanel extends UIPanel {
     isSave = true
     /** Currently highlighted slot index (-1 = none). */
     selectedSlot = -1
+    private saves: Map<number, SaveGame> = new Map()
 
     constructor(screenWidth: number, screenHeight: number) {
         super('saveLoad', {
@@ -50,7 +52,19 @@ export class SaveLoadPanel extends UIPanel {
     openAs(mode: 'save' | 'load'): void {
         this.isSave = mode === 'save'
         this.selectedSlot = -1
+        this.loadSaveList()
         this.show()
+    }
+
+    private loadSaveList(): void {
+        saveList((savesList) => {
+            this.saves.clear()
+            for (const s of savesList) {
+                if (s.id !== undefined) {
+                    this.saves.set(s.id, s)
+                }
+            }
+        })
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -76,13 +90,25 @@ export class SaveLoadPanel extends UIPanel {
         for (let i = 0; i < SLOT_COUNT; i++) {
             const y = SLOT_START_Y + i * SLOT_H
             const isSelected = i === this.selectedSlot
+            const slotSave = this.saves.get(i)
 
             fillRect(ctx, SLOT_PAD_X, y, width - SLOT_PAD_X * 2, SLOT_H - 4, isSelected ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, SLOT_PAD_X, y, width - SLOT_PAD_X * 2, SLOT_H - 4, FALLOUT_GREEN, 1)
 
-            ctx.font = '12px monospace'
+            ctx.font = '11px monospace'
             ctx.fillStyle = isSelected ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.fillText(`Slot ${i + 1}`, SLOT_PAD_X + 10, y + 17)
+
+            if (slotSave) {
+                const dateStr = formatSaveDate(slotSave)
+                const displayStr = `${i + 1}. ${slotSave.name}`
+                ctx.fillText(displayStr, SLOT_PAD_X + 10, y + 17)
+
+                ctx.textAlign = 'right'
+                ctx.fillText(dateStr, width - SLOT_PAD_X - 10, y + 17)
+                ctx.textAlign = 'left'
+            } else {
+                ctx.fillText(`${i + 1}. (Empty)`, SLOT_PAD_X + 10, y + 17)
+            }
         }
 
         // Action button (confirm)

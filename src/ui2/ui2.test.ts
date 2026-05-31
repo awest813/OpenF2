@@ -1966,3 +1966,92 @@ describe('CharacterScreen Perks Tab', () => {
         expect(screen['perkScrollOffset']).toBe(0)
     })
 })
+
+describe('SaveLoadPanel Integration', () => {
+    let mgr: UIManagerImpl
+    let panel: SaveLoadPanel
+
+    beforeEach(() => {
+        mgr = new UIManagerImpl(800, 600)
+        panel = new SaveLoadPanel(800, 600)
+        mgr.register(panel)
+    })
+
+    it('opens as save mode and preloads saves', () => {
+        panel.openAs('save')
+        expect(panel.isSave).toBe(true)
+        expect(panel.selectedSlot).toBe(-1)
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('opens as load mode and preloads saves', () => {
+        panel.openAs('load')
+        expect(panel.isSave).toBe(false)
+        expect(panel.selectedSlot).toBe(-1)
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('allows selecting slots by clicking on slot rows', () => {
+        panel.openAs('save')
+        
+        // Clicks inside slot 0: y starts at 60 (SLOT_START_Y)
+        panel.onMouseDown(50, 60 + 5, 'l')
+        expect(panel.selectedSlot).toBe(0)
+
+        // Clicks inside slot 2: y starts at 60 + 2 * 28 = 116
+        panel.onMouseDown(50, 116 + 5, 'l')
+        expect(panel.selectedSlot).toBe(2)
+    })
+
+    it('allows slot selection and ArrowUp / ArrowDown navigation', () => {
+        panel.openAs('save')
+        expect(panel.selectedSlot).toBe(-1)
+
+        panel.onKeyDown('ArrowDown')
+        expect(panel.selectedSlot).toBe(0)
+
+        panel.onKeyDown('ArrowDown')
+        expect(panel.selectedSlot).toBe(1)
+
+        panel.onKeyDown('ArrowUp')
+        expect(panel.selectedSlot).toBe(0)
+    })
+
+    it('clicking close button hides the panel', () => {
+        panel.openAs('save')
+        expect(panel.visible).toBe(true)
+        
+        // Close button starts at x = width / 2 + 10 = 170, y = height - 36 = 244
+        panel.onMouseDown(170 + 10, 244 + 5, 'l')
+        expect(panel.visible).toBe(false)
+    })
+
+    it('confirming save slot selection emits game:saveToSlot', () => {
+        panel.openAs('save')
+        panel.onMouseDown(50, 60 + 5, 'l') // select slot 0
+        
+        const saveSpy = vi.fn()
+        EventBus.on('game:saveToSlot', saveSpy)
+
+        // Action button starts at x = width / 2 - 70 = 90, y = height - 36 = 244
+        panel.onMouseDown(90 + 10, 244 + 5, 'l')
+
+        expect(saveSpy).toHaveBeenCalledWith({ slot: 0 })
+        expect(panel.visible).toBe(false)
+        EventBus.clear('game:saveToSlot')
+    })
+
+    it('confirming load slot selection emits game:loadFromSlot', () => {
+        panel.openAs('load')
+        panel.onMouseDown(50, 60 + 28 + 5, 'l') // select slot 1
+        
+        const loadSpy = vi.fn()
+        EventBus.on('game:loadFromSlot', loadSpy)
+
+        panel.onMouseDown(90 + 10, 244 + 5, 'l')
+
+        expect(loadSpy).toHaveBeenCalledWith({ slot: 1 })
+        expect(panel.visible).toBe(false)
+        EventBus.clear('game:loadFromSlot')
+    })
+})
