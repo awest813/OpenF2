@@ -1554,9 +1554,15 @@ export function uiLoot(object: Obj) {
 }
 
 export function uiLog(msg: string) {
+    if (typeof document === 'undefined') {
+        console.log('[uiLog stub] ' + msg)
+        return
+    }
     const $log = $id('displayLog')
-    $log.insertAdjacentHTML('beforeend', `<li>${msg}</li>`)
-    $log.scrollTop = $log.scrollHeight
+    if ($log) {
+        $log.insertAdjacentHTML('beforeend', `<li>${msg}</li>`)
+        $log.scrollTop = $log.scrollHeight
+    }
 }
 
 export function uiCloseWorldMap() {

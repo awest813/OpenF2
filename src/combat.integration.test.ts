@@ -3,7 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest'
 vi.mock('./player.js', () => ({ Player: class MockPlayer {} }))
 vi.mock('./ui.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('./ui.js')>()
-    return { ...actual, uiStartCombat: vi.fn(), uiEndCombat: vi.fn() }
+    return { ...actual, uiStartCombat: vi.fn(), uiEndCombat: vi.fn(), uiLog: vi.fn() }
 })
 
 import { ActionPoints, Combat } from './combat.js'
@@ -1079,5 +1079,81 @@ describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee
         // Stacking both, AGI 9: 5 + floor(9/2) + 2 - 2 = 9 AP
         const stackedAp = new ActionPoints(makeCritterWith(9, 2, true))
         expect(stackedAp.getMaxAP().combat).toBe(9)
+    })
+
+    describe('Combat rounds tracking and logs audit', () => {
+        it('tracks and increments rounds upon turn wraparound, logging events to uiLog', async () => {
+            const { uiLog } = await import('./ui.js')
+            const logSpy = vi.mocked(uiLog)
+            logSpy.mockClear()
+
+            const gs = (await import('./globalState.js')).default
+            const origGMap = gs.gMap
+            gs.gMap = { updateMap: vi.fn(), getObjects: () => [] } as any
+
+            const playerObj = Object.create(Critter.prototype) as Critter
+            playerObj.isPlayer = true
+            playerObj.dead = false
+            playerObj.visible = true
+            playerObj.art = "dude"
+            playerObj.clearAnim = vi.fn()
+            playerObj.stats = { apBonus: 0 } as any
+            playerObj.getStat = (stat: string) => {
+                if (stat === 'AGI') return 6
+                if (stat === 'HP') return 30
+                return 0
+            }
+            playerObj.perkRanks = {}
+            playerObj.charTraits = new Set()
+            playerObj.position = { x: 5, y: 5 }
+            playerObj.AP = new ActionPoints(playerObj)
+
+            const enemyObj = Object.create(Critter.prototype) as Critter
+            enemyObj.isPlayer = false
+            enemyObj.dead = false
+            enemyObj.visible = true
+            enemyObj.hostile = true
+            enemyObj.stats = { apBonus: 0 } as any
+            enemyObj.getStat = (stat: string) => {
+                if (stat === 'AGI') return 5
+                return 0
+            }
+            enemyObj.perkRanks = {}
+            enemyObj.charTraits = new Set()
+            enemyObj.position = { x: 6, y: 5 }
+            enemyObj.ai = { info: { max_dist: 10 } } as any
+            enemyObj.AP = new ActionPoints(enemyObj)
+
+            const combat = new Combat([playerObj, enemyObj])
+            // Override player idx
+            combat.playerIdx = combat.combatants.indexOf(playerObj)
+            combat.player = playerObj as any
+
+            // Initialize combat state manually
+            combat.round = 1
+            combat.turnNum = 1
+            combat.whoseTurn = -1
+
+            // Turn 1 starts (Player's turn)
+            combat.nextTurn()
+            expect(combat.round).toBe(1)
+            expect(combat.whoseTurn).toBe(0) // Player
+            expect(logSpy).toHaveBeenCalledWith("Combat Round 1")
+
+            // End player's turn. This starts the Enemy's turn, which automatically
+            // runs its AI and advances the turn loop back to the player.
+            combat.nextTurn()
+            expect(combat.round).toBe(2)
+            expect(combat.whoseTurn).toBe(0) // Back to Player
+            expect(logSpy).toHaveBeenCalledWith("Combat Round 2")
+
+            try {
+                // End combat
+                combat.end()
+                expect(logSpy).toHaveBeenCalledWith("Combat ended.")
+            } finally {
+                gs.gMap = origGMap
+            }
+        })
     })
 })

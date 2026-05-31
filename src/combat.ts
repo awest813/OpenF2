@@ -23,7 +23,7 @@ import globalState from './globalState.js'
 import { Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
-import { uiEndCombat, uiStartCombat } from './ui.js'
+import { uiEndCombat, uiStartCombat, uiLog } from './ui.js'
 import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
 
 // Turn-based combat system
@@ -163,6 +163,7 @@ export class Combat {
     turnNum: number
     whoseTurn: number
     inPlayerTurn: boolean
+    round: number
 
     constructor(objects: Obj[]) {
         // Gather a list of combatants (critters meeting a certain criteria)
@@ -210,6 +211,7 @@ export class Combat {
             this.turnNum = 1
             this.whoseTurn = 0
             this.inPlayerTurn = false
+            this.round = 1
             return
         }
 
@@ -217,6 +219,7 @@ export class Combat {
         this.turnNum = 1
         this.whoseTurn = -1
         this.inPlayerTurn = false
+        this.round = 1
 
         // Stop the player from walking combat is initiating
         this.player.clearAnim()
@@ -907,6 +910,7 @@ export class Combat {
         // begin combat
         globalState.inCombat = true
         globalState.combat = new Combat(globalState.gMap.getObjects())
+        uiLog("Combat started.")
 
         // FO2: fire combat_p_proc(COMBAT_SUBTYPE_INITIATE = 0) on all combatants
         // when combat starts. Scripts use this to set up flee states, switch AI
@@ -945,6 +949,7 @@ export class Combat {
         }
 
         console.log('[end combat]')
+        uiLog("Combat ended.")
         globalState.combat = null // todo: invert control
         globalState.inCombat = false
 
@@ -1023,7 +1028,18 @@ export class Combat {
         this.turnNum++
         this.whoseTurn++
 
-        if (this.whoseTurn >= this.combatants.length) {this.whoseTurn = 0}
+        let isNewRound = false
+        if (this.whoseTurn >= this.combatants.length) {
+            this.whoseTurn = 0
+            this.round++
+            isNewRound = true
+        }
+
+        if (this.round === 1 && this.whoseTurn === 0 && this.turnNum === 2) {
+            uiLog("Combat Round 1")
+        } else if (isNewRound) {
+            uiLog(`Combat Round ${this.round}`)
+        }
 
         if (this.combatants[this.whoseTurn].isPlayer) {
             // Player's turn starts — clear the player's end-of-turn AC bonus.
