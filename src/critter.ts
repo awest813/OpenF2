@@ -122,17 +122,17 @@ export class Weapon {
     attackOne!: { mode: number; APCost: number; maxRange: number }
     attackTwo!: { mode: number; APCost: number; maxRange: number }
 
-    constructor(weapon: WeaponObj) {
+    constructor(weapon: WeaponObj, critter?: any) {
         this.weapon = weapon
         this.modes = ['single', 'called']
 
         if (weapon === null) {
-            // default punch
-            // todo: use character stats...
-            // todo: fully turn this into a real weapon
             this.type = 'melee'
-            this.minDmg = 1
-            this.maxDmg = 2
+            // FO2 unarmed damage scales with Unarmed skill and meleeDamage (STR-5).
+            const unarmedSkill = (typeof critter?.getSkill === 'function') ? critter.getSkill('Unarmed') : 0
+            const meleeDmg = (typeof critter?.getStat === 'function') ? Math.max(1, (critter.getStat('STR') ?? 5) - 5) : 0
+            this.minDmg = 1 + Math.floor(unarmedSkill / 50)
+            this.maxDmg = 2 + meleeDmg + Math.floor(unarmedSkill / 25)
             this.name = 'punch'
             this.weaponSkillType = 'Unarmed'
             this.weapon = {}
@@ -142,8 +142,17 @@ export class Weapon {
             this.weapon.pro.extra.APCost1 = 4
             this.weapon.pro.extra.APCost2 = 4
         } else {
-            // todo: spears, etc
-            this.type = 'gun'
+            // Detect melee weapons from attackMode: 1=punch, 2=kick, 3=swing, 4=thrust
+            const attackModes = weapon.pro.extra['attackMode'] ?? 0
+            const primaryMode = attackModes & 0x0f
+            const secondaryMode = (attackModes >> 4) & 0x0f
+            if (primaryMode >= 1 && primaryMode <= 4 && secondaryMode < 6) {
+                this.type = 'melee'
+            } else if (primaryMode === 5 || secondaryMode === 5) {
+                this.type = 'throwing'
+            } else {
+                this.type = 'gun'
+            }
             this.minDmg = weapon.pro.extra.minDmg
             this.maxDmg = weapon.pro.extra.maxDmg
             const s = weapon.art.split('/')

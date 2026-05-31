@@ -7341,10 +7341,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_critter_combat_data_86',
         kind: 'opcode',
         description:
-            'sfall 0x82BF: get_critter_combat_data_sfall(obj) → 0 (stub). ' +
-            'Browser build: no combat-session data structure; returns 0 so that ' +
-            'New Reno combat scripts fall through to safe defaults.',
-        status: 'stub',
+            'sfall 0x82BF: get_critter_combat_data_sfall(obj) → combat bitmask. ' +
+            'Returns bit0=inCombat, bit1=hostile, bit2=fleeing, bit3=currentTurn.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -7504,10 +7503,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_critter_attack_type_87',
         kind: 'opcode',
         description:
-            'sfall 0x82C6: get_critter_attack_type_sfall(obj, slot) → 0 (stub). ' +
-            'Browser build: no per-weapon attack-type table; returns 0. ' +
-            'New Reno combat AI uses this to branch on fighter attack styles.',
-        status: 'stub',
+            'sfall 0x82C6: get_critter_attack_type_sfall(obj, slot) → attack type. ' +
+            'Reads weapon proto attackMode nibbles with per-critter override.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -7516,10 +7514,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_critter_min_str_87',
         kind: 'opcode',
         description:
-            'sfall 0x82C7: get_critter_min_str_sfall(obj) → 0 (stub). ' +
-            'Browser build: no equipped-weapon proto lookup for minimum Strength; returns 0. ' +
-            'New Reno boxing scripts use this to check fighter eligibility.',
-        status: 'stub',
+            'sfall 0x82C7: get_critter_min_str_sfall(obj) → minimum Strength. ' +
+            'Reads pro.extra.minST from equipped weapon; returns 0 for unarmed.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

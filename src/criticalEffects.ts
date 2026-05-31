@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Critter } from './object.js'
+import { Critter, createObjectWithPID } from './object.js'
+import globalState from './globalState.js'
 import { StatType } from './skills.js'
 import { getFileJSON, rollSkillCheck } from './util.js'
 import { critterDamage, critterKill } from './critter.js'
@@ -112,8 +113,6 @@ export namespace CriticalEffects {
         8: 'uncalled',
     }
 
-    // TODO: make this table account for different weapon types. It appears melee weapons use a second one
-    // though it appears to only be a /2 for melee
     export const regionHitChanceDecTable: { [region: string]: number } = {
         torso: 0,
         leftLeg: 20,
@@ -123,6 +122,12 @@ export namespace CriticalEffects {
         rightArm: 30,
         head: 40,
         eyes: 60,
+    }
+
+    /** Return the region penalty, halved for melee/unarmed weapons (FO2 rule). */
+    export function getRegionPenalty(region: string, isMelee: boolean): number {
+        const penalty = regionHitChanceDecTable[region] ?? regionHitChanceDecTable['torso'] ?? 0
+        return isMelee ? (penalty >> 1) : penalty
     }
 
     let critterTable: Dict<CritType[]>[]
@@ -153,8 +158,26 @@ export namespace CriticalEffects {
 
         hitRandomly: function (target: Critter) {
             console.log(target.name + ' hit a random target!')
-            // TODO: In full Fallout, this hits a random nearby critter
-            // For now, just hit self with reduced damage
+            // Find a random nearby critter within 3 hexes.
+            if (target.position && globalState.gMap) {
+                const nearbyCritters: Critter[] = []
+                const objects = globalState.gMap.getObjects()
+                for (const obj of objects) {
+                    if (obj === target || obj.type !== 'critter' || (obj as Critter).dead) {continue}
+                    if (!obj.position) {continue}
+                    const dx = Math.abs(obj.position.x - target.position.x)
+                    const dy = Math.abs(obj.position.y - target.position.y)
+                    if (dx <= 3 && dy <= 3) {nearbyCritters.push(obj as Critter)}
+                }
+                if (nearbyCritters.length > 0) {
+                    const victim = nearbyCritters[Math.floor(Math.random() * nearbyCritters.length)]
+                    const weapon = target.equippedWeapon
+                    const damage = weapon?.weapon ? Math.floor((weapon.weapon.minDmg + weapon.weapon.maxDmg) / 2) : 3
+                    critterDamage(victim, damage, target, false, false)
+                    return
+                }
+            }
+            // No nearby target found — fall back to self-damage.
             critFailEffects.damageSelf(target)
         },
 
@@ -170,8 +193,10 @@ export namespace CriticalEffects {
 
         loseAmmo: function (target: Critter) {
             console.log(target.name + ' has lost their ammo!')
-            // TODO: Implement ammo system integration
-            // For now, just a visual effect
+            const weapon = target.equippedWeapon
+            if (weapon && weapon.extra && typeof weapon.extra.ammoLoaded === 'number') {
+                weapon.extra.ammoLoaded = 0
+            }
         },
 
         destroyWeapon: function (target: Critter) {
@@ -241,7 +266,6 @@ export namespace CriticalEffects {
         onFire: function (target: Critter) {
             console.log(target.name + ' is on fire!')
             target.onFire = true
-            // TODO: Should deal fire damage each turn
         },
 
         bypassArmor: function (target: Critter) {
@@ -252,8 +276,15 @@ export namespace CriticalEffects {
 
         droppedWeapon: function (target: Critter) {
             console.log(target.name + ' dropped their weapon!')
-            // TODO: Implement weapon drop to ground
-            // For now, just clear weapon slots
+            // Drop the weapon to the ground at the critter's tile.
+            const weapon = target.equippedWeapon
+            if (weapon && target.position && globalState.gMap) {
+                const groundItem = createObjectWithPID(weapon.pid)
+                if (groundItem) {
+                    groundItem.position = { x: target.position.x, y: target.position.y }
+                    globalState.gMap.addObject(groundItem)
+                }
+            }
             target.leftHand = undefined
             target.rightHand = undefined
         },
