@@ -308,6 +308,7 @@ export class Obj {
 
     amount = 1 // TODO: Where does this belong? Items and misc seem to have it, or is Money an Item?
     position: Point = { x: -1, y: -1 }
+    lightLevel?: number
     inventory: Obj[] = []
 
     // TODO: verify

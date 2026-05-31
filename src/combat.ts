@@ -465,7 +465,7 @@ export class Combat {
         // In Fallout 2, if *any* combatant is Jinxed, or if the Pariah Dog is in the party
         // or active combat list, everyone's misses have a 50% chance of being critical misses.
         const anyoneJinxed = (this.combatants ?? []).some(c => c.charTraits?.has(9) ?? false)
-        const pariahDogPresent = (globalState.party && globalState.party.getPartyMemberByPID(16777413) !== null) || (this.combatants ?? []).some(c => c.pid === 16777413)
+        const pariahDogPresent = (globalState.gParty && globalState.gParty.getPartyMemberByPID(16777413) !== null) || (this.combatants ?? []).some(c => c.pid === 16777413)
         if ((anyoneJinxed || pariahDogPresent) && !isCrit) {
             if (getRandomInt(1, D100_MAX) <= JINXED_CRIT_MISS_CHANCE) {isCrit = true}
         }

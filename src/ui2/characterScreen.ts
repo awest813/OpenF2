@@ -5,7 +5,7 @@
  * EntityManager; all writes go through the leveling module.
  */
 
-import { UIPanel, Rect, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_RED, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, UIColor } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { spendSkillPoint, getSkillPointCost } from '../character/leveling.js'
@@ -49,7 +49,7 @@ export class CharacterScreen extends UIPanel {
     private activeTab: TabName = 'stats'
     private hoveredSkill: string | null = null
     private selectedPerkId: number | null = null
-    private perkScrollOffset: number = 0
+    private perkScrollOffset = 0
 
     constructor(screenWidth: number, screenHeight: number, playerEntityId: number) {
         const W = 380
@@ -328,13 +328,13 @@ export class CharacterScreen extends UIPanel {
 
             // Prerequisites
             let prereqStr = `Req: Level ${selectedPerk.prerequisites.minLevel ?? 1}`
-            if (selectedPerk.prerequisites.minStrength) prereqStr += `, STR ${selectedPerk.prerequisites.minStrength}`
-            if (selectedPerk.prerequisites.minPerception) prereqStr += `, PER ${selectedPerk.prerequisites.minPerception}`
-            if (selectedPerk.prerequisites.minEndurance) prereqStr += `, END ${selectedPerk.prerequisites.minEndurance}`
-            if (selectedPerk.prerequisites.minCharisma) prereqStr += `, CHA ${selectedPerk.prerequisites.minCharisma}`
-            if (selectedPerk.prerequisites.minIntelligence) prereqStr += `, INT ${selectedPerk.prerequisites.minIntelligence}`
-            if (selectedPerk.prerequisites.minAgility) prereqStr += `, AGI ${selectedPerk.prerequisites.minAgility}`
-            if (selectedPerk.prerequisites.minLuck) prereqStr += `, LCK ${selectedPerk.prerequisites.minLuck}`
+            if (selectedPerk.prerequisites.minStrength) { prereqStr += `, STR ${selectedPerk.prerequisites.minStrength}` }
+            if (selectedPerk.prerequisites.minPerception) { prereqStr += `, PER ${selectedPerk.prerequisites.minPerception}` }
+            if (selectedPerk.prerequisites.minEndurance) { prereqStr += `, END ${selectedPerk.prerequisites.minEndurance}` }
+            if (selectedPerk.prerequisites.minCharisma) { prereqStr += `, CHA ${selectedPerk.prerequisites.minCharisma}` }
+            if (selectedPerk.prerequisites.minIntelligence) { prereqStr += `, INT ${selectedPerk.prerequisites.minIntelligence}` }
+            if (selectedPerk.prerequisites.minAgility) { prereqStr += `, AGI ${selectedPerk.prerequisites.minAgility}` }
+            if (selectedPerk.prerequisites.minLuck) { prereqStr += `, LCK ${selectedPerk.prerequisites.minLuck}` }
             if (selectedPerk.prerequisites.minSkill) {
                 prereqStr += `, ${selectedPerk.prerequisites.minSkill.skill} ${selectedPerk.prerequisites.minSkill.value}%`
             }
@@ -356,7 +356,7 @@ export class CharacterScreen extends UIPanel {
         }
     }
 
-    override onMouseDown(x: number, y: number, btn: 'l' | 'r'): boolean {
+    override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
         const { width, height } = this.bounds
 
         // Close button
