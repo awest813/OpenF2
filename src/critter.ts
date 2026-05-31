@@ -183,7 +183,13 @@ export class Weapon {
     }
 
     getAPCost(attackMode: number): number {
-        return this.weapon.pro.extra['APCost' + attackMode]
+        const cost = this.weapon.pro.extra['APCost' + attackMode]
+        if (cost === undefined) {
+            // BLK-222: unknown attack mode index; return 0 so AP calculations don't produce NaN.
+            console.warn(`getAPCost: unknown attackMode ${attackMode} — returning 0`)
+            return 0
+        }
+        return cost
     }
 
     getSkin(): string | null {

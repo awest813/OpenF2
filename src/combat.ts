@@ -47,10 +47,18 @@ export class ActionPoints {
     getMaxAP(): { combat: number; move: number } {
         // Get bonus AP from critter's stats (perks/traits)
         const bonusCombatAP = this.attachedCritter.stats.apBonus || 0
+        // Action Boy perk (ID 6): +1 combat AP per rank.
+        const actionBoyAP = ((this.attachedCritter.perkRanks ?? {})[6] ?? 0) * 1
+        // Bruiser trait (ID 1): -2 combat AP penalty.
+        const hasBruiser = this.attachedCritter.charTraits?.has(1) ?? false
+        const bruiserAPMod = hasBruiser ? -2 : 0
         // Bonus Move perk (ID 1): +2 move-only AP per rank.
         const bonusMoveAP = ((this.attachedCritter.perkRanks ?? {})[BONUS_MOVE_PERK_ID] ?? 0) * 2
 
-        return { combat: 5 + Math.ceil(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP, move: bonusMoveAP }
+        return {
+            combat: Math.max(1, 5 + Math.floor(this.attachedCritter.getStat('AGI') / 2) + bonusCombatAP + actionBoyAP + bruiserAPMod),
+            move: bonusMoveAP
+        }
     }
 
     getAvailableMoveAP(): number {
@@ -318,7 +326,17 @@ export class Combat {
 
     getHitChance(obj: Critter, target: Critter, region: string) {
         const normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
-        // TODO: visibility (= light conditions) and distance
+        // Visibility penalty: ranges from 0 to 40% based on target light level
+        let lightPenalty = 0
+        if (target.lightLevel !== undefined) {
+            // Assuming lightLevel is roughly 0-100 for normalization
+            const lightLevelPercent = Math.min(100, Math.max(0, target.lightLevel))
+            lightPenalty = Math.floor(40 * (1 - lightLevelPercent / 100))
+        }
+
+        // Night Vision perk (ID 12) reduces lighting penalty by 20% per rank
+        const nightVisionRanks = (obj.perkRanks ?? {})[12] ?? 0
+        lightPenalty = Math.max(0, lightPenalty - (nightVisionRanks * 20))
 
         // BLK-053: Build a resolved weapon and skill, falling back to unarmed when
         // the critter has no equipped weapon or its weapon data is missing.
@@ -331,7 +349,7 @@ export class Combat {
         let effectiveWeapon: Weapon
         let weaponSkill: number
 
-        if (rawWeaponObj !== null && rawWeaponObj.weapon) {
+        if (rawWeaponObj != null && rawWeaponObj.weapon) {
             effectiveWeaponObj = rawWeaponObj
             effectiveWeapon = rawWeaponObj.weapon
             if (effectiveWeapon.weaponSkillType === undefined) {
@@ -354,10 +372,29 @@ export class Combat {
         const partialCoverModifier = this.accountForPartialCover(obj, target)
         // AC now includes any temporary end-of-turn AP bonus via StatSet.acBonus
         const AC = target.getStat('AC')
-        const bonusCrit = 0 // TODO: perk bonuses, other crit influencing things
+        // Ammo AC Mod (subtracted from attacker's hit chance)
+        const ammoACMod = (effectiveWeapon as any)?.weapon?.pro?.extra?.acModifier ?? 0
+        
+        // One Hander trait (ID 3)
+        const hasOneHander = obj.charTraits?.has(3) ?? false
+        let oneHanderModifier = 0
+        if (hasOneHander && effectiveWeaponObj !== unarmedWeaponObj) {
+            const isTwoHanded = (effectiveWeapon as any)?.weapon?.pro?.extra?.twoHanded ?? 0
+            if (isTwoHanded) {
+                oneHanderModifier = -40
+            } else {
+                oneHanderModifier = 20
+            }
+        }
+        
+        // More Criticals perk (ID 7) grants +5% per rank
+        const moreCriticalsRank = (obj.perkRanks ?? {})[7] ?? 0
+        // Finesse trait (ID 4) grants +10% critical chance
+        const hasFinesse = obj.charTraits?.has(4) ?? false
+        const bonusCrit = (moreCriticalsRank * 5) + (hasFinesse ? 10 : 0)
         const baseCrit = obj.getStat('Critical Chance') + bonusCrit
         const regionPenalty = CriticalEffects.regionHitChanceDecTable[normalizedRegion] ?? CriticalEffects.regionHitChanceDecTable['torso'] ?? 0
-        let hitChance = weaponSkill - AC - regionPenalty - hitDistanceModifier - partialCoverModifier
+        let hitChance = weaponSkill - AC - ammoACMod - regionPenalty - hitDistanceModifier - partialCoverModifier - lightPenalty + oneHanderModifier
         const critChance = baseCrit + regionPenalty
 
         if (isNaN(hitChance)) {
@@ -385,22 +422,27 @@ export class Combat {
             var isCrit = false
             if (rollSkillCheck(Math.floor(hitChance.hit - roll) / 10, hitChance.crit, false) === true) {isCrit = true}
 
-            // Sniper perk (ID 9): make a second d100 roll; use the better outcome
-            // for the called-shot location. If the second roll also qualifies as a
-            // critical, the attack becomes a critical hit.
             const sniperRank = (obj.perkRanks ?? {})[9] ?? 0
-            if (sniperRank > 0 && !isCrit) {
-                const secondRoll = getRandomInt(1, D100_MAX)
-                if (hitChance.hit - secondRoll > 0) {
-                    if (rollSkillCheck(Math.floor(hitChance.hit - secondRoll) / 10, hitChance.crit, false))
-                        {isCrit = true}
+            const slayerRank = (obj.perkRanks ?? {})[10] ?? 0
+            const isMelee = !this.isRangedPrimaryAttack(obj)
+            
+            if (!isCrit) {
+                if (!isMelee && sniperRank > 0) {
+                    // Sniper: roll 1d100. If <= LUK * 10, automatic critical
+                    if (getRandomInt(1, 100) <= obj.getStat('LUK') * 10) { isCrit = true }
+                } else if (isMelee && slayerRank > 0) {
+                    // Slayer: roll 1d100. If <= LUK * 10, automatic critical
+                    if (getRandomInt(1, 100) <= obj.getStat('LUK') * 10) { isCrit = true }
                 }
             }
 
             if (isCrit === true) {
                 // H4 FIX: FO2 crit level = clamp(0, d100 + betterCriticals, 100) / 20
-                // BetterCriticals shifts the roll UP (more chance of level 4/5 crits).
-                const rawCritRoll = getRandomInt(0, 100) + critModifier
+                // Heavy Handed subtracts 30 from the critical table roll (only for melee attacks)
+                const hasHeavyHanded = obj.charTraits?.has(6) ?? false
+                const heavyHandedModifier = (hasHeavyHanded && isMelee) ? -30 : 0
+                
+                const rawCritRoll = getRandomInt(0, 100) + critModifier + heavyHandedModifier
                 const critLevel = Math.min(4, Math.floor(Math.max(0, rawCritRoll) / 20))
                 this.log('crit level: ' + critLevel)
                 const crit = CriticalEffects.getCritical(target.killType, normalizedRegion, critLevel)
@@ -417,9 +459,11 @@ export class Combat {
         if (rollSkillCheck(Math.floor(roll - hitChance.hit) / 10, 0, false)) {isCrit = true}
         // Jinxed trait (ID 9): 50% added chance for a critical miss on any miss.
         // Pariah Dog companion provides the same non-stacking bonus; check both.
-        const attackerJinxed = obj.charTraits?.has(9) ?? false
-        const playerJinxed = this.player && !obj.isPlayer ? (this.player.charTraits?.has(9) ?? false) : false
-        if ((attackerJinxed || playerJinxed) && !isCrit) {
+        // In Fallout 2, if *any* combatant is Jinxed, or if the Pariah Dog is in the party
+        // or active combat list, everyone's misses have a 50% chance of being critical misses.
+        const anyoneJinxed = (this.combatants ?? []).some(c => c.charTraits?.has(9) ?? false)
+        const pariahDogPresent = (globalState.party && globalState.party.getPartyMemberByPID(16777413) !== null) || (this.combatants ?? []).some(c => c.pid === 16777413)
+        if ((anyoneJinxed || pariahDogPresent) && !isCrit) {
             if (getRandomInt(1, D100_MAX) <= JINXED_CRIT_MISS_CHANCE) {isCrit = true}
         }
 
@@ -458,13 +502,25 @@ export class Combat {
         const DR = target.getStat('DR ' + damageTypeName)
 
         const afterDT = Math.max(0, afterAmmo - DT)
-        const effectiveDR = Math.max(0, Math.min(100, DR + ammoRM))
+        
+        // Finesse trait (ID 4) increases target's effective DR by 30%
+        const attackerHasFinesse = obj.charTraits?.has(4) ?? false
+        const finesseDRMod = attackerHasFinesse ? 30 : 0
+        
+        const effectiveDR = Math.max(0, Math.min(100, DR + ammoRM + finesseDRMod))
         const afterDR = Math.floor(afterDT * (1 - effectiveDR / 100))
+        
+        // Add Bonus Ranged/HtH damage and Heavy Handed trait flat damage
+        const bonusRangedRank = (obj.perkRanks ?? {})[3] ?? 0 // Bonus Ranged Damage is ID 3
+        const bonusHtHRank = (obj.perkRanks ?? {})[4] ?? 0 // Bonus HtH Damage is ID 4
+        const hasHeavyHanded = obj.charTraits?.has(6) ?? false
+        const isMelee = !this.isRangedPrimaryAttack(obj)
+        const flatBonusDamage = isMelee ? (bonusHtHRank * 2) + (hasHeavyHanded ? 4 : 0) : (bonusRangedRank * 2)
 
         // Apply critical damage multiplier. critMultiplier = 2 for a normal hit (×1 after /2 in attack()).
         // Crits use DM from the critical effects table (typically 2–6 = ×1–3).
-        // FO2 formula: final = afterDR × (critMultiplier / 2) — multiplier is stored as 2× value.
-        const finalDamage = Math.max(0, Math.floor(afterDR * critMultiplier / 2))
+        // FO2 formula: final = (afterDR + bonusDamage) × (critMultiplier / 2)
+        const finalDamage = Math.max(0, Math.floor((afterDR + flatBonusDamage) * critMultiplier / 2))
 
         console.log(
             `raw: ${rawRoll} | ammo: ${afterAmmo} | DT: ${DT} DR: ${DR}% | afterDT: ${afterDT} | final: ${finalDamage} | type: ${damageTypeName} critMult: ${critMultiplier}`
@@ -548,8 +604,10 @@ export class Combat {
 
                 // Map weapon type to appropriate crit fail table
                 const weaponType = CriticalEffects.getWeaponCritFailType(obj)
-                const critFailEffect = CriticalEffects.criticalFailTable[weaponType][critFailLevel]
-                CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
+                const critFailEffect = CriticalEffects.criticalFailTable[weaponType]?.[critFailLevel]
+                if (critFailEffect) {
+                    CriticalEffects.temporaryDoCritFail(critFailEffect, obj)
+                }
             }
         }
 
@@ -577,9 +635,10 @@ export class Combat {
     // can be safely ended).  Used by auto-end-combat (BLK-062) and may be
     // queried by the UI or scripts to determine current combat viability.
     canEndCombat(): boolean {
+        const playerTeam = globalState.player?.teamNum ?? -1
         for (const c of this.combatants) {
             if (c.isPlayer) {continue}
-            if (!c.dead) {return false}
+            if (!c.dead && c.teamNum !== playerTeam) {return false}
         }
         return true
     }
@@ -597,17 +656,26 @@ export class Combat {
     }
 
     findTarget(obj: Critter): Critter | null {
-        // TODO: find target according to AI rules
-        // Find the closest living combatant on a different team
-
+        // Find the closest living combatant on a different team, with an AI heuristic
         const targets = this.combatants.filter((x) => !x.dead && x.teamNum !== obj.teamNum)
         if (targets.length === 0) {return null}
         // BLK-059: Guard null positions in the sort comparator to avoid crashes when
         // combatants lack a position (e.g. freshly added or off-map).
         if (!obj.position) {return targets[0] ?? null}
         targets.sort((a, b) => {
-            const da = a.position ? hexDistance(obj.position!, a.position) : Infinity
-            const db = b.position ? hexDistance(obj.position!, b.position) : Infinity
+            let da = a.position ? hexDistance(obj.position!, a.position) : Infinity
+            let db = b.position ? hexDistance(obj.position!, b.position) : Infinity
+            
+            // AI Heuristic: 'finish off weak targets' by discounting effective distance
+            if (a.getStat('Max HP') > 0) {
+                const aRatio = Math.max(0, a.getStat('HP') / a.getStat('Max HP'))
+                if (aRatio < 0.3) da -= 3
+            }
+            if (b.getStat('Max HP') > 0) {
+                const bRatio = Math.max(0, b.getStat('HP') / b.getStat('Max HP'))
+                if (bRatio < 0.3) db -= 3
+            }
+
             return da - db
         })
         return targets[0]
@@ -675,15 +743,47 @@ export class Combat {
             // hp <= min fleeing hp, so flee
             this.log('[AI FLEES]')
 
-            // todo: pick the closest edge of the map
             this.maybeTaunt(obj, 'run', messageRoll)
-            const targetPos = { x: 128, y: obj.position?.y ?? 0 } // left edge
+            // Calculate nearest map edge instead of hardcoding left edge
+            const curX = obj.position?.x ?? 100
+            const curY = obj.position?.y ?? 100
+            let targetPos = { x: 0, y: curY } // Left edge
+            let minEdgeDist = curX
+            let edgeType = 'left'
+            if (200 - curX < minEdgeDist) { minEdgeDist = 200 - curX; targetPos = { x: 200, y: curY }; edgeType = 'right' } // Right edge
+            if (curY < minEdgeDist) { minEdgeDist = curY; targetPos = { x: curX, y: 0 }; edgeType = 'top' } // Top edge
+            if (200 - curY < minEdgeDist) { targetPos = { x: curX, y: 200 }; edgeType = 'bottom' } // Bottom edge
+
+            // Check if critter reached the edge (escaped)
+            if (minEdgeDist <= 2) {
+                this.log(`[AI ESCAPED] ${obj.name} reached map edge`)
+                obj.dead = true // Treat as dead for combat purposes
+                obj.visible = false // Hide from map
+                return this.nextTurn()
+            }
+
+            // Find a walkable destination near the selected edge (up to 10 tiles inward)
+            let walkableTarget = targetPos
+            for (let distOffset = 0; distOffset <= 10; distOffset++) {
+                let testPos = { ...targetPos }
+                if (edgeType === 'left') { testPos.x = distOffset }
+                else if (edgeType === 'right') { testPos.x = 200 - distOffset }
+                else if (edgeType === 'top') { testPos.y = distOffset }
+                else if (edgeType === 'bottom') { testPos.y = 200 - distOffset }
+
+                const path = globalState.gMap ? globalState.gMap.recalcPath(obj.position!, testPos) : []
+                if (path && path.length > 0) {
+                    walkableTarget = testPos
+                    break
+                }
+            }
+
             const callback = () => {
                 obj.clearAnim()
                 this.doAITurn(obj, idx, depth + 1) // if we can, do another turn
             }
 
-            if (!this.walkUpTo(obj, idx, targetPos, AP.getAvailableMoveAP(), callback)) {
+            if (!this.walkUpTo(obj, idx, walkableTarget, AP.getAvailableMoveAP(), callback)) {
                 return this.nextTurn() // not a valid path, just move on
             }
 
@@ -892,9 +992,17 @@ export class Combat {
 
         // update range checks
         let numActive = 0
+        const playerTeam = globalState.player?.teamNum ?? -1
         for (let i = 0; i < this.combatants.length; i++) {
             const obj = this.combatants[i]
             if (obj.dead || obj.isPlayer) {continue}
+            
+            // Allies shouldn't keep combat active by themselves
+            if (obj.teamNum === playerTeam) {
+                obj.outline = 'green'
+                continue 
+            }
+
             // BLK-051: Guard against null ai (AI failed to init for this critter).
             // Fall back to a safe default max_dist so the loop can still complete.
             const maxDist: number = obj.ai?.info?.max_dist ?? 20
@@ -905,10 +1013,7 @@ export class Combat {
 
             if (inRange || obj.hostile) {
                 obj.hostile = true
-                // BLK-051: Guard globalState.player null — fall back to team -1 (never
-                // matches any NPC team) so the outline defaults to hostile red.
-                const playerTeam = globalState.player?.teamNum ?? -1
-                obj.outline = obj.teamNum !== playerTeam ? 'red' : 'green'
+                obj.outline = 'red'
                 numActive++
             }
         }
@@ -930,7 +1035,11 @@ export class Combat {
             // the start of their turn. Scripts use this for per-turn status effects
             // (poison ticks, radiation damage, drug wears-off, etc.).
             if (Config.engine.doLoadScripts && this.player._script) {
-                Scripting.combatEvent(this.player, 'turnBegin')
+                const override = Scripting.combatEvent(this.player, 'turnBegin')
+                if (override) {
+                    console.log('[combat] Player script overrode turn')
+                    return this.nextTurn(skipDepth + 1)
+                }
             }
         } else {
             this.inPlayerTurn = false
@@ -963,6 +1072,11 @@ export class Combat {
             // procedures see the same game-time state.
             if (Config.engine.doLoadScripts && critter._script) {
                 Scripting.updateCritter(critter._script, critter)
+                const override = Scripting.combatEvent(critter, 'turnBegin')
+                if (override) {
+                    console.log(`[combat] ${critter.name} script overrode turn`)
+                    return this.nextTurn(skipDepth + 1)
+                }
             }
 
             this.doAITurn(critter, this.whoseTurn, 1)

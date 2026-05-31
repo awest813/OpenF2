@@ -6812,11 +6812,11 @@ export namespace Scripting {
             return this.get_critter_stat(obj as Critter, stat)
         }
 
-        // sfall 0x8299 — set_critter_extra_stat_sfall(obj, stat, val):
-        // Set a temporary extra-stat modifier on a critter.  Stores the value in a
-        // critter.extraStats dictionary for retrieval by get_critter_extra_stat_sfall.
-        // Used by New Reno boss scripts that buff/debuff NPCs dynamically.
-        set_critter_extra_stat_sfall(obj: Obj, stat: number, val: number): void {
+        // sfall 0x8299 / 0x831B — set_critter_extra_stat_sfall(obj, statId, val):
+        // Set a temporary extra-stat modifier on a critter. Stores the value in both
+        // critter.extraStats (by ID for backwards compatibility) and critter._extraStats
+        // (by stat name for dynamic integration with getStat).
+        set_critter_extra_stat_sfall(obj: Obj, statId: number, val: number): void {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('set_critter_extra_stat_sfall: not a critter: ' + obj, undefined, this)
                 return
@@ -6827,7 +6827,13 @@ export namespace Scripting {
             }
             const critter = obj as any
             if (!critter.extraStats) {critter.extraStats = {}}
-            critter.extraStats[stat] = val
+            critter.extraStats[statId] = val
+
+            const statName = statMap[statId]
+            if (statName) {
+                if (!critter._extraStats) {critter._extraStats = {}}
+                critter._extraStats[statName] = Math.trunc(val)
+            }
         }
 
         // sfall 0x829A — get_active_hand_sfall():
@@ -7114,7 +7120,7 @@ export namespace Scripting {
                 if (typeof base === 'number' && isFinite(base)) {return base}
             }
             const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
-            return 5 + Math.ceil(agi / 2)
+            return 5 + Math.floor(agi / 2)
         }
 
         // sfall 0x82B2 — get_critter_inventory_weight_sfall(obj):
@@ -8260,6 +8266,54 @@ export namespace Scripting {
                 critter.maxHP = v
             }
         }
+
+        // sfall 0x8318 — get_critter_current_ap_sfall(obj): returns current combat AP.
+        get_critter_current_ap_sfall(obj: Obj): number {
+            return this.get_critter_combat_ap(obj)
+        }
+
+        // sfall 0x8319 — set_critter_current_ap_sfall(obj, val): sets current AP clamped to base Max AP.
+        set_critter_current_ap_sfall(obj: Obj, val: number): void {
+            this.set_critter_combat_ap(obj, val)
+        }
+
+        // sfall 0x831A — get_critter_extra_stat_sfall(obj, statId): returns derived stat modifier.
+        get_critter_extra_stat_sfall(obj: Obj, statId: number): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_extra_stat_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const statName = statMap[statId]
+            if (!statName) {return 0}
+            return (obj as any)._extraStats?.[statName] ?? 0
+        }
+
+        // sfall 0x831C — get_critter_base_ac_sfall(obj): returns base AC.
+        get_critter_base_ac_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('get_critter_base_ac_sfall: not a critter: ' + obj, undefined, this)
+                return 0
+            }
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.getBase === 'function') {
+                return critter.stats.getBase('AC') ?? 0
+            }
+            return 0
+        }
+
+        // sfall 0x831D — set_critter_base_ac_sfall(obj, val): sets base AC.
+        set_critter_base_ac_sfall(obj: Obj, val: number): void {
+            if (!isGameObject(obj) || obj.type !== 'critter') {
+                warn('set_critter_base_ac_sfall: not a critter: ' + obj, undefined, this)
+                return
+            }
+            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
+            const critter = obj as any
+            if (critter.stats && typeof critter.stats.setBase === 'function') {
+                critter.stats.setBase('AC', v)
+            }
+        }
+
 
 
         reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {

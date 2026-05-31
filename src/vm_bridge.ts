@@ -1878,6 +1878,35 @@ export namespace ScriptVMBridge {
 
        // 0x8317 — set_critter_base_hp_sfall(obj, val): set critter base Max HP.
        ,0x8317: bridged("set_critter_base_hp_sfall", 2, false) // set base Max HP [1..∞)
+
+       // -----------------------------------------------------------------------
+       // Phase 98 — sfall extended opcodes 0x8318–0x831F (AP, derived stat
+       // modifiers, base Armor Class, and gender get/set r/w).
+       // -----------------------------------------------------------------------
+
+       // 0x8318 — get_critter_current_ap_sfall(obj): return current AP.
+       ,0x8318: bridged("get_critter_current_ap_sfall", 1) // → current AP
+
+       // 0x8319 — set_critter_current_ap_sfall(obj, val): set current AP.
+       ,0x8319: bridged("set_critter_current_ap_sfall", 2, false) // set current AP
+
+       // 0x831A — get_critter_extra_stat_sfall(obj, statId): return derived stat modifier.
+       ,0x831A: bridged("get_critter_extra_stat_sfall", 2) // → modifier
+
+       // 0x831B — set_critter_extra_stat_sfall(obj, statId, val): set derived stat modifier.
+       ,0x831B: bridged("set_critter_extra_stat_sfall", 3, false) // set modifier
+
+       // 0x831C — get_critter_base_ac_sfall(obj): return base AC.
+       ,0x831C: bridged("get_critter_base_ac_sfall", 1) // → base AC
+
+       // 0x831D — set_critter_base_ac_sfall(obj, val): set base AC.
+       ,0x831D: bridged("set_critter_base_ac_sfall", 2, false) // set base AC [0..∞)
+
+       // 0x831E — get_critter_gender_sfall(obj): return gender (0=male, 1=female).
+       ,0x831E: bridged("get_critter_gender_sfall", 1) // → 0|1
+
+       // 0x831F — set_critter_gender_sfall(obj, val): set gender.
+       ,0x831F: bridged("set_critter_gender_sfall", 2, false) // set gender (0 or 1)
     }
     Object.assign(opMap, bridgeOpMap)
 

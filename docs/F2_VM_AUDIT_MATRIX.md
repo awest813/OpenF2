@@ -157,3 +157,43 @@ Next available sfall opcode: **0x82C8**
 | `set_critter_sneak_state_sfall` (0x830F) | opcode | implemented | P2 | Sets/clears SNK_MODE (pcFlags bit 3); enables sneak simulation for Arroyo stealth scripts. |
 
 Next available sfall opcode: **0x8310**
+
+## Phase 97 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `isWithinPerception getStat/getSkill null guard` (BLK-210) | procedure | implemented | P1 | Guard against missing getStat/getSkill on Temple boss / early unplaced critters; returns false safely. |
+| `rotation_to_tile non-finite tile guard` (BLK-211) | procedure | implemented | P1 | Non-finite tile coords from patrol math return -1 direction safely. |
+| `wm_area_set_pos non-finite coordinates guard` (BLK-212) | procedure | implemented | P1 | Coordinate math yielding NaN in world map exit grids ignored cleanly with warning. |
+| `mark_area_known non-finite area ID guard` (BLK-213) | procedure | implemented | P1 | NaN area ID calculation in quest flags dropped cleanly with warning to avoid corrupting mapAreas collection. |
+| `critter_inven_obj undefined hand-slot guard` (BLK-214) | procedure | implemented | P1 | Null (not undefined) returned for unequipped slot objects to prevent == 0 comparison failures in VM. |
+| `get_critter_orientation_sfall` (0x8310) | opcode | implemented | P2 | Returns critter facing direction modulo 6. |
+| `set_critter_orientation_sfall` (0x8311) | opcode | implemented | P2 | Sets critter facing direction with wrapped modulo 6. |
+| `get_critter_tile_num_sfall` (0x8312) | opcode | implemented | P2 | Returns critter tile number or -1. |
+| `get_critter_elevation_sfall` (0x8313) | opcode | implemented | P2 | Returns elevation clamped [0, 2] or falls back to current map elevation. |
+| `set_critter_base_ap_sfall` (0x8314) | opcode | implemented | P2 | Sets base Max AP clamped >= 0. |
+| `get_critter_xp_for_level_sfall` (0x8315) | opcode | implemented | P2 | Returns exact level threshold XP according to Fallout 2 triangular progression formula. |
+| `get_critter_base_hp_sfall` (0x8316) | opcode | implemented | P2 | Returns base Max HP. |
+| `set_critter_base_hp_sfall` (0x8317) | opcode | implemented | P2 | Sets base Max HP clamped >= 1. |
+
+Next available sfall opcode: **0x8318**
+
+## Phase 98 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `tile_num_in_direction out-of-bounds` (BLK-215) | procedure | implemented | P1 | Returns source tile when tile, direction or distance are non-finite (NaN/Infinity). |
+| `critter_heal non-finite amount` (BLK-216) | procedure | implemented | P1 | Non-finite heal amount rejected with warning; HP not modified. |
+| `item_caps_adjust non-finite adjustment` (BLK-217) | procedure | implemented | P1 | Non-finite adjustment amount rejected with warning; caps not modified. |
+| `set_critter_stat invalid index` (BLK-218) | procedure | implemented | P1 | Warns and returns safely when stat index is out of bounds [0, 35]. |
+| `move_to non-finite coordinates` (BLK-219) | procedure | implemented | P1 | Warns and performs no-op when destination tile is non-finite. |
+| `get_critter_current_ap_sfall` (0x8318) | opcode | implemented | P2 | Returns current AP. |
+| `set_critter_current_ap_sfall` (0x8319) | opcode | implemented | P2 | Sets current AP clamped to base Max AP. |
+| `get_critter_extra_stat_sfall` (0x831A) | opcode | implemented | P2 | Returns derived stat modifier by stat ID mapping. |
+| `set_critter_extra_stat_sfall` (0x831B) | opcode | implemented | P2 | Sets derived stat modifier, writing to both extraStats and _extraStats for full parity. |
+| `get_critter_base_ac_sfall` (0x831C) | opcode | implemented | P2 | Returns base Armor Class. |
+| `set_critter_base_ac_sfall` (0x831D) | opcode | implemented | P2 | Sets base Armor Class clamped >= 0. |
+| `get_critter_gender_sfall` (0x831E) | opcode | implemented | P2 | Returns critter gender (0=male, 1=female). |
+| `set_critter_gender_sfall` (0x831F) | opcode | implemented | P2 | Sets critter gender (0 or 1). |
+
+Next available sfall opcode: **0x8320**

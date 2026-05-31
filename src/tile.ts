@@ -24,7 +24,7 @@ export function toTileNum(position: Point): number {
 }
 
 export function fromTileNum(tile: number): Point {
-    return { x: tile % 200, y: Math.floor(tile / 200) } // TODO: use x|0 instead of floor for some of these
+    return { x: tile % 200, y: (tile / 200) | 0 }
 }
 
 export function tileToScreen(x: number, y: number): Point {
@@ -96,8 +96,6 @@ function tile_coord(tileNum: number): Point | null {
 
     a2 += 48 * Math.ceil((v3 - tile_x) / 2) // TODO: ceil, round or floor?
     a3 += 12 * v5
-
-    console.log('v3:', v3, '=', v3 & 1)
 
     if (v3 & 1) {
         if (v3 > tile_x) {

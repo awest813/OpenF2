@@ -702,3 +702,55 @@ Gate: **PASS** --- all 4459 tests green, tsc clean.
 - [x] phase95.test.ts: regression tests for all BLK items, sfall opcodes, arroyo start-to-end smoke tests, and checklist integrity.
 
 Gate: **PASS** --- all 4527 tests green, tsc clean.
+
+---
+
+## Phase 96 --- Debug and polish: start menu to end of Arroyo (continued)
+
+- [x] **BLK-205**: `set_pc_base_stat` non-finite value guard
+- [x] **BLK-206**: `tile_num_in_direction` non-finite dir/count guard
+- [x] **BLK-207**: `gsay_message` empty-string guard
+- [x] **BLK-208**: `critter_heal` null getStat guard
+- [x] **BLK-209**: `random` non-finite bounds guard
+- [x] New sfall opcodes 0x8308-0x830F: critter SPECIAL stats (Strength, Endurance, Intelligence, Sneak state r/w).
+- [x] phase96.test.ts: regression tests for all BLK items, sfall opcodes, arroyo start-to-end smoke tests, and checklist integrity.
+
+Gate: **PASS** --- all 4623 tests green, tsc clean.
+
+---
+
+## Phase 97 --- Debug and polish: start menu to end of Arroyo (final)
+
+- [x] **BLK-210**: `isWithinPerception` getStat/getSkill null guard
+- [x] **BLK-211**: `rotation_to_tile` non-finite tile guard
+- [x] **BLK-212**: `wm_area_set_pos` non-finite coordinates guard
+- [x] **BLK-213**: `mark_area_known` non-finite area ID guard
+- [x] **BLK-214**: `critter_inven_obj` undefined hand-slot guard
+- [x] New sfall opcodes 0x8310-0x8317: critter orientation, tile num, elevation, base AP, level XP, base HP r/w.
+- [x] phase97.test.ts: regression tests for all BLK items, sfall opcodes, arroyo start-to-end smoke tests, and checklist integrity.
+
+Gate: **PASS** --- all 4744 tests green, tsc clean.
+
+---
+
+## Major Subsystem Integrations
+
+- [x] **World Map Keyboard Navigation**: Added dynamic area populating, ArrowUp/ArrowDown list navigation, scroll clamping, and scroll indicators.
+- [x] **Combat Scripting & Parity**: Hardened critical damage formulas, distance modifiers, and AP tracking, and wired full turn-based scripting hooks (`combatStart`, `combatOver`, player `turnBegin`, NPC `critter_p_proc`).
+
+Gate: **PASS** --- all 4759 tests green, tsc clean.
+
+---
+
+## Phase 98 — VM opcode hardening and sfall extended opcodes 0x8318–0x831F
+
+- [x] **BLK-215**: `tile_num_in_direction` out-of-bounds / unplaced objects guard. Returns source tile when input tiles or parameters are non-finite (NaN/Infinity).
+- [x] **BLK-216**: `critter_heal` non-finite heal amount guard. Warns and safely returns without modifying HP.
+- [x] **BLK-217**: `item_caps_adjust` non-finite adjustment guard. Warns and safely returns without modifying caps.
+- [x] **BLK-218**: `set_critter_stat` invalid stat index guard. Warns and returns safely if stat index is out of bounds [0, 35].
+- [x] **BLK-219**: `move_to` non-finite coordinates guard. Warns and performs no-op for invalid/non-finite tile numbers.
+- [x] New sfall opcodes 0x8318-0x831F: critter Action Points, derived stat modifiers, armor class (AC), and gender r/w support.
+- [x] phase98.test.ts: 37 regression tests covering all BLK crash-prevention guards and sfall opcodes.
+
+Gate: **PASS** — all 4796 tests green, tsc clean.
+

@@ -36,6 +36,11 @@ export function applyEncounterCritterLoadout(
         if (amount <= 0) {continue}
 
         const itemObj = deps.createItem(item.pid)
+        if (!itemObj) {
+            // BLK-223: unknown or unregistered PID; skip rather than crashing addInventoryItem.
+            console.warn(`applyEncounterCritterLoadout: createItem returned null for pid=${item.pid} — skipping`)
+            continue
+        }
         obj.addInventoryItem(itemObj, amount)
 
         if (item.wielded !== true) {continue}

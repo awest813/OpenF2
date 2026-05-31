@@ -104,21 +104,21 @@ describe('HP formula', () => {
 // ---------------------------------------------------------------------------
 
 describe('AP formula', () => {
-    it('AGI=5 gives 8 AP (5 + ceil(5/2))', () => {
-        expect(makeStats({ agility: 5 }).maxAP).toBe(8)
+    it('AGI=5 gives 7 AP (5 + floor(5/2))', () => {
+        expect(makeStats({ agility: 5 }).maxAP).toBe(7)
     })
 
-    it('AGI=6 gives 8 AP (5 + ceil(6/2))', () => {
+    it('AGI=6 gives 8 AP (5 + floor(6/2))', () => {
         expect(makeStats({ agility: 6 }).maxAP).toBe(8)
     })
 
-    it('AGI=7 gives 9 AP (5 + ceil(7/2))', () => {
-        expect(makeStats({ agility: 7 }).maxAP).toBe(9)
+    it('AGI=7 gives 8 AP (5 + floor(7/2))', () => {
+        expect(makeStats({ agility: 7 }).maxAP).toBe(8)
     })
 
     it('maxAPMod is included in final AP', () => {
         const s = makeStats({ agility: 5, maxAPMod: 2 })
-        expect(s.maxAP).toBe(10)  // 8 + 2
+        expect(s.maxAP).toBe(9)  // 7 + 2
     })
 })
 
@@ -450,27 +450,26 @@ describe('getAvailablePerks', () => {
 
 describe('combat AP formula consistency (regression)', () => {
     it('AP matches derivedStats for odd AGI values', () => {
-        // AGI=7: canonical = 5 + ceil(7/2) = 5 + 4 = 9
-        // Bug used floor: 5 + floor(7/2) = 5 + 3 = 8
+        // AGI=7: canonical = 5 + floor(7/2) = 5 + 3 = 8
         const stats = makeStats({ agility: 7 })
-        expect(stats.maxAP).toBe(9)  // derivedStats canonical
+        expect(stats.maxAP).toBe(8)  // derivedStats canonical
     })
 
     it('AP matches derivedStats for even AGI values', () => {
-        // AGI=6: 5 + ceil(6/2) = 5 + 3 = 8 (same with floor for even)
+        // AGI=6: 5 + floor(6/2) = 5 + 3 = 8
         const stats = makeStats({ agility: 6 })
         expect(stats.maxAP).toBe(8)
     })
 
-    it('AGI=1 yields 6 AP (5 + ceil(1/2) = 5 + 1)', () => {
-        expect(makeStats({ agility: 1 }).maxAP).toBe(6)
+    it('AGI=1 yields 5 AP (5 + floor(1/2) = 5 + 0)', () => {
+        expect(makeStats({ agility: 1 }).maxAP).toBe(5)
     })
 
-    it('AGI=10 yields 10 AP (5 + ceil(10/2) = 5 + 5)', () => {
+    it('AGI=10 yields 10 AP (5 + floor(10/2) = 5 + 5)', () => {
         expect(makeStats({ agility: 10 }).maxAP).toBe(10)
     })
 
-    it('AGI=9 yields 10 AP (5 + ceil(9/2) = 5 + 5)', () => {
-        expect(makeStats({ agility: 9 }).maxAP).toBe(10)
+    it('AGI=9 yields 9 AP (5 + floor(9/2) = 5 + 4)', () => {
+        expect(makeStats({ agility: 9 }).maxAP).toBe(9)
     })
 })

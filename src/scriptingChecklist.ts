@@ -9211,6 +9211,146 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         frequency: 'low',
         impact: 'low',
     },
+
+    // -----------------------------------------------------------------------
+    // Phase 98 — BLK-215 to BLK-219 guards; plus sfall extended opcodes 0x8318–0x831F.
+    // -----------------------------------------------------------------------
+
+    // BLK-215 — tile_num_in_direction out-of-bounds / unplaced objects guard
+    {
+        id: 'blk_215_tile_num_in_direction_bounds_guard',
+        kind: 'bug',
+        description:
+            'BLK-215: tile_num_in_direction() now explicitly guards against out-of-bounds tile ' +
+            'indices or unplaced source objects, returning the source tile instead of corrupting layout.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // BLK-216 — critter_heal non-finite amount guard
+    {
+        id: 'blk_216_critter_heal_non_finite_amount_guard',
+        kind: 'bug',
+        description:
+            'BLK-216: critter_heal() now guards against non-finite heal amounts, treating ' +
+            'non-finite inputs as no-ops instead of corrupting critter current HP.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // BLK-217 — item_caps_adjust non-finite adjustment guard
+    {
+        id: 'blk_217_item_caps_adjust_non_finite_guard',
+        kind: 'bug',
+        description:
+            'BLK-217: item_caps_adjust() now guards against non-finite values, treating ' +
+            'NaN or Infinity adjustment amounts as no-ops instead of corrupting player/NPC caps.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // BLK-218 — set_critter_stat invalid stat index guard
+    {
+        id: 'blk_218_set_critter_stat_invalid_index_guard',
+        kind: 'bug',
+        description:
+            'BLK-218: set_critter_stat() now explicitly guards against out-of-range stat indices ' +
+            'to avoid writing undefined stat entries.',
+        status: 'implemented',
+        frequency: 'medium',
+        impact: 'medium',
+    },
+    // BLK-219 — move_to non-finite coordinates guard
+    {
+        id: 'blk_219_move_to_non_finite_coords_guard',
+        kind: 'bug',
+        description:
+            'BLK-219: move_to() now explicitly guards against non-finite target coordinates ' +
+            'to prevent corrupted entity positions.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x8318 — get_critter_current_ap_sfall
+    {
+        id: 'sfall_get_critter_current_ap_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x8318: get_critter_current_ap_sfall(obj) → returns critter\'s current AP.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x8319 — set_critter_current_ap_sfall
+    {
+        id: 'sfall_set_critter_current_ap_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x8319: set_critter_current_ap_sfall(obj, val) → sets current AP clamped to max AP.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831A — get_critter_extra_stat_sfall
+    {
+        id: 'sfall_get_critter_extra_stat_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831A: get_critter_extra_stat_sfall(obj, statId) → returns derived stat modifier.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831B — set_critter_extra_stat_sfall
+    {
+        id: 'sfall_set_critter_extra_stat_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831B: set_critter_extra_stat_sfall(obj, statId, val) → sets derived stat modifier.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831C — get_critter_base_ac_sfall
+    {
+        id: 'sfall_get_critter_base_ac_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831C: get_critter_base_ac_sfall(obj) → returns critter\'s base Armor Class.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831D — set_critter_base_ac_sfall
+    {
+        id: 'sfall_set_critter_base_ac_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831D: set_critter_base_ac_sfall(obj, val) → sets base AC clamped >= 0.',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831E — get_critter_gender_sfall
+    {
+        id: 'sfall_get_critter_gender_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831E: get_critter_gender_sfall(obj) → returns critter gender (0=male, 1=female).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
+    // sfall 0x831F — set_critter_gender_sfall
+    {
+        id: 'sfall_set_critter_gender_98',
+        kind: 'opcode',
+        description:
+            'sfall 0x831F: set_critter_gender_sfall(obj, val) → sets critter gender (0 or 1).',
+        status: 'implemented',
+        frequency: 'low',
+        impact: 'low',
+    },
 ])
 
 // ---------------------------------------------------------------------------

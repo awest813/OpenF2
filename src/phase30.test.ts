@@ -16,8 +16,8 @@ describe('Phase 30-A — AP bonus integration', () => {
         }
         const ap = new ActionPoints(critter)
         const max = ap.getMaxAP()
-        // Base formula: 5 + ceil(AGI/2) + bonus
-        expect(max.combat).toBe(5 + Math.ceil(8 / 2) + 2)
+        // Base formula: 5 + floor(AGI/2) + bonus
+        expect(max.combat).toBe(5 + Math.floor(8 / 2) + 2)
         expect(max.move).toBe(0)
     })
 })

@@ -165,12 +165,23 @@ export function hexNeighbors(position: Point): Point[] {
 }
 
 export function hexInDirection(position: Point, dir: number): Point {
-    return hexNeighbors(position)[dir]
+    const neighbor = hexNeighbors(position)[dir]
+    if (neighbor === undefined) {
+        // BLK-220: out-of-range direction; return current position as safe fallback.
+        console.warn(`hexInDirection: invalid direction ${dir} — returning current position`)
+        return { x: position.x, y: position.y }
+    }
+    return neighbor
 }
 
 export function hexInDirectionDistance(position: Point, dir: number, distance: number): Point {
     if (distance === 0) {
         return position
+    }
+    if (dir < 0 || dir > 5) {
+        // BLK-220: out-of-range direction; return current position as safe fallback.
+        console.warn(`hexInDirectionDistance: invalid direction ${dir} — returning current position`)
+        return { x: position.x, y: position.y }
     }
 
     let tile = hexInDirection(position, dir)

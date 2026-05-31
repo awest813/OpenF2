@@ -47,7 +47,7 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **85 files, 2961 tests passed**.
+- Full regression run: `npm test` → **116 files, 4796 tests passed**.
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
 - Phase 50: critter status-flag persistence (BLK-033), active-hand tracking (BLK-034), save schema v13, sfall opcodes 0x81AE–0x81B5, checklist upgrades for proto_data/tile_is_visible/metarule_18/21/35/44/46/55/anim.
 - Phase 51: player stats/skills persisted in save schema v14 (BLK-035); sfall opcodes 0x81B6–0x81BD.
@@ -71,5 +71,16 @@ Reason:
 - Phase 82: Global browser error boundary with recoverable overlay (BLK-139); callProcedureSafe() wrapper applied to all 18 script trigger dispatch points — talk/critter/map_update/map_enter/map_exit/timed_event/use/look_at/description/use_skill_on/pickup/use_obj_on/push/is_dropping/combat/spatial/destroy/damage (BLK-140); per-object map_update isolation (BLK-142); timer event isolation (BLK-143); sfall opcodes 0x82A0–0x82A7 (worldmap_free_move, car_current_town, dude_obj, critter_max_ap alias, tile_light_level).
 - Phase 83: initScript() start proc wrapped in callProcedureSafe() (BLK-144) — a throwing script initializer no longer aborts map-load for subsequent objects; sfall opcodes 0x82A8–0x82AF (critter_experience r/w, critter_crit_chance r/w, critter_npc_flag r/w, critter_outline_color r/w).
 - Phase 87: rm_mult_objs_from_inven non-positive count guard (BLK-161); obj_carrying_pid_obj null inventory guard (BLK-162); poison/radiation_add/radiation_dec non-finite amount guards (BLK-163–165); sfall opcodes 0x82C0–0x82C7 (critter active weapon, base skill r/w, in-combat check, map_var r/w via sfall, attack-type stub, min-str stub).
+- Phase 90: Arroyo combat/trait hardening: attack/display guards, sfall 0x82D8–0x82DF.
+- Phase 91: Arroyo end-sequence debug: animation/skill guards, sfall 0x82E0–0x82E7.
+- Phase 92: Arroyo end-sequence debug and polish: final guards, sfall 0x82E8–0x82EF.
+- Phase 93: Arroyo debug and polish: inventory/dialogue guards, sfall 0x82F0-0x82F7.
+- Phase 94: Arroyo debug and polish: stat/skill/lighting guards, sfall 0x82F8-0x82FF.
+- Phase 95: start menu to end of Arroyo debug: inventory/visibility/var guards (BLK-200–204), sfall 0x8300-0x8307.
+- Phase 96: start menu to end of Arroyo debug: base stat, tile direction, gsay message, critter heal, random bounds non-finite/null guards (BLK-205–209), sfall 0x8308-0x830F.
+- Phase 97: start menu to end of Arroyo debug: perception, rotation to tile, area pos, area known, inventory hand slot undefined guards (BLK-210–214), sfall 0x8310-0x8317.
+- Phase 98: sfall opcodes 0x8318–0x831F (AP current r/w, extra stat r/w, base AC r/w, gender r/w), bugs BLK-215–219 (tile_num_in_direction, critter_heal, item_caps_adjust, set_critter_stat, move_to non-finite/out-of-bounds guards).
+- World Map & Combat Updates: dynamic area routing, keyboard scrolling list navigation, turn-based combat VM callbacks, AP targeting, and damage fidelity.
 
-**Updated gate status:** `READY` — 105 files, 4025 tests passed, tsc clean.
+**Updated gate status:** `READY` — 116 files, 4796 tests passed, tsc clean.
+

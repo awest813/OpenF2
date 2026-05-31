@@ -281,7 +281,11 @@ def parseObject(f, lstFiles: dict[str, list[bytes]]):
 
     elif objType == 1: # critter
         namedType = "critter"
-        art = stripExt(getCritterArtPath(frmPID, lstFiles["critters"]))
+        try:
+            art = stripExt(getCritterArtPath(frmPID, lstFiles["critters"]))
+        except Exception as e:
+            print("WARNING: getCritterArtPath failed for frmPID %08x (%s) — using fallback 'art/critters/hmjmpsaa'" % (frmPID, str(e)))
+            art = "art/critters/hmjmpsaa"
 
         f.read(4*4)
         extra["AInum"] = read32(f)

@@ -1370,6 +1370,11 @@ export class Critter extends Obj {
     getStat(stat: string) {
         let statValue = this.stats.get(stat)
         
+        // Add sfall dynamic extra stat modifiers
+        if ((this as any)._extraStats && (this as any)._extraStats[stat] !== undefined) {
+            statValue += (this as any)._extraStats[stat]
+        }
+        
         // Add armor bonuses for DT/DR stats if armor is equipped
         if (this.equippedArmor && this.equippedArmor.pro && this.equippedArmor.pro.extra) {
             const armorStats = this.equippedArmor.pro.extra.stats

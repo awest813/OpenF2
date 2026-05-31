@@ -69,9 +69,9 @@ describe('effectiveStat', () => {
 // ---------------------------------------------------------------------------
 
 describe('recomputeDerivedStats', () => {
-    it('computes max AP as 5 + ceil(AGI/2)', () => {
+    it('computes max AP as 5 + floor(AGI/2)', () => {
         const s = makeStats({ agility: 6 })
-        expect(s.maxAP).toBe(5 + Math.ceil(6 / 2))  // 8
+        expect(s.maxAP).toBe(5 + Math.floor(6 / 2))  // 8
     })
 
     it('computes armor class equal to AGI (unarmored)', () => {
@@ -128,7 +128,7 @@ describe('recomputeDerivedStats', () => {
 
     it('applies stat modifiers before computing derived values', () => {
         const s = makeStats({ agility: 5, agilityMod: 2 })  // effective AGI = 7
-        expect(s.maxAP).toBe(5 + Math.ceil(7 / 2))  // 9
+        expect(s.maxAP).toBe(5 + Math.floor(7 / 2))  // 8
     })
 
     it('sets xpToNextLevel to cumulative triangular threshold for current level', () => {
