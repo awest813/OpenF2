@@ -754,3 +754,20 @@ Gate: **PASS** --- all 4759 tests green, tsc clean.
 
 Gate: **PASS** — all 4796 tests green, tsc clean.
 
+---
+
+## Phase 109 — Combat scripting parity: sfall opcode promotion, encounter/knockback/blocking systems
+
+- [x] **combatEvent onAttack/onDeath**: Fires `combat_p_proc` hooks in `Combat.attack()` (before hit roll) and `Combat.perish()`.
+- [x] **isWithinPerception critterFlags bit 2**: Halves perception range for sneaky targets (integer-truncated division).
+- [x] **16 combat sfall opcodes** promoted from stub to implemented: `get_combat_target` (0x81CB), `set_combat_target` (0x81CC), `get_critter_attack_mode_sfall` (0x81E2), `set_critter_attack_mode_sfall` (0x81E3), `get_inven_ap_cost_sfall` (0x8225), `get_attack_type_sfall` (0x8256), `get_critter_attack_type_sfall` (0x82C6), `get_critter_min_str_sfall` (0x82C7), `get_num_critters_on_tile_sfall` (0x82BE), `get_critter_combat_data_sfall` (0x82BF), `get_combat_free_move_sfall` (0x8242), `set_combat_free_move_sfall` (0x8243), `obj_is_disabled_sfall` (0x81D4), `get_last_pers_obj` (0x81D3).
+- [x] **force_encounter** (0x81D1) / **force_encounter_with_flags** (0x81D2): Looks up encounter table by ID/name, triggers `execEncounter`; flag bit 0 starts combat.
+- [x] **set_weapon_knockback** (0x81B4) / **remove_weapon_knockback** (0x81B5): Stores/clamps knockback params on weapon; `Combat.attack()` pushes target on hit with null-position guard and grid-bounds validation.
+- [x] **tile_add_blocking** (0x8140) / **tile_remove_blocking** (0x8141): Stores tiles in `globalState.blockedTiles` Set; `hexLinecast` checks them with proper Obj sentinel.
+- [x] **get_drop_amount** (0x81D8) / **set_drop_amount** (0x81D9): UID-keyed Map in `globalState.dropAmounts`; negative UID guard.
+- [x] **set_critter_burst_disable** (0x81DF): Stores `burstDisabled` flag on critter.
+- [x] **Audit pass**: 6 hardening fixes — null-position guard + grid bounds (knockback), UID sentinel (drop_amount), integer truncation (critterFlags), clamp dist/chance (knockback), Obj sentinel (hexLinecast), class name fix (`GameMap` not `Map`).
+- [x] combat.integration.test.ts: 66 regression tests covering combat hooks, opcodes, hit-chance fidelity, AP correctness.
+
+Gate: **PASS** — all 5089 tests green, tsc clean.
+

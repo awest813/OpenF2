@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest'
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 
 vi.mock('./player.js', () => ({ Player: class MockPlayer {} }))
 vi.mock('./ui.js', async (importOriginal) => {
@@ -516,6 +516,88 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
         const obj: any = { _script: script }
         Scripting.combatEvent(obj, 'combatStart')
         expect(script.combat_is_initialized).toBe(1)
+    })
+
+    it('combatEvent supports onAttack event with fixed_param = 1', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_on_attack',
+            _didOverride: false,
+        }
+        const attacker: any = { _script: script, name: 'Attacker' }
+        const target: any = { _script: null, name: 'Target' }
+        const result = Scripting.combatEvent(attacker, 'onAttack', target)
+        expect(script.combat_p_proc).toHaveBeenCalled()
+        expect(script.fixed_param).toBe(1) // COMBAT_SUBTYPE_ATTACK
+        expect(script.target_obj).toBe(target)
+        expect(result).toBe(false)
+    })
+
+    it('combatEvent supports onDeath event with fixed_param = 5', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_on_death',
+            _didOverride: false,
+        }
+        const victim: any = { _script: script, name: 'Victim' }
+        const killer: any = { _script: null, name: 'Killer' }
+        const result = Scripting.combatEvent(victim, 'onDeath', undefined, killer)
+        expect(script.combat_p_proc).toHaveBeenCalled()
+        expect(script.fixed_param).toBe(5) // COMBAT_SUBTYPE_DEATH
+        expect(script.source_obj).toBe(killer)
+        expect(result).toBe(false)
+    })
+
+    it('combatEvent sets target_obj on onAttack when provided', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_target_obj',
+            _didOverride: false,
+        }
+        const attacker: any = { _script: script }
+        const target: any = { _script: null, name: 'SomeTarget' }
+        Scripting.combatEvent(attacker, 'onAttack', target)
+        expect(script.target_obj).toBe(target)
+    })
+
+    it('combatEvent does not override target_obj when not provided', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            combat_p_proc: vi.fn(),
+            scriptName: 'test_no_target',
+            _didOverride: false,
+        }
+        const obj: any = { _script: script }
+        script.target_obj = 'previousValue'
+        Scripting.combatEvent(obj, 'combatStart')
+        // combatStart does not pass targetObj, so target_obj should remain unchanged
+        expect(script.target_obj).toBe('previousValue')
+    })
+
+    it('Scripting.damage sets fixed_param to the damage amount', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            damage_p_proc: vi.fn(),
+            scriptName: 'test_damage_fp',
+        }
+        const obj: any = { _script: script }
+        const source: any = { _script: null }
+        Scripting.damage(obj, obj, source, 42)
+        expect(script.fixed_param).toBe(42)
+    })
+
+    it('Scripting.damage sets fixed_param to 0 for non-finite damage', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = {
+            damage_p_proc: vi.fn(),
+            scriptName: 'test_damage_nan',
+        }
+        const obj: any = { _script: script }
+        Scripting.damage(obj, obj, null as any, NaN)
+        expect(script.fixed_param).toBe(0)
     })
 
     it('getAttackAPCost returns 4 (default) for unarmed critters', () => {
@@ -1155,5 +1237,145 @@ describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee
                 gs.gMap = origGMap
             }
         })
+    })
+})
+
+describe('Phase 108: Combat sfall opcode implementations', () => {
+    let script: any
+
+    beforeEach(async () => {
+        const { Scripting } = await import('./scripting.js')
+        Scripting.init('test_map', 0)
+        script = new Scripting.Script()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function makeObj(overrides: Record<string, any> = {}): any {
+        return { type: 'critter', dead: false, position: { x: 5, y: 5 }, ...overrides }
+    }
+
+    it('get_combat_target returns 0 for critter with no target', () => {
+        expect(script.get_combat_target(makeObj())).toBe(0)
+    })
+
+    it('get_combat_target returns combatTarget when set via set_combat_target', () => {
+        const obj = makeObj()
+        const target = makeObj({ name: 'target' })
+        script.set_combat_target(obj, target)
+        expect(script.get_combat_target(obj)).toBe(target)
+    })
+
+    it('get_critter_attack_mode_sfall returns 0 for non-critter', () => {
+        expect(script.get_critter_attack_mode_sfall(null as any)).toBe(0)
+        expect(script.get_critter_attack_mode_sfall({} as any)).toBe(0)
+    })
+
+    it('get_critter_attack_mode_sfall returns override when set', () => {
+        const critter = makeObj({ attackModeOverride: 2 })
+        expect(script.get_critter_attack_mode_sfall(critter)).toBe(2)
+    })
+
+    it('get_critter_attack_mode_sfall reads equipped weapon attack mode', () => {
+        // Melee weapon (attackMode = 0x34 → lower nibble 4 = thrust → melee)
+        const critter = makeObj({ equippedWeapon: { pro: { extra: { attackMode: 0x34 } } } })
+        expect(script.get_critter_attack_mode_sfall(critter)).toBe(1) // melee
+        // Ranged weapon (attackMode = 0x16 → lower nibble 6 = fire single → ranged)
+        critter.equippedWeapon = { pro: { extra: { attackMode: 0x16 } } }
+        expect(script.get_critter_attack_mode_sfall(critter)).toBe(2) // ranged
+    })
+
+    it('set_critter_attack_mode_sfall stores attackModeOverride', () => {
+        const critter = makeObj()
+        script.set_critter_attack_mode_sfall(critter, 1)
+        expect(critter.attackModeOverride).toBe(1)
+        expect(() => script.set_critter_attack_mode_sfall(null as any, 1)).not.toThrow()
+        expect(() => script.set_critter_attack_mode_sfall({}, 1)).not.toThrow()
+    })
+
+    it('get_attack_type_sfall returns 0 for non-critter', () => {
+        expect(script.get_attack_type_sfall(null as any, 0)).toBe(0)
+    })
+
+    it('get_attack_type_sfall returns primary attack mode from weapon', () => {
+        // attackMode = 0x61 → lower nibble 1 (punch), upper nibble 6 (fire single)
+        const critter = makeObj({ equippedWeapon: { pro: { extra: { attackMode: 0x61 } } } })
+        expect(script.get_attack_type_sfall(critter, 0)).toBe(1) // primary = punch
+        expect(script.get_attack_type_sfall(critter, 1)).toBe(6) // secondary = fire single
+    })
+
+    it('get_critter_attack_type_sfall delegates to get_attack_type_sfall', () => {
+        const critter = makeObj({ equippedWeapon: { pro: { extra: { attackMode: 0x63 } } } })
+        expect(script.get_critter_attack_type_sfall(critter, 0))
+            .toBe(script.get_attack_type_sfall(critter, 0))
+    })
+
+    it('get_critter_min_str_sfall returns 0 for non-critter', () => {
+        expect(script.get_critter_min_str_sfall({} as any)).toBe(0)
+    })
+
+    it('get_critter_min_str_sfall reads minST from weapon proto', () => {
+        const critter = makeObj({ equippedWeapon: { pro: { extra: { minST: 5 } } } })
+        expect(script.get_critter_min_str_sfall(critter)).toBe(5)
+    })
+
+    it('get_critter_combat_data_sfall returns 0 for non-critter', () => {
+        expect(script.get_critter_combat_data_sfall(null as any)).toBe(0)
+    })
+
+    it('get_critter_combat_data_sfall shows inCombat bit when in combat', async () => {
+        const gs = (await import('./globalState.js')).default
+        const origCombat = gs.combat
+        const origInCombat = gs.inCombat
+        try {
+            gs.inCombat = true
+            gs.combat = { combatants: [], whoseTurn: 0 } as any
+            const data = script.get_critter_combat_data_sfall(makeObj())
+            expect(data & 1).toBe(1)
+        } finally {
+            gs.combat = origCombat
+            gs.inCombat = origInCombat
+        }
+    })
+
+    it('get_critter_combat_data_sfall shows hostile bit', async () => {
+        const gs = (await import('./globalState.js')).default
+        const origCombat = gs.combat
+        const origInCombat = gs.inCombat
+        try {
+            gs.inCombat = true
+            gs.combat = { combatants: [], whoseTurn: 0 } as any
+            const data = script.get_critter_combat_data_sfall(makeObj({ hostile: true }))
+            expect(data & 2).toBe(2)
+        } finally {
+            gs.combat = origCombat
+            gs.inCombat = origInCombat
+        }
+    })
+
+    it('obj_is_disabled_sfall reads scriptDisabled flag', () => {
+        expect(script.obj_is_disabled_sfall({} as any)).toBe(0)
+        expect(script.obj_is_disabled_sfall(null as any)).toBe(0)
+        const obj = makeObj({ scriptDisabled: true })
+        expect(script.obj_is_disabled_sfall(obj)).toBe(1)
+        obj.scriptDisabled = false
+        expect(script.obj_is_disabled_sfall(obj)).toBe(0)
+    })
+
+    it('get_combat_free_move_sfall reads from script object', () => {
+        expect(script.get_combat_free_move_sfall()).toBe(0)
+        ;(script as any).combatFreeMove = 5
+        expect(script.get_combat_free_move_sfall()).toBe(5)
+    })
+
+    it('set_combat_free_move_sfall stores on critter', () => {
+        const critter = makeObj()
+        script.set_combat_free_move_sfall(critter, 3)
+        expect(critter.combatFreeMove).toBe(3)
+        script.set_combat_free_move_sfall(critter, NaN)
+        expect(critter.combatFreeMove).toBe(0)
+        expect(() => script.set_combat_free_move_sfall(null as any, 5)).not.toThrow()
     })
 })

@@ -18,7 +18,7 @@ limitations under the License.
 import { Config } from './config.js'
 import { CriticalEffects } from './criticalEffects.js'
 import { critterDamage, Weapon } from './critter.js'
-import { hexDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
+import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
 import globalState from './globalState.js'
 import { Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
@@ -567,6 +567,12 @@ export class Combat {
         (obj as any).lastCombatTarget = target
         ;(target as any).lastCombatAttacker = obj
 
+        // FO2: fire combat_p_proc(COMBAT_SUBTYPE_ATTACK = 1) on the attacker so
+        // scripts can react to attack events (e.g. trigger dialogue, modify damage).
+        if (Config.engine.doLoadScripts) {
+            Scripting.combatEvent(obj, 'onAttack', target)
+        }
+
         // Calculate hit and damage synchronously before starting the animation so
         // that we can wrap the callback if the last enemy was just killed (BLK-062).
         const who = obj.isPlayer ? 'You' : obj.name
@@ -585,6 +591,21 @@ export class Combat {
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage' + extraMsg)
 
             critterDamage(target, damage, obj)
+
+            // FO2 sfall knockback: if the attacker's weapon has knockbackDist/knockbackChance,
+            // push the target away from the attacker.
+            const wep = typeof obj.getEquippedWeapon === 'function' ? obj.getEquippedWeapon() : null
+            if (wep && (wep as any).knockbackDist && obj.position && target.position) {
+                const dist = Math.max(0, (wep as any).knockbackDist | 0)
+                const chance = Math.min(100, Math.max(0, ((wep as any).knockbackChance ?? 100) | 0))
+                if (dist > 0 && getRandomInt(1, 100) <= chance) {
+                    const dir = hexDirectionTo(obj.position, target.position)
+                    const newPos = hexInDirectionDistance(target.position, dir, dist)
+                    if (newPos && newPos.x >= 0 && newPos.x < 200 && newPos.y >= 0 && newPos.y < 200) {
+                        target.move(newPos)
+                    }
+                }
+            }
 
             if (target.dead) {
                 this.perish(target)
@@ -632,6 +653,13 @@ export class Combat {
 
     perish(obj: Critter) {
         this.log('...And killed them.')
+
+        // FO2: fire combat_p_proc(COMBAT_SUBTYPE_DEATH = 5) on the dying critter so
+        // scripts can run death-quotes, quest triggers, or loot-dropping logic.
+        if (Config.engine.doLoadScripts && obj._script) {
+            const attacker = (obj as any).lastCombatAttacker as Critter | undefined
+            Scripting.combatEvent(obj, 'onDeath', undefined, attacker)
+        }
     }
 
     // BLK-063: Return true when all non-player combatants are dead (i.e. combat

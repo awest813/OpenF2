@@ -228,8 +228,13 @@ describe('Phase 64-D — sfall opcodes 0x8220–0x8227', () => {
     })
 
     // ---- 0x8225 get_inven_ap_cost_sfall ----
-    it('get_inven_ap_cost_sfall returns 0 (stub)', () => {
-        expect(script.get_inven_ap_cost_sfall(makeObj(), makeObj())).toBe(0)
+    it('get_inven_ap_cost_sfall returns default AP cost for non-weapon items', () => {
+        // makeObj() has no weapon data → falls back to default 4
+        expect(script.get_inven_ap_cost_sfall(makeObj(), makeObj())).toBe(4)
+    })
+
+    it('get_inven_ap_cost_sfall returns 0 for null item', () => {
+        expect(script.get_inven_ap_cost_sfall(makeObj(), null as any)).toBe(0)
     })
 
     // ---- 0x8226 obj_can_see_tile_sfall ----

@@ -2939,8 +2939,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81B4: set_weapon_knockback(obj, dist, chance) — configure weapon knockback. ' +
-            'No-op in browser build (no knockback physics model). ' +
-            'Prevents unknown-opcode crashes in modded weapon scripts.',
+            'Stores knockbackDist and knockbackChance on the weapon; ' +
+            'applied in Combat.attack() after a successful hit.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -2950,7 +2950,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81B5: remove_weapon_knockback(obj) — remove custom weapon knockback. ' +
-            'No-op in browser build. Prevents unknown-opcode crashes in modded weapon scripts.',
+            'Deletes knockbackDist/knockbackChance properties from the weapon.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -3391,8 +3391,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81D1: force_encounter(mapId) — trigger a forced random encounter. ' +
-            'Browser build: no-op (random encounter system not fully implemented).',
-        status: 'stub',
+            'Looks up the encounter table by ID/name and calls execEncounter.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3401,8 +3401,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81D2: force_encounter_with_flags(mapId, flags) — force encounter. ' +
-            'Browser build: no-op.',
-        status: 'stub',
+            'Same as force_encounter, with bit 0 = start combat immediately.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

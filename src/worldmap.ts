@@ -523,6 +523,16 @@ export namespace Worldmap {
         })
     }
 
+    /** Lookup table of standard encounter type IDs → lookup_name strings.
+     *  sfall's force_encounter accepts integer IDs; this maps them to the
+     *  string keys used in worldmap.encounterTables. */
+    const ENCOUNTER_TYPE_IDS: Record<number, string> = {
+        0: 'city', 1: 'desert', 2: 'forest', 3: 'wasteland',
+        4: 'cold', 5: 'toxic caves', 6: 'mountain', 7: 'coast',
+        8: 'urban', 9: 'desert city', 10: 'military base',
+        // 11-22 are unused / game-data specific
+    }
+
     export function doEncounter(): void {
         const squarePos = positionToSquare(worldmapPlayer)
         if (!squarePos) {return}
@@ -533,6 +543,23 @@ export namespace Worldmap {
 
         console.log('enc table: %s -> %o', square.encounterType, encTable)
         execEncounter(encTable)
+    }
+
+    /** forceEncounter(tableKey): Trigger an encounter using the encounter table
+     *  identified by tableKey (a lookup_name string or an integer type ID).
+     *  Returns true if the encounter was triggered, false otherwise. */
+    export function forceEncounter(tableKey: string | number): boolean {
+        if (!globalState.gMap) {return false}
+        const key = typeof tableKey === 'number'
+            ? ENCOUNTER_TYPE_IDS[tableKey] ?? String(tableKey)
+            : tableKey
+        const encTable = worldmap?.encounterTables?.[key]
+        if (!encTable) {
+            console.warn(`forceEncounter: no encounter table for "${key}"`)
+            return false
+        }
+        execEncounter(encTable)
+        return true
     }
 
     export function didEncounter(): boolean {

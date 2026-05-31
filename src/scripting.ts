@@ -543,7 +543,8 @@ export namespace Scripting {
         if (canSee(obj, target)) {
             reqDist = perception * 5
 
-            // TODO: if (someTargetFlags & 2) { reqDist /= 2 } — not implemented yet
+            // FO2 critter flags bit 2: sneaky/hard-to-perceive targets halve perception range.
+            if ((target as any).critterFlags & 2) {reqDist = Math.max(1, (reqDist / 2) | 0)}
 
             if (target === globalState.player) {
                 // SNK_MODE (bit 3) set via pc_flag_on(3) means sneak mode is active.
@@ -558,6 +559,9 @@ export namespace Scripting {
         }
 
         reqDist = globalState.inCombat ? perception * 2 : perception
+
+        // FO2 critter flags bit 2: sneaky/hard-to-perceive targets halve perception range.
+        if ((target as any).critterFlags & 2) {reqDist = Math.max(1, (reqDist / 2) | 0)}
 
         if (target === globalState.player) {
             const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
@@ -2231,6 +2235,8 @@ export namespace Scripting {
             }
 
             // begin combat, turn starting with us
+            // Track the starting combatant for get_last_pers_obj (0x81D3).
+            ;(globalState as any).lastPersistentObj = this.self_obj
             if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter)}
         }
         terminate_combat() {
@@ -4754,17 +4760,17 @@ export namespace Scripting {
             // NPCs do not have a skill-point pool; silently ignore.
         }
 
-        // Phase 53 — sfall 0x81CB — get_combat_target(critter):
+        // Phase 53 — original 0x81CB — get_combat_target(critter):
         // Return the current combat target of a critter.
-        // Browser build: returns 0 (no per-critter target tracking).
+        // Delegates to the sfall 0x8253 implementation which reads combatTarget.
         get_combat_target(obj: Obj): Obj | 0 {
-            return 0
+            return this.get_combat_target_sfall(obj)
         }
 
-        // Phase 53 — sfall 0x81CC — set_combat_target(critter, target):
-        // Set a critter's combat target. No-op in the browser build.
+        // Phase 53 — original 0x81CC — set_combat_target(critter, target):
+        // Set a critter's combat target. Delegates to sfall 0x8254.
         set_combat_target(obj: Obj, target: Obj): void {
-            // No per-critter target tracking in the browser build.
+            this.set_combat_target_sfall(obj, target)
         }
 
         // Phase 53 — sfall 0x81CD — get_game_time_in_seconds:
@@ -4810,10 +4816,11 @@ export namespace Scripting {
 
         // Phase 54 — sfall 0x81D4 — obj_is_disabled_sfall(obj):
         // Returns 1 if the object's AI / script is disabled, 0 otherwise.
-        // Browser build: partial — no per-object disable flag; always returns 0.
+        // Checks the scriptDisabled flag on the object.
         obj_is_disabled_sfall(obj: Obj): number {
             log('obj_is_disabled_sfall', arguments)
-            return 0
+            if (!isGameObject(obj)) {return 0}
+            return (obj as any).scriptDisabled ? 1 : 0
         }
 
         // -----------------------------------------------------------------------
@@ -4846,16 +4853,35 @@ export namespace Scripting {
 
         // sfall 0x81E2 — get_critter_attack_mode_sfall(obj):
         // Return the critter's current attack-mode index (0=unarmed, 1=melee, 2=ranged).
-        // Browser build: partial — no per-critter attack-mode flag; always returns 0.
+        // Reads from attackModeOverride (set by 0x81E3), then falls back to the
+        // equipped weapon's primary attack mode.
         get_critter_attack_mode_sfall(obj: Obj): number {
             log('get_critter_attack_mode_sfall', arguments)
-            return 0
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
+            // Check per-critter override first
+            const override = (obj as any).attackModeOverride
+            if (typeof override === 'number' && override >= 0 && override <= 2) {return override}
+            // Fall back to equipped weapon
+            const critter = obj as Critter
+            const weaponObj = critter.equippedWeapon
+            if (!weaponObj || !weaponObj.pro || !weaponObj.pro.extra) {return 0}
+            const attackMode = weaponObj.pro.extra.attackMode
+            const primaryMode = (attackMode ?? 0) & 0x0f
+            // 0=none, 1=punch, 2=kick → unarmed(0)
+            if (primaryMode <= 2) {return 0}
+            // 3=swing, 4=thrust → melee(1)
+            if (primaryMode <= 4) {return 1}
+            // 5=throw, 6=fire single, 7=fire burst, 8=flame → ranged(2)
+            return 2
         }
 
         // sfall 0x81E3 — set_critter_attack_mode_sfall(obj, mode):
-        // Set the critter's attack-mode index.  Browser build: no-op.
-        set_critter_attack_mode_sfall(obj: Obj, _mode: number): void {
+        // Set the critter's attack-mode index (0=unarmed, 1=melee, 2=ranged).
+        // Stored as attackModeOverride; cleared on next AP reset.
+        set_critter_attack_mode_sfall(obj: Obj, mode: number): void {
             log('set_critter_attack_mode_sfall', arguments)
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return}
+            ;(obj as any).attackModeOverride = (mode >= 0 && mode <= 2) ? mode : 0
         }
 
         // sfall 0x81E4 — get_map_first_run_sfall():
@@ -5586,9 +5612,20 @@ export namespace Scripting {
 
         // sfall 0x8225 — get_inven_ap_cost_sfall(obj, item):
         // Return the AP cost to use an item from inventory on a target.
-        // Browser build: returns 0 (AP costs are handled by the UI/combat layer).
+        // Reads APCost1 from the item's weapon proto data when applicable.
         get_inven_ap_cost_sfall(obj: Obj, item: Obj): number {
-            return 0
+            if (!isGameObject(item)) {return 0}
+            const itemObj = item as any
+            // Check weapon AP cost
+            if (itemObj.weapon && typeof itemObj.weapon.getAPCost === 'function') {
+                return itemObj.weapon.getAPCost(1)
+            }
+            // Fall back to proto data
+            if (itemObj.pro?.extra?.APCost1 !== undefined) {
+                return itemObj.pro.extra.APCost1
+            }
+            // Default AP cost for unarmed/unknown
+            return 4
         }
 
         // sfall 0x8226 — obj_can_see_tile_sfall(obj, tileNum):
@@ -5932,16 +5969,18 @@ export namespace Scripting {
         // sfall 0x8242 — get_combat_free_move_sfall():
         // Return the number of free tile-moves available this combat turn
         // (the "free move" AP bonus from some perks/traits).
-        // Browser build: returns 0 (no free-move tracking).
+        // Tracks per-critter via combatFreeMove on the script object.
         get_combat_free_move_sfall(): number {
-            return 0
+            return (<any>this).combatFreeMove ?? 0
         }
 
         // sfall 0x8243 — set_combat_free_move_sfall(obj, tiles):
         // Set the number of free tile-moves available to a critter this turn.
-        // Browser build: no-op (free-move is not tracked per critter).
+        // Stored as combatFreeMove on the script object.
         set_combat_free_move_sfall(obj: Obj, tiles: number): void {
             log('set_combat_free_move_sfall', arguments)
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return}
+            ;(obj as any).combatFreeMove = isFinite(tiles) ? Math.max(0, Math.floor(tiles)) : 0
         }
 
         // sfall 0x8244 — get_base_stat_sfall(obj, stat_id):
@@ -6166,11 +6205,19 @@ export namespace Scripting {
 
         // sfall 0x8256 — get_attack_type_sfall(obj, slot):
         // Return the active attack mode/type for a critter.  slot: 0=primary,
-        // 1=secondary.  Browser build: returns 0 (unarmed/default) for all critters.
-        // The isGameObject check is kept for consistency with other opcode handlers
-        // so that invalid arguments produce the same code path as future improvements.
-        get_attack_type_sfall(_obj: Obj, _slot: number): number {
-            return 0
+        // 1=secondary.  Returns the raw attack mode nibble from equipped weapon.
+        get_attack_type_sfall(obj: Obj, slot: number): number {
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
+            const critter = obj as Critter
+            const weaponObj = critter.equippedWeapon
+            if (!weaponObj || !weaponObj.pro || !weaponObj.pro.extra) {return 0}
+            const attackMode = weaponObj.pro.extra.attackMode ?? 0
+            if (slot === 1) {
+                // Secondary attack — upper nibble
+                return (attackMode >> 4) & 0x0f
+            }
+            // Primary attack — lower nibble
+            return attackMode & 0x0f
         }
 
         // sfall 0x8257 — get_map_script_idx_sfall():
@@ -7254,18 +7301,41 @@ export namespace Scripting {
 
         // sfall 0x82BE — get_num_critters_on_tile_sfall(tile):
         // Return the number of critters currently standing on a given tile.
-        // Browser build: returns 0 (no per-tile critter index).
-        // New Reno crowd-management scripts use this to gate NPC spawning.
-        get_num_critters_on_tile_sfall(_tile: number): number {
-            return 0
+        // Counts living critters from gMap's object list on the given tile.
+        get_num_critters_on_tile_sfall(tile: number): number {
+            if (!globalState.gMap || !isFinite(tile)) {return 0}
+            const pos = fromTileNum(tile)
+            if (!isFinite(pos.x) || !isFinite(pos.y)) {return 0}
+            let count = 0
+            for (const obj of globalState.gMap.getObjects()) {
+                if (obj instanceof Critter && !obj.dead && obj.position) {
+                    if (obj.position.x === pos.x && obj.position.y === pos.y) {count++}
+                }
+            }
+            return count
         }
 
         // sfall 0x82BF — get_critter_combat_data_sfall(obj):
-        // Return combat-session data for a critter (browser stub → 0).
-        // New Reno combat scripts query this for extended AI state; returning 0
-        // causes them to fall through to safe defaults.
-        get_critter_combat_data_sfall(_obj: Obj): number {
-            return 0
+        // Return combat-session data for a critter.  Returns a bitmask:
+        //   bit 0: critter is in combat
+        //   bit 1: critter is hostile
+        //   bit 2: critter is fleeing
+        //   bit 3: critter is the current turn owner
+        get_critter_combat_data_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
+            let data = 0
+            // bit 0: in combat
+            if (globalState.inCombat && globalState.combat) {
+                data |= 1
+                // bit 1: hostile
+                if ((obj as any).hostile) {data |= 2}
+                // bit 2: fleeing
+                if ((obj as any).isFleeing) {data |= 4}
+                // bit 3: current turn owner
+                const idx = globalState.combat.combatants.indexOf(obj as Critter)
+                if (idx !== -1 && idx === globalState.combat.whoseTurn) {data |= 8}
+            }
+            return data
         }
 
         // -----------------------------------------------------------------------
@@ -7341,18 +7411,20 @@ export namespace Scripting {
 
         // sfall 0x82C6 — get_critter_attack_type_sfall(obj, slot):
         // Return the attack type for slot 0 (primary) or 1 (secondary).
-        // Browser build: returns 0 (no per-weapon attack type table).
-        // New Reno combat AI uses this to branch on fighter attack styles.
-        get_critter_attack_type_sfall(_obj: Obj, _slot: number): number {
-            return 0
+        // Delegates to get_attack_type_sfall (0x8256) which reads from weapon proto.
+        get_critter_attack_type_sfall(obj: Obj, slot: number): number {
+            return this.get_attack_type_sfall(obj, slot)
         }
 
         // sfall 0x82C7 — get_critter_min_str_sfall(obj):
         // Return the minimum Strength required for the critter's equipped
-        // weapon.  Browser build: returns 0 (no equipped-weapon proto lookup).
-        // New Reno boxing scripts use this to check fighter eligibility.
-        get_critter_min_str_sfall(_obj: Obj): number {
-            return 0
+        // weapon.  Reads minST from the weapon proto (data_member 20).
+        get_critter_min_str_sfall(obj: Obj): number {
+            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
+            const critter = obj as Critter
+            const weaponObj = critter.equippedWeapon
+            if (!weaponObj || !weaponObj.pro || !weaponObj.pro.extra) {return 0}
+            return weaponObj.pro.extra.minST ?? 0
         }
 
         // sfall 0x82C8 — get_weapon_min_dam_sfall(obj):
@@ -8602,6 +8674,7 @@ export namespace Scripting {
         obj._script.self_obj = obj as ScriptableObj
         obj._script.target_obj = target
         obj._script.source_obj = source
+        obj._script.fixed_param = isFinite(damage) ? damage : 0
         obj._script.game_time = Math.max(1, globalState.gameTickTime)
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
@@ -8700,24 +8773,38 @@ export namespace Scripting {
         return obj._script._didOverride
     }
 
-    export function combatEvent(obj: Obj, event: 'turnBegin' | 'combatStart' | 'combatOver'): boolean {
+    export function combatEvent(
+        obj: Obj,
+        event: 'turnBegin' | 'combatStart' | 'combatOver' | 'onAttack' | 'onDeath',
+        targetObj?: Obj,
+        sourceObj?: Obj,
+    ): boolean {
         if (!obj._script) {return false} // no script — not a bug; many map objects lack one
 
         // FO2 combat_p_proc fixed_param values (COMBAT_SUBTYPE):
         //   0 = COMBAT_SUBTYPE_INITIATE  — combat just started
-        //   4 = COMBAT_SUBTYPE_TURN      — start of critter's turn
+        //   1 = COMBAT_SUBTYPE_ATTACK    — this critter is attacking
+        //   2 = COMBAT_SUBTYPE_HIT       — this critter was hit (not yet implemented)
         //   3 = COMBAT_SUBTYPE_ENDCOMBAT — combat is ending
+        //   4 = COMBAT_SUBTYPE_TURN      — start of critter's turn
+        //   5 = COMBAT_SUBTYPE_DEATH     — this critter died in combat
         let fixed_param: number
         switch (event) {
             case 'combatStart':
                 fixed_param = 0
                 break // COMBAT_SUBTYPE_INITIATE
-            case 'turnBegin':
-                fixed_param = 4
-                break // COMBAT_SUBTYPE_TURN
+            case 'onAttack':
+                fixed_param = 1
+                break // COMBAT_SUBTYPE_ATTACK
             case 'combatOver':
                 fixed_param = 3
                 break // COMBAT_SUBTYPE_ENDCOMBAT
+            case 'turnBegin':
+                fixed_param = 4
+                break // COMBAT_SUBTYPE_TURN
+            case 'onDeath':
+                fixed_param = 5
+                break // COMBAT_SUBTYPE_DEATH
             default:
                 console.warn('combatEvent: unknown event ' + event + ' — ignoring')
                 return false
@@ -8732,6 +8819,8 @@ export namespace Scripting {
         obj._script.self_obj = obj as ScriptableObj
         obj._script.game_time = Math.max(1, globalState.gameTickTime)
         obj._script.cur_map_index = currentMapID
+        if (targetObj) {obj._script.target_obj = targetObj}
+        if (sourceObj) {obj._script.source_obj = sourceObj}
         obj._script._didOverride = false
 
         // hack so that the procedure is allowed to finish before

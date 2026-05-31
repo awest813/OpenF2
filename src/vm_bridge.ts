@@ -14,12 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Combat } from "./combat.js"
+import { Config } from "./config.js"
 import globalState from "./globalState.js"
 import { IntFile } from "./intfile.js"
 import { Scripting } from "./scripting.js"
 import { UIMode } from "./ui.js"
 import { BinaryReader } from "./util.js"
 import { opMap, ScriptVM } from "./vm.js"
+import * as Worldmap from "./worldmap.js"
 
 // Bridge between Scripting API and the Scripting VM
 
@@ -434,10 +437,24 @@ export namespace ScriptVMBridge {
        ,0x81A8: bridged("get_combat_free_move", 1)       // get_combat_free_move(obj) → free AP for movement this combat turn
        ,0x81A9: bridged("set_combat_free_move", 2, false) // set_combat_free_move(obj, ap) — set free movement AP
 
-       // Phase 48 — gap opcodes in 0x8140–0x814D range
-       // tile_add_blocking / tile_remove_blocking — safe no-ops (no runtime tile-block registry)
-       ,0x8140: function() { this.pop(); this.pop() } // tile_add_blocking(tile, rotation) — no-op
-       ,0x8141: function() { this.pop(); this.pop() } // tile_remove_blocking(tile, rotation) — no-op
+        // Phase 48 — gap opcodes in 0x8140–0x814D range
+        // tile_add_blocking(tile, rotation) — mark a tile as blocking line of sight/movement.
+        ,0x8140: function(this: GameScriptVM) {
+            const _rotation = this.pop()
+            const tile = this.pop()
+            if (!globalState.blockedTiles) { (globalState as any).blockedTiles = new Set<number>() }
+            if (typeof tile === 'number' && isFinite(tile)) {
+                (globalState as any).blockedTiles.add(tile)
+            }
+        }
+        // tile_remove_blocking(tile, rotation) — clear the blocking flag on a tile.
+        ,0x8141: function(this: GameScriptVM) {
+            const _rotation = this.pop()
+            const tile = this.pop()
+            if (globalState.blockedTiles && typeof tile === 'number') {
+                (globalState as any).blockedTiles.delete(tile)
+            }
+        }
 
        // give_karma / take_karma — add or subtract from GVAR_PLAYER_REPUTATION (GVAR_0).
        // In Fallout 2 these are sometimes compiled as standalone opcodes when the
@@ -534,13 +551,26 @@ export namespace ScriptVMBridge {
        // globalState.mapLoadedFromSave flag set by the save/load system.
        ,0x81B3: function() { this.push(globalState.mapLoadedFromSave ? 1 : 0) } // game_loaded() → real flag
 
-       // 0x81B4 — set_weapon_knockback(obj, dist, chance): set weapon knockback
-       // parameters for an object.  No-op in browser build (no knockback model).
-       ,0x81B4: function() { this.pop(); this.pop(); this.pop() } // set_weapon_knockback — no-op
+        // 0x81B4 — set_weapon_knockback(obj, dist, chance): set weapon knockback
+        // parameters for an object.  Stores knockbackDist and knockbackChance on the weapon.
+        ,0x81B4: function(this: GameScriptVM) {
+            const chance = this.pop()
+            const dist = this.pop()
+            const obj = this.pop()
+            if (obj) {
+                ;(obj as any).knockbackDist = Math.max(0, dist | 0)
+                ;(obj as any).knockbackChance = Math.min(100, Math.max(0, chance | 0))
+            }
+        }
 
-       // 0x81B5 — remove_weapon_knockback(obj): clear weapon knockback.
-       // No-op in browser build.
-       ,0x81B5: function() { this.pop() } // remove_weapon_knockback — no-op
+        // 0x81B5 — remove_weapon_knockback(obj): clear weapon knockback.
+        ,0x81B5: function(this: GameScriptVM) {
+            const obj = this.pop()
+            if (obj) {
+                delete (obj as any).knockbackDist
+                delete (obj as any).knockbackChance
+            }
+        }
 
        // Phase 51 — sfall extended opcodes 0x81B6–0x81BD
 
@@ -659,17 +689,26 @@ export namespace ScriptVMBridge {
        // Browser build: return current mode as a best-effort flag set.
        ,0x81D0: bridged("get_game_mode_sfall", 0) // get_game_mode() → mode bitmask
 
-       // 0x81D1 — force_encounter(mapId): trigger a forced random encounter.
-       // Browser build: no-op (random encounter system not fully implemented).
-       ,0x81D1: function() { this.pop() } // force_encounter(mapId) — no-op
+        // 0x81D1 — force_encounter(mapId): trigger a forced random encounter
+        // using the encounter table identified by mapId (integer type ID or string key).
+        ,0x81D1: function(this: GameScriptVM) {
+            const mapId = this.pop()
+            Worldmap.forceEncounter(mapId)
+        }
 
-       // 0x81D2 — force_encounter_with_flags(mapId, flags): force encounter with options.
-       // Browser build: no-op.
-       ,0x81D2: function() { this.pop(); this.pop() } // force_encounter_with_flags — no-op
+        // 0x81D2 — force_encounter_with_flags(mapId, flags): force encounter with
+        // flags (bit 0 = start combat immediately, other bits reserved).
+        ,0x81D2: function(this: GameScriptVM) {
+            const flags = this.pop()
+            const mapId = this.pop()
+            const triggered = Worldmap.forceEncounter(mapId)
+            // bit 0: start combat immediately
+            if (triggered && (flags & 1) && Config.engine.doCombat === true) {Combat.start()}
+        }
 
        // 0x81D3 — get_last_pers_obj(): return the last critter that started persistent combat.
-       // Browser build: returns 0 (no persistent combat tracking).
-       ,0x81D3: function() { this.push(0) } // get_last_pers_obj() → 0
+       // Tracks via globalState.lastPersistentObj set when attack_complex initiates combat.
+       ,0x81D3: function() { this.push((globalState as any).lastPersistentObj ?? 0) } // get_last_pers_obj()
 
        // 0x81D4 — obj_is_disabled(obj): return 1 if object's AI is disabled.
        // Browser build: partial — always returns 0 (no per-object disable flag).
@@ -716,13 +755,27 @@ export namespace ScriptVMBridge {
        // Phase 55 — sfall extended opcodes 0x81D8–0x81DF
        // -----------------------------------------------------------------------
 
-       // 0x81D8 — get_drop_amount(obj): return the count of items that drop when
-       // an object is destroyed.  Browser build: returns 0 (no drop-amount registry).
-       ,0x81D8: function() { this.pop(); this.push(0) } // get_drop_amount(obj) → 0
+        // 0x81D8 — get_drop_amount(obj): return the count of items that drop when
+        // an object is destroyed.  Uses a global registry (dropAmounts) keyed by object UID.
+        ,0x81D8: function(this: GameScriptVM) {
+            const obj = this.pop()
+            const uid = obj?.uid
+            if (uid == null || uid < 0) { this.push(0); return }
+            const map: Map<number, number> = (globalState as any).dropAmounts ?? new Map()
+            this.push(map.get(uid) ?? 0)
+        }
 
-       // 0x81D9 — set_drop_amount(obj, amount): override how many items drop from an
-       // object on destruction.  Browser build: no-op.
-       ,0x81D9: function() { this.pop(); this.pop() } // set_drop_amount(obj, amount) — no-op
+        // 0x81D9 — set_drop_amount(obj, amount): override how many items drop from an
+        // object on destruction.  Stores in global dropAmounts registry.
+        ,0x81D9: function(this: GameScriptVM) {
+            const amount = this.pop()
+            const obj = this.pop()
+            const uid = obj?.uid ?? -1
+            if (uid >= 0) {
+                if (!(globalState as any).dropAmounts) { (globalState as any).dropAmounts = new Map<number, number>() }
+                (globalState as any).dropAmounts.set(uid, amount)
+            }
+        }
 
        // 0x81DA — art_exists(artPath): check whether an art resource exists.
        // Browser build: returns 0 (no local art index; cannot check at runtime).
@@ -745,9 +798,13 @@ export namespace ScriptVMBridge {
        // (in item-size units) of a critter's inventory.  Equivalent to critter_inven_size.
        ,0x81DE: bridged("critter_inven_size", 1) // get_current_inven_size(critter) → size
 
-       // 0x81DF — set_critter_burst_disable(obj, disable): disable or enable the
-       // burst-fire mode for a critter's weapon.  Browser build: no-op.
-       ,0x81DF: function() { this.pop(); this.pop() } // set_critter_burst_disable — no-op
+        // 0x81DF — set_critter_burst_disable(obj, disable): disable or enable the
+        // burst-fire mode for a critter's weapon.  Stores burstDisabled flag on the critter.
+        ,0x81DF: function(this: GameScriptVM) {
+            const disable = this.pop()
+            const obj = this.pop()
+            if (obj?.type === 'critter') { (obj as any).burstDisabled = !!disable }
+        }
 
        // -----------------------------------------------------------------------
        // Phase 56 — sfall extended opcodes 0x81E0–0x81E7

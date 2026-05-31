@@ -24,7 +24,7 @@ import { Lightmap } from './lightmap.js'
 import { Critter, deserializeObj, Obj, objFromMapObject } from './object.js'
 import { centerCamera } from './renderer.js'
 import { Scripting } from './scripting.js'
-import { fromTileNum, hexToTile } from './tile.js'
+import { fromTileNum, hexToTile, toTileNum } from './tile.js'
 import { arrayRemove, arrayWithout, getFileJSON } from './util.js'
 
 declare let PF: any
@@ -511,14 +511,26 @@ export class GameMap {
         return (this.objectsAtPosition(position).find((obj) => obj.type === 'critter') as Critter) || null
     }
 
-    /// Draws a line between a and b, returning the first object hit
+    /// Draws a line between a and b, returning the first object hit.
+    /// A script-registered blocked tile (via tile_add_blocking) returns a
+    /// well-typed sentinel Obj so callers that only check for null/truthy
+    /// results work correctly; callers that inspect .type will see
+    /// "__blocked_tile__" instead of undefined.
+    private static readonly _blockedTileSentinel: Obj = (() => { const o = new Obj(); o.type = '__blocked_tile__'; return o })()
+
     hexLinecast(a: Point, b: Point): Obj | null {
         let line = hexLine(a, b)
         if (line === null) {
             return null
         }
         line = line.slice(1, -1)
+        const blockedTiles: Set<number> | undefined = (globalState as any).blockedTiles
         for (let i = 0; i < line.length; i++) {
+            // check script-registered blocked tiles first
+            if (blockedTiles?.has(toTileNum(line[i]))) {
+                GameMap._blockedTileSentinel.position = line[i]
+                return GameMap._blockedTileSentinel
+            }
             // todo: we could optimize this by only
             // checking in a certain radius of `a`
             const obj = this.objectsAtPosition(line[i])

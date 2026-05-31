@@ -197,3 +197,36 @@ Next available sfall opcode: **0x8318**
 | `set_critter_gender_sfall` (0x831F) | opcode | implemented | P2 | Sets critter gender (0 or 1). |
 
 Next available sfall opcode: **0x8320**
+
+## Phase 109 additions
+
+| Procedure/Opcode | Kind | Current status | Priority | Notes |
+|---|---|---|---|---|
+| `combatEvent onAttack` | procedure | implemented | P1 | Fires `combat_p_proc(COMBAT_SUBTYPE_ATTACK)` on attacker before hit roll. |
+| `combatEvent onDeath` | procedure | implemented | P1 | Fires `combat_p_proc(COMBAT_SUBTYPE_DEATH)` on target in `perish()`. |
+| `isWithinPerception critterFlags` | procedure | implemented | P1 | Bit 2 of target `critterFlags` halves perception range (integer-truncated). |
+| `get_combat_target` (0x81CB) | opcode | implemented | P2 | Returns critter's current combat target from AI state. |
+| `set_combat_target` (0x81CC) | opcode | implemented | P2 | Sets combat target and starts combat if needed. |
+| `get_critter_attack_mode_sfall` (0x81E2) | opcode | implemented | P2 | Maps proto attackMode nibbles to 0=unarmed/1=melee/2=ranged. |
+| `set_critter_attack_mode_sfall` (0x81E3) | opcode | implemented | P2 | Per-critter attack-mode override. |
+| `get_inven_ap_cost_sfall` (0x8225) | opcode | implemented | P2 | Returns inventory AP cost (default 4). |
+| `get_attack_type_sfall` (0x8256) | opcode | implemented | P2 | Returns current attack type from combat state. |
+| `get_critter_attack_type_sfall` (0x82C6) | opcode | implemented | P2 | Returns per-critter attack type (primary/secondary). |
+| `get_critter_min_str_sfall` (0x82C7) | opcode | implemented | P2 | Returns minimum strength requirement for critter's weapon. |
+| `get_num_critters_on_tile_sfall` (0x82BE) | opcode | implemented | P2 | Counts critters on a packed tile number. |
+| `get_critter_combat_data_sfall` (0x82BF) | opcode | implemented | P2 | Returns combat bitmask (inCombat/hostile/fleeing/currentTurn). |
+| `get_combat_free_move_sfall` (0x8242) | opcode | implemented | P2 | Reads combatFreeMove from script instance. |
+| `set_combat_free_move_sfall` (0x8243) | opcode | implemented | P2 | Sets combatFreeMove on script instance. |
+| `obj_is_disabled_sfall` (0x81D4) | opcode | implemented | P2 | Checks critter AI disable flag. |
+| `get_last_pers_obj` (0x81D3) | opcode | implemented | P2 | Returns last persistent-combat initiator from globalState. |
+| `tile_add_blocking` (0x8140) | opcode | implemented | P2 | Adds tile to `globalState.blockedTiles` Set; checked in `hexLinecast`. |
+| `tile_remove_blocking` (0x8141) | opcode | implemented | P2 | Removes tile from `globalState.blockedTiles` Set. |
+| `get_drop_amount` (0x81D8) | opcode | implemented | P2 | Reads from `globalState.dropAmounts` Map keyed by UID. |
+| `set_drop_amount` (0x81D9) | opcode | implemented | P2 | Writes to `globalState.dropAmounts` Map. |
+| `set_critter_burst_disable` (0x81DF) | opcode | implemented | P2 | Stores `burstDisabled` flag on critter. |
+| `force_encounter` (0x81D1) | opcode | implemented | P2 | Looks up encounter table by ID/name, calls `execEncounter`. |
+| `force_encounter_with_flags` (0x81D2) | opcode | implemented | P2 | Same + bit 0 starts combat immediately. |
+| `set_weapon_knockback` (0x81B4) | opcode | implemented | P2 | Stores clamped `knockbackDist`/`knockbackChance` on weapon. |
+| `remove_weapon_knockback` (0x81B5) | opcode | implemented | P2 | Deletes knockback properties from weapon. |
+| `Combat.attack knockback` | procedure | implemented | P1 | Applies hex push on hit with null-position guard and grid-bounds check. |
+| `hexLinecast blockedTiles` | procedure | implemented | P1 | Checks `globalState.blockedTiles` before object query; returns proper Obj sentinel. |

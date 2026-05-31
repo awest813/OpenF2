@@ -47,7 +47,7 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **116 files, 4796 tests passed**.
+- Full regression run: `npm test` → **120 files, 5089 tests passed**.
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
 - Phase 50: critter status-flag persistence (BLK-033), active-hand tracking (BLK-034), save schema v13, sfall opcodes 0x81AE–0x81B5, checklist upgrades for proto_data/tile_is_visible/metarule_18/21/35/44/46/55/anim.
 - Phase 51: player stats/skills persisted in save schema v14 (BLK-035); sfall opcodes 0x81B6–0x81BD.
@@ -81,6 +81,7 @@ Reason:
 - Phase 97: start menu to end of Arroyo debug: perception, rotation to tile, area pos, area known, inventory hand slot undefined guards (BLK-210–214), sfall 0x8310-0x8317.
 - Phase 98: sfall opcodes 0x8318–0x831F (AP current r/w, extra stat r/w, base AC r/w, gender r/w), bugs BLK-215–219 (tile_num_in_direction, critter_heal, item_caps_adjust, set_critter_stat, move_to non-finite/out-of-bounds guards).
 - World Map & Combat Updates: dynamic area routing, keyboard scrolling list navigation, turn-based combat VM callbacks, AP targeting, and damage fidelity.
+- Phase 109: combat scripting parity — 16 sfall combat opcodes promoted from stub to implemented (0x81CB–0x82C7 range); `combatEvent` onAttack/onDeath hooks; `isWithinPerception` critterFlags bit 2; `force_encounter`/`force_encounter_with_flags`; `set_weapon_knockback` with hex push on hit; `tile_add_blocking`/`tile_remove_blocking` wired into `hexLinecast`; `get_drop_amount`/`set_drop_amount` registry; `set_critter_burst_disable` flag. Full audit pass: 6 hardening fixes (null guards, grid bounds, integer truncation, UID sentinel, Obj sentinel, class name fix).
 
-**Updated gate status:** `READY` — 116 files, 4796 tests passed, tsc clean.
+**Updated gate status:** `READY` — 120 files, 5089 tests passed, tsc clean.
 
