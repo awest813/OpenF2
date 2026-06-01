@@ -36,6 +36,7 @@ import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object
 import { Player } from './player.js'
 import { makePID, loadPRO } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
+import { Lightmap } from './lightmap.js'
 import { fromTileNum, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
@@ -2930,8 +2931,7 @@ export namespace Scripting {
                 ? Math.max(0, Math.min(65536, intensity)) : 0
             const safeDistance = (typeof distance === 'number' && isFinite(distance))
                 ? Math.max(0, distance) : 0
-            obj.lightIntensity = safeIntensity
-            obj.lightRadius = safeDistance
+            Lightmap.syncObjectEmitterLight(obj, safeIntensity, safeDistance)
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {
             log('override_map_start', arguments)
@@ -4749,6 +4749,9 @@ export namespace Scripting {
         // per-object lighting is not modelled separately in the browser build.
         get_object_lighting(obj: Obj): number {
             log('get_object_lighting', arguments)
+            if (obj && typeof obj === 'object') {
+                return Lightmap.getObjectReceivedLight(obj as Obj)
+            }
             return globalState.ambientLightLevel ?? 65536
         }
 
@@ -6473,18 +6476,20 @@ export namespace Scripting {
                 warn('get_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
                 return 0
             }
-            return (obj as any).lightLevel ?? 0
+            const o = obj as Obj
+            return o.lightIntensity ?? o.lightLevel ?? 0
         }
 
         // sfall 0x826E — set_obj_light_level_sfall(obj, level):
         // Set the light emission level of an object (0–65536).
-        // Browser build: stores on obj.lightLevel for get_obj_light_level_sfall reads.
         set_obj_light_level_sfall(obj: Obj, level: number): void {
             if (!isGameObject(obj)) {
                 warn('set_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
                 return
             }
-            (obj as any).lightLevel = Math.max(0, Math.min(65536, level))
+            const safe = (typeof level === 'number' && isFinite(level))
+                ? Math.max(0, Math.min(65536, level)) : 0
+            Lightmap.syncObjectEmitterLight(obj, safe)
         }
 
         // sfall 0x826F — get_elevation_sfall():
@@ -7040,14 +7045,14 @@ export namespace Scripting {
         // sfall 0x82A6 — get_tile_light_level_sfall(tile):
         // Returns the light level (0–65536) at the given tile.  The browser build
         // does not expose per-tile light readback; returns 0.
-        get_tile_light_level_sfall(_tile: number): number {
-            return 0
+        get_tile_light_level_sfall(tile: number): number {
+            return Lightmap.getTileLightLevel(tile)
         }
 
         // sfall 0x82A7 — set_tile_light_level_sfall(tile, level):
-        // Sets the light level at a specific tile.  No-op in the browser build.
-        set_tile_light_level_sfall(_tile: number, _level: number): void {
-            // no-op
+        // Sets the light level at a specific tile (may be overwritten on rebuildLight).
+        set_tile_light_level_sfall(tile: number, level: number): void {
+            Lightmap.setTileLightLevel(tile, level)
         }
 
         // -----------------------------------------------------------------------

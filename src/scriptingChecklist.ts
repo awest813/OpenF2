@@ -3148,10 +3148,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81C3: get_object_lighting(obj) → light level (0–65536). ' +
-            'Partial: returns the global ambient light level as an approximation. ' +
-            'Per-object lighting is not modelled in the browser build. ' +
-            'Prevents unknown-opcode crashes in lighting-aware scripts.',
-        status: 'partial',
+            'Reads Lightmap.tile_intensity at the object tile; falls back to ambient when unplaced.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5888,7 +5886,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x826D: get_obj_light_level_sfall(obj) — return object light emission level (0–65536). ' +
-            'Reads obj.lightLevel; defaults to 0 (no emission).',
+            'Reads lightIntensity (synced with lightLevel).',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -5900,7 +5898,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x826E: set_obj_light_level_sfall(obj, level) — set object light emission level (0–65536). ' +
-            'Clamps to [0, 65536]; stored on obj.lightLevel.',
+            'Syncs lightIntensity/lightLevel and rebuilds the lightmap when floor lighting is enabled.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -6896,8 +6894,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_tile_light_level_82',
         kind: 'opcode',
         description:
-            'sfall 0x82A6: get_tile_light_level_sfall(tile) → 0. ' +
-            'Per-tile light readback not wired to renderer. Always returns 0.',
+            'sfall 0x82A6: get_tile_light_level_sfall(tile) → light at tile (0–65536). ' +
+            'Reads Lightmap.tile_intensity; returns 0 for invalid tiles.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -6907,7 +6905,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_set_tile_light_level_82',
         kind: 'opcode',
         description:
-            'sfall 0x82A7: set_tile_light_level_sfall(tile, level) — no-op in browser build.',
+            'sfall 0x82A7: set_tile_light_level_sfall(tile, level) — writes Lightmap.tile_intensity.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',

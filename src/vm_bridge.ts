@@ -629,7 +629,6 @@ export namespace ScriptVMBridge {
        ,0x81C2: bridged("set_sfall_arg", 2, false) // set_sfall_arg(idx, val) — no-op
 
        // 0x81C3 — get_object_lighting(obj): return the light level received by obj (0–65536).
-       // Partial: returns the global ambient light level.
        ,0x81C3: bridged("get_object_lighting", 1) // get_object_lighting(obj) → light level
 
        // 0x81C4 — get_critter_team(critter): return the team number of a critter.
@@ -1537,8 +1536,8 @@ export namespace ScriptVMBridge {
        // 0x82A5 — get_critter_max_ap_sfall(obj): max AP from stats.
        ,0x82A5: bridged("get_critter_max_ap_sfall", 1) // get_critter_max_ap(obj) → maxAP
 
-       // 0x82A6 — get_tile_light_level_sfall(tile): 0 (no per-tile light readback).
-       ,0x82A6: bridged("get_tile_light_level_sfall", 1) // get_tile_light_level(tile) → 0
+       // 0x82A6 — get_tile_light_level_sfall(tile): light at tile from Lightmap.
+       ,0x82A6: bridged("get_tile_light_level_sfall", 1) // get_tile_light_level(tile) → level
 
        // 0x82A7 — set_tile_light_level_sfall(tile, level): no-op.
        ,0x82A7: bridged("set_tile_light_level_sfall", 2, false) // set_tile_light_level(tile, level)
