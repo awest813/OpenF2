@@ -15,9 +15,10 @@ limitations under the License.
 */
 
 import { hexInDirectionDistance } from "./geometry.js"
+import { Config } from "./config.js"
 import globalState from "./globalState.js"
 import { Obj } from "./object.js"
-import { fromTileNum, setCenterTile, toTileNum } from "./tile.js"
+import { fromTileNum, isValidTileNum, setCenterTile, toTileNum } from "./tile.js"
 
 // Generates a lightmap for floor lighting
 
@@ -28,9 +29,27 @@ import { fromTileNum, setCenterTile, toTileNum } from "./tile.js"
 // moves or the tilemap changes.
 
 export namespace Lightmap {
+    const TILE_LIGHT_MAX = 655
+
+    function tileLevelToScript(raw: number): number {
+        return Math.min(65536, Math.max(0, Math.round((raw / TILE_LIGHT_MAX) * 65536)))
+    }
+
+    function scriptLevelToTile(level: number): number {
+        const safe = Math.max(0, Math.min(65536, level))
+        return Math.max(0, Math.min(TILE_LIGHT_MAX, Math.round((safe / 65536) * TILE_LIGHT_MAX)))
+    }
+
+    function ambientTileBaseline(): number {
+        const ambient = globalState.ambientLightLevel ?? 65536
+        return scriptLevelToTile(ambient)
+    }
+
     function light_reset(): void {
-        for(let i = 0; i < tile_intensity.length; i++)
-            {tile_intensity[i] = 655}
+        const baseline = ambientTileBaseline()
+        for (let i = 0; i < tile_intensity.length; i++) {
+            tile_intensity[i] = baseline
+        }
     }
 
     // Tile lightmap
@@ -561,5 +580,51 @@ export namespace Lightmap {
 
     export function rebuildLight(): void {
         obj_rebuild_all_light()
+    }
+
+    export function getTileLightLevel(tile: number): number {
+        if (!isValidTileNum(tile)) {return 0}
+        return tileLevelToScript(tile_intensity[tile] ?? 0)
+    }
+
+    export function setTileLightLevel(tile: number, level: number): void {
+        if (!isValidTileNum(tile)) {return}
+        const safe = (typeof level === 'number' && isFinite(level))
+            ? Math.max(0, Math.min(65536, level)) : 0
+        tile_intensity[tile] = scriptLevelToTile(safe)
+    }
+
+    export function getObjectReceivedLight(obj: Obj): number {
+        if (!obj?.position
+            || typeof obj.position.x !== 'number' || typeof obj.position.y !== 'number'
+            || !isFinite(obj.position.x) || !isFinite(obj.position.y)) {
+            return globalState.ambientLightLevel ?? 65536
+        }
+        const tile = toTileNum(obj.position)
+        if (!isValidTileNum(tile)) {
+            return globalState.ambientLightLevel ?? 65536
+        }
+        return getTileLightLevel(tile)
+    }
+
+    export function syncObjectEmitterLight(obj: Obj, intensity: number, radius?: number): void {
+        const safe = Math.max(0, Math.min(65536, intensity))
+        obj.lightIntensity = safe
+        obj.lightLevel = safe
+        if (typeof radius === 'number' && isFinite(radius)) {
+            obj.lightRadius = Math.max(0, radius)
+        }
+        if (globalState.gMap) {
+            rebuildLight()
+        }
+    }
+
+    /** Apply globalState.ambientLightLevel to the tile baseline and rebuild object lights. */
+    export function applyAmbientLight(): void {
+        if (globalState.gMap) {
+            rebuildLight()
+        } else {
+            light_reset()
+        }
     }
 }

@@ -557,9 +557,10 @@ describe('Phase 82-E-6 — sfall 0x82A5: get_critter_max_ap_sfall', () => {
 })
 
 describe('Phase 82-E-7 — sfall 0x82A6: get_tile_light_level_sfall', () => {
-    it('returns 0', () => {
-        expect(script.get_tile_light_level_sfall(100)).toBe(0)
-        expect(script.get_tile_light_level_sfall(0)).toBe(0)
+    it('returns default tile intensity for valid tiles', () => {
+        // light_reset() initializes all tiles to 655
+        expect(script.get_tile_light_level_sfall(100)).toBe(65536)
+        expect(script.get_tile_light_level_sfall(0)).toBe(65536)
     })
 
     it('does not throw for invalid tiles', () => {
