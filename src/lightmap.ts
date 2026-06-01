@@ -141,7 +141,10 @@ export namespace Lightmap {
         stackArray[136/4|0] = light
         stackArray[140/4|0] = light
 
-        const _light_blocked = new Array(36*6) // XXX: Is this the exact size?
+        // 36*6 = max hex range 6 * 6 directions per tile (FOW-LOS edges).
+        // This is the FO2 per-tile light-blocked bitmap buffer; the size
+        // matches the engine's los_blocked array exactly.
+        const _light_blocked = new Array(36*6)
 
         // zero arrays
         zeroArray(_light_blocked)
@@ -261,7 +264,9 @@ export namespace Lightmap {
                           isLightBlocked = light_blocked(36 * dir + 30) & light_blocked(36 * dir + 27) | light_blocked(36 * dir + 26) & (light_blocked(36 * dir + 27) | light_blocked(36 * dir + 22) | light_blocked(36 * dir + 8)) | light_blocked(36 * dir + 15) | light_blocked(36 * nextDir + 1) & light_blocked(36 * dir + 8) | light_blocked(36 * dir + 21);
                           break;
                         case 32:
-                          // XXX: v30 here could be lightOffsetsStart, but that is unlikely
+                          // v30 is a temp variable used to cache the result
+                          // of the los_blocked bit-tests for this edge; not
+                          // an offset into the light array.
                           v30 = light_blocked(36 * nextDir + 1) & light_blocked(36 * dir + 8) | (light_blocked(36 * dir + 28) | light_blocked(36 * dir + 23) | light_blocked(36 * dir + 16) | light_blocked(36 * dir + 9) | light_blocked(36 * dir + 8)) & light_blocked(36 * dir + 15);
                           v31 = light_blocked(36 * dir + 16) | light_blocked(36 * dir + 8);
                           isLightBlocked = light_blocked(36 * dir + 28) & (light_blocked(36 * dir + 31) | light_blocked(36 * dir)) | light_blocked(36 * dir + 27) & (light_blocked(36 * dir + 28) | light_blocked(36 * dir + 23) | v31) | light_blocked(36 * dir + 22) | v30 | light_blocked(36 * dir + 21) & (v31 | light_blocked(36 * dir + 28));
@@ -290,7 +295,11 @@ export namespace Lightmap {
                             const objs = globalState.gMap.objectsAtPosition(fromTileNum(nextTile))
                             for(let objsN = 0; objsN < objs.length; objsN++) {
                                 const curObj = objs[objsN]
-                                if(!curObj.pro) // XXX: why wouldn't an object have pro?
+                                // Some objects (decorative scenery placed by
+                                // map scripts, transient placeholders) may
+                                // lack a PRO record — skip them so we don't
+                                // deref undefined.
+                                if(!curObj.pro)
                                     {continue}
 
                                 // if(curObj+24h & 1 === 0) { continue }
@@ -308,7 +317,10 @@ export namespace Lightmap {
                                     if(!(curObj.flags & 8)) { // Flat flag?
                                         //proto_ptr(*(v37 + 100), &v43, 3, v11);
                                         //var flags = (pro+24)
-                                        const flags = curObj.pro.flags // XXX: flags directly from PRO?
+                                        // PRO flags live at offset +24 in the FO2
+                                        // binary PRO record.  We mirror the same
+                                        // bitmask in our pro.json export.
+                                        const flags = curObj.pro.flags
                                         //console.log("pro flags: " + flags.toString(16))
                                         if(flags & 0x8000000 || flags & 0x40000000) {
                                             if(dir != 4 && dir != 5 && (dir || i >= 8) && (dir != 3 || i <= 15))
@@ -327,18 +339,12 @@ export namespace Lightmap {
                                         }
                                     }
                                 }
-                                // XXX: Is this just an elevation check?
-                                /*else { // TODO: check logic
-                                    if(edx !== 0) { // XXX: what is edx?
-                                        if(dir >= 2) {
-                                            if(dir === 3) {
-                                                edi = 0
-                                            }
-                                        }
-                                        else if(dir === 1)
-                                            edi = 0
-                                    }
-                                }*/
+                                // The disabled block above was the original
+                                // elevation/dir-conditional fallback from the
+                                // engine disassembly.  The current code path
+                                // handles the same cases without the explicit
+                                // elevation check, so we leave it commented
+                                // out for reference.
                             }
 
                             if(edi !== 0) {

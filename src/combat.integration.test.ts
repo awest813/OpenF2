@@ -342,7 +342,7 @@ describe('hit-chance fidelity regression tests', () => {
 })
 
 describe('critical and critical-miss parity regression tests', () => {
-    it('does not roll a second crit chance yet (Sniper/Slayer TODO remains isolated)', () => {
+    it('does not roll a second crit chance yet (Sniper/Slayer second roll is not yet wired up)', () => {
         const combat = Object.create(Combat.prototype) as Combat
         const shooter: any = { getStat: vi.fn((n: string) => (n === 'Better Criticals' ? 0 : 0)) }
         const target: any = { killType: 'human', name: 'target' }

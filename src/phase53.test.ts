@@ -467,13 +467,13 @@ describe('Phase 53-E — Checklist entries: all Phase 53 IDs present', () => {
         expect(e?.status).toBe('implemented')
     })
 
-    it('sfall_get_combat_target is partial (no per-critter tracking)', () => {
+    it('sfall_get_combat_target is implemented (reads combatTarget field)', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'sfall_get_combat_target')
-        expect(e?.status).toBe('partial')
+        expect(e?.status).toBe('implemented')
     })
 
-    it('sfall_set_combat_target is partial (no-op in browser build)', () => {
+    it('sfall_set_combat_target is implemented (writes combatTarget field)', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'sfall_set_combat_target')
-        expect(e?.status).toBe('partial')
+        expect(e?.status).toBe('implemented')
     })
 })

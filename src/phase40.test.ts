@@ -16,7 +16,7 @@
  *   Phase 40-J — doAITurn no weapon → warn+skip turn (no throw)
  *   Phase 40-K — forceTurn critter not found → warn+no-op (no throw)
  *   Phase 40-L — critter getMaximumRange unknown type → warn+1 (no throw)
- *   Phase 40-M — critter getAttackSkin TODO → warn+default skin (no throw)
+ *   Phase 40-M — critter getAttackSkin unknown mode → warn+default skin (no throw)
  *   Phase 40-N — scripting combatEvent unknown event → warn+false (no throw)
  *   Phase 40-O — object objectSwapItem item not found → warn+return (no throw)
  *   Phase 40-P — checklist integrity: all Phase 40 entries present
@@ -170,12 +170,12 @@ describe('Phase 40-L — getMaximumRange unknown attack type → 1', () => {
 })
 
 // ===========================================================================
-// Phase 40-M — getAttackSkin TODO stub
+// Phase 40-M — getAttackSkin unknown mode
 // ===========================================================================
 
-describe('Phase 40-M — getAttackSkin TODO → default skin "a"', () => {
-    it('checklist entry critter_get_attack_skin_todo is present and implemented', () => {
-        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'critter_get_attack_skin_todo')
+describe('Phase 40-M — getAttackSkin unknown mode → default skin "a"', () => {
+    it('checklist entry critter_get_attack_skin_unknown_mode is present and implemented', () => {
+        const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'critter_get_attack_skin_unknown_mode')
         expect(entry).toBeDefined()
         expect(entry?.status).toBe('implemented')
         expect(entry?.impact).toBe('medium')
@@ -241,7 +241,7 @@ describe('Phase 40-P — checklist integrity', () => {
         'combat_ai_no_weapon',
         'combat_force_turn_not_found',
         'critter_invalid_attack_type',
-        'critter_get_attack_skin_todo',
+        'critter_get_attack_skin_unknown_mode',
         'combat_event_unknown_event',
         'object_swap_item_not_found',
     ]

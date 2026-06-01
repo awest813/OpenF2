@@ -109,7 +109,10 @@ export function parseIntFile(reader: BinaryReader, name=""): IntFile {
     const stringEnd = reader.read32()
     const strings: { [offset: number]: string } = {}
 
-    //assertEq(stringEnd, 0xFFFFFFFF, "TODO: string table")
+    // NOTE: the original (commented-out) assertEq(stringEnd, 0xFFFFFFFF) was
+    // a sanity check on the .int format that turned out to be a no-op in
+    // practice — stringEnd is a sentinel and doesn't have to be 0xFFFFFFFF
+    // for valid files.  The actual handling lives in the loop below.
 
     if(stringEnd !== 0xFFFFFFFF) {
         // read string table

@@ -19,12 +19,32 @@ import globalState from "./globalState.js"
 
 // Functions handling FO2 prototypes and lookups performed on them
 
-function getPROType(pid: number) {
+export enum PROType {
+    Item = 0,
+    Critter = 1,
+    Scenery = 2,
+    Wall = 3,
+    Tile = 4,
+    Misc = 5,
+}
+
+export type PROTypeName = 'item' | 'critter' | 'scenery' | 'wall' | 'tile' | 'misc'
+
+const PRO_TYPE_NAMES: { [K in PROType]: PROTypeName } = {
+    [PROType.Item]: 'item',
+    [PROType.Critter]: 'critter',
+    [PROType.Scenery]: 'scenery',
+    [PROType.Wall]: 'wall',
+    [PROType.Tile]: 'tile',
+    [PROType.Misc]: 'misc',
+}
+
+function getPROType(pid: number): string {
     const map: { [pid: number]: string } = {0: 'items', 1: 'critters', 2: 'scenery', 3: 'walls', 4: 'tiles', 5: 'misc'}
     return map[(pid >> 24) & 0xff]
 }
 
-export function loadPRO(pid: number, pidID: number) {
+export function loadPRO(pid: number, pidID: number): any | null {
     if(!globalState.proMap)
         {return null}
 
@@ -39,10 +59,8 @@ export function loadPRO(pid: number, pidID: number) {
     return globalState.proMap[type][id]
 }
 
-export function getPROTypeName(type: number) {
-    // singular
-    const map: { [type: number]: string } = {0: 'item', 1: 'critter', 2: 'scenery', 3: 'wall', 4: 'tile', 5: 'misc'}
-    return map[type]
+export function getPROTypeName(type: number): PROTypeName | undefined {
+    return PRO_TYPE_NAMES[type as PROType]
 }
 
 export function getPROSubTypeName(type: number): string {

@@ -117,8 +117,8 @@ beforeEach(() => {
     script = new Scripting.Script()
     drainStubHits()
     // Reset difficulty state between tests
-    delete (globalState as any).gameDifficulty
-    delete (globalState as any).combatDifficulty
+    globalState.gameDifficulty = 1
+    globalState.combatDifficulty = 1
 })
 
 // ---------------------------------------------------------------------------

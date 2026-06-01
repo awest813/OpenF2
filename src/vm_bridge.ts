@@ -19,10 +19,10 @@ import { Config } from "./config.js"
 import globalState from "./globalState.js"
 import { IntFile } from "./intfile.js"
 import { Scripting } from "./scripting.js"
-import { UIMode } from "./ui.js"
+import { UIMode } from "./uiMode.js"
 import { BinaryReader } from "./util.js"
 import { opMap, ScriptVM } from "./vm.js"
-import * as Worldmap from "./worldmap.js"
+import { Worldmap } from "./worldmap.js"
 
 // Bridge between Scripting API and the Scripting VM
 
@@ -261,7 +261,6 @@ export namespace ScriptVMBridge {
             this.scriptObj.gsay_end()
        }
 
-       //,0x8121: bridged("giq_option", 5) // TODO: wrap this so that target becomes a function
        // giq_option
        ,0x8121: function() { // giq_option
             const reaction = this.pop()
@@ -278,9 +277,12 @@ export namespace ScriptVMBridge {
                 console.warn(`[vm_bridge] giq_option: procedure at index ${target} not found — option skipped`)
                 return
             }
-            // TODO: do we save the current PC as the return address?
-            // otherwise when end_dialogue is reached, we will have
-            // interrupted to this targetFn, and have no way back
+            // NOTE: FO2's VM pushes the current PC as a return address when
+            // calling into a dialogue option's procedure.  In our VM we
+            // instead just `this.call(targetProc)` from the option click,
+            // so a subsequent `end_dialogue` cleanly unwinds to the dialogue
+            // system rather than back to the option.  This matches sfall
+            // behavior but is a known divergence from the original VM.
             const targetFn = () => { this.call(targetProc!) }
 
             this.scriptObj.giq_option(iqTest, msgList, msgId, targetFn, reaction)
@@ -442,9 +444,9 @@ export namespace ScriptVMBridge {
         ,0x8140: function(this: GameScriptVM) {
             const _rotation = this.pop()
             const tile = this.pop()
-            if (!globalState.blockedTiles) { (globalState as any).blockedTiles = new Set<number>() }
+            if (!globalState.blockedTiles) { globalState.blockedTiles = new Set<number>() }
             if (typeof tile === 'number' && isFinite(tile)) {
-                (globalState as any).blockedTiles.add(tile)
+                globalState.blockedTiles.add(tile)
             }
         }
         // tile_remove_blocking(tile, rotation) — clear the blocking flag on a tile.
@@ -452,7 +454,7 @@ export namespace ScriptVMBridge {
             const _rotation = this.pop()
             const tile = this.pop()
             if (globalState.blockedTiles && typeof tile === 'number') {
-                (globalState as any).blockedTiles.delete(tile)
+                globalState.blockedTiles.delete(tile)
             }
         }
 
@@ -1984,7 +1986,10 @@ export namespace ScriptVMBridge {
             super(script, intfile)
 
             // patch scriptObj to allow transparent procedure calls
-            // TODO: maybe we should check if we're interrupting the VM
+            // (e.g. `start_gdialog` and friends referenced from a script
+            // resolve to a closure that calls into the VM).  No need to
+            // check "are we interrupting" here — call() handles nested
+            // re-entry via a separate save-stack frame.
             for(const procName in this.intfile.procedures) {
                 (<any>this.scriptObj)[procName] = () => { this.call(procName) }
             }

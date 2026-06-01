@@ -91,7 +91,8 @@ export class AssetStoreImpl {
             const candidate = `${overlay.basePath}/${category}/${relativePath}`
             // We cannot synchronously check existence in a browser, so we return
             // the overlay path and let the caller fall back on 404.
-            // TODO: build an asset manifest at pipeline time for existence checks.
+            // A future build step could emit a JSON manifest of all asset
+            // paths in the overlay so the browser can verify them at boot.
             void candidate
         }
 

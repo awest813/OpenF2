@@ -23,7 +23,7 @@ import globalState from './globalState.js'
 import { Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
-import { uiEndCombat, uiStartCombat, uiLog } from './ui.js'
+import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
 import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
 
 // Turn-based combat system
@@ -171,7 +171,9 @@ export class Combat {
             if (obj instanceof Critter) {
                 if (obj.dead || !obj.visible) {return false}
 
-                // TODO: should we initialize AI elsewhere, like in Critter?
+                // AI is initialised lazily here rather than in Critter to avoid
+                // pulling the combat module into non-combat callers and to skip
+                // the (expensive) AI construction for critters that never fight.
                 if (!obj.isPlayer && !obj.ai) {
                     try { obj.ai = new AI(obj) } catch(e) {
                         console.warn('combat: could not create AI for ' + obj.toString() + ': ' + e)
@@ -420,7 +422,7 @@ export class Combat {
 
         // FO2 combat difficulty: adjusts NPC hit chance. Easy: -20%, Rough: +10%, Hard: +20%.
         if (!obj.isPlayer && target.isPlayer) {
-            const diff = (globalState as any).combatDifficulty ?? 1
+            const diff = globalState.combatDifficulty
             if (diff === 0) {hitChance -= 20}
             else if (diff === 2) {hitChance += 10}
             else if (diff >= 3) {hitChance += 20}
@@ -555,7 +557,7 @@ export class Combat {
 
         // FO2 combat difficulty: adjusts NPC→player damage. 0=wimpy(×0.5), 1=normal(×1), 2=rough(×1.25), 3=hard(×1.5)
         if (target.isPlayer && !obj.isPlayer) {
-            const diff = (globalState as any).combatDifficulty ?? 1
+            const diff = globalState.combatDifficulty
             if (diff === 0) {finalDamage = Math.floor(finalDamage * 0.5)}
             else if (diff === 2) {finalDamage = Math.floor(finalDamage * 1.25)}
             else if (diff >= 3) {finalDamage = Math.floor(finalDamage * 1.5)}
@@ -630,7 +632,7 @@ export class Combat {
 
             // FO2 sfall knockback: if the attacker's weapon has knockbackDist/knockbackChance,
             // push the target away from the attacker.
-            const wep = typeof obj.getEquippedWeapon === 'function' ? obj.getEquippedWeapon() : null
+            const wep = obj.equippedWeapon
             if (wep && (wep as any).knockbackDist && obj.position && target.position) {
                 const dist = Math.max(0, (wep as any).knockbackDist | 0)
                 const chance = Math.min(100, Math.max(0, ((wep as any).knockbackChance ?? 100) | 0))
@@ -880,6 +882,29 @@ export class Combat {
         return false
     }
 
+    playerWalkTo(target: Point, running: boolean): boolean {
+        if (!this.player || !this.player.AP) {return false}
+        if (this.player.AP.getAvailableMoveAP() === 0) {return false}
+
+        const maxDist = this.player.AP.getAvailableMoveAP()
+        if (!this.player.walkTo(target, running, undefined, maxDist)) {
+            return false
+        }
+
+        const moveCost = Math.max(0, this.player.path.path.length - 1)
+        if (!this.player.AP.subtractMoveAP(moveCost)) {
+            console.warn(
+                'playerWalkTo: AP desync — has AP: ' +
+                this.player.AP.getAvailableMoveAP() +
+                ' needs AP: ' + moveCost +
+                ' — forcing AP to 0'
+            )
+            this.player.AP.combat = 0
+            this.player.AP.move = 0
+        }
+        return true
+    }
+
     doAITurn(obj: Critter, idx: number, depth: number): void {
         if (depth > Config.combat.maxAIDepth) {
             console.warn(`Bailing out of ${depth}-deep AI turn recursion`)
@@ -1113,7 +1138,7 @@ export class Combat {
 
     end() {
         // BLK-063: canEndCombat() is called by nextTurn() (numActive===0) and by
-        // the BLK-062 auto-end callback.  The former TODO is now resolved.
+        // the BLK-062 auto-end callback.
 
         // FO2: fire combat_p_proc(COMBAT_SUBTYPE_ENDCOMBAT = 3) on all combatants
         // so scripts can run post-combat cleanup (drop weapons, switch to
@@ -1136,7 +1161,7 @@ export class Combat {
 
         console.log('[end combat]')
         uiLog("Combat ended.")
-        globalState.combat = null // todo: invert control
+        globalState.combat = null
         globalState.inCombat = false
 
         globalState.gMap.updateMap()
@@ -1232,6 +1257,7 @@ export class Combat {
             this.player.stats.acBonus = 0
             this.inPlayerTurn = true
             this.player.AP!.resetAP()
+            uiUpdateCombatHUD()
 
             // FO2 fire DoT: if the player is on fire, take 5-15 fire damage per turn.
             if ((this.player as any).onFire) {

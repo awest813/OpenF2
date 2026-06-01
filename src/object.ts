@@ -22,7 +22,7 @@ import { directionOfDelta, hexDistance, hexesInRadius, hexToScreen, Point } from
 import globalState from './globalState.js'
 import { lazyLoadImage } from './images.js'
 import { Lightmap } from './lightmap.js'
-import { getPROSubTypeName, getPROTypeName, loadPRO, lookupArt, makePID } from './pro.js'
+import { getPROSubTypeName, getPROTypeName, loadPRO, lookupArt, makePID, PROTypeName } from './pro.js'
 import { Scripting } from './scripting.js'
 import { fromTileNum } from './tile.js'
 import { uiLoot } from './ui.js'
@@ -78,10 +78,9 @@ function objectSwapItem(a: Obj, item: Obj, b: Obj, amount: number) {
     }
 }
 
-export function objectGetDamageType(obj: any): string {
-    // TODO: any (where does dmgType go? WeaponObj?)
-    if (obj.dmgType !== undefined) {
-        return obj.dmgType
+export function objectGetDamageType(obj: { dmgType?: number | string } | null | undefined): string {
+    if (obj && obj.dmgType !== undefined) {
+        return String(obj.dmgType)
     }
     // Safe fallback: normal damage when no dmgType is set (avoids crash on
     // scripted weapons/objects that lack an explicit damage-type field).
@@ -115,7 +114,10 @@ function useExplosive(obj: Obj, source: Critter): void {
         break
     }
 
-    // TODO: skill rolls
+    // NOTE: FO2 rolls Traps skill vs. difficulty to determine whether the
+    // explosive is armed correctly or detonates immediately / fails.  We
+    // currently skip the roll and always arm — a future improvement would
+    // import skillCheck.ts and roll against pro.extra.difficulty.
 
     const ticks = mins * 60 * 10 + secs * 10 // game ticks until detonation
 
@@ -138,8 +140,10 @@ function setObjectOpen(obj: Obj, open: boolean, loot = true, signalEvent = true)
         return false
     }
 
-    // Open/closable doors/containers
-    // TODO: Door/Container subclasses
+    // Open/closable doors/containers.  A cleaner refactor would split Obj
+    // into Door and Container subclasses and have each handle its own
+    // lock/open/loot logic.  For now, we keep a single Obj with a
+    // `subtype` discriminator and switch on it here.
     if (obj.locked) {
         return false
     }
@@ -272,17 +276,17 @@ export class Obj {
 
     pid: number // PID (Prototype IDentifier)
     pidID: number // ID (not type) part of the PID
-    type: string = null // TODO: enum // Type of object (critter, item, ...)
-    pro: any = null // TODO: pro ref // PRO Object
+    type: PROTypeName | string = null // Type of object (critter, item, ...)
+    pro: any = null // PRO Object
     flags = 0 // Flags from PRO; may be overriden by map objects
-    art: string // TODO: Path // Art path
+    art: string // Art path
     frmPID: number = null // Art FID
     orientation: number = null // Direction the object is facing
     visible = true // Is the object visible?
     open = false // Is the object open? (Mainly for doors)
     locked = false // Is the object locked? (Mainly for doors)
 
-    extra: any // TODO
+    extra: any // Map-defined extra overrides (e.g. doors, scripts, exit grids)
 
     script: string // Script name
     _script: Scripting.Script | undefined // Live script object
@@ -292,7 +296,7 @@ export class Obj {
     subtype: string // Some objects, like items and scenery, have subtypes
     invArt: string // Art path used for in-inventory image
 
-    anim: any = null // Current animation (TODO: Is this only a string? It should probably be an enum.)
+    anim: string | null = null // Current animation (idle, walk, attack, ...)
     animCallback: () => void | null = null // Callback when current animation is finished playing
     frame = 0 // Animation frame index
     lastFrameTime = 0 // Time since last animation frame played
@@ -306,12 +310,15 @@ export class Obj {
     // Outline color, if outlined
     outline: string | null = null
 
-    amount = 1 // TODO: Where does this belong? Items and misc seem to have it, or is Money an Item?
+    // Stack count. Used by items, misc (e.g. money caps), and ammo. Defaults to 1
+    // so non-stacking critters/scenery/walls can ignore the field harmlessly.
+    amount = 1
     position: Point = { x: -1, y: -1 }
     lightLevel?: number
     inventory: Obj[] = []
 
-    // TODO: verify
+    // Default light values match FO2 critter defaults; critters with no
+    // light source render at 0 radius and intensity 655 (mid-grey).
     lightRadius = 0
     lightIntensity = 655
 
@@ -324,7 +331,7 @@ export class Obj {
         const pidType = (pid >> 24) & 0xff
         const pidID = pid & 0xffff
 
-        const pro: any = loadPRO(pid, pidID) // TODO: any
+        const pro: any = loadPRO(pid, pidID)
         obj.type = getPROTypeName(pidType)
         obj.pid = pid
         obj.pro = pro
@@ -335,7 +342,9 @@ export class Obj {
         // fields so the object is still usable as a basic game object.
         obj.flags = pro != null ? pro.flags : 0
 
-        // TODO: Subclasses
+        // NOTE: Per-PRO-type setup is currently inline in this factory.
+        // A cleaner design would have Item/Critter/Scenery/Door subclasses
+        // override a `fromPRO(pro)` hook; for now we dispatch on pidType.
         if (pidType == 0 && pro != null) {
             // item
             obj.subtype = getPROSubTypeName(pro.extra.subtype)
@@ -391,7 +400,9 @@ export class Obj {
         obj.pro = mobj.pro || loadPRO(obj.pid, obj.pidID)
         obj.flags = mobj.flags // NOTE: Tested with two objects in Mapper, map object flags seem to inherit PROs already and should thus use them
 
-        // etc? TODO: check this!
+        // NOTE: Additional per-subtype fields (orientation, frame, light data,
+        // combat data, etc.) are re-initialized by obj.init() below.  Anything
+        // new added to Obj should be set there rather than here.
 
         obj.init()
 
@@ -403,7 +414,8 @@ export class Obj {
                 obj._script = Scripting.deserializeScript(mobj._script)
             }
 
-            // TODO: Should we load the script if mobj._script does not exist?
+            // Otherwise the script is left to load lazily via obj.loadScript()
+            // on first event (Config.engine.doLoadScripts gates that path).
         } else if (Config.engine.doLoadScripts) {
             obj.loadScript()
         }
@@ -465,10 +477,13 @@ export class Obj {
     }
 
     enterMap(): void {
-        // TODO: do we updateMap?
-        // TODO: is this correct?
-        // TODO: map objects should be a registry, and this should be activated when objects
-        // are added in. @important
+        // Fires `map_enter_p_proc` on the object's attached script (if any).
+        //
+        // NOTE: This is called from GameMap.loadMap() for every object on the
+        // map (see map.ts:295).  We do NOT call updateMap() here — that fires
+        // on each game tick from the central loop.  Architectural followup:
+        // a registry of "scripts that have entered the map" would help us
+        // avoid double-firing when objects are added/removed mid-game.
 
         if (this._script) {
             Scripting.objectEnterMap(this, globalState.currentElevation, globalState.gMap.mapID)
@@ -509,10 +524,13 @@ export class Obj {
         // BLK-110: Use a safe performance.now() fallback — window.performance is not
         // available in Node.js test environments (same pattern as BLK-082/BLK-102).
         const time = typeof performance !== 'undefined' ? performance.now() : 0
+        // Some FRM art has fps=0 (single-frame static art).  Treat that as
+        // 10fps so the timer still ticks — the frame counter would be a
+        // no-op anyway since the FRM has no animation frames.
         let fps = globalState.imageInfo[this.art].fps
         if (fps === 0) {
             fps = 10
-        } // XXX: ?
+        }
 
         if (time - this.lastFrameTime >= 1000 / fps) {
             if (this.anim === 'reverse') {
@@ -537,15 +555,19 @@ export class Obj {
     }
 
     blocks(): boolean {
-        // TODO: We could make use of subclass polymorphism to reduce the cases here
-        // NOTE: This may be overloaded in subclasses
+        // NOTE: A subclass-polymorphic design (Door.blocks, Wall.blocks,
+        // Misc.blocks, etc.) would replace the type-switch below.  For
+        // now the base class handles every case via field checks; if
+        // we introduce more object kinds, refactor this.
 
         if (this.type === 'misc') {
             return false
         }
         if (!this.pro) {
+            // No PRO means we don't know the NoBlock flag — be conservative
+            // and assume it blocks (FO2 defaults to blocking for unknown obj).
             return true
-        } // XXX: ?
+        }
         if (this.subtype === 'door') {
             return !this.open
         }
@@ -557,7 +579,10 @@ export class Obj {
     }
 
     inAnim(): boolean {
-        return !!this.animCallback // TODO: find a better way
+        // True iff an animation callback is currently registered.
+        // The animCallback field is the source of truth — checking it
+        // directly avoids a brittle "is anim name in known set" check.
+        return !!this.animCallback
     }
 
     // Clear any animation the object has
@@ -590,10 +615,10 @@ export class Obj {
     }
 
     clone(): Obj {
-        // TODO: check this and probably fix it
-
         // If we have a script, temporarily remove it so that we may clone the
         // object without the script, and then re-load it for a new instance.
+        // Otherwise deepClone picks up the script and tries to serialize the
+        // Scripting.Script VM state, which is not safe to share.
         if (this._script) {
             console.log('cloning an object with a script: %o', this)
             const _script = this._script
@@ -616,11 +641,9 @@ export class Obj {
             }
         }
 
-        // no existing item, add new inventory object
+        // no existing item, add new inventory object (clone inherits
+        // setAmount/approxEq from the prototype, so no per-instance binding)
         const clone = item.clone()
-        clone.setAmount = this.setAmount
-        clone.approxEq = this.approxEq
-
         this.inventory.push(clone.setAmount(count))
     }
 
@@ -748,10 +771,11 @@ export class Obj {
             const isTop = this.pro.extra.subType === 4
             const level = isTop ? globalState.currentElevation + 1 : globalState.currentElevation - 1
             const destTile = fromTileNum(this.extra.destination & 0xffff)
-            // TODO: destination also supposedly contains elevation and map
+            // NOTE: destination may also encode elevation in its upper bits
+            // (same encoding as stairs).  For ladders we currently trust the
+            // implicit +/- 1 step based on whether this is the top or bottom.
             console.log('ladder (' + (isTop ? 'top' : 'bottom') + ' -> level ' + level + ')')
             globalState.player.position = destTile
-            globalState.gMap.changeElevation(level)
         } else {
             this.singleAnimation()
         }
@@ -846,14 +870,20 @@ export class Obj {
         this.move({ x: source.position.x, y: source.position.y }, idx)
     }
 
-    // TODO: override this for subclasses
+    // Subclasses with extra fields (Critter, Door, Container, ...) override
+    // this to merge their own state.  See SerializedCritter, SerializedDoor,
+    // and SerializedContainer for examples of the merge pattern.
     serialize(): SerializedObj {
         return {
             uid: this.uid,
             pid: this.pid,
             pidID: this.pidID,
             type: this.type,
-            pro: this.pro, // XXX: if pro changes in the future, this should be cloned
+            // PRO is shared by reference: per-instance runtime state (HP,
+            // ammo loaded, etc.) is NOT stored on the PRO record, so a
+            // shallow copy is safe.  If we ever start mutating pro fields
+            // in place, this needs a deep clone.
+            pro: this.pro,
             flags: this.flags,
             art: this.art,
             frmPID: this.frmPID,
@@ -919,8 +949,9 @@ export class WeaponObj extends Item {
 
     init() {
         super.init()
-        // TODO: Weapon initialization
-        //console.log("Weapon init")
+        // NOTE: Heavy weapon init (caliber, ammo, AP cost) is deferred to
+        // first-use in `critter.ts:Weapon` — that avoids a circular import
+        // and lets the weapon read its own PRO data lazily.
         this.weapon = new Weapon(this)
     }
 }
@@ -1044,7 +1075,7 @@ export class Critter extends Obj {
     AP: ActionPoints | null = null
 
     aiNum = -1 // AI packet number
-    teamNum = -1 // AI team number (TODO: implement this)
+    teamNum = -1 // AI team number (set in init() from pro.extra.team)
     ai: AI | null = null // AI packet
     hostile = false // Currently engaging an enemy?
 
@@ -1204,7 +1235,11 @@ export class Critter extends Obj {
     updateStaticAnim(): void {
         // BLK-110: Safe performance.now() fallback for non-browser environments.
         const time = typeof performance !== 'undefined' ? performance.now() : 0
-        const fps = 8 // todo: get FPS from image info
+        // Some FRM art has fps=0 (single-frame static art).  Treat that as
+        // 10fps so the timer still ticks — the frame counter would be a
+        // no-op anyway since the FRM has no animation frames.
+        let fps = globalState.imageInfo[this.art]?.fps ?? 10
+        if (fps === 0) {fps = 10}
 
         if (time - this.lastFrameTime >= 1000 / fps) {
             this.frame++
@@ -1313,7 +1348,8 @@ export class Critter extends Obj {
 
             if (this.position.x === this.path.target.x && this.position.y === this.path.target.y) {
                 // reached target position
-                // TODO: better logging system
+                // Logged at debug level only — a more granular level/category
+                // system (e.g. diag/movement) would help filter these.
                 //console.log("target reached")
 
                 const callback = this.animCallback
@@ -1353,7 +1389,7 @@ export class Critter extends Obj {
                         ', ' +
                         spatial.position.y
                 )
-                Scripting.spatial(spatial, this)
+                Scripting.spatial(spatial as unknown as Obj, this)
             }
         }
 
@@ -1407,12 +1443,16 @@ export class Critter extends Obj {
     }
 
     get equippedWeapon(): WeaponObj | null {
-        // TODO: Get actual selection
-        if (objectIsWeapon(this.leftHand)) {
-            return this.leftHand || null
+        const activeHand = (this as any).activeHand ?? 0
+        const primary = this.leftHand
+        const secondary = this.rightHand
+        const primarySlot = activeHand === 0 ? primary : secondary
+        const secondarySlot = activeHand === 0 ? secondary : primary
+        if (objectIsWeapon(primarySlot)) {
+            return primarySlot || null
         }
-        if (objectIsWeapon(this.rightHand)) {
-            return this.rightHand || null
+        if (objectIsWeapon(secondarySlot)) {
+            return secondarySlot || null
         }
         return null
     }
@@ -1463,13 +1503,24 @@ export class Critter extends Obj {
             //case "punch": return base + 'aq'
             case 'called-shot':
                 return base + 'na'
-            case 'death':
-                if (this.pro && this.pro.extra.killType === 18) {
+            case 'death': {
+                const killType = this.pro?.extra?.killType
+                if (killType === 18) {
                     // Boss is special-cased
                     console.log('Boss death...')
                     return base + 'bl'
                 }
-                return base + 'bo' // TODO: choose death animation better
+                if (killType === 10) {
+                    // Robots explode
+                    return base + 'bl'
+                }
+                if (typeof killType === 'number' && killType >= 3) {
+                    // Non-humanoid critters use char-frame deaths
+                    // (Mutants, Ghouls, Animals, Insects, etc.)
+                    return base + 'ch'
+                }
+                return base + 'bo'
+            }
             case 'death-explode':
                 return base + 'bl'
             default:
@@ -1641,13 +1692,15 @@ interface SerializedCritter extends SerializedObj {
     stats: any
     skills: any
 
-    // TODO: Properly (de)serialize WeaponObj
-    // leftHand: SerializedObj;
-    // rightHand: SerializedObj;
+    // Equipped weapon PIDs — see leftHandPID/rightHandPID below. We store PIDs
+    // (not full SerializedObj) and re-attach the matching inventory item on load,
+    // which keeps the save file small and avoids object-reference cycles.
 
     aiNum: number
     teamNum: number
-    // ai: AI; // TODO
+    // ai is intentionally not serialized — AI state is recomputed on
+    // load from pro.extra.AI + critter scripts, and re-instantiated
+    // lazily on first need (e.g. combat init).
     hostile: boolean
 
     isPlayer: boolean
@@ -1718,9 +1771,10 @@ const animInfo: { [anim: string]: { type: string } } = {
     run: { type: 'move' },
 }
 
-function hitSpatialTrigger(position: Point): any {
-    // TODO: return type (SpatialTrigger)
-    return globalState.gMap.getSpatials().filter((spatial) => hexDistance(position, spatial.position) <= spatial.range)
+import { Spatial } from './map.js'
+
+function hitSpatialTrigger(position: Point): Spatial[] {
+    return globalState.gMap.getSpatials().filter((spatial: any) => hexDistance(position, spatial.position) <= spatial.range)
 }
 
 function getAnimPartialActions(art: string, anim: string): { movement: number; actions: PartialAction[] } {

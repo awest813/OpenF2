@@ -19,12 +19,20 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 export const TILE_WIDTH = 80
 export const TILE_HEIGHT = 36
 
+/** Map grid is 200×200 squares (Fallout 2 engine standard). */
+export const MAP_GRID_SIZE = 200
+
+/** Returns true when the tile index falls within the 200×200 map grid. */
+export function isValidTileNum(tile: number): boolean {
+    return typeof tile === 'number' && isFinite(tile) && tile >= 0 && tile < MAP_GRID_SIZE * MAP_GRID_SIZE
+}
+
 export function toTileNum(position: Point): number {
-    return position.y * 200 + position.x
+    return position.y * MAP_GRID_SIZE + position.x
 }
 
 export function fromTileNum(tile: number): Point {
-    return { x: tile % 200, y: (tile / 200) | 0 }
+    return { x: tile % MAP_GRID_SIZE, y: (tile / MAP_GRID_SIZE) | 0 }
 }
 
 export function tileToScreen(x: number, y: number): Point {
@@ -75,10 +83,8 @@ export function setCenterTile() {
 // tile_coord(0x5018) should be (230, 304)
 
 function tile_coord(tileNum: number): Point | null {
-    if (tileNum < 0 || tileNum >= 200 * 200) {return null}
+    if (!isValidTileNum(tileNum)) {return null}
 
-    //var tile_x = 0x62 // todo: ?
-    //var tile_y = 0x64 // todo: ?
     setCenterTile()
     const tile_x = /*199 -*/ globalState.centerTile.x
     const tile_y = globalState.centerTile.y
@@ -94,7 +100,10 @@ function tile_coord(tileNum: number): Point | null {
 
     const v5 = Math.floor((v3 - tile_x) / -2)
 
-    a2 += 48 * Math.ceil((v3 - tile_x) / 2) // TODO: ceil, round or floor?
+    // For odd values of (v3 - tile_x), Math.ceil and Math.floor differ by 1.
+    // We use ceil here to match the original disassembly in engine.s which
+    // computes hex-grid x-offsets by rounding toward the upper hex.
+    a2 += 48 * Math.ceil((v3 - tile_x) / 2)
     a3 += 12 * v5
 
     if (v3 & 1) {
@@ -112,16 +121,15 @@ function tile_coord(tileNum: number): Point | null {
 
     return { x: a2, y: a3 }
 }
-/*
+/* previous implementation (kept for reference):
 function tile_coord(tileNum: number): Point {
-  if(tileNum < 0 || tileNum >= 200*200)
-      return null
+  if(tileNum < 0 || tileNum >= 200*200) return null
 
-  var tile_x = 0x62 // todo: ? this seems to be the same as tile_offx right now
-  var tile_y = 0x64 // same, but for tile_offy
+  var tile_x = 0x62 // appears to equal tile_offx
+  var tile_y = 0x64 // appears to equal tile_offy
 
-  var a2 = tile_x // x (normally this would be cameraX aka tile_offx)
-  var a3 = tile_y // y (normally this would be cameraY aka tile_offy)
+  var a2 = tile_x
+  var a3 = tile_y
 
   var v3 = 200 - 1 - tileNum % 200
   var v4 = Math.floor(tileNum / 200)

@@ -23,7 +23,7 @@ import { lazyLoadImage } from './images.js'
 import { Obj } from './object.js'
 import { tileFromScreen } from './tile.js'
 import { Config } from './config.js'
-import { WindowFrame } from './ui.js'
+import { WindowFrame } from './widgets.js'
 import { Font } from './formats/fon.js'
 
 // Abstract game renderer

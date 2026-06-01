@@ -25,290 +25,27 @@ import { formatSaveDate, load, save, SaveGame, saveList } from './saveload.js'
 import { Scripting } from './scripting.js'
 import { Skills } from './skills.js'
 import { fromTileNum } from './tile.js'
+import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl, ElementOptions } from './dom.js'
+import { CSSBoundingBox, Widget, WindowFrame, SmallButton, Label, List, ListItem } from './widgets.js'
 import { pad } from './util.js'
 import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
 import { Point } from './geometry.js'
 import { lazyLoadImage } from './images.js'
 import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
+import { xpForLevel } from './ecs/derivedStats.js'
+import { UIMode } from './uiMode.js'
 
 // UI system
 
-let playerUseHandler: () => void = () => {}
+let playerUseHandler: (obj?: Obj) => void = () => {}
 
-export function setPlayerUseHandler(handler: () => void): void {
+export function setPlayerUseHandler(handler: (obj?: Obj) => void): void {
     playerUseHandler = handler
 }
 
-// TODO: reduce code duplication, circular references,
-//       and general badness/unmaintainability.
-// TODO: combat UI on main bar
-// TODO: stats/info view in inventory screen
-// TODO: fix inventory image size
-// TODO: fix style for inventory image amount
-// TODO: option for scaling the UI
-
-// Bounding box that accepts strings as well as numbers
-export interface CSSBoundingBox {
-    x: number | string
-    y: number | string
-    w: number | string
-    h: number | string
-}
-
-export class WindowFrame {
-    children: Widget[] = []
-    elem: HTMLElement
-    showing = false
-
-    constructor(
-        public background: string,
-        public position: Point,
-        public width: number,
-        public height: number,
-        children?: Widget[]
-    ) {
-        this.elem = document.createElement('div')
-
-        Object.assign(this.elem.style, {
-            position: 'absolute',
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            width: `${width}px`,
-            height: `${height}px`,
-            backgroundImage: `url('${background}')`,
-        })
-
-        if (children) {
-            for (const child of children) {
-                this.add(child)
-            }
-        }
-    }
-
-    add(widget: Widget): this {
-        this.children.push(widget)
-        this.elem.appendChild(widget.elem)
-        return this
-    }
-
-    show(): this {
-        if (this.showing) {
-            return this
-        }
-        this.showing = true
-        // $uiContainer.appendChild(this.elem)
-        return this
-    }
-
-    close(): void {
-        if (!this.showing) {
-            return
-        }
-        this.showing = false
-        // this.elem.parentNode!.removeChild(this.elem)
-    }
-
-    toggle(): this {
-        if (this.showing) {
-            this.close()
-        } else {
-            this.show()
-        }
-        return this
-    }
-}
-export class Widget {
-    elem: HTMLElement
-    hoverBackground: string | null = null
-    mouseDownBackground: string | null = null
-
-    constructor(public background: string | null, public bbox: CSSBoundingBox) {
-        this.elem = document.createElement('div')
-
-        Object.assign(this.elem.style, {
-            position: 'absolute',
-            left: `${bbox.x}px`,
-            top: `${bbox.y}px`,
-            width: `${bbox.w}px`,
-            height: `${bbox.h}px`,
-            backgroundImage: background && `url('${background}')`,
-        })
-    }
-
-    onClick(fn: (widget?: Widget) => void): this {
-        this.elem.onclick = () => {
-            fn(this)
-        }
-        return this
-    }
-
-    hoverBG(background: string): this {
-        this.hoverBackground = background
-
-        if (!this.elem.onmouseenter) {
-            // Set up events for hovering/not hovering
-            this.elem.onmouseenter = () => {
-                this.elem.style.backgroundImage = `url('${this.hoverBackground}')`
-            }
-            this.elem.onmouseleave = () => {
-                this.elem.style.backgroundImage = `url('${this.background}')`
-            }
-        }
-
-        return this
-    }
-
-    mouseDownBG(background: string): this {
-        this.mouseDownBackground = background
-
-        if (!this.elem.onmousedown) {
-            // Set up events for mouse down/up
-            this.elem.onmousedown = () => {
-                this.elem.style.backgroundImage = `url('${this.mouseDownBackground}')`
-            }
-            this.elem.onmouseup = () => {
-                this.elem.style.backgroundImage = `url('${this.background}')`
-            }
-        }
-
-        return this
-    }
-
-    css(props: object): this {
-        Object.assign(this.elem.style, props)
-        return this
-    }
-}
-export class SmallButton extends Widget {
-    constructor(x: number, y: number) {
-        super('art/intrface/lilredup.png', { x, y, w: 15, h: 16 })
-        this.mouseDownBG('art/intrface/lilreddn.png')
-    }
-}
-
-export class Label extends Widget {
-    constructor(x: number, y: number, text: string, public textColor: string = 'yellow') {
-        super(null, { x, y, w: 'auto', h: 'auto' })
-        this.setText(text)
-        this.elem.style.color = this.textColor
-    }
-
-    setText(text: string): void {
-        this.elem.innerHTML = text
-    }
-}
-
-interface ListItem {
-    id?: any // identifier userdata
-    uid?: number // unique identifier (filled in by List)
-    text: string
-    onSelected?: () => void
-}
-
-// TODO: disable-selection class
-export class List extends Widget {
-    items: ListItem[] = []
-    itemSelected?: (item: ListItem) => void
-    currentlySelected: ListItem | null = null
-    currentlySelectedElem: HTMLElement | null = null
-    _lastUID = 0
-
-    constructor(
-        bbox: CSSBoundingBox,
-        items?: ListItem[],
-        public textColor: string = '#00FF00',
-        public selectedTextColor: string = '#FCFC7C'
-    ) {
-        super(null, bbox)
-        this.elem.style.color = this.textColor
-
-        if (items) {
-            for (const item of items) {
-                this.addItem(item)
-            }
-        }
-    }
-
-    onItemSelected(fn: (item: ListItem) => void): this {
-        this.itemSelected = fn
-        return this
-    }
-
-    getSelection(): ListItem | null {
-        return this.currentlySelected
-    }
-
-    // Select the given item (and optionally, give its element for performance reasons)
-    select(item: ListItem, itemElem?: HTMLElement): boolean {
-        if (!itemElem) {
-            // Find element belonging to this item
-            itemElem = this.elem.querySelector(`[data-uid="${item.uid}"]`) as HTMLElement
-        }
-
-        if (!itemElem) {
-            console.warn(`Can't find item's element for item UID ${item.uid}`)
-            return false
-        }
-
-        this.itemSelected && this.itemSelected(item)
-
-        item.onSelected && item.onSelected()
-
-        if (this.currentlySelectedElem) {
-            // Reset text color for old selection
-            this.currentlySelectedElem.style.color = this.textColor
-        }
-
-        // Use selection color for new selection
-        itemElem.style.color = this.selectedTextColor
-
-        this.currentlySelected = item
-        this.currentlySelectedElem = itemElem
-
-        return true
-    }
-
-    // Select item given by its id
-    selectId(id: any): boolean {
-        const item = this.items.filter((item) => item.id === id)[0]
-        if (!item) {
-            return false
-        }
-        this.select(item)
-        return true
-    }
-
-    addItem(item: ListItem): ListItem {
-        item.uid = this._lastUID++
-        this.items.push(item)
-
-        const itemElem = document.createElement('div')
-        itemElem.style.cursor = 'pointer'
-        itemElem.textContent = item.text
-        itemElem.setAttribute('data-uid', item.uid + '')
-        itemElem.onclick = () => {
-            this.select(item, itemElem)
-        }
-        this.elem.appendChild(itemElem)
-
-        // Select first item added
-        if (!this.currentlySelected) {
-            this.select(item)
-        }
-
-        return item
-    }
-
-    clear(): void {
-        this.items.length = 0
-
-        const node = this.elem
-        while (node.firstChild) {
-            node.removeChild(node.firstChild)
-        }
-    }
-}
+// NOTE: UIMode moved to src/uiMode.ts, DOM helpers to src/dom.ts, widget classes to src/widgets.ts,
+//       shared uiDragMove extracted from barter/loot handlers, inventory stats view, UI scaling option
 // Container that all of the top-level UI elements reside in
 let $uiContainer: HTMLElement
 
@@ -367,7 +104,11 @@ function initCharacterScreen() {
         640,
         480
     )
-        .add(new SmallButton(455, 454))
+        .add(new SmallButton(455, 454).onClick(() => {
+            globalState.player.stats = newStatSet
+            globalState.player.skills = newSkillSet
+            characterWindow.close()
+        }))
         .add(new Label(455 + 18, 454, 'Done'))
         .add(
             new SmallButton(552, 454).onClick(() => {
@@ -402,8 +143,6 @@ function initCharacterScreen() {
         .add(skillList)
         .show()
 
-    // TODO: Move these constants to their proper place
-
     const skills = [
         'Small Guns',
         'Big Guns',
@@ -427,23 +166,21 @@ function initCharacterScreen() {
 
     const stats = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK']
 
-    // TODO: Use a list of widgets or something for stats instead of this hack
     const statWidgets: Label[] = []
 
     let selectedStat = stats[0]
+    const STAT_ROW_HEIGHT = 33
 
-    let n = 0
-    for (const stat of stats) {
-        const widget = new Label(20, 39 + n, '').css({ background: 'black', padding: '5px' })
+    for (let i = 0; i < stats.length; i++) {
+        const stat = stats[i]
+        const widget = new Label(20, 39 + i * STAT_ROW_HEIGHT, '').css({ background: 'black', padding: '5px' })
         widget.onClick(() => {
             selectedStat = stat
         })
         statWidgets.push(widget)
         characterWindow.add(widget)
-        n += 33
     }
 
-    // TODO: (Re-)run this after window is shown / a level-up is invoked
     const newStatSet = globalState.player.stats.clone()
     const newSkillSet = globalState.player.skills.clone()
 
@@ -453,7 +190,7 @@ function initCharacterScreen() {
 
     const redrawStatsSkills = () => {
         // Draw skills
-        skillList.clear() // TODO: setItemText or something
+        skillList.clear()
 
         for (const skill of skills) {
             skillList.addItem({ text: `${skill} ${newSkillSet.get(skill, newStatSet)}%`, id: skill })
@@ -471,8 +208,8 @@ function initCharacterScreen() {
 
     redrawStatsSkills()
 
-    const isLevelUp = true // TODO
-    const canChangeStats = true // TODO
+    const isLevelUp = globalState.playerPerksOwed > 0 || newSkillSet.skillPoints > 0
+    const canChangeStats = false
 
     if (isLevelUp) {
         const modifySkill = (inc: boolean) => {
@@ -550,111 +287,41 @@ function initCharacterScreen() {
     }
 }
 
-export enum UIMode {
-    none = 0,
-    dialogue = 1,
-    barter = 2,
-    loot = 3,
-    inventory = 4,
-    worldMap = 5,
-    elevator = 6,
-    calledShot = 7,
-    skilldex = 8,
-    useSkill = 9,
-    contextMenu = 10,
-    saveLoad = 11,
-    char = 12,
-}
 
-// XXX: Should this throw if the element doesn't exist?
-function $id(id: string): HTMLElement {
-    return document.getElementById(id)!
-}
 
-function $img(id: string): HTMLImageElement {
-    return document.getElementById(id) as HTMLImageElement
-}
+// NOTE: DOM helpers ($id, makeEl, clearEl, showv, hidev, etc.) moved to src/dom.ts
 
-function $q(selector: string): HTMLElement {
-    return document.querySelector(selector) as HTMLElement
-}
-
-function $qa(selector: string): HTMLElement[] {
-    return Array.from(document.querySelectorAll(selector))
-}
-
-function clearEl($el: HTMLElement): void {
-    $el.innerHTML = ''
-}
-
-function show($el: HTMLElement): void {
-    $el.style.display = 'block'
-}
-
-function hide($el: HTMLElement): void {
-    $el.style.display = 'none'
-}
-
-// TODO: Examine if we actually need visibility or we can replace them all with show/hide
-export function showv($el: HTMLElement): void {
-    $el.style.visibility = 'visible'
-}
-
-export function hidev($el: HTMLElement): void {
-    $el.style.visibility = 'hidden'
-}
-
-function off($el: HTMLElement, events: string): void {
-    const eventList = events.split(' ')
-    for (const event of eventList) {
-        (<any>$el)['on' + event] = null
-    }
-}
-
-function appendHTML($el: HTMLElement, html: string): void {
-    $el.insertAdjacentHTML('beforeend', html)
-}
-
-interface ElementOptions {
-    id?: string
-    src?: string
-    classes?: string[]
-    click?: (e: MouseEvent) => void
-    style?: { [key in keyof CSSStyleDeclaration]?: string }
-    children?: HTMLElement[]
-    attrs?: { [key: string]: string | number }
-}
-
-export function makeEl(tag: string, options: ElementOptions): HTMLElement {
-    const $el = document.createElement(tag)
-
-    if (options.id !== undefined) {
-        $el.id = options.id
-    }
-    if (options.src !== undefined) {
-        ($el as HTMLImageElement).src = options.src
-    }
-    if (options.classes !== undefined) {
-        $el.className = options.classes.join(' ')
-    }
-    if (options.click !== undefined) {
-        $el.onclick = options.click
-    }
-    if (options.style !== undefined) {
-        Object.assign($el.style, options.style)
-    }
-    if (options.children !== undefined) {
-        for (const child of options.children) {
-            $el.appendChild(child)
-        }
-    }
-    if (options.attrs !== undefined) {
-        for (const prop in options.attrs) {
-            $el.setAttribute(prop, options.attrs[prop] + '')
+function drawInventory($el: HTMLElement, objects: Obj[], prefix: string, options?: {
+    clickCallback?: (item: Obj, e: MouseEvent) => void
+    extraClearEls?: string[]
+    onDragEnd?: () => void
+}): void {
+    clearEl($el)
+    if (options?.extraClearEls) {
+        for (const id of options.extraClearEls) {
+            clearEl($id(id))
         }
     }
 
-    return $el
+    for (let i = 0; i < objects.length; i++) {
+        const obj = objects[i]
+        const img = makeEl('img', {
+            src: obj.invArt + '.png',
+            attrs: { width: 64, height: 49, title: obj.name },
+            style: { display: 'block', imageRendering: 'pixelated' },
+            click: options?.clickCallback
+                ? (e: MouseEvent) => { options.clickCallback!(obj, e) }
+                : undefined,
+        })
+        $el.appendChild(img)
+        const amountEl = makeEl('span', {
+            classes: ['inventoryAmount'],
+            style: { color: '#00FF00', fontSize: '8pt', display: 'block', textAlign: 'center', marginTop: '-4px' },
+        })
+        amountEl.textContent = 'x' + obj.amount
+        $el.appendChild(amountEl)
+        makeDraggable(img, prefix + i, options?.onDragEnd)
+    }
 }
 
 export function initUI() {
@@ -715,7 +382,15 @@ export function initUI() {
             return
         }
         if (globalState.inCombat) {
-            // TODO: targeting reticle for attacks
+            // Toggle targeting cursor — next click on a critter will attack
+            const $canvas = document.getElementById('cnv')
+            if ($canvas) {
+                if ($canvas.style.cursor === 'crosshair') {
+                    $canvas.style.cursor = 'default'
+                } else {
+                    $canvas.style.cursor = 'crosshair'
+                }
+            }
         } else {
             // begin combat
             Combat.start()
@@ -816,7 +491,7 @@ export function uiContextMenu(obj: Obj, evt: any) {
             uiLog('You see: ' + obj.getDescription())
         }
     })
-    const useBtn = button(obj, 'use', () => playerUseHandler()) // TODO: playerUse should take an object
+    const useBtn = button(obj, 'use', () => playerUseHandler(obj))
     const talkBtn = button(obj, 'talk', () => {
         console.log('talking to ' + obj.name)
         if (!obj._script) {
@@ -841,6 +516,7 @@ export function uiContextMenu(obj: Obj, evt: any) {
 export function uiStartCombat() {
     // play end container animation
     Object.assign($id('endContainer').style, { animationPlayState: 'running', webkitAnimationPlayState: 'running' })
+    uiUpdateCombatHUD()
 }
 
 export function uiEndCombat() {
@@ -850,6 +526,45 @@ export function uiEndCombat() {
     // disable buttons
     hidev($id('endTurnButton'))
     hidev($id('endCombatButton'))
+
+    // clear combat AP display and targeting cursor
+    uiUpdateCombatHUD()
+    const $canvas = document.getElementById('cnv')
+    if ($canvas) {
+        $canvas.style.cursor = 'default'
+    }
+}
+
+export function uiUpdateCombatHUD() {
+    if (!globalState.player || typeof globalState.player.getStat !== 'function') {return}
+
+    // update HP
+    drawHP(globalState.player.getStat('HP'))
+
+    // update AP digits on the attack button
+    if (globalState.inCombat && globalState.player.AP) {
+        const currentAP = globalState.player.AP.getAvailableMoveAP()
+        const maxAP = globalState.player.AP.getMaxAP().combat
+        const CHAR_W = 10
+        const $apDigit1 = $id('attackButtonAPDigit1')
+        const $apDigit2 = $id('attackButtonAPDigit2')
+
+        if (currentAP > 9) {
+            const tens = Math.floor(currentAP / 10)
+            const ones = currentAP % 10
+            $apDigit1.style.backgroundPosition = 0 - CHAR_W * tens + 'px'
+            $apDigit2.style.backgroundPosition = 0 - CHAR_W * ones + 'px'
+        } else {
+            $apDigit1.style.backgroundPosition = '0px'
+            $apDigit2.style.backgroundPosition = 0 - CHAR_W * currentAP + 'px'
+        }
+
+        // also show max AP alongside if we have an element for it
+        const $acNumber = $id('acNumber')
+        if ($acNumber) {
+            drawDigits('#acDigit', maxAP, 4, false)
+        }
+    }
 }
 
 function uiEndCombatAnimationDone(this: HTMLElement) {
@@ -859,6 +574,7 @@ function uiEndCombatAnimationDone(this: HTMLElement) {
         // enable buttons
         showv($id('endTurnButton'))
         showv($id('endCombatButton'))
+        uiUpdateCombatHUD()
     }
 }
 
@@ -890,16 +606,35 @@ function uiDrawWeapon() {
 
     // draw weapon AP
     const CHAR_W = 10
-    const digit = weapon.weapon.getAPCost(1)
-    if (digit === undefined || digit > 9) {
+    const apCost = weapon.weapon.getAPCost(1)
+    if (apCost === undefined) {
         return
-    } // TODO: Weapon AP >9?
-    $id('attackButtonAPDigit').style.backgroundPosition = 0 - CHAR_W * digit + 'px'
+    }
 
-    // draw weapon type (single, burst, called, punch, ...)
-    // TODO: all melee weapons
-    const wepTypes: { [wepType: string]: string } = { melee: 'punch', gun: 'single' }
-    const type = wepTypes[weapon.weapon.type]
+    const apDigits = apCost.toString().split('')
+    const $apDigit1 = $id('attackButtonAPDigit1')
+    const $apDigit2 = $id('attackButtonAPDigit2')
+    if (apDigits.length === 1) {
+        $apDigit1.style.backgroundPosition = '0px'
+        $apDigit2.style.backgroundPosition = 0 - CHAR_W * parseInt(apDigits[0]) + 'px'
+    } else {
+        $apDigit1.style.backgroundPosition = 0 - CHAR_W * parseInt(apDigits[0]) + 'px'
+        $apDigit2.style.backgroundPosition = 0 - CHAR_W * parseInt(apDigits[1]) + 'px'
+    }
+
+    // draw weapon type (single, burst, called, punch, kick, swing, thrust, throw, flame, ...)
+    const attackSkin = weapon.weapon.getAttackSkin()
+    const skinToIcon: { [skin: string]: string } = {
+        q: 'punch',
+        r: 'kick',
+        g: 'swing',
+        f: 'thrust',
+        s: 'throw',
+        j: 'single',
+        k: 'burst',
+        l: 'burst',
+    }
+    const type = skinToIcon[attackSkin ?? 'q'] ?? 'punch'
     $img('attackButtonType').src = `art/intrface/${type}.png`
 
     // hide or show called shot sigil?
@@ -910,23 +645,34 @@ function uiDrawWeapon() {
     }
 }
 
-// TODO: Rewrite this sanely (and not directly modify the player object's properties...)
+const INVENTORY_SLOTS = ['leftHand', 'rightHand', 'armor'] as const
+type InventorySlot = typeof INVENTORY_SLOTS[number]
+
+function playerGetSlot(slot: string): Obj | null {
+    const player = globalState.player as any
+    return player[slot] ?? null
+}
+
+function playerSetSlot(slot: string, obj: Obj | null): void {
+    const player = globalState.player as any
+    player[slot] = obj
+}
+
 function uiMoveSlot(data: string, target: string) {
-    const playerUnsafe = globalState.player as any
-    let obj = null
+    let obj: Obj | null = null
 
     if (data[0] === 'i') {
         if (target === 'inventory') {
             return
-        } // disallow inventory -> inventory
+        }
 
         const idx = parseInt(data.slice(1))
         console.log('idx: ' + idx)
         obj = globalState.player.inventory[idx]
-        globalState.player.inventory.splice(idx, 1) // remove object from inventory
+        globalState.player.inventory.splice(idx, 1)
     } else {
-        obj = playerUnsafe[data]
-        playerUnsafe[data] = null // remove object from slot
+        obj = playerGetSlot(data)
+        playerSetSlot(data, null)
     }
 
     console.log('obj: ' + obj + ' (data: ' + data + ', target: ' + target + ')')
@@ -934,17 +680,16 @@ function uiMoveSlot(data: string, target: string) {
     if (target === 'inventory') {
         globalState.player.inventory.push(obj)
     } else {
-        if (playerUnsafe[target] !== undefined && playerUnsafe[target] !== null) {
-            // perform a swap
+        const existing = playerGetSlot(target)
+        if (existing !== undefined && existing !== null) {
             if (data[0] === 'i') {
-                globalState.player.inventory.push(playerUnsafe[target])
-            } // inventory -> slot
-            else {
-                playerUnsafe[data] = playerUnsafe[target]
-            } // slot -> slot
+                globalState.player.inventory.push(existing)
+            } else {
+                playerSetSlot(data, existing)
+            }
         }
 
-        playerUnsafe[target] = obj // move the object over
+        playerSetSlot(target, obj)
     }
 
     uiInventoryScreen()
@@ -974,39 +719,92 @@ function makeDraggable($el: HTMLElement, data: string, endCallback?: () => void)
     }
 }
 
+function drawStatsInfo(): void {
+    const $info = $id('inventoryBoxInfo')
+    clearEl($info)
+
+    const p = globalState.player
+
+    // Helper: create a text span
+    const span = (text: string, color = '#00FF00', bold = false): HTMLSpanElement => {
+        const $s = document.createElement('span')
+        $s.style.color = color
+        if (bold) $s.style.fontWeight = 'bold'
+        $s.textContent = text
+        return $s
+    }
+
+    // Header row
+    $info.appendChild(span('CHARACTER', '#00FF00', true))
+
+    // Level / XP / Karma
+    $info.appendChild(span(''))
+    const level = p.getStat('Level')
+    const xp = p.getStat('Experience')
+    const xpNext = xpForLevel(level + 1)
+    $info.appendChild(span(`LVL ${level}`))
+    $info.appendChild(span(`XP  ${xp}/${xpNext}`))
+    const karma = (p as any).karma ?? 0
+    $info.appendChild(span(`KAR ${karma}`))
+    $info.appendChild(span(''))
+
+    // SPECIAL stats in 3 columns
+    const specNames = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK']
+    $info.appendChild(span(''))
+    for (let i = 0; i < specNames.length; i += 3) {
+        const parts: HTMLSpanElement[] = []
+        for (let j = i; j < Math.min(i + 3, specNames.length); j++) {
+            const s = specNames[j]
+            parts.push(span(`${s}=${p.getStat(s)}`))
+        }
+        const $row = document.createElement('div')
+        $row.style.cssText = 'display:flex;justify-content:space-between'
+        for (const $s of parts) $row.appendChild($s)
+        $info.appendChild($row)
+    }
+    $info.appendChild(span(''))
+
+    // Key derived stats
+    const hp = p.getStat('HP')
+    const maxHp = p.getStat('Max HP')
+    const ap = p.getStat('AP')
+    const ac = p.getStat('AC')
+    const md = p.getStat('Melee')
+    const cw = p.getStat('Carry')
+    const sq = p.getStat('Sequence')
+    const hr = p.getStat('Healing Rate')
+    const cc = p.getStat('Critical Chance')
+
+    const row = (a: string, b: string, c?: string) => {
+        const $r = document.createElement('div')
+        $r.style.cssText = 'display:flex;justify-content:space-between'
+        $r.appendChild(span(a))
+        $r.appendChild(span(b ?? ''))
+        if (c !== undefined) $r.appendChild(span(c))
+        $info.appendChild($r)
+    }
+    row(`HP ${hp}/${maxHp}`, `AP ${ap}`)
+    row(`AC ${ac}`, `MD ${md}`, `CW ${cw}`)
+    row(`SQ ${sq}`, `HR ${hr}`, `CC ${cc}%`)
+    $info.appendChild(span(''))
+
+    // Resistances
+    const pr = p.getStat('DR Poison')
+    const rr = p.getStat('DR Radiation')
+    row(`PR ${pr}%`, `RR ${rr}%`)
+}
+
 function uiInventoryScreen() {
     assertNoLegacyGameplayPanelFallback('inventory', 'uiInventoryScreen')
     globalState.uiMode = UIMode.inventory
 
     showv($id('inventoryBox'))
-    drawInventory($id('inventoryBoxList'), globalState.player.inventory, (obj: Obj, e: MouseEvent) => {
-        makeItemContextMenu(e, obj, 'inventory')
+    drawStatsInfo()
+    drawInventory($id('inventoryBoxList'), globalState.player.inventory, 'i', {
+        clickCallback: (obj, e) => makeItemContextMenu(e, obj, 'inventory'),
+        extraClearEls: ['inventoryBoxItem1', 'inventoryBoxItem2'],
+        onDragEnd: () => uiInventoryScreen(),
     })
-
-    function drawInventory($el: HTMLElement, objects: Obj[], clickCallback?: (item: Obj, e: MouseEvent) => void) {
-        clearEl($el)
-        clearEl($id('inventoryBoxItem1'))
-        clearEl($id('inventoryBoxItem2'))
-
-        for (let i = 0; i < objects.length; i++) {
-            const invObj = objects[i]
-            // 90x60 // 70x40
-            const img = makeEl('img', {
-                src: invObj.invArt + '.png',
-                attrs: { width: 72, height: 60, title: invObj.name },
-                click: clickCallback
-                    ? (e: MouseEvent) => {
-                          clickCallback(invObj, e)
-                      }
-                    : undefined,
-            })
-            $el.appendChild(img)
-            $el.insertAdjacentHTML('beforeend', 'x' + invObj.amount)
-            makeDraggable(img, 'i' + i, () => {
-                uiInventoryScreen()
-            })
-        }
-    }
 
     function itemAction(obj: Obj, slot: keyof Player, action: 'cancel' | 'use' | 'drop') {
         switch (action) {
@@ -1017,14 +815,24 @@ function uiInventoryScreen() {
                 obj.use(globalState.player)
                 break
             case 'drop':
-                //console.log("todo: drop " + obj.art); break
                 console.log('dropping: ' + obj.art + ' with pid ' + obj.pid)
                 if (slot !== 'inventory') {
                     // add into inventory to drop
                     console.log('moving into inventory first')
                     globalState.player.inventory.push(obj)
-                    // FIXME: this doesn't type check
-                    // player[slot] = null
+                    // Clear the equipment slot we just pulled this from.
+                    // We map the drag-source slot id back to a Critter field;
+                    // any unrecognised slot id is logged and ignored.
+                    switch (slot) {
+                        case 'leftHand':
+                        case 'rightHand':
+                        case 'equippedArmor':
+                            (globalState.player as any)[slot] = null
+                            break
+                        default:
+                            console.warn('uiInventoryScreen drop: unrecognised slot "' + slot + '" — leaving it set')
+                            break
+                    }
                 }
 
                 obj.drop(globalState.player)
@@ -1065,10 +873,10 @@ function uiInventoryScreen() {
 
     function drawSlot(slot: keyof Player, slotID: string) {
         const art = globalState.player[slot].invArt
-        // 90x60 // 70x40
         const img = makeEl('img', {
             src: art + '.png',
-            attrs: { width: 72, height: 60, title: globalState.player[slot].name },
+            attrs: { width: 64, height: 49, title: globalState.player[slot].name },
+            style: { display: 'block', imageRendering: 'pixelated' },
             click: (e: MouseEvent) => {
                 makeItemContextMenu(e, globalState.player[slot], slot)
             },
@@ -1179,12 +987,14 @@ export function uiStartDialogue(force: boolean, target?: Critter) {
 }
 
 export function uiEndDialogue() {
-    // TODO: Transition the dialogue box down?
     globalState.uiMode = UIMode.none
 
-    $id('dialogueContainer').style.visibility = 'hidden'
-    $id('dialogueBox').style.visibility = 'hidden'
-    $id('dialogueBoxReply').innerHTML = ''
+    const $dialogueBox = $id('dialogueBox')
+    uiAnimateBox($dialogueBox, null, 480, () => {
+        $id('dialogueContainer').style.visibility = 'hidden'
+        $dialogueBox.style.visibility = 'hidden'
+        $id('dialogueBoxReply').innerHTML = ''
+    })
 }
 
 export function uiSetDialogueReply(reply: string) {
@@ -1266,6 +1076,44 @@ function uiSwapItem(a: Obj[], item: Obj, b: Obj[], amount: number) {
     _uiAddItem(b, item, amount)
 }
 
+function uiDragMove(
+    data: string,
+    where: string,
+    fromMap: Record<string, Obj[]>,
+    toMap: Record<string, Obj[]>,
+    options?: {
+        guard?: (data: string, where: string) => boolean
+        onDone?: () => void
+    },
+): void {
+    const from = fromMap[data[0]]
+    if (from === undefined) {
+        console.warn(`uiDragMove: unrecognized source prefix "${data[0]}" — skipping`)
+        return
+    }
+    const idx = parseInt(data.slice(1))
+    const obj = from[idx]
+    if (obj === undefined) {
+        console.warn(`uiDragMove: obj not found at index ${idx} — skipping`)
+        return
+    }
+    if (options?.guard && !options.guard(data, where)) return
+
+    const to = toMap[where]
+    if (to === undefined) {
+        console.warn(`uiDragMove: invalid destination "${where}" — skipping`)
+        return
+    }
+    if (to === from) return
+
+    if (obj.amount > 1) {
+        uiSwapItem(from, obj, to, uiGetAmount(obj))
+    } else {
+        uiSwapItem(from, obj, to, 1)
+    }
+    options?.onDone?.()
+}
+
 function uiEndBarterMode() {
     const $barterBox = $id('barterBox')
 
@@ -1299,7 +1147,10 @@ export function uiBarterMode(merchant: Critter) {
     })
 
     // logic + UI for bartering
-    // TODO: would it be better if we dropped the "working" copies?
+    // NOTE: We keep "working" copies of both inventories so the UI can
+    // mutate the offer without touching globalState.player.inventory or
+    // merchant.inventory until the player accepts.  Re-cloning on each
+    // open is cheap (≤ dozens of items) and prevents stale state.
 
     // a copy of inventories for both parties
     let workingPlayerInventory = globalState.player.inventory.map(cloneItem)
@@ -1317,7 +1168,10 @@ export function uiBarterMode(merchant: Critter) {
         return total
     }
 
-    // TODO: checkOffer() or some-such
+    // Evaluate the current offer: pull totals from both tables, compute
+    // value difference, and (if non-negative) commit the trade.  The
+    // inline check is small enough that a separate checkOffer() helper
+    // would just add indirection.
     function offer() {
         console.log('[OFFER]')
 
@@ -1356,76 +1210,26 @@ export function uiBarterMode(merchant: Critter) {
         }
     }
 
-    function drawInventory($el: HTMLElement, who: 'p' | 'm' | 'l' | 'r', objects: Obj[]) {
-        clearEl($el)
-
-        for (let i = 0; i < objects.length; i++) {
-            const inventoryImage = objects[i].invArt
-            // 90x60 // 70x40
-            const img = makeEl('img', {
-                src: inventoryImage + '.png',
-                attrs: { width: 72, height: 60, title: objects[i].name },
-            })
-            $el.appendChild(img)
-            $el.insertAdjacentHTML('beforeend', 'x' + objects[i].amount)
-            makeDraggable(img, who + i)
-        }
-    }
-
     function uiBarterMove(data: string, where: 'left' | 'right' | 'leftInv' | 'rightInv') {
         console.log('barter: move ' + data + ' to ' + where)
-
-        const from = (
-            {
-                p: workingPlayerInventory,
-                m: workingMerchantInventory,
-                l: playerBarterTable,
-                r: merchantBarterTable,
-            } as any
-        )[data[0]]
-
-        if (from === undefined) {
-            console.warn('uiBarterMove: wrong data: ' + data + ' — skipping')
-            return
-        }
-
-        const idx = parseInt(data.slice(1))
-        const obj = from[idx]
-        if (obj === undefined) {
-            console.warn('uiBarterMove: obj not found in list (' + idx + ') — skipping')
-            return
-        }
-
-        // player inventory -> left table or player inventory
-        if (data[0] === 'p' && where !== 'left' && where !== 'leftInv') {
-            return
-        }
-
-        // merchant inventory -> right table or merchant inventory
-        if (data[0] === 'm' && where !== 'right' && where !== 'rightInv') {
-            return
-        }
-
-        const to = {
+        uiDragMove(data, where, {
+            p: workingPlayerInventory,
+            m: workingMerchantInventory,
+            l: playerBarterTable,
+            r: merchantBarterTable,
+        }, {
             left: playerBarterTable,
             right: merchantBarterTable,
             leftInv: workingPlayerInventory,
             rightInv: workingMerchantInventory,
-        }[where]
-
-        if (to === undefined) {
-            console.warn('uiBarterMove: invalid location: ' + where + ' — skipping')
-            return
-        } else if (to === from) {
-            // table -> same table
-            return
-        } else if (obj.amount > 1) {
-            uiSwapItem(from, obj, to, uiGetAmount(obj))
-        } else {
-            uiSwapItem(from, obj, to, 1)
-        }
-
-        redrawBarterInventory()
+        }, {
+            guard: (data, where) => {
+                if (data[0] === 'p' && where !== 'left' && where !== 'leftInv') return false
+                if (data[0] === 'm' && where !== 'right' && where !== 'rightInv') return false
+                return true
+            },
+            onDone: () => redrawBarterInventory(),
+        })
     }
 
     // bartering drop targets
@@ -1446,10 +1250,10 @@ export function uiBarterMode(merchant: Critter) {
     $id('barterOfferButton').onclick = offer
 
     function redrawBarterInventory() {
-        drawInventory($id('barterBoxInventoryLeft'), 'p', workingPlayerInventory)
-        drawInventory($id('barterBoxInventoryRight'), 'm', workingMerchantInventory)
-        drawInventory($id('barterBoxLeft'), 'l', playerBarterTable)
-        drawInventory($id('barterBoxRight'), 'r', merchantBarterTable)
+        drawInventory($id('barterBoxInventoryLeft'), workingPlayerInventory, 'p')
+        drawInventory($id('barterBoxInventoryRight'), workingMerchantInventory, 'm')
+        drawInventory($id('barterBoxLeft'), playerBarterTable, 'l')
+        drawInventory($id('barterBoxRight'), merchantBarterTable, 'r')
 
         const moneyLeft = totalAmount(playerBarterTable)
         const moneyRight = totalAmount(merchantBarterTable)
@@ -1476,52 +1280,15 @@ export function uiLoot(object: Obj) {
 
     function uiLootMove(data: string /* "l"|"r" */, where: 'left' | 'right') {
         console.log('loot: move ' + data + ' to ' + where)
-
-        const from = ({ l: globalState.player.inventory, r: object.inventory } as any)[data[0]]
-
-        if (from === undefined) {
-            console.warn('uiLootMove: wrong data: ' + data + ' — skipping')
-            return
-        }
-
-        const idx = parseInt(data.slice(1))
-        const obj = from[idx]
-        if (obj === undefined) {
-            console.warn('uiLootMove: obj not found in list (' + idx + ') — skipping')
-            return
-        }
-
-        const to = { left: globalState.player.inventory, right: object.inventory }[where]
-
-        if (to === undefined) {
-            console.warn('uiLootMove: invalid location: ' + where + ' — skipping')
-            return
-        } else if (to === from) {
-            // object -> same location
-            return
-        } else if (obj.amount > 1) {
-            uiSwapItem(from, obj, to, uiGetAmount(obj))
-        } else {
-            uiSwapItem(from, obj, to, 1)
-        }
-
-        drawLoot()
-    }
-
-    function drawInventory($el: HTMLElement, who: 'p' | 'm' | 'l' | 'r', objects: Obj[]) {
-        clearEl($el)
-
-        for (let i = 0; i < objects.length; i++) {
-            const inventoryImage = objects[i].invArt
-            // 90x60 // 70x40
-            const img = makeEl('img', {
-                src: inventoryImage + '.png',
-                attrs: { width: 72, height: 60, title: objects[i].name },
-            })
-            $el.appendChild(img)
-            $el.insertAdjacentHTML('beforeend', 'x' + objects[i].amount)
-            makeDraggable(img, who + i)
-        }
+        uiDragMove(data, where, {
+            l: globalState.player.inventory,
+            r: object.inventory,
+        }, {
+            left: globalState.player.inventory,
+            right: object.inventory,
+        }, {
+            onDone: () => drawLoot(),
+        })
     }
 
     console.log('looting...')
@@ -1546,8 +1313,8 @@ export function uiLoot(object: Obj) {
     }
 
     function drawLoot() {
-        drawInventory($id('lootBoxLeft'), 'l', globalState.player.inventory)
-        drawInventory($id('lootBoxRight'), 'r', object.inventory)
+        drawInventory($id('lootBoxLeft'), globalState.player.inventory, 'l')
+        drawInventory($id('lootBoxRight'), object.inventory, 'r')
     }
 
     drawLoot()
@@ -1700,7 +1467,7 @@ export function uiElevator(elevator: Elevator) {
         showv($elevatorButton)
         $elevatorButton.onclick = () => {
             // button `i` pushed
-            // todo: animate positioner/spinner (and come up with a better name for that)
+            // elevator positioner/spinner animation not yet implemented
 
             const mapID = elevator.buttons[i - 1].mapID
             const level = elevator.buttons[i - 1].level
@@ -1770,7 +1537,6 @@ export function uiSaveLoad(isSave: boolean): void {
 
     const listOfSaves = new List({ x: 55, y: 50, w: 'auto', h: 'auto' })
     const saveInfo = new Label(404, 262, '', '#00FF00')
-    // TODO: CSSBoundingBox's width and height should be optional (and default to `auto`), then Label can accept one
     Object.assign(saveInfo.elem.style, {
         width: '154px',
         height: '33px',

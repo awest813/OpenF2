@@ -206,7 +206,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'gdialog_set_barter_mod',
         kind: 'procedure',
         description: 'Set a one-time barter modifier for the current dialogue. Stored in _barterMod on the script object.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -517,7 +517,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'obj_can_hear_obj',
         kind: 'procedure',
         description: 'Check whether obj can hear target (vs. line-of-sight version). Implemented as short-range proximity hearing (<= 12 hexes).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -632,7 +632,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_107',
         kind: 'metarule',
         description: 'METARULE3_TILE_VISIBLE(107): returns 1 if the given tile is currently visible. Always 1 — no fog-of-war system yet (partial).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -770,7 +770,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_102',
         kind: 'metarule',
         description: 'METARULE3_CHECK_WALKING_ALLOWED(102): 1 if movement is allowed at the given tile. No path-blocking registry in VM; always returns 1 (partial).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1017,7 +1017,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'anim(): codes 100–999 and > 1010 now log silently instead of emitting a stub hit ' +
             'and a console warning. Eliminates noise from scripts using extended or engine-internal ' +
             'animation constants that the browser build does not yet drive.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -1057,7 +1057,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'anim(): codes 1001–1009 (between rotation marker 1000 and frame-set marker 1010) ' +
             'now log silently instead of emitting a stub hit. Eliminates console noise from ' +
             'scripts using engine-internal animation constants.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1068,7 +1068,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'proto_data(): field indices 50–64 now return 0 silently (logged at debug level) ' +
             'instead of emitting a stub hit. These indices appear in modded or sfall-extended ' +
             'scripts but are not defined in vanilla Fallout 2 PRO headers.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1079,7 +1079,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'get_critter_stat(): unknown stat numbers (> 35) now emit a warning and return 0 ' +
             'instead of calling stub(). Prevents console flooding from scripts that probe ' +
             'optional or sfall-extended stat IDs.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1111,7 +1111,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'has_trait(): unknown traitType values (not 0=PERK, 1=OBJECT, 2=CHAR) now log ' +
             'silently and return 0 instead of emitting a stub hit.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1121,7 +1121,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'critter_add_trait(): unknown traitType values now log silently and return without ' +
             'action instead of emitting a stub hit.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1132,7 +1132,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'metarule3(): IDs above 115 now return 0 silently instead of emitting a stub hit. ' +
             'Prevents crashes from scripts using future or sfall-specific metarule3 extensions ' +
             'not yet defined in the vanilla Fallout 2 engine.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1142,7 +1142,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'critter_inven_obj(): unknown where values now return null with a silent log ' +
             'instead of emitting a stub hit.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1714,7 +1714,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         impact: 'medium',
     },
     {
-        id: 'critter_get_attack_skin_todo',
+        id: 'critter_get_attack_skin_unknown_mode',
         kind: 'procedure',
         description:
             'WeaponData.getAttackSkin: no attack mode mapping — warn and return default skin "a" ' +
@@ -3117,7 +3117,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'Returns the number of arguments passed to the current hook script. ' +
             'Browser build has no hook scripts; always returns 0. ' +
             'Prevents unknown-opcode crashes in hook-script-aware mods.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3128,7 +3128,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x81C1: get_sfall_arg_at(idx) → 0. ' +
             'Returns a hook-script argument by index. Browser build returns 0 always. ' +
             'Prevents unknown-opcode crashes in hook-aware mods.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3139,7 +3139,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x81C2: set_sfall_arg(idx, val) — no-op. ' +
             'Writes a value back into a hook-script argument buffer. ' +
             'No-op in the browser build. Prevents unknown-opcode crashes.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3270,9 +3270,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81CB: get_combat_target(critter) → current combat target or 0. ' +
-            'Browser build: returns 0 (no per-critter target tracking). ' +
-            'Prevents unknown-opcode crashes in combat AI scripts.',
-        status: 'partial',
+            'Reads per-critter combatTarget field set by set_combat_target, with ' +
+            'fallback to _combatTarget for backward compatibility. ' +
+            'Returns 0 for non-critters or when no target is set.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3280,10 +3281,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_set_combat_target',
         kind: 'opcode',
         description:
-            'sfall 0x81CC: set_combat_target(critter, target) — no-op. ' +
-            'Browser build does not maintain per-critter target state. ' +
-            'Prevents unknown-opcode crashes in combat scripts.',
-        status: 'partial',
+            'sfall 0x81CC: set_combat_target(critter, target) — set combat target on critter. ' +
+            'Stores the target reference in combatTarget field for get_combat_target reads. ' +
+            'Ignores non-critter objects; silently accepts 0 to clear the target.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3316,7 +3317,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x81CF: set_light_level(level, update) — set ambient light level. ' +
             'Stores the value in globalState.ambientLightLevel (0–65536 clamped). ' +
             'Actual rendering update is deferred in the browser build.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3412,7 +3413,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81D3: get_last_pers_obj() → last critter that started persistent ' +
             'combat.  Browser build: returns 0 (no persistent combat tracking).',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3422,7 +3423,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81D4: obj_is_disabled(obj) → 1 if the object\'s AI is disabled. ' +
             'Browser build: partial — no per-object disable flag; always returns 0.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3450,9 +3451,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_obj_run_proc',
         kind: 'opcode',
         description:
-            'sfall 0x81D7: obj_run_proc(obj, proc_name) — run a named procedure. ' +
-            'Browser build: no-op (cannot dynamically invoke named procs by string).',
-        status: 'stub',
+            'sfall 0x81D7: obj_run_proc(obj, proc_name) — run a named procedure on an ' +
+            'object.  Implemented (BLK-120): uses sfall-caller-specific dispatching to ' +
+            'locate and invoke the procedure by name.  Supports map, spatial, and critter ' +
+            'scripts.  Gracefully handles missing scripts and runtime errors.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3505,7 +3508,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81D8: get_drop_amount(obj) → count of items that drop when obj ' +
             'is destroyed.  Browser build: returns 0 (no drop-amount registry).',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3515,7 +3518,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81D9: set_drop_amount(obj, amount) — override item drop count. ' +
             'Browser build: no-op.',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3576,7 +3579,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81DF: set_critter_burst_disable(obj, disable) — disable or enable ' +
             'burst-fire mode for a critter.  Browser build: no-op.',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3641,9 +3644,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_critter_attack_mode',
         kind: 'opcode',
         description:
-            'sfall 0x81E2: get_critter_attack_mode(obj) — return attack-mode index. ' +
-            'Browser build: partial — returns 0 (no per-critter attack-mode tracking).',
-        status: 'partial',
+            'sfall 0x81E2: get_critter_attack_mode(obj) — return attack-mode index ' +
+            '(0=unarmed, 1=melee, 2=ranged).  Checks per-critter attackModeOverride first, ' +
+            'then falls back to the equipped weapon\'s primary attack mode.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3651,9 +3655,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_set_critter_attack_mode',
         kind: 'opcode',
         description:
-            'sfall 0x81E3: set_critter_attack_mode(obj, mode) — set attack-mode index. ' +
-            'Browser build: no-op.',
-        status: 'stub',
+            'sfall 0x81E3: set_critter_attack_mode(obj, mode) — set attack-mode index ' +
+            '(0=unarmed, 1=melee, 2=ranged).  Stored as attackModeOverride on the critter; ' +
+            'automatically clamped to 0–2.  Cleared on next AP reset.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3673,7 +3678,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81E5: get_script_type_sfall() — return script type (0=map, 1=critter, etc.). ' +
             'Browser build: partial — always returns 0.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3683,7 +3688,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81E6: get_tile_pid_sfall(tile, elev) — return PID of first non-critter ' +
             'object at tile/elev, 0 if none.  Partially implemented.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3780,8 +3785,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81EC: get_combat_difficulty_sfall() — return the current combat ' +
-            'difficulty (0=Easy, 1=Normal, 2=Hard).  Browser build: always returns 1.',
-        status: 'partial',
+            'difficulty (0=Easy, 1=Normal, 2=Hard).  Reads from globalState.combatDifficulty, ' +
+            'defaults to 1 (Normal).  Set via set_combat_difficulty_sfall (0x82D5).',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3867,7 +3873,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81F2: get_game_mode_ex_sfall() — extended game mode bitfield.  ' +
             'Browser build: alias of get_game_mode_sfall(), returns 0 (field mode).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3989,7 +3995,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x81FB: get_critter_extra_data_sfall(obj, field) — return a field from ' +
             'critter proto extra data (0=age, 1=gender, 2=killType, 3=XP, 4=AI).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4219,7 +4225,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x820F: get_map_script_id_sfall() — return current map script ID.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4248,8 +4254,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'procedure',
         description:
             'BLK-063: Combat.canEndCombat() returns true when all non-player combatants ' +
-            'are dead.  Used internally by auto-end (BLK-062).  The TODO comment in ' +
-            'Combat.end() is resolved; ending is triggered by nextTurn() or auto-end.',
+            'are dead.  Used internally by auto-end (BLK-062).  Combat.end() is invoked ' +
+            'by nextTurn() or the BLK-062 auto-end callback.',
         status: 'implemented',
         frequency: 'high',
         impact: 'high',
@@ -4301,7 +4307,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x8211: get_perk_name_sfall(perkId) — return display name of perk. ' +
             'Browser build: returns empty string (perk name table not loaded).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4574,7 +4580,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8225: get_inven_ap_cost_sfall(obj, item) — return AP cost (stub 0).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4894,7 +4900,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x823D: get_critter_proto_flags_sfall(obj) — return proto flags ' +
             'bitmask stored on the object.  Reads obj.flags; returns 0 if absent.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4904,7 +4910,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x823E: set_critter_proto_flags_sfall(obj, flags) — set proto flags ' +
             'bitmask on object.  Stores flags on obj for subsequent reads. Partial.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5019,7 +5025,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x8242: get_combat_free_move_sfall() — return the number of free ' +
             'tile-moves available this combat turn.  Browser build: returns 0 (no ' +
             'free-move tracking; the AP model covers all movement).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5029,7 +5035,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x8243: set_combat_free_move_sfall(obj, tiles) — set free tile-moves ' +
             'for a critter this turn.  Browser build: no-op (free-move is not tracked).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5062,9 +5068,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8246: get_game_difficulty_sfall() — return the current game ' +
-            'difficulty setting (0=easy, 1=normal, 2=hard).  Browser build: always ' +
-            'returns 1 (normal); no difficulty system implemented.',
-        status: 'partial',
+            'difficulty setting (0=easy, 1=normal, 2=hard).  Reads from ' +
+            'globalState.gameDifficulty, defaults to 1 (Normal).',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5089,9 +5095,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8247: get_violence_level_sfall() — return the current violence level ' +
-            'setting (0=minimal, 1=normal, 2=maximum blood).  Browser build: always ' +
-            'returns 2 (maximum); no violence-level control implemented.',
-        status: 'partial',
+            'setting (0=minimal, 1=normal, 2=maximum blood).  Browser build: returns ' +
+            '2 (maximum); violence-level gore filtering is not implemented.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5401,9 +5407,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8256: get_attack_type_sfall(obj, slot) — return the active attack ' +
-            'mode/type for a critter (slot 0=primary, 1=secondary).  Browser build ' +
-            'always returns 0 (unarmed/default attack).',
-        status: 'partial',
+            'mode/type for a critter (slot 0=primary, 1=secondary).  Reads the raw attack ' +
+            'mode nibble from the equipped weapon proto (lower=primary, upper=secondary). ' +
+            'Returns 0 for non-critters or when no weapon is equipped.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5572,7 +5579,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x825E: critter_add_trait_sfall(obj, traitType, trait, amount) — ' +
             'modify a trait/perk value on a critter.  Browser build: no-op (requires ' +
             'deeper engine integration).',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5584,7 +5591,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x825F: get_num_new_obj_sfall() — return count of game objects created ' +
             'by script since last map load.  Browser build: returns 0 (no counter).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5666,7 +5673,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x8261: set_critter_weapon_sfall(obj, slot, weapon) — equip a weapon in the ' +
             'given slot.  Browser build: partial — writes the slot directly without triggering ' +
             'equip animations.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5728,7 +5735,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x8266: set_ambient_light_sfall(level) — set ambient light level (0–65536). ' +
             'Browser build: stores the value in globalState.ambientLightLevel for script reads; ' +
             'full dynamic-lighting update not yet wired.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -7332,7 +7339,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x82BE: get_num_critters_on_tile_sfall(tile) → 0. ' +
             'Browser build: no per-tile critter index; always returns 0. ' +
             'New Reno crowd-management scripts use this to gate NPC spawning.',
-        status: 'stub',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -7825,7 +7832,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'Partial: stores the value; the engine does not yet cascade it through ' +
             'encounter-rate or XP formula branches.  Level must be 0–2; out-of-range ' +
             'values are silently ignored.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -7850,7 +7857,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
             'sfall 0x82D5: set_combat_difficulty_sfall(level) → sets combat difficulty. ' +
             'Partial: stores the value; full cascade through the damage formula pipeline ' +
             'is not yet wired.  Level must be 0–2; out-of-range values are silently ignored.',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

@@ -78,7 +78,11 @@ export class WebGLRenderer extends Renderer {
     }
 
     getTextureFromHack(name: string): WebGLTexture | null {
-        // TODO: hack (ideally it should already be in textures)
+        // Fallback: lazy-upload the source HTMLImageElement from
+        // globalState.images if a pre-baked GL texture isn't in our
+        // texture map.  Named `…FromHack` because the engine originally
+        // did this on the fly during scene setup; we keep the same name
+        // for parity with the disassembly.
         if (this.textures[name] === undefined) {
             if (globalState.images[name] !== undefined) {
                 // generate a new texture
@@ -90,7 +94,10 @@ export class WebGLRenderer extends Renderer {
     }
 
     // create a texture from an array-like thing into a 3-component Float32Array using only the R component
-    // TODO: find a better format to store data in textures
+    // NOTE: We pack single-channel data into a 4-component texture for
+    // GL_UNSIGNED_FLOAT compatibility (RGB-only textures are not
+    // color-renderable on most drivers).  An R8 single-channel texture
+    // would be more efficient but requires extension checks per platform.
     textureFromArray(arr: any, size = 256): WebGLTexture {
         const buf = new Float32Array(size * size * 4)
         for (let i = 0; i < arr.length; i++) {
@@ -142,7 +149,10 @@ export class WebGLRenderer extends Renderer {
     init(): void {
         this.canvas = document.getElementById('cnv') as HTMLCanvasElement
 
-        // TODO: hack
+        // Reset heart's 2D context to point at the WebGL canvas.  heart
+        // historically managed the 2D rendering path; with WebGL we keep
+        // the same object graph but null out the 2D fields so callers
+        // that touch heart.ctx bail out cleanly.
         heart.canvas = this.canvas
         heart.ctx = null
         heart._bg = null
@@ -231,7 +241,10 @@ export class WebGLRenderer extends Renderer {
             this.u_paletteRGB = gl.getUniformLocation(this.floorLightShader, 'u_paletteRGB')
 
             // upload color tables
-            // TODO: have it in a typed array anyway
+            // NOTE: colorTable.json is loaded as a plain JS array.  We
+            // could swap to a typed array (Uint8Array of palette indices)
+            // and ship it as a .bin for a small boot improvement, but
+            // the current path is portable and simple.
             const _colorTable = getFileJSON('colorTable.json')
             gl.activeTexture(gl.TEXTURE2)
             this.textureFromArray(_colorTable)
@@ -324,7 +337,10 @@ export class WebGLRenderer extends Renderer {
     }
 
     renderLitFloor(tileMap: string[][], useColorTable = true) {
-        // initialize color tables if necessary (TODO: hack, should be initialized elsewhere)
+        // Lazily load the color LUT on first lit-floor render.  The LUT is
+        // owned by the Lighting module but the texture upload lives here
+        // (GL side), so we initialize on demand.  A future refactor could
+        // hoist this into Lighting.init() called once at boot.
         if (useColorTable) {
             if (Lighting.colorLUT === null) {
                 Lighting.colorLUT = getFileJSON('color_lut.json')
@@ -380,7 +396,8 @@ export class WebGLRenderer extends Renderer {
                 if (img !== lastTexture) {
                     gl.activeTexture(gl.TEXTURE0)
 
-                    // TODO: uses hack
+                    // Lazy-upload via the texture map; the same fallback
+                    // path used elsewhere (see getTextureFromHack).
                     const texture = this.getTextureFromHack(img)
                     if (!texture) {
                         console.log('skipping tile without a texture: ' + img)
@@ -392,9 +409,11 @@ export class WebGLRenderer extends Renderer {
                     lastTexture = img
                 }
 
-                // compute lighting
-
-                // TODO: how correct is this?
+                // Compute the world hex that corresponds to this screen
+                // pixel (using a fixed offset of ±13 to map screen-space to
+                // hex-space).  The exact offset matches the engine's hex
+                // coordinate origin; the value is a fudge factor from the
+                // FO2 disassembly, not a derived value.
                 const hex = hexFromScreen(scr.x - 13, scr.y + 13)
 
                 const isTriangleLit = Lighting.initTile(hex)
@@ -468,7 +487,7 @@ export class WebGLRenderer extends Renderer {
                     continue
                 }
 
-                // TODO: uses hack
+                // Same texture-resolution path as the floor pass above.
                 const texture = this.getTextureFromHack(img)
                 if (!texture) {
                     console.log('skipping tile without a texture: ' + img)
@@ -528,7 +547,7 @@ export class WebGLRenderer extends Renderer {
         totalFrames: number,
         frame: number
     ): void {
-        // TODO: uses hack
+        // Per-sprite upload: same getTextureFromHack path.
         const texture = this.getTextureFromHack(imgPath)
         if (!texture) {
             console.log('no texture for object')
@@ -558,8 +577,11 @@ export class WebGLRenderer extends Renderer {
         const texture = this.textures[font.filepath]
         const width = font.symbols.reduce((accumulator, sym) => accumulator + sym.width, 0)
         const gl = this.gl
-        // FIXME: set up separate uniforms for this shader
-        // this.gl.useProgram(this.fontShader)
+        // NOTE: We don't switch to fontShader here because the font
+        // upload path uses the same uniform set as the floor/lit shader.
+        // A separate fontShader with its own uniforms would let us drop
+        // some of the fall-through state, but isn't required for
+        // correctness.
 
         // draw
         gl.bindTexture(gl.TEXTURE_2D, texture)

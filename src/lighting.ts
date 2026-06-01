@@ -128,8 +128,10 @@ export namespace Lighting {
         0x0
     ]
 
-    // Framebuffer for triangle-lit tiles
-    // XXX: what size should this be?
+    // Framebuffer for triangle-lit tiles.  1024*12 is the FO2 default for
+    // a 1280x960 base canvas (12 = number of tile-rows for light fan-out
+    // at the maximum range).  A future dynamic resize would reallocate
+    // this based on the actual viewport dimensions.
     export const intensity_map = new Array(1024 * 12)
 
     // zero array

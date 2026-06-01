@@ -17,7 +17,7 @@ import { Combat } from './combat.js'
 import { critterKill } from './critter.js'
 import { getElevator, lookupMapNameFromLookup } from './data.js'
 import { heart } from './heart.js'
-import { hexesInRadius, hexFromScreen } from './geometry.js'
+import { hexDistance, hexesInRadius, hexFromScreen, hexNeighbors } from './geometry.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
 import { initGame } from './init.js'
@@ -25,6 +25,7 @@ import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
+import { UIMode } from './uiMode.js'
 import {
     uiCalledShot,
     uiCloseCalledShot,
@@ -32,7 +33,6 @@ import {
     uiElevator,
     uiLog,
     uiLoot,
-    UIMode,
     uiSaveLoad,
     setPlayerUseHandler,
     uiWorldMap,
@@ -79,14 +79,15 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
     }
 }
 
-export function playerUse() {
-    // TODO: playerUse should take an object
+export function playerUse(obj?: Obj) {
     const mousePos = heart.mouse.getPosition()
     const mouseHex = hexFromScreen(
         mousePos[0] + globalState.cameraPosition.x,
         mousePos[1] + globalState.cameraPosition.y
     )
-    let obj = getObjectUnderCursor((obj) => obj.isSelectable)
+    if (obj === undefined) {
+        obj = getObjectUnderCursor((o) => o.isSelectable)
+    }
     const who = <Critter>obj
 
     if (globalState.uiMode === UIMode.useSkill) {
@@ -106,8 +107,6 @@ export function playerUse() {
     }
 
     if (obj === null) {
-        // walk to the destination if there is no usable object
-        // Walking in combat (TODO: This should probably be in Combat...)
         if (globalState.inCombat) {
             if (!(globalState.combat.inPlayerTurn || Config.combat.allowWalkDuringAnyTurn)) {
                 console.log('Wait your turn.')
@@ -115,29 +114,16 @@ export function playerUse() {
             }
 
             if (globalState.player.AP.getAvailableMoveAP() === 0) {
-                uiLog(getProtoMsg(700)) // "You don't have enough action points."
+                uiLog(getProtoMsg(700))
                 return
             }
 
-            const maxWalkingDist = globalState.player.AP.getAvailableMoveAP()
-            if (!globalState.player.walkTo(mouseHex, Config.engine.doAlwaysRun, undefined, maxWalkingDist)) {
+            if (!globalState.combat.playerWalkTo(mouseHex, Config.engine.doAlwaysRun)) {
                 console.log('Cannot walk there')
-            } else {
-                if (!globalState.player.AP.subtractMoveAP(globalState.player.path.path.length - 1)) {
-                    console.warn(
-                        'subtractMoveAP failed: has AP: ' +
-                        globalState.player.AP.getAvailableMoveAP() +
-                        ' needs AP:' +
-                        globalState.player.path.path.length +
-                        ' and maxDist was:' +
-                        maxWalkingDist +
-                        ' — ignoring AP desync'
-                    )
-                }
             }
+            return
         }
 
-        // Walking out of combat
         if (!globalState.player.walkTo(mouseHex, Config.engine.doAlwaysRun)) {
             console.log('Cannot walk there')
         }
@@ -157,23 +143,104 @@ export function playerUse() {
                 return
             }
 
-            // TODO: move within range of target
-
             const weapon = globalState.player.equippedWeapon
             if (weapon === null) {
                 console.log('You have no weapon equipped!')
                 return
             }
 
+            const playerPos = globalState.player.position
+            const targetPos = (obj as Critter).position
+
+            const weaponRange = weapon.weapon?.getMaximumRange?.(1) ?? 1
+            const currentDist = (playerPos && targetPos) ? hexDistance(playerPos, targetPos) : 0
+
             // C2 FIX: use weapon-specific AP cost (APCost1 = primary attack mode)
             const attackCost: number = weapon.weapon?.getAPCost?.(1) ??
                 weapon.weapon?.weapon?.pro?.extra?.APCost1 ?? 4
 
-            if (globalState.player.AP!.getAvailableCombatAP() < attackCost) {
-                uiLog(getProtoMsg(700)!) // "You don't have enough action points."
+            const totalAP = globalState.player.AP!.getAvailableMoveAP()
+            if (totalAP < attackCost) {
+                uiLog(getProtoMsg(700)!)
                 return
             }
 
+            const doAttack = (region: string) => {
+                if (!globalState.player.AP!.subtractCombatAP(attackCost)) {
+                    uiLog(getProtoMsg(700)!)
+                    return
+                }
+                console.log('Attacking %s...', region)
+                globalState.combat!.attack(globalState.player, <Critter>obj, region)
+            }
+
+            if (currentDist > weaponRange) {
+                // Out of range — walk toward the target until within weapon range,
+                // then attack from the closest reachable hex.
+                const moveBudget = totalAP - attackCost
+                if (moveBudget <= 0) {
+                    uiLog(getProtoMsg(700)!)
+                    return
+                }
+
+                if (!playerPos || !targetPos) {
+                    console.log('Cannot determine path to target.')
+                    return
+                }
+
+                // Find the nearest hex to the target that is within weapon range.
+                // Prefer hexes closest to the player for shortest walk.
+                const candidates = hexNeighbors(targetPos)
+                    .map(n => ({ pos: n, dist: hexDistance(playerPos, n) }))
+                    .filter(c => c.dist <= weaponRange)
+                    .sort((a, b) => a.dist - b.dist)
+
+                // If no neighbor is within range, walk directly toward target
+                const dest = candidates.length > 0 ? candidates[0].pos : targetPos
+
+                const walkOk = globalState.player.walkTo(
+                    dest,
+                    Config.engine.doAlwaysRun,
+                    () => {
+                        globalState.player.clearAnim()
+                        const afterDist = (globalState.player.position && targetPos)
+                            ? hexDistance(globalState.player.position, targetPos)
+                            : 0
+                        if (afterDist > weaponRange) {
+                            console.log('Could not get close enough to attack.')
+                            return
+                        }
+                        if (weapon.weapon!.isCalled()) {
+                            let art = 'art/critters/hmjmpsna'
+                            if (who.hasAnimation('called-shot')) {
+                                art = who.getAnimation('called-shot')
+                            }
+                            uiCalledShot(art, who, (region: string) => {
+                                doAttack(region)
+                                uiCloseCalledShot()
+                            })
+                        } else {
+                            doAttack('torso')
+                        }
+                    },
+                    moveBudget
+                )
+
+                if (!walkOk) {
+                    console.log('Cannot reach target.')
+                    return
+                }
+
+                const moveCost = Math.max(0, globalState.player.path.path.length - 1)
+                if (!globalState.player.AP!.subtractMoveAP(moveCost)) {
+                    console.warn('walk-to-range: AP desync — forcing AP to 0')
+                    globalState.player.AP!.combat = 0
+                    globalState.player.AP!.move = 0
+                }
+                return
+            }
+
+            // Already in range — attack directly
             if (weapon.weapon!.isCalled()) {
                 let art = 'art/critters/hmjmpsna' // default art
                 if (who.hasAnimation('called-shot')) {
@@ -183,15 +250,11 @@ export function playerUse() {
                 console.log('art: %s', art)
 
                 uiCalledShot(art, who, (region: string) => {
-                    globalState.player.AP!.subtractCombatAP(attackCost)
-                    console.log('Attacking %s...', region)
-                    globalState.combat!.attack(globalState.player, <Critter>obj, region)
+                    doAttack(region)
                     uiCloseCalledShot()
                 })
             } else {
-                globalState.player.AP!.subtractCombatAP(attackCost)
-                console.log('Attacking the torso...')
-                globalState.combat!.attack(globalState.player, <Critter>obj, 'torso')
+                doAttack('torso')
             }
 
             return
@@ -313,6 +376,27 @@ function initUIManager(): void {
     globalState.uiManager = mgr
 }
 
+function applyUIScale(): void {
+    const container = document.getElementById('game-container')
+    if (!container) return
+
+    if (!Config.ui.scaleToFit) {
+        container.style.transform = ''
+        document.body.style.justifyContent = ''
+        document.body.style.alignItems = ''
+        return
+    }
+
+    const sx = window.innerWidth / 800
+    const sy = window.innerHeight / 600
+    const s = Math.min(sx, sy)
+
+    container.style.transform = `scale(${s})`
+    document.body.style.justifyContent = 'center'
+    document.body.style.alignItems = 'center'
+    document.body.style.display = 'flex'
+}
+
 window.onload = async function () {
     globalState.isInitializing = true
 
@@ -378,6 +462,9 @@ window.onload = async function () {
     })
 
     heart._init()
+
+    applyUIScale()
+    window.addEventListener('resize', applyUIScale)
 }
 
 heart.mousepressed = (x: number, y: number, btn: string) => {

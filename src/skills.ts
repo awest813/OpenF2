@@ -121,7 +121,6 @@ export const statDependencies: { [name: string]: Stat } = {
     'DR Poison': new Stat(0, 95, 0, [new Dependency('END', 5)]),
     Age: new Stat(16, 101, 25, []),
     Gender: new Stat(0, 1, 0, []),
-    //todo: figure out HP.,
     HP: new Stat(0, 999, 1, []),
     'Poison Level': new Stat(0, 2000, 0, []),
     'Radiation Level': new Stat(0, 2000, 0, []),
@@ -132,11 +131,13 @@ export const statDependencies: { [name: string]: Stat } = {
     Karma: new Stat(-99999999, 99999999, 0, []),
 }
 
-// TODO: figure out what is going on with Skill
-// all the weird pseudo stats
+// FO2's "pseudo-stats" (Party Limit, Skill Rate, Perk Rate) are derived
+// per-tick from a base stat + a formula.  They're not yet exposed in this
+// engine because no current caller reads them; the commented definitions
+// below show the structure they would take when wired up.
 //statDependencies['Party Limit'] = new Stat(0, 5, 0, [new Dependency('CHA', 0.5)])
-//statDependencies['Skill Rate'] = new Skill(0, Math.pow(2, 31-1), 0, [new Dependency('IN', 2), new Dependency('One', 5)])
-//statDependencies['Perk Rate'] = new Skill(1, Math.pow(2, 31-1), 0, [new Dependency('One', 3)])
+//statDependencies['Skill Rate'] = new Stat(0, Math.pow(2, 31-1), 0, [new Dependency('IN', 2), new Dependency('One', 5)])
+//statDependencies['Perk Rate'] = new Stat(1, Math.pow(2, 31-1), 0, [new Dependency('One', 3)])
 
 //helper
 statDependencies['One'] = new Stat(1, 1, 1, [])

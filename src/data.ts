@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { getFileJSON, getFileText, parseIni } from './util.js'
+import { fixMojibake, getFileJSON, getFileText, parseIni } from './util.js'
 import globalState from './globalState.js'
 import { Point } from './geometry.js'
 import { lookupInterfaceArt } from './pro.js'
@@ -24,7 +24,11 @@ let mapInfo: { [mapID: number]: MapInfo } | null = null
 let elevatorInfo: { elevators: Elevator[] } | null = null
 
 export interface AreaMap {
-    // XXX: Why does using a number key break areas?
+    // NOTE: We index by string here because TypeScript requires all
+    // numeric keys to be present (an AreaMap with `[k: number]: Area`
+    // would force every integer key to point at an Area, which JS
+    // doesn't actually do at runtime).  See loadAreas() where we
+    // call `String(id)` to coerce.
     [areaID: string]: Area
 }
 
@@ -199,8 +203,8 @@ export function loadMessage(name: string) {
             console.warn('message parsing: skipping invalid line: ' + lines[i])
             continue
         }
-        // HACK: replace unicode replacement character with an apostrophe (because the Web sucks at character encodings)
-        globalState.messageFiles[name][m[1]] = m[2].replace(/\ufffd/g, "'")
+        // Decode U+FFFD sentinels (see fixMojibake for rationale).
+        globalState.messageFiles[name][m[1]] = fixMojibake(m[2])
     }
 }
 

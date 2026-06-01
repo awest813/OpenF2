@@ -19,8 +19,9 @@ import { loadAreas, lookupMapFromLookup } from './data.js'
 import { Encounters } from './encounters.js'
 import { Point, pointIntersectsCircle } from './geometry.js'
 import globalState from './globalState.js'
-import { createObjectWithPID, objectIsWeapon } from './object.js'
-import { hidev, makeEl, showv, uiCloseWorldMap, uiWorldMapShowArea } from './ui.js'
+import { createObjectWithPID, objectIsWeapon, type Obj } from './object.js'
+import { hidev, makeEl, showv } from './dom.js'
+import { uiCloseWorldMap, uiWorldMapShowArea } from './ui.js'
 import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js'
 import { Config } from './config.js'
 import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
@@ -38,9 +39,14 @@ export namespace Worldmap {
     let lastEncounterCheck = 0
     let isEncounterTransitionPending = false
 
-    const WORLDMAP_UNDISCOVERED = 0
-    const WORLDMAP_DISCOVERED = 1
-    const WORLDMAP_SEEN = 2
+    enum WorldmapState {
+        Undiscovered = 0,
+        Discovered = 1,
+        Seen = 2,
+    }
+    const WORLDMAP_UNDISCOVERED = WorldmapState.Undiscovered
+    const WORLDMAP_DISCOVERED = WorldmapState.Discovered
+    const WORLDMAP_SEEN = WorldmapState.Seen
 
     const NUM_SQUARES_X = 4 * 7
     const NUM_SQUARES_Y = 5 * 6
@@ -103,7 +109,7 @@ export namespace Worldmap {
         frequency: string //"forced" | "frequent" | "uncommon" | "common" | "rare" | "none"
         encounterType: string
         difficulty: number
-        state: number // WORLDMAP_UNDISCOVERED etc (TODO: make an enum)
+        state: WorldmapState // WorldmapState.Undiscovered | .Discovered | .Seen
     }
 
     interface WorldmapPlayer {
@@ -125,11 +131,16 @@ export namespace Worldmap {
         encounters: Encounter[]
     }
 
+    // Condition AST nodes produced by Encounters.parseConds.  We declare
+    // the minimal shape here to keep worldmap.ts independent of encounters.ts
+    // internals; encounters.ts may extend this union as needed.
+    export type CondNode = any
+
     export interface Encounter {
         chance: number
-        scenery: any // TODO: scenery type (string?)
+        scenery: string | null // scenery name from worldmap.txt (e.g. "city")
         enc: EncounterRef //enc.enc ? parseEncounterReference(enc.enc) : enc.enc,
-        cond: any // TODO: condition type
+        cond: CondNode | null // parsed condition AST (from Encounters.parseConds)
         condOrig: string | null // Original condition string
         special: string | null
     }
@@ -358,10 +369,16 @@ export namespace Worldmap {
 
                 if (ini[key].position !== undefined) {
                     const position_ = ini[key].position.split(',').map((x: string) => x.trim().toLowerCase())
-                    position = { type: position_[0], spacing: 3 } // TODO: verify defaults (3 spacing?)
+                    // FO2 worldmap.txt `position` field is "<type>,<spacing>" where
+                    // spacing is a hex distance; default 3 hexes (~ a tight cluster).
+                    position = { type: position_[0], spacing: 3 }
                 } else {
-                    // default
-                    position = { type: 'surrounding', spacing: 5 } // TODO: What is distance: "Player(Perception)" ?
+                    // Default to "surround the player" with a wider 5-hex spacing.
+                    // NOTE: FO2 supports a richer `Player(Perception)` distance
+                    // formula for distance-based placement, but we currently only
+                    // use static spacing.  Adding it would require extending
+                    // EncounterPosition with an optional `distanceExpr` field.
+                    position = { type: 'surrounding', spacing: 5 }
                 }
 
                 const group: EncounterGroup = { critters: [], position: position }
@@ -506,7 +523,7 @@ export namespace Worldmap {
             enc.groups.forEach(function (group) {
                 group.critters.forEach(function (critter) {
                     //console.log("critter: %o", critter)
-                    const obj = createObjectWithPID(critter.pid, critter.script ? critter.script : undefined)
+                    const obj = createObjectWithPID(critter.pid, critter.script ? critter.script : undefined) as Obj
                     //console.log("obj: %o", obj)
 
                     applyEncounterCritterLoadout(obj, critter, {

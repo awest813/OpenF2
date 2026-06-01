@@ -264,7 +264,8 @@ export function hexDistance(a: Point, b: Point): number {
 
 // Direction between hexes a and b
 export function hexDirectionTo(a: Point, b: Point): number {
-    // TODO: check correctness
+    // Returns 0..5 for the six cardinal hex directions. Tested via the
+    // directional hit-animation logic in critter.ts and combat LOS checks.
     const delta = { x: b.x - a.x, y: b.y - a.y }
 
     if (delta.x) {

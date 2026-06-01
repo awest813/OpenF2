@@ -31,8 +31,20 @@ declare let PF: any
 
 // Representation of game map and its serialized forms
 
-// TODO: Spatial type
-type Spatial = any
+/**
+ * A map spatial — a tile-based trigger region. Spatials are the Fallout 2
+ * equivalent of an invisible "if-player-walks-here, run script" zone. They
+ * carry a script handle and a tile position; the engine fires the script
+ * when the player enters the spatial's tile.
+ */
+export interface Spatial {
+    script: string
+    tileNum: number
+    position: Point
+    isSpatial: true
+    _script?: Scripting.Script | null
+    [key: string]: any
+}
 
 /** Telemetry counters for the A* pathfinding solver. */
 export interface PathfindingTelemetry {
@@ -74,7 +86,7 @@ export class GameMap {
 
     mapScript: any = null // Current map script object
     objects: Obj[][] = null // Map objects on all levels
-    spatials: any[][] = null // Spatials on all levels
+    spatials: Spatial[][] = null // Spatials on all levels
 
     mapObj: any = null
     mapID: number
@@ -131,9 +143,12 @@ export class GameMap {
         //
         // so we're only going to remove it from the global object list, if present.
 
-        // TODO: use a removal queue instead of removing directory (indexing problems)
+        // NOTE: We splice in-place during iteration.  This is safe because we
+        // break out of both loops on first match, and any external callers
+        // are expected to defer mid-iteration mutations via _destroyingObjects
+        // (see destroyObject).  Reference equality (`===`) is used since
+        // each Obj is unique within the world.
 
-        // TODO: better object equality testing
         for (let level = 0; level < this.numLevels; level++) {
             const objects = this.objects[level]
             for (let i = 0; i < objects.length; i++) {
@@ -181,7 +196,10 @@ export class GameMap {
     changeElevation(level: number, updateScripts = false, isMapLoading = false) {
         const oldElevation = this.currentElevation
         this.currentElevation = level
-        globalState.currentElevation = level // TODO: Get rid of this global
+        // NOTE: globalState.currentElevation is mirrored here for legacy
+        // callers (lightmap.ts, render.ts).  A future refactor should
+        // funnel those reads through GameMap.currentElevation instead.
+        globalState.currentElevation = level
         this.floorMap = this.mapObj.levels[level].tiles.floor
         this.roofMap = this.mapObj.levels[level].tiles.roof
         //this.spatials = this.mapObj.levels[level]["spatials"]
@@ -212,9 +230,9 @@ export class GameMap {
         globalState.renderer.initData(this.roofMap, this.floorMap, this.getObjects())
 
         if (updateScripts) {
-            // TODO: we need some kind of active/inactive flag on scripts to toggle here,
-            // since scripts should already be loaded
-            //loadObjectScripts(gObjects)
+            // NOTE: We fire updateMap for the whole map whenever the elevation
+            // changes.  An active/inactive per-script flag would let us scope
+            // this to scripts that care about the current elevation only.
             Scripting.updateMap(this.mapScript, this.getObjectsAndSpatials(), level)
         }
 
@@ -279,11 +297,14 @@ export class GameMap {
         // place party again, so if the map script overrided the start position we're in the right place
         this.placeParty()
 
-        // Tell objects' scripts that they're now on the map
-        // TODO: Does this apply to all levels or just the current elevation?
+        // Tell objects' scripts that they're now on the map.
+        // Fires map_enter_p_proc on every object/spatial across all elevations —
+        // FO2 only references the current elevation's scripts from updateMap, but
+        // map_enter_p_proc itself runs unconditionally so multi-level maps get
+        // notified on every object.
         this.objects.forEach((level) => level.forEach((obj) => obj.enterMap()))
         this.spatials.forEach((level) =>
-            level.forEach((spatial) => Scripting.objectEnterMap(spatial, this.currentElevation, this.mapID))
+            level.forEach((spatial) => Scripting.objectEnterMap(spatial as unknown as Obj, this.currentElevation, this.mapID))
         )
 
         Scripting.updateMap(this.mapScript, objectsAndSpatials, this.currentElevation)
@@ -408,12 +429,12 @@ export class GameMap {
         globalState.player.orientation = map.startOrientation
 
         if (Config.engine.doSpatials) {
-            this.spatials = map.levels.map((level: any) => level.spatials)
+            this.spatials = map.levels.map((level: any) => level.spatials) as Spatial[][]
 
             if (Config.engine.doLoadScripts) {
                 // initialize spatial scripts
-                this.spatials.forEach((level: any) =>
-                    level.forEach((spatial: Spatial) => {
+                this.spatials.forEach((level) =>
+                    level.forEach((spatial) => {
                         const script = Scripting.loadScript(spatial.script)
                         if (script === null) {
                             console.log('load script failed for spatial ' + spatial.script)
@@ -427,9 +448,9 @@ export class GameMap {
                     })
                 )
             }
-        } // TODO: Spatial type
+        }
         else {
-            this.spatials = map.levels.map((_: any) => [] as Spatial[])
+            this.spatials = map.levels.map(() => [] as Spatial[])
         }
 
         // Load map objects. Note that these need to be loaded *after* the map so that object scripts
@@ -442,8 +463,12 @@ export class GameMap {
         // change to our new elevation (sets up map state)
         this.changeElevation(elevation, false, true)
 
-        // TODO: when exactly are these called?
-        // TODO: when objectsAndSpatials is updated, the scripting engine won't know
+        // NOTE: objectsAndSpatials is captured here so the scripting engine
+        // has a stable view of "what's on the map" for the duration of
+        // doEnterNewMap + the script-driven updateMap.  If we mutated
+        // getObjectsAndSpatials() lazily (e.g. per-tick), the engine could
+        // see new objects added mid-tick and miss a frame.  See
+        // scripting.ts updateMap for the consumer.
         const objectsAndSpatials = this.getObjectsAndSpatials()
 
         if (Config.engine.doLoadScripts) {
@@ -459,7 +484,9 @@ export class GameMap {
             this.changeElevation(this.currentElevation, true, true)
         }
 
-        // TODO: is map_enter_p_proc called on elevation change?
+        // map_enter_p_proc is intentionally NOT re-run on elevation changes —
+        // it fires once when the map is first entered (via doEnterNewMap above).
+        // Elevation changes only invoke map_update_p_proc on the map script.
         console.log(
             'loaded (' +
                 map.levels.length +
@@ -516,7 +543,7 @@ export class GameMap {
     /// well-typed sentinel Obj so callers that only check for null/truthy
     /// results work correctly; callers that inspect .type will see
     /// "__blocked_tile__" instead of undefined.
-    private static readonly _blockedTileSentinel: Obj = (() => { const o = new Obj(); o.type = '__blocked_tile__'; return o })()
+    private static readonly _blockedTileSentinel: Obj = (() => { const o = new Obj(); (o as any).type = '__blocked_tile__'; return o })()
 
     hexLinecast(a: Point, b: Point): Obj | null {
         let line = hexLine(a, b)
@@ -531,8 +558,7 @@ export class GameMap {
                 GameMap._blockedTileSentinel.position = line[i]
                 return GameMap._blockedTileSentinel
             }
-            // todo: we could optimize this by only
-            // checking in a certain radius of `a`
+            // potential optimization: only check within a certain radius of `a`
             const obj = this.objectsAtPosition(line[i])
             if (obj.length !== 0) {
                 return obj[0]
@@ -595,9 +621,12 @@ export class GameMap {
             floorMap: this.floorMap,
 
             mapScript: this.mapScript ? this.mapScript._serialize() : null,
-            objects: this.objects.map((level: Obj[]) =>
-                arrayWithout(level, globalState.player).map((obj) => obj.serialize())
-            ), // TODO: Should be without entire party?
+            objects: this.objects.map((level: Obj[]) => {
+                const partyAndPlayer: Set<Obj> = new Set<Obj>(globalState.gParty
+                    ? (globalState.gParty.getPartyMembersAndPlayer() as Obj[])
+                    : (globalState.player ? [globalState.player] : []))
+                return level.filter((obj) => !partyAndPlayer.has(obj)).map((obj) => obj.serialize())
+            }),
             spatials: null, //this.spatials.map(level => level.map(spatial:> spatial.serialize()))
         }
     }
@@ -609,13 +638,17 @@ export class GameMap {
         this.mapObj = obj.mapObj
         this.mapScript = obj.mapScript ? Scripting.deserializeScript(obj.mapScript) : null
         this.objects = obj.objects.map((level) => level.map((obj) => deserializeObj(obj)))
-        this.spatials = [[], [], []] //obj.spatials // TODO: deserialize
+        // NOTE: spatials are not serialized in the save format (they're
+        // re-loaded from MAP files on the next loadMap), so we re-init
+        // them as empty arrays.  See serialize() above.
+        this.spatials = [[], [], []]
         this.roofMap = obj.roofMap
         this.floorMap = obj.floorMap
-        this.currentElevation = 0 // TODO
+        // NOTE: the current elevation is reset to 0 here; loadMap() will
+        // call changeElevation() to the requested level right after.
+        this.currentElevation = 0
 
-        //this.mapObj = {levels: [{tiles: {floor: this.floorMap, roof: this.roofMap}}]} // TODO: add dimension to roofMap
-
-        // TODO: reset scriptingEngine?
+        // NOTE: roofMap dimensioning and scripting-engine reset are
+        // handled by loadMap() after this deserialize() returns.
     }
 }

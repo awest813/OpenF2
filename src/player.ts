@@ -103,7 +103,7 @@ export class Player extends Critter {
         for (let i = 0; i < objs.length; i++) {
             if (objs[i].type === 'misc' && objs[i].extra && objs[i].extra.exitMapID !== undefined) {
                 // walking on an exit grid
-                // todo: exit grids are likely multi-hex (maybe have a set?)
+                // exit grids may span multiple tiles (not yet verified against real map data)
                 const exitMapID = objs[i].extra.exitMapID
                 const startingPosition = fromTileNum(objs[i].extra.startingPosition)
                 const startingElevation = objs[i].extra.startingElevation

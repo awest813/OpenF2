@@ -19,6 +19,16 @@ limitations under the License.
 body {
   font-family: sans-serif;
   margin: 0;
+  overflow: hidden;
+  background: black;
+}
+
+#game-container {
+  position: relative;
+  width: 800px;
+  height: 600px;
+  background-color: black;
+  transform-origin: top left;
 }
 
 .disable-selection {
@@ -28,13 +38,6 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-}
-
-#game-container {
-  position: relative;
-  width: 800px;
-  height: 600px;
-  background-color: black;
 }
 
 /* canvas overlay */
@@ -195,10 +198,19 @@ body {
   background-repeat: no-repeat;
 }
 
-#attackButtonAPDigit {
+#attackButtonAPDigit1 {
   position: absolute;
   top: 0px;
   left: 20px;
+  width: 9px;
+  height: 12px;
+  background-image: url("art/intrface/mvenum.png");
+}
+
+#attackButtonAPDigit2 {
+  position: absolute;
+  top: 0px;
+  left: 29px;
   width: 9px;
   height: 12px;
   background-image: url("art/intrface/mvenum.png");
@@ -321,8 +333,11 @@ body {
   position: absolute;
   left: 295px;
   top: 45px;
-  width: 150px;
-  height: 190px;
+  width: 160px;
+  height: 250px;
+  font-family: monospace;
+  font-size: 8pt;
+  overflow-y: auto;
 }
 
 .number {

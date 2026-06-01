@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import globalState from './globalState.js'
+import { hexDirectionTo } from './geometry.js'
 import { Critter, WeaponObj } from './object.js'
 import { Scripting } from './scripting.js'
 
@@ -28,50 +29,60 @@ const weaponAnims: { [weapon: string]: { [anim: string]: string } } = {
     punch: { idle: 'aa', attack: 'aq' },
 }
 
-// TODO: (Double-sided) enum
-const attackMode: { [mode: string]: string | number } = {
-    none: 0,
-    punch: 1,
-    kick: 2,
-    swing: 3,
-    thrust: 4,
-    throw: 5,
-    'fire single': 6,
-    'fire burst': 7,
-    flame: 8,
+class BiDiEnum<T extends string, U extends number> {
+    private byName: { [K in T]?: U } = {}
+    private byValue: { [K in U]?: T } = {}
+    readonly names: T[] = []
+    readonly values: U[] = []
 
-    0: 'none',
-    1: 'punch',
-    2: 'kick',
-    3: 'swing',
-    4: 'thrust',
-    5: 'throw',
-    6: 'fire single',
-    7: 'fire burst',
-    8: 'flame',
+    add(name: T, value: U): void {
+        this.byName[name] = value
+        this.byValue[value] = name
+        this.names.push(name)
+        this.values.push(value)
+    }
+
+    toValue(name: string): U | undefined { return this.byName[name as T] }
+    toName(value: number): T | undefined { return this.byValue[value as U] }
+    hasName(name: string): boolean { return name in this.byName }
+    hasValue(value: number): boolean { return value in this.byValue }
 }
 
-// TODO: (Double-sided) enum
-const damageType: { [type: string]: string | number } = {
-    Normal: 0,
-    Laser: 1,
-    Fire: 2,
-    Plasma: 3,
-    Electrical: 4,
-    EMP: 5,
-    Explosive: 6,
+const attackMode = new BiDiEnum<string, number>()
+attackMode.add('none', 0)
+attackMode.add('punch', 1)
+attackMode.add('kick', 2)
+attackMode.add('swing', 3)
+attackMode.add('thrust', 4)
+attackMode.add('throw', 5)
+attackMode.add('fire single', 6)
+attackMode.add('fire burst', 7)
+attackMode.add('flame', 8)
 
-    0: 'Normal',
-    1: 'Laser',
-    2: 'Fire',
-    3: 'Plasma',
-    4: 'Electrical',
-    5: 'EMP',
-    6: 'Explosive',
+const damageType = new BiDiEnum<string, number>()
+damageType.add('Normal', 0)
+damageType.add('Laser', 1)
+damageType.add('Fire', 2)
+damageType.add('Plasma', 3)
+damageType.add('Electrical', 4)
+damageType.add('EMP', 5)
+damageType.add('Explosive', 6)
+
+const weaponSkillByAnimCode: { [code: number]: string } = {
+    0: 'Unarmed',
+    1: 'Melee Weapons',
+    2: 'Melee Weapons',
+    3: 'Melee Weapons',
+    4: 'Melee Weapons',
+    5: 'Small Guns',
+    6: 'Small Guns',
+    7: 'Small Guns',
+    8: 'Big Guns',
+    9: 'Big Guns',
+    10: 'Big Guns',
 }
 
-// TODO: Figure out if we can derive the correct info from the game somehow
-const weaponSkillMap: { [weapon: string]: string } = {
+const weaponSkillByNameFallback: { [weapon: string]: string } = {
     uzi: 'Small Guns',
     rifle: 'Small Guns',
     spear: 'Melee Weapons',
@@ -82,6 +93,38 @@ const weaponSkillMap: { [weapon: string]: string } = {
     pistol: 'Small Guns',
 }
 
+function resolveWeaponSkill(weapon: WeaponObj): string {
+    const animCode = weapon.pro?.extra?.animCode
+    if (typeof animCode === 'number' && weaponSkillByAnimCode[animCode]) {
+        return weaponSkillByAnimCode[animCode]
+    }
+    const s = weapon.art.split('/')
+    const name = s[s.length - 1]
+    return weaponSkillByNameFallback[name] ?? 'Small Guns'
+}
+
+type WeaponType = 'melee' | 'gun' | 'throwing'
+
+interface WeaponProtoExtra {
+    maxRange1: number
+    maxRange2: number
+    APCost1: number
+    APCost2: number
+    minDmg: number
+    maxDmg: number
+    dmgType?: number
+    projPID?: number
+    animCode?: number
+    attackMode?: number
+    perk?: number
+    twoHanded?: number
+    acModifier?: number
+    ammoDmgMult?: number
+    ammoDmgDiv?: number
+    drModifier?: number
+    minST?: number
+}
+
 interface AttackInfo {
     mode: number
     APCost: number
@@ -90,17 +133,17 @@ interface AttackInfo {
 
 function parseAttack(weapon: WeaponObj): { first: AttackInfo; second: AttackInfo } {
     const attackModes = weapon.pro.extra['attackMode']
-    const modeOne = attackMode[attackModes & 0xf] as number
-    const modeTwo = attackMode[(attackModes >> 4) & 0xf] as number
+    const modeOne = attackMode.toValue(attackMode.toName(attackModes & 0xf) ?? 'none') ?? 0
+    const modeTwo = attackMode.toValue(attackMode.toName((attackModes >> 4) & 0xf) ?? 'none') ?? 0
     const attackOne: AttackInfo = { mode: modeOne, APCost: 0, maxRange: 0 }
     const attackTwo: AttackInfo = { mode: modeTwo, APCost: 0, maxRange: 0 }
 
-    if (modeOne !== attackMode.none) {
+    if (modeOne !== attackMode.toValue('none')) {
         attackOne.APCost = weapon.pro.extra.APCost1
         attackOne.maxRange = weapon.pro.extra.maxRange1
     }
 
-    if (modeTwo !== attackMode.none) {
+    if (modeTwo !== attackMode.toValue('none')) {
         attackTwo.APCost = weapon.pro.extra.APCost2
         attackTwo.maxRange = weapon.pro.extra.maxRange2
     }
@@ -108,41 +151,50 @@ function parseAttack(weapon: WeaponObj): { first: AttackInfo; second: AttackInfo
     return { first: attackOne, second: attackTwo }
 }
 
-// TODO: improve handling of melee
 export class Weapon {
-    weapon: any // TODO: any (because of melee)
+    weapon: WeaponObj | { pro: { extra: WeaponProtoExtra } }
     name: string
     modes: string[]
-    mode: string // current mode
-    type: string
+    mode: string
+    type: WeaponType
     minDmg: number
     maxDmg: number
     weaponSkillType: string
 
-    attackOne!: { mode: number; APCost: number; maxRange: number }
-    attackTwo!: { mode: number; APCost: number; maxRange: number }
+    attackOne!: AttackInfo
+    attackTwo!: AttackInfo
 
-    constructor(weapon: WeaponObj, critter?: any) {
-        this.weapon = weapon
+    private get protoExtra(): WeaponProtoExtra {
+        return this.weapon.pro.extra
+    }
+
+    constructor(weapon: WeaponObj | null, critter?: any) {
+        this.weapon = weapon!
         this.modes = ['single', 'called']
 
         if (weapon === null) {
             this.type = 'melee'
-            // FO2 unarmed damage scales with Unarmed skill and meleeDamage (STR-5).
             const unarmedSkill = (typeof critter?.getSkill === 'function') ? critter.getSkill('Unarmed') : 0
             const meleeDmg = (typeof critter?.getStat === 'function') ? Math.max(1, (critter.getStat('STR') ?? 5) - 5) : 0
             this.minDmg = 1 + Math.floor(unarmedSkill / 50)
             this.maxDmg = 2 + meleeDmg + Math.floor(unarmedSkill / 25)
             this.name = 'punch'
             this.weaponSkillType = 'Unarmed'
-            this.weapon = {}
-            this.weapon.pro = { extra: {} }
-            this.weapon.pro.extra.maxRange1 = 1
-            this.weapon.pro.extra.maxRange2 = 1
-            this.weapon.pro.extra.APCost1 = 4
-            this.weapon.pro.extra.APCost2 = 4
+            this.weapon = {
+                pro: {
+                    extra: {
+                        maxRange1: 1,
+                        maxRange2: 1,
+                        APCost1: 4,
+                        APCost2: 4,
+                        minDmg: this.minDmg,
+                        maxDmg: this.maxDmg,
+                        dmgType: 0,
+                        attackMode: 0x11,
+                    }
+                }
+            }
         } else {
-            // Detect melee weapons from attackMode: 1=punch, 2=kick, 3=swing, 4=thrust
             const attackModes = weapon.pro.extra['attackMode'] ?? 0
             const primaryMode = attackModes & 0x0f
             const secondaryMode = (attackModes >> 4) & 0x0f
@@ -162,8 +214,8 @@ export class Weapon {
             this.attackOne = attacks.first
             this.attackTwo = attacks.second
 
-            this.weaponSkillType = weaponSkillMap[this.name]
-            if (this.weaponSkillType === undefined) {console.log('unknown weapon type for ' + this.name)}
+            this.weaponSkillType = resolveWeaponSkill(weapon)
+            if (this.weaponSkillType === undefined) {console.log('unknown weapon type for ' + this.name + ' (animCode: ' + weapon.pro?.extra?.animCode + ')')}
         }
 
         this.mode = this.modes[0]
@@ -179,49 +231,49 @@ export class Weapon {
 
     getProjectilePID(): number {
         if (this.type === 'melee') {return -1}
-        return this.weapon.pro.extra.projPID
+        return this.protoExtra.projPID ?? -1
     }
 
-    // TODO: enum
     getMaximumRange(attackType: number): number {
-        if (attackType === 1) {return this.weapon.pro.extra.maxRange1}
-        if (attackType === 2) {return this.weapon.pro.extra.maxRange2}
-        // Unknown attack type — return a safe minimum range rather than crashing.
+        if (attackType === 1) {return this.protoExtra.maxRange1}
+        if (attackType === 2) {return this.protoExtra.maxRange2}
         console.warn('getMaximumRange: unknown attack type ' + attackType + ' — returning 1')
         return 1
     }
 
-    getAPCost(attackMode: number): number {
-        const cost = this.weapon.pro.extra['APCost' + attackMode]
+    getAPCost(atkMode: number): number {
+        const key = 'APCost' + atkMode as 'APCost1' | 'APCost2'
+        const cost = this.protoExtra[key]
         if (cost === undefined) {
-            // BLK-222: unknown attack mode index; return 0 so AP calculations don't produce NaN.
-            console.warn(`getAPCost: unknown attackMode ${attackMode} — returning 0`)
+            console.warn(`getAPCost: unknown attackMode ${atkMode} — returning 0`)
             return 0
         }
         return cost
     }
 
     getSkin(): string | null {
-        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) {return null}
+        const extra = this.protoExtra
+        if (extra === undefined) {return null}
         const animCodeMap: { [animCode: number]: string } = {
-            0: 'a', // None
-            1: 'd', // Knife
-            2: 'e', // Club
-            3: 'f', // Sledgehammer
-            4: 'g', // Spear
-            5: 'h', // Pistol
-            6: 'i', // SMG
-            7: 'j', // Rifle
-            8: 'k', // Big Gun
-            9: 'l', // Minigun
+            0: 'a',
+            1: 'd',
+            2: 'e',
+            3: 'f',
+            4: 'g',
+            5: 'h',
+            6: 'i',
+            7: 'j',
+            8: 'k',
+            9: 'l',
             10: 'm',
-        } // Rocket Launcher
-        return animCodeMap[this.weapon.pro.extra.animCode]
+        }
+        return animCodeMap[extra.animCode ?? 0]
     }
 
     getAttackSkin(): string | null {
-        if (this.weapon.pro === undefined || this.weapon.pro.extra === undefined) {return null}
-        if (this.weapon === 'punch') {return 'q'}
+        const extra = this.protoExtra
+        if (extra === undefined) {return null}
+        if (this.name === 'punch' && this.type === 'melee' && !(this.weapon instanceof WeaponObj)) {return 'q'}
 
         const modeSkinMap: { [mode: string]: string } = {
             punch: 'q',
@@ -234,12 +286,15 @@ export class Weapon {
             flame: 'l',
         }
 
-        // TODO: mode equipped
-        if (this.attackOne.mode !== attackMode.none) {
-            return modeSkinMap[this.attackOne.mode]
+        const activeAttack = this.mode === 'called' && this.attackTwo.mode !== attackMode.toValue('none')
+            ? this.attackTwo
+            : this.attackOne
+
+        if (activeAttack.mode !== attackMode.toValue('none')) {
+            const skin = modeSkinMap[activeAttack.mode]
+            if (skin) {return skin}
         }
 
-        // No attack mode mapped — return default skin so animations don't crash.
         console.warn('getAttackSkin: no attack mode mapping for weapon — using default skin "a"')
         return 'a'
     }
@@ -257,20 +312,29 @@ export class Weapon {
                 var attackSkin = this.getAttackSkin()
                 return wep + attackSkin
             default:
-                return null // let something else handle it
+                return null
         }
     }
 
-    // FIXME: need some other way to check this without accessing `globalState.imageInfo`
     canEquip(obj: Critter): boolean {
-        return globalState.imageInfo[obj.getBase() + this.getAnim('attack')] !== undefined
+        const attackAnim = this.getAnim('attack')
+        if (attackAnim !== null && globalState.imageInfo[obj.getBase() + attackAnim] !== undefined) {
+            return true
+        }
+        if (this.weapon instanceof WeaponObj) {
+            const minST = this.protoExtra.minST ?? 0
+            return obj.getStat('STR') >= minST
+        }
+        return false
     }
 
     getDamageType(): string {
-        // Return the (string) damage type of the weapon, e.g. "Normal", "Laser", ...
-        // Defaults to "Normal" if the weapon's PRO does not provide one.
-        const rawDmgType = this.weapon.pro.extra.dmgType
-        return rawDmgType !== undefined ? (damageType[rawDmgType] as string) : 'Normal'
+        const rawDmgType = this.protoExtra.dmgType
+        return rawDmgType !== undefined ? (damageType.toName(rawDmgType) ?? 'Normal') : 'Normal'
+    }
+
+    isMelee(): boolean {
+        return this.type === 'melee'
     }
 }
 
@@ -345,8 +409,7 @@ export function critterKill(
     obj.staticAnimation(
         animName,
         function () {
-            // todo: corpse-ify
-            obj.frame-- // go to last frame
+            obj.frame-- // go to last frame; body remains as static lootable object
             obj.anim = undefined
             if (callback) {callback()}
         },
@@ -372,12 +435,24 @@ export function critterDamage(
         Scripting.damage(obj as any, obj as any, source as any, damage)
     }
 
-    // TODO: other hit animations
-    if (useAnim && obj.hasAnimation('hitFront')) {
-        obj.staticAnimation('hitFront', () => {
-            obj.clearAnim()
-            if (callback) {callback()}
-        })
+    if (useAnim) {
+        let hitAnim: string | null = null
+        if (source && source.position && obj.position) {
+            const dir = hexDirectionTo(source.position, obj.position)
+            if (dir !== null) {
+                const dirAnims = ['hitFront', 'hitFront', 'hitRight', 'hitBack', 'hitBack', 'hitLeft']
+                hitAnim = dirAnims[dir] ?? null
+            }
+        }
+        if (!hitAnim || !obj.hasAnimation(hitAnim)) {
+            hitAnim = obj.hasAnimation('hitFront') ? 'hitFront' : null
+        }
+        if (hitAnim) {
+            obj.staticAnimation(hitAnim, () => {
+                obj.clearAnim()
+                if (callback) {callback()}
+            })
+        }
     }
 }
 

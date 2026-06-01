@@ -71,12 +71,13 @@ describe('Phase 15-D — checklist reflects de-stubbed procedures', () => {
         expect(entry?.status).toBe('implemented')
     })
 
-    it('inven_cmds is now fully implemented; obj_can_hear_obj is partial', () => {
+    it('inven_cmds is now fully implemented; obj_can_hear_obj is implemented (hex-distance check)', () => {
         const inven = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'inven_cmds')
         const hearing = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'obj_can_hear_obj')
 
         // Phase 42: inven_cmds unknown-command fallback upgraded from stub() to warn()
+        // Phase X: obj_can_hear_obj upgraded to implemented (hex-distance check with null guards)
         expect(inven?.status).toBe('implemented')
-        expect(hearing?.status).toBe('partial')
+        expect(hearing?.status).toBe('implemented')
     })
 })

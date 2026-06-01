@@ -24,7 +24,7 @@ import { QuestLog } from './quest/questLog.js'
 import { Reputation } from './quest/reputation.js'
 import { Renderer } from './renderer.js'
 import { Skills } from './skills.js'
-import { UIMode } from './ui.js'
+import { UIMode } from './uiMode.js'
 import { UIManagerImpl } from './ui2/uiPanel.js'
 
 interface FloatMessage {
@@ -65,6 +65,8 @@ export default {
     lastGameTick: 0, // real time of the last game tick
     gameHasFocus: false, // do we have input focus?
     lastMousePickTime: 0, // time when we last checked what's under the mouse cursor
+    lastUpdateTime: 0, // time of last update() call
+    lastDrawTime: 0, // time of last draw() call
     lastFPSTime: 0, // Time since FPS counter was last updated
 
     floatMessages: [],
@@ -98,6 +100,10 @@ export default {
     uiManager: null,
     playerEntityId: 0,
 
+    combatDifficulty: 1, // Normal
+    gameDifficulty: 1, // Normal
+    violenceLevel: 2, // Maximum blood
+
     mapAreas: null,
     markAreaKnown: null,
 
@@ -113,13 +119,20 @@ export default {
      * Returns 0 when no object is under the cursor.
      */
     objUnderCursor: null,
+
+    newObjCounter: 0, // count of objects created via create_object_sid since last map load
 } as {
     gMap: GameMap | null
     combat: Combat | null
     inCombat: boolean
     messageFiles: { [msgFile: string]: { [msgID: string]: string } }
     player: Player | null
-    proMap: any // TODO: type
+    // proMap is a JSON-derived lookup keyed by PRO type ('items' |
+    // 'critters' | 'scenery' | 'walls' | 'tiles' | 'misc') and then by
+    // PRO id.  The value is an opaque record (fields differ per type);
+    // callers should narrow it through loadPRO() or via per-type helpers
+    // rather than reading it directly.
+    proMap: { [proType: string]: { [proId: number]: any } } | null
 
     skillMode: Skills
 
@@ -239,15 +252,21 @@ export default {
     /** Registered by Worldmap.init() to bridge mark_area_known scripting calls. */
     markAreaKnown: ((areaID: number, markState: number) => void) | null
 
-    /**
-     * Phase 79: sfall cursor mode (0 = default action cursor).
-     * Readable/writable by get_cursor_mode_sfall (0x8220) / set_cursor_mode_sfall (0x8221).
-     */
-    sfallCursorMode: number
+    /** Set of blocked tile numbers used by tile_add_blocking / tile_remove_blocking. */
+    blockedTiles?: Set<number>
 
-    /**
-     * Phase 79: last game object under the mouse cursor, or null if none.
-     * Updated by renderer hover detection; read by obj_under_cursor_sfall (0x822D).
-     */
+    /** Combat difficulty: 0=Easy, 1=Normal, 2=Rough, 3=Hard. Controls NPC hit/damage multipliers. */
+    combatDifficulty: number
+    /** Game difficulty: 0=Easy, 1=Normal, 2=Hard. Controls encounter/XP formula branches. */
+    gameDifficulty: number
+    /** Violence level: 0=minimal, 1=normal, 2=maximum blood. */
+    violenceLevel: number
+
+    /** Phase 79: sfall cursor mode (0 = default action cursor). */
+    sfallCursorMode: number
+    /** Phase 79: last game object under the mouse cursor, or null if none. */
     objUnderCursor: import('./object.js').Obj | null
+
+    /** Count of game objects created by script since the last map load (sfall 0x825F). */
+    newObjCounter: number
 }

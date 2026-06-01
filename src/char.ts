@@ -20,7 +20,10 @@ import { clamp } from "./util.js";
 
 // Character Stats and Skills
 
-// TODO: "Melee Weapons" skill is called "Melee" in the PRO
+// NOTE: The `skillDependencies` map uses the in-game name 'Melee Weapons',
+// but the PRO record in proto/skills/skills.lst is just 'Melee'.  The skill
+// display name is taken from the PRO during loading, but for in-memory code
+// we stick with 'Melee Weapons' (see char.ts SkillSet.getBase).
 
 export class SkillSet {
     baseSkills: { [name: string]: number } = {};
@@ -83,10 +86,16 @@ export class SkillSet {
         this.baseSkills[skill] = skillValue;
     }
 
-    // TODO: Respect min and max bounds in inc/dec
+    // Skill base values are bounded by [0, 300] in Fallout 2.
+    private static readonly SKILL_MIN = 0
+    private static readonly SKILL_MAX = 300
 
     incBase(skill: string, useSkillPoints=true): boolean {
         const base = this.getBase(skill);
+
+        if (base >= SkillSet.SKILL_MAX) {
+            return false; // already at max
+        }
 
         if(useSkillPoints) {
             const cost = skillImprovementCost(base);
@@ -106,6 +115,10 @@ export class SkillSet {
     decBase(skill: string, useSkillPoints=true) {
         const base = this.getBase(skill);
 
+        if (base <= SkillSet.SKILL_MIN) {
+            return; // already at min
+        }
+
         if(useSkillPoints) {
             const cost = skillImprovementCost(base - 1);
             this.skillPoints += cost;
@@ -118,9 +131,13 @@ export class SkillSet {
         return this.tagged.indexOf(skill) !== -1;
     }
 
-    // TODO: There should be a limit on the number of tagged skills (3 by default)
+    // The player gets 3 tag slots during character creation.
+    private static readonly MAX_TAGS = 3
 
     tag(skill: string) {
+        if (this.tagged.length >= SkillSet.MAX_TAGS) {
+            return;
+        }
         this.tagged.push(skill);
     }
 

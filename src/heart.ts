@@ -87,7 +87,11 @@ class Graphics {
 
     newImage(src: string, callback: (img: HTMLImageElement) => void) {
         /* load an image */
-        /* XXX: does not handle errors */
+        // NOTE: We don't currently handle image-load errors.  A failed
+        // load (404, CORS, etc.) silently leaves the callback un-fired,
+        // which is fine for our asset pipeline (we'd rather skip the
+        // asset than crash the boot), but should be revisited if we
+        // add UI feedback for missing art.
         const img = new Image()
         heart._imagesLoading.push(img)
         img.onload = function () {
@@ -321,8 +325,11 @@ class Heart {
     }
 }
 
-// XXX: we need a keymap, since browsers decide on being annoying and
-// not having a consistent keymap. (also, this won't work with special characters.)
+// Keymap: we use `e.keyCode` (deprecated but still works) and route
+// through heart._getKeyChar to translate the browser-specific keycode
+// into our in-game character set.  A more modern approach would use
+// `e.code` (layout-independent) and a small mapping table; for now
+// we rely on the existing helper to keep the surface area small.
 window.onkeydown = function (e) {
     const c = heart._getKeyChar(e.keyCode)
     heart._keysDown[c] = true

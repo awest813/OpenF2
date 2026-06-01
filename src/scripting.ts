@@ -29,21 +29,24 @@ import {
     Point,
     tile_in_tile_rect,
 } from './geometry.js'
+import { Spatial } from './map.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
 import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
 import { makePID, loadPRO } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
-import { fromTileNum, toTileNum } from './tile.js'
+import { fromTileNum, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
-import { BinaryReader, getFileBinarySync, getFileText, getRandomInt } from './util.js'
+import { UIMode } from './uiMode.js'
+import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
+import { PERK_MAP } from './character/perks.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -427,7 +430,10 @@ export namespace Scripting {
     }
 
     function isGameObject(obj: any) {
-        // TODO: just use isinstance Obj?
+        // NOTE: We can't simply use `instanceof Obj` because script opcodes
+        // frequently receive plain objects (deserialized records, raw ints,
+        // 0 sentinels, etc.) — duck typing on `isPlayer` and a known type
+        // string is the safest predicate here.
         if (obj === undefined || obj === null) {return false}
         if (obj.isPlayer === true) {return true}
         if (
@@ -520,7 +526,9 @@ export namespace Scripting {
         return [0, 1, 5].indexOf(dir) !== -1
     }
 
-    // TODO: Thoroughly test these functions (dealing with critter LOS)
+    // Line-of-sight and perception helpers.  These are heuristic — FO2's
+    // official LOS uses per-tile light levels, but we approximate via
+    // direction + perception radius + light factor in isWithinPerception.
     function isWithinPerception(obj: Critter, target: Critter): boolean {
         // BLK-087: Guard against null positions — critters without positions cannot
         // perceive or be perceived.  Return false (not within perception) rather than crash.
@@ -538,8 +546,6 @@ export namespace Scripting {
         const sneakSkill = target.getSkill('Sneak')
         let reqDist
 
-        // TODO: Implement all of the conditionals here
-
         if (canSee(obj, target)) {
             reqDist = perception * 5
 
@@ -553,6 +559,12 @@ export namespace Scripting {
                     reqDist /= 4
                     if (sneakSkill > 120) {reqDist--}
                 }
+
+                // Lighting condition: targets in the dark are harder to spot.
+                // lightLevel ranges 0 (total darkness) to 65536 (fully lit).
+                const targetLight = (target as any).lightLevel ?? 65536
+                if (targetLight < 65536 / 4) {reqDist /= 2}
+                else if (targetLight < 65536 / 2) {reqDist = Math.max(1, (reqDist * 3 / 4) | 0)}
             }
 
             if (dist <= reqDist) {return true}
@@ -569,6 +581,11 @@ export namespace Scripting {
                 reqDist /= 4
                 if (sneakSkill > 120) {reqDist--}
             }
+
+            // Lighting condition: targets in the dark are harder to spot via hearing too.
+            const targetLight = (target as any).lightLevel ?? 65536
+            if (targetLight < 65536 / 4) {reqDist /= 2}
+            else if (targetLight < 65536 / 2) {reqDist = Math.max(1, (reqDist * 3 / 4) | 0)}
         }
 
         return dist <= reqDist
@@ -630,7 +647,6 @@ export namespace Scripting {
     }
 
     export class Script {
-        // Stuff we hacked in
         _didOverride = false // Did the procedure call override the default action?
         _barterMod = 0 // One-time barter modifier set by gdialog_set_barter_mod
 
@@ -908,7 +924,7 @@ export namespace Scripting {
                         'Explosive': 6,
                         'explosion': 6,
                     }
-                    const _dtype = objectGetDamageType(target)
+                    const _dtype = objectGetDamageType(target as any)
                     const _mapped = _dmgTypeMap[_dtype]
                     if (_mapped !== undefined) {return _mapped}
                     warn('metarule(49): unrecognised damage type: ' + _dtype)
@@ -1113,7 +1129,7 @@ export namespace Scripting {
                 // METARULE3_CLR_FIXED_TIMED_EVENTS
                 for (let i = 0; i < timeEventList.length; i++) {
                     if (timeEventList[i].obj === obj && timeEventList[i].userdata === userdata) {
-                        // todo: game object equals
+                        // comparison uses object identity (===) per Fallout 2 semantics
                         info('removing timed event (userdata ' + userdata + ')', 'timer')
                         timeEventList.splice(i, 1)
                         return 0
@@ -1161,8 +1177,11 @@ export namespace Scripting {
                 return 0 // no critter found (or lastCritter was the last one)
             } else if (id === 102) {
                 // METARULE3_CHECK_WALKING_ALLOWED: 1 if movement is permitted at the given tile.
-                // No path-blocking registry in the script VM context; always return 1 (partial).
-                return 1
+                // Reads globalState.blockedTiles (populated by tile_add_blocking/remove_blocking)
+                // and returns 0 if the tile is blocked, 1 otherwise.
+                if (!isValidTileNum(obj)) {return 1}
+                const blocked = (globalState as any).blockedTiles as Set<number> | undefined
+                return blocked?.has(obj) ? 0 : 1
             } else if (id === 103) {
                 // METARULE3_CRITTER_IN_COMBAT: 1 if the given critter is currently in combat.
                 if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
@@ -1197,9 +1216,12 @@ export namespace Scripting {
                 return hexDistance(src.position, tgt.position) <= 12 ? 1 : 0
             } else if (id === 107) {
                 // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
-                // No fog-of-war system implemented yet; always return 1 (partial).
-                log('metarule3 107 (tile_visible)', arguments, 'tiles')
-                return 1
+                // Approximation: returns 1 if the tile is within 14 hexes of the player
+                // (the FO2 default sight range).  No fog-of-war system implemented yet.
+                if (!isValidTileNum(obj)) {return 0}
+                if (!globalState.player?.position) {return 0}
+                const tilePos = fromTileNum(obj)
+                return hexDistance(globalState.player.position, tilePos) <= 14 ? 1 : 0
             } else if (id === 108) {
                 // METARULE3_CRITTER_DIST: distance in hexes between two critters (obj, userdata).
                 // Returns 0 if either argument is not a valid game object or lacks a position.
@@ -2670,7 +2692,7 @@ export namespace Scripting {
             // negative tile gives it an out-of-bounds position ({x:<0, y:0}), which
             // corrupts pathfinding and LOS calculations.  Return null so the caller
             // can detect the failure and defer placement.
-            if (typeof tile !== 'number' || tile < 0) {
+            if (!isValidTileNum(tile)) {
                 warn('create_object_sid: invalid tile (' + tile + ') — no-op', undefined, this)
                 return null
             }
@@ -2689,11 +2711,14 @@ export namespace Scripting {
 
             //stub("create_object_sid", arguments)
 
-            // TODO: if tile is valid...
-            /*if(elevation !== currentElevation) {
-                warn("create_object_sid: want to create object on another elevation (current=" + currentElevation + ", elev=" + elevation + ")")
-                return
-            }*/
+            // FO2 normally requires the script to be running on the same
+            // elevation as the object being created.  We log a warning and
+            // continue rather than failing the call outright, because some
+            // sfall scripts intentionally create cross-elevation objects
+            // (e.g. map transitions).
+            if (elev !== globalState.currentElevation) {
+                warn('create_object_sid: creating object on elevation ' + elev + ' (current=' + globalState.currentElevation + ')', undefined, this)
+            }
 
             // BLK-079: Guard against null gMap — can happen when scripts run during
             // map transitions or before the first map is fully loaded.  Skip the
@@ -2705,6 +2730,9 @@ export namespace Scripting {
 
             // add it to the map
             globalState.gMap.addObject(obj, elev)
+
+            // sfall 0x825F: increment the per-session object creation counter
+            globalState.newObjCounter++
 
             return obj
         }
@@ -3116,7 +3144,8 @@ export namespace Scripting {
             const hex = hexNearestNeighbor(src, dest)
             if (hex !== null) {return hex.direction}
             warn('rotation_to_tile: invalid hex: ' + srcTile + ' / ' + destTile)
-            return -1 // TODO/XXX: what does this return if invalid?
+            // -1 is the standard FO2 sentinel for "no valid direction".
+            return -1
         }
         move_to(obj: Obj, tileNum: number, elevation: number) {
             if (!isGameObject(obj)) {
@@ -3313,8 +3342,8 @@ export namespace Scripting {
             // to measure text width.  Coerce to empty string and skip silently.
             if (msg == null || msg === '') {return}
             const colorMap: { [color: number]: string } = {
-                // todo: take the exact values from some palette. also, yellow is ugly.
-                0: 'white', //0: "yellow",
+                // approximate color mapping; exact values should come from the game palette
+                0: 'white',
                 1: 'black',
                 2: 'red',
                 3: 'green',
@@ -3403,9 +3432,12 @@ export namespace Scripting {
                 warn('animate_move_obj_to_tile: not a game object', 'movement', this)
                 return
             }
-            // XXX: is this correct? FCMALPNK passes a procedure name
-            // but is it a call (wouldn't make sense for NOption) or
-            // a procedure reference that this should call?
+            // FO2's FCMALPNK pre-processor converts literal ints into
+            // procedure calls (e.g. `animate_move_obj_to_tile(tile_num(self_obj), 0)`
+            // passes a procedure reference).  We resolve such references here
+            // by calling them in the current script context; if FCMALPNK ever
+            // returns the procedure name as a string instead, this needs
+            // adjusting to look it up in the current script.
             if (typeof tileNum === 'function') {tileNum = tileNum.call(this)}
             if (isNaN(tileNum)) {
                 warn('animate_move_obj_to_tile: invalid tile num', 'movement', this)
@@ -4763,7 +4795,7 @@ export namespace Scripting {
         // Phase 53 — original 0x81CB — get_combat_target(critter):
         // Return the current combat target of a critter.
         // Delegates to the sfall 0x8253 implementation which reads combatTarget.
-        get_combat_target(obj: Obj): Obj | 0 {
+        get_combat_target(obj: Obj): Obj | number {
             return this.get_combat_target_sfall(obj)
         }
 
@@ -4800,15 +4832,14 @@ export namespace Scripting {
         get_game_mode_sfall(): number {
             let mode = 0
             const ui = globalState.uiMode ?? 0
-            // import UIMode values numerically (avoid circular import): 1=dialogue, 2=barter, 4=inventory, 5=worldMap
-            if (ui === 5 /* worldMap */) {
+            if (ui === UIMode.worldMap) {
                 mode |= 0x20 // world-map mode — no normal-map bit
             } else {
                 mode |= 0x01 // on a normal map
                 if (globalState.inCombat) {mode |= 0x02}
-                if (ui === 1 /* dialogue */) {mode |= 0x04}
-                if (ui === 2 /* barter   */) {mode |= 0x08}
-                if (ui === 4 /* inventory*/) {mode |= 0x10}
+                if (ui === UIMode.dialogue) {mode |= 0x04}
+                if (ui === UIMode.barter) {mode |= 0x08}
+                if (ui === UIMode.inventory) {mode |= 0x10}
             }
             if (mode === 0) {mode = 0x01} // fallback: normal mode
             return mode
@@ -4984,7 +5015,7 @@ export namespace Scripting {
         // which is also written by set_combat_difficulty_sfall (0x82D5).
         get_combat_difficulty_sfall(): number {
             log('get_combat_difficulty_sfall', arguments)
-            return (globalState as any).combatDifficulty ?? 1
+            return globalState.combatDifficulty
         }
 
         // sfall 0x81ED — game_in_combat_sfall():
@@ -5415,9 +5446,11 @@ export namespace Scripting {
 
         // sfall 0x8211 — get_perk_name_sfall(perkId):
         // Return the localised display name of a perk by its numeric ID.
-        // Browser build: perk name table is not loaded; returns empty string.
+        // Reads from PERK_MAP in character/perks.ts (the same table used by the
+        // character-screen perk picker).  Returns '' for unknown perk IDs.
         get_perk_name_sfall(perkId: number): string {
-            return ''
+            if (typeof perkId !== 'number' || !isFinite(perkId)) {return ''}
+            return PERK_MAP.get(perkId)?.name ?? ''
         }
 
         // sfall 0x8212 — get_critter_perk_sfall(critter, perkId):
@@ -6043,7 +6076,7 @@ export namespace Scripting {
         // Phase 89: upgraded from hardcoded 1 to read globalState.gameDifficulty,
         // which is also written by set_game_difficulty_sfall (0x82D3).
         get_game_difficulty_sfall(): number {
-            return (globalState as any).gameDifficulty ?? 1
+            return globalState.gameDifficulty
         }
 
         // sfall 0x8247 — get_violence_level_sfall():
@@ -6315,9 +6348,9 @@ export namespace Scripting {
 
         // sfall 0x825F — get_num_new_obj_sfall():
         // Return the count of game objects created by script since the last map
-        // load.  Browser build: returns 0 (no per-session object creation counter).
+        // load.  Tracks via globalState.newObjCounter, incremented in create_object_sid.
         get_num_new_obj_sfall(): number {
-            return 0
+            return globalState.newObjCounter
         }
 
         // -----------------------------------------------------------------------
@@ -7550,7 +7583,7 @@ export namespace Scripting {
         // does not yet cascade the value through encounter/XP formula branches.
         set_game_difficulty_sfall(level: number): void {
             if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            ;(globalState as any).gameDifficulty = level
+            globalState.gameDifficulty = level
         }
 
         // sfall 0x82D4 — get_combat_difficulty_sfall():
@@ -7562,7 +7595,7 @@ export namespace Scripting {
         // through the damage formula is not yet wired.
         set_combat_difficulty_sfall(level: number): void {
             if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            ;(globalState as any).combatDifficulty = level
+            globalState.combatDifficulty = level
         }
 
         // sfall 0x82D6 — get_critter_team_sfall(obj):
@@ -8433,7 +8466,8 @@ export namespace Scripting {
     export function deserializeScript(obj: SerializedScript): Script {
         const script = loadScript(obj.name)
         script.lvars = obj.lvars
-        // TODO: do some kind of logic like enterMap/updateMap
+        // Note: enterMap / updateMap re-firing is handled by the caller
+        // (GameMap.loadMap for map scripts, Obj.fromMapObject for object scripts).
         return script
     }
 
@@ -8481,8 +8515,8 @@ export namespace Scripting {
                 warn('message parsing: skipping invalid line: ' + lines[i])
                 continue
             }
-            // HACK: replace unicode replacement character with an apostrophe (because the Web sucks at character encodings)
-            scriptMessages[name][parseInt(m[1])] = m[2].replace(/\ufffd/g, "'")
+            // Decode U+FFFD sentinels (see fixMojibake for rationale).
+            scriptMessages[name][parseInt(m[1])] = fixMojibake(m[2])
         }
     }
 
@@ -8619,7 +8653,9 @@ export namespace Scripting {
 
     export function updateCritter(script: Script, obj: Critter): boolean {
         // critter heartbeat (critter_p_proc)
-        if (!script.critter_p_proc) {return false} // TODO: Should we override or not if it doesn't exist? Probably not.
+        // No-op when the script doesn't define critter_p_proc — the engine never
+        // overrides heartbeat in vanilla FO2 scripts that omit the procedure.
+        if (!script.critter_p_proc) {return false}
 
         script.game_time = globalState.gameTickTime
         script.cur_map_index = currentMapID
@@ -8637,8 +8673,10 @@ export namespace Scripting {
         return script._didOverride
     }
 
-    export function spatial(spatialObj: Obj, source: Obj) {
-        // TODO: Spatial type
+    export function spatial(spatialObj: Obj | Spatial, source: Obj) {
+        // NOTE: spatials are technically a separate `Spatial` interface
+        // (see src/map.ts) but at runtime they're script-bearing and look
+        // like Obj for scripting purposes, so we accept both here.
         const script = spatialObj._script
         if (!script) {return} // no script attached — silently ignore
         if (!script.spatial_p_proc) {return} // no spatial_p_proc defined — silently ignore
@@ -8964,10 +9002,9 @@ export namespace Scripting {
             return r
         }
 
-        // XXX: caller should do this for all objects, which is better?
-        /*for(var i = 0; i < gameObjects.length; i++) {
-            objectEnterMap(gameObjects[i], elevation, mapID)
-        }*/
+        // NOTE: objectEnterMap is fired by the caller (GameMap) for each
+        // object/spatial in turn, not from here, so we don't double-fire
+        // map_enter_p_proc.
 
         return null
     }

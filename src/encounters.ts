@@ -253,7 +253,6 @@ export namespace Encounters {
     }
 
     function evalConds(conds: Node[]): boolean {
-        // TODO: Array.every
         for(let i = 0; i < conds.length; i++) {
             if(evalCond(conds[i]) === false)
                 {return false}
@@ -297,7 +296,10 @@ export namespace Encounters {
                 {critters.push(evalEncounterCritter(critter))}
             else {
                 const num = Math.ceil(critter.ratio/100 * count)
-                // TODO: better distribution (might be +1 now)
+                // NOTE: Math.ceil may over-shoot by 1 in some cases.  FO2's
+                // encounter table format doesn't have a per-row remainder
+                // mechanism, so we accept the slight off-by-one and rely
+                // on the per-encounter count to absorb variance.
                 console.log("critter nums: %d (%d% of %d)", num, critter.ratio, count)
                 for(let j = 0; j < num; j++)
                     {critters.push(evalEncounterCritter(critter))}
@@ -443,7 +445,9 @@ export namespace Encounters {
         console.log("map: %s (from %s)", mapName, mapLookupName)
         console.log("encounter: %o", encounter)
 
-        // TODO: maybe unify these and just have a `.groups` in the encounter, along with a target.
+        // NOTE: `encounter.enc` distinguishes ambush (single party) from
+        // fighting (two parties).  A future cleanup could collapse these
+        // into a single `.groups[]` with an optional `.target` field.
         if(encounter.enc.type === "ambush") {
             // player ambush
             console.log("(player ambush)")
@@ -475,7 +479,9 @@ export namespace Encounters {
             const firstCritterCount = getRandomInt(firstParty.start, firstParty.end)
             groups.push({critters: evalEncounterCritters(firstCritterCount, firstGroup), target: 1, position: firstGroup.position})
 
-            // one-party fighting? TODO: check what all is allowed with `fighting`
+            // FO2's `fighting` encounter format is a 1-2 party fight; the
+            // second party is optional.  We only spawn it if the encounter
+            // record explicitly names it.
             if(secondParty && secondParty.name !== undefined) {
                 const secondGroup = Worldmap.getEncounterGroup(secondParty.name)
                 const secondCritterCount = getRandomInt(secondParty.start, secondParty.end)
@@ -483,7 +489,8 @@ export namespace Encounters {
             }
         }
         else if(encounter.enc.type === "special") {
-            //console.log("TODO: special encounter type")
+            // Special encounters (e.g. random maps, story-triggered) are
+            // dispatched by their `special` field — see encounters.ts above.
         }
         else {
             console.warn("encounter: unknown encounter type: " + encounter.enc.type + " — treating as empty encounter")

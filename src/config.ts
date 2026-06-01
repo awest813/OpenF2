@@ -23,6 +23,7 @@ export const Config = {
         showDebugOverlay: false, // show in-browser debug overlay (HP, AP, entity count)?
         forceUI2OnlyGameplayPanels: (globalThis as any)?.process?.env?.UI2_ONLY_GAMEPLAY_PANELS === '1',
         // When true, legacy DOM gameplay-panel codepaths throw instead of rendering.
+        scaleToFit: true, // auto-scale the 800x600 game to fill the browser window? (maintains 4:3)
     },
 
     engine: {

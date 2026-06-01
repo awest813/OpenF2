@@ -233,3 +233,11 @@ export function deepClone<T>(obj: T): T {
 export function isNumeric(str: string): boolean {
     return !isNaN((str as any) - parseFloat(str))
 }
+
+// FO2 .msg files occasionally contain U+FFFD (REPLACEMENT CHARACTER)
+// where a high-bit character (e.g. apostrophes in latin-1 source) failed
+// to decode.  We treat those as apostrophes — the safest one-character
+// substitution for FO2 text.  See data.ts and scripting.ts for callers.
+export function fixMojibake(s: string): string {
+    return s.replace(/\ufffd/g, "'")
+}

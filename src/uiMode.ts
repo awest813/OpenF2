@@ -1,0 +1,15 @@
+export enum UIMode {
+    none = 0,
+    dialogue = 1,
+    barter = 2,
+    loot = 3,
+    inventory = 4,
+    worldMap = 5,
+    elevator = 6,
+    calledShot = 7,
+    skilldex = 8,
+    useSkill = 9,
+    contextMenu = 10,
+    saveLoad = 11,
+    char = 12,
+}
