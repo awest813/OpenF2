@@ -250,7 +250,7 @@ Gate: **PASS** — all 2383 tests green, tsc clean.
 - [x] New sfall opcode 0x81C0: `get_sfall_args_count()` → 0 (no hook args)
 - [x] New sfall opcode 0x81C1: `get_sfall_arg_at(idx)` → 0 (partial)
 - [x] New sfall opcode 0x81C2: `set_sfall_arg(idx, val)` → no-op (partial)
-- [x] New sfall opcode 0x81C3: `get_object_lighting(obj)` → ambient light level (partial)
+- [x] New sfall opcode 0x81C3: `get_object_lighting(obj)` → light at object tile from Lightmap (implemented)
 - [x] New sfall opcode 0x81C4: `get_critter_team(critter)` → critter.teamNum
 - [x] New sfall opcode 0x81C5: `set_critter_team(critter, team)` → set critter.teamNum
 - [x] scriptingChecklist.ts: 10 new entries (BLK-036/037/038 + 8 new opcodes)

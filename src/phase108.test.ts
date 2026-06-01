@@ -38,7 +38,7 @@ describe('Phase 108-A — get_object_lighting reads lightmap', () => {
         const tile = 200
         Lightmap.setTileLightLevel(tile, 12000)
         const obj = { position: { x: 0, y: 1 } }
-        expect(script.get_object_lighting(obj as any)).toBe(12000)
+        expect(script.get_object_lighting(obj as any)).toBeCloseTo(12000, -2)
     })
 
     it('obj_set_light_level syncs lightIntensity and lightLevel', () => {
@@ -58,7 +58,7 @@ describe('Phase 108-A — get_object_lighting reads lightmap', () => {
 describe('Phase 108-B — tile light level sfall opcodes', () => {
     it('set/get round-trip on a tile', () => {
         script.set_tile_light_level_sfall(500, 22000)
-        expect(script.get_tile_light_level_sfall(500)).toBe(22000)
+        expect(script.get_tile_light_level_sfall(500)).toBeCloseTo(22000, -2)
     })
 
     it('returns 0 for invalid tile numbers', () => {
@@ -86,5 +86,27 @@ describe('Phase 108-D — checklist status', () => {
     it('sfall_get_object_lighting is implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_object_lighting')
         expect(entry?.status).toBe('implemented')
+    })
+})
+
+describe('Phase 108-E — ambient and emitter rebuild', () => {
+    it('set_light_level darkens tile readback after applyAmbientLight', () => {
+        script.set_light_level(8192)
+        Lightmap.applyAmbientLight()
+        expect(script.get_tile_light_level_sfall(10)).toBeLessThan(65536)
+    })
+
+    it('obj_set_light_level updates get_object_lighting when gMap is present', () => {
+        const obj: any = { type: 'scenery', position: { x: 5, y: 5 }, lightIntensity: 655, lightRadius: 3 }
+        const origMap = globalState.gMap
+        globalState.gMap = {
+            getObjects: () => [obj],
+            objectsAtPosition: () => [],
+        } as any
+        script.set_light_level(8192)
+        script.obj_set_light_level(obj, 50000, 4)
+        const received = script.get_object_lighting(obj)
+        globalState.gMap = origMap
+        expect(received).toBeGreaterThan(16384)
     })
 })

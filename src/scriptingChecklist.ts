@@ -3313,8 +3313,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81CF: set_light_level(level, update) — set ambient light level. ' +
-            'Stores the value in globalState.ambientLightLevel (0–65536 clamped). ' +
-            'Actual rendering update is deferred in the browser build.',
+            'Stores globalState.ambientLightLevel and calls Lightmap.applyAmbientLight() to refresh tile baseline.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',

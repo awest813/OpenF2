@@ -2915,6 +2915,7 @@ export namespace Scripting {
             log('set_light_level', arguments)
             // Clamp to the valid range 0–65536 and store on globalState.
             globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
+            Lightmap.applyAmbientLight()
         }
         obj_set_light_level(obj: Obj, intensity: number, distance: number) {
             log('obj_set_light_level', arguments)
@@ -4816,10 +4817,11 @@ export namespace Scripting {
 
         // Phase 53 — sfall 0x81CF — set_light_level_sfall(level, update):
         // Set the global ambient light level (0–65536).
-        // Browser build stores it but defers actual rendering update.
+        // Updates globalState and refreshes the lightmap baseline via Lightmap.applyAmbientLight().
         set_light_level_sfall(level: number, _update: number): void {
             if (typeof level === 'number') {
                 globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
+                Lightmap.applyAmbientLight()
             }
         }
 
@@ -6398,9 +6400,10 @@ export namespace Scripting {
 
         // sfall 0x8266 — set_ambient_light_sfall(level):
         // Set the ambient light level.  Browser build: writes globalState.ambientLightLevel.
-        // Full dynamic-lighting update is not yet wired; the value is stored for script reads.
+        // Refreshes the lightmap tile baseline via Lightmap.applyAmbientLight().
         set_ambient_light_sfall(level: number): void {
             globalState.ambientLightLevel = typeof level === 'number' ? Math.max(0, Math.min(65536, level)) : 65536
+            Lightmap.applyAmbientLight()
         }
 
         // sfall 0x8267 — get_map_local_var_sfall(idx):
