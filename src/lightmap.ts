@@ -52,9 +52,10 @@ export namespace Lightmap {
         }
     }
 
-    // Tile lightmap
-    export const tile_intensity = new Array(40000)
-    light_reset()
+    // Tile lightmap — initialised to TILE_LIGHT_MAX (≡ scriptLevelToTile(65536), the default
+    // full-brightness ambient) so the module can be imported without reading globalState.
+    // light_reset() / obj_light_table_init() are called at runtime before any map is rendered.
+    export const tile_intensity = new Array(40000).fill(TILE_LIGHT_MAX)
 
     const light_offsets = new Array(532)
     zeroArray(light_offsets)
