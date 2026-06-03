@@ -12,7 +12,7 @@
  * Panel name: 'loot'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,8 @@ export class LootPanel extends UIPanel {
 
     private _selectedSide: 'player' | 'container' | null = null
     private _selectedIndex = -1
+    private _hoveredSide: 'player' | 'container' | null = null
+    private _hoveredIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('loot', {
@@ -68,6 +70,8 @@ export class LootPanel extends UIPanel {
         this.containerInventory = containerInventory.map(i => ({ ...i }))
         this._selectedSide  = null
         this._selectedIndex = -1
+        this._hoveredSide   = null
+        this._hoveredIndex  = -1
         this.show()
     }
 
@@ -135,11 +139,14 @@ export class LootPanel extends UIPanel {
             const item = items[i]
             const iy = y + 4 + i * ITEM_ROW_H
             const isSelected = this._selectedSide === side && this._selectedIndex === i
+            const isHovered  = this._hoveredSide  === side && this._hoveredIndex  === i
             if (isSelected) {
                 fillRect(ctx, x + 2, iy - 2, COL_W - 4, ITEM_ROW_H, FALLOUT_DARK_GRAY)
+            } else if (isHovered) {
+                fillRect(ctx, x + 2, iy - 2, COL_W - 4, ITEM_ROW_H, { r: 20, g: 20, b: 20, a: 255 })
             }
             ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(isSelected || isHovered ? FALLOUT_AMBER : FALLOUT_GREEN)
             const label = item.name.length > MAX_ITEM_NAME_LEN ? item.name.slice(0, MAX_ITEM_NAME_LEN) : item.name
             ctx.fillText(`${label} x${item.amount}`, x + 4, iy + 11)
         }
@@ -213,6 +220,33 @@ export class LootPanel extends UIPanel {
         }
 
         return true
+    }
+
+    override onMouseMove(x: number, y: number): void {
+        const { width } = this.bounds
+        const playerX    = COL_PAD
+        const containerX = width - COL_PAD - COL_W
+
+        // Player column hover
+        if (x >= playerX && x < playerX + COL_W && y >= COL_Y && y < COL_Y + COL_H) {
+            const idx = Math.floor((y - COL_Y - 4) / ITEM_ROW_H)
+            if (idx >= 0 && idx < this.playerInventory.length) {
+                this._hoveredSide  = 'player'
+                this._hoveredIndex = idx
+                return
+            }
+        }
+        // Container column hover
+        if (x >= containerX && x < containerX + COL_W && y >= COL_Y && y < COL_Y + COL_H) {
+            const idx = Math.floor((y - COL_Y - 4) / ITEM_ROW_H)
+            if (idx >= 0 && idx < this.containerInventory.length) {
+                this._hoveredSide  = 'container'
+                this._hoveredIndex = idx
+                return
+            }
+        }
+        this._hoveredSide  = null
+        this._hoveredIndex = -1
     }
 
     override onKeyDown(key: string): boolean {
@@ -303,26 +337,4 @@ export class LootPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)

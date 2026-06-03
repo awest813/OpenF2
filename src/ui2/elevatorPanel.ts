@@ -12,7 +12,7 @@
  * Panel name: 'elevator'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,7 @@ export interface ElevatorButton {
 
 export class ElevatorPanel extends UIPanel {
     buttons: ElevatorButton[] = []
+    private _hoveredIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('elevator', {
@@ -59,6 +60,7 @@ export class ElevatorPanel extends UIPanel {
     /** Load elevator buttons and show the panel. */
     openWith(buttons: ElevatorButton[]): void {
         this.buttons = buttons.slice()
+        this._hoveredIndex = -1
         this.show()
     }
 
@@ -87,12 +89,14 @@ export class ElevatorPanel extends UIPanel {
             const btn = this.buttons[i]
             const bx = BTNS_CENTER_X_OFFSET
             const by = BTNS_START_Y + i * (BTN_H + BTN_GAP)
-            fillRect(ctx, bx, by, BTN_W, BTN_H, FALLOUT_DARK_GRAY)
+            const isHovered = i === this._hoveredIndex
+            fillRect(ctx, bx, by, BTN_W, BTN_H, isHovered ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, bx, by, BTN_W, BTN_H, FALLOUT_GREEN, 1)
             ctx.font = 'bold 11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_AMBER)
+            ctx.fillStyle = cssColor(isHovered ? FALLOUT_BLACK : FALLOUT_AMBER)
             ctx.textAlign = 'center'
-            ctx.fillText(btn.label, bx + BTN_W / 2, by + 18)
+            // Show number hint so player knows keyboard shortcut
+            ctx.fillText(`${i + 1}. ${btn.label}`, bx + BTN_W / 2, by + 18)
             ctx.textAlign = 'left'
         }
 
@@ -138,6 +142,18 @@ export class ElevatorPanel extends UIPanel {
         return true
     }
 
+    override onMouseMove(x: number, y: number): void {
+        for (let i = 0; i < this.buttons.length; i++) {
+            const bx = BTNS_CENTER_X_OFFSET
+            const by = BTNS_START_Y + i * (BTN_H + BTN_GAP)
+            if (x >= bx && x < bx + BTN_W && y >= by && y < by + BTN_H) {
+                this._hoveredIndex = i
+                return
+            }
+        }
+        this._hoveredIndex = -1
+    }
+
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
             this.hide()
@@ -163,26 +179,4 @@ export class ElevatorPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)

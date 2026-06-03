@@ -13,7 +13,7 @@
  * panel falls back to system monospace.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { QuestLog, QuestState } from '../quest/questLog.js'
@@ -397,29 +397,7 @@ export class PipBoyPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)
 
 function drawText(
     ctx: OffscreenCanvasRenderingContext2D,

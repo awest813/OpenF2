@@ -15,7 +15,7 @@
  * Panel name: 'worldMap'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect, clampListOffset } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 import globalState from '../globalState.js'
 import { loadAreas } from '../data.js'
@@ -377,35 +377,7 @@ export class WorldMapPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
-
-function clampListOffset(selectedIndex: number, currentOffset: number, visibleRows: number): number {
-    if (selectedIndex < currentOffset) {return selectedIndex}
-    if (selectedIndex >= currentOffset + visibleRows) {return selectedIndex - visibleRows + 1}
-    return currentOffset
-}
+// (cssColor / fillRect / strokeRect / clampListOffset now live in uiPanel.ts)
 
 function drawScrollIndicator(
     ctx: OffscreenCanvasRenderingContext2D,

@@ -16,7 +16,7 @@
  *   dbg.show()  // or driven by Config.ui.showDebugOverlay
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_RED, UIColor, cssColor } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 
 const PANEL_WIDTH  = 200
@@ -107,15 +107,13 @@ export class DebugOverlayPanel extends UIPanel {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
+// (cssColor now lives in uiPanel.ts)
 
 function hpColor(current: number, max: number): UIColor {
     const ratio = max > 0 ? current / max : 0
     if (ratio > 0.66) {return FALLOUT_GREEN}
     if (ratio > 0.33) {return FALLOUT_AMBER}
-    return { r: 195, g: 0, b: 0, a: 255 }
+    return FALLOUT_RED
 }
 
 function truncate(text: string, maxLen: number): string {

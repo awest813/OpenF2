@@ -5,7 +5,7 @@
  * EntityManager; all writes go through the leveling module.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, UIColor, cssColor, wrapText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { spendSkillPoint, getSkillPointCost } from '../character/leveling.js'
@@ -499,27 +499,4 @@ export class CharacterScreen extends UIPanel {
     }
 }
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function wrapText(ctx: OffscreenCanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-    const words = text.split(' ')
-    const lines: string[] = []
-    let currentLine = ''
-
-    for (const word of words) {
-        const testLine = currentLine ? currentLine + ' ' + word : word
-        const metrics = ctx.measureText(testLine)
-        if (metrics.width > maxWidth && currentLine) {
-            lines.push(currentLine)
-            currentLine = word
-        } else {
-            currentLine = testLine
-        }
-    }
-    if (currentLine) {
-        lines.push(currentLine)
-    }
-    return lines
-}
+// (cssColor and wrapText now live in uiPanel.ts)

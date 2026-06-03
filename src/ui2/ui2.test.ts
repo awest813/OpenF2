@@ -2055,3 +2055,270 @@ describe('SaveLoadPanel Integration', () => {
         EventBus.clear('game:loadFromSlot')
     })
 })
+
+// ---------------------------------------------------------------------------
+// GamePanel: combat log, END TURN button, weapon name resolution
+// ---------------------------------------------------------------------------
+
+describe('GamePanel: combat log overlay', () => {
+    let mgr: UIManagerImpl
+    let panel: GamePanel
+    let playerEntityId: number
+
+    beforeEach(() => {
+        EventBus.clear('combat:start')
+        EventBus.clear('combat:end')
+        EventBus.clear('combat:turnStart')
+        EventBus.clear('combat:turnEnd')
+        EventBus.clear('combat:hit')
+        EventBus.clear('combat:miss')
+        EventBus.clear('combat:death')
+        playerEntityId = createPlayerEntity({ name: 'LOG TEST' })
+        mgr = new UIManagerImpl(800, 600)
+        panel = new GamePanel(800, 600, playerEntityId)
+        mgr.register(panel)
+    })
+
+    afterEach(() => {
+        EventBus.clear('combat:start')
+        EventBus.clear('combat:end')
+        EventBus.clear('combat:turnStart')
+        EventBus.clear('combat:turnEnd')
+        EventBus.clear('combat:hit')
+        EventBus.clear('combat:miss')
+        EventBus.clear('combat:death')
+    })
+
+    it('starts with empty log and log hidden', () => {
+        expect(panel.getCombatLog()).toEqual([])
+        expect(panel.isLogVisible()).toBe(false)
+    })
+
+    it('L key toggles the log overlay', () => {
+        expect(panel.isLogVisible()).toBe(false)
+        panel.onKeyDown('l')
+        expect(panel.isLogVisible()).toBe(true)
+        panel.onKeyDown('L')
+        expect(panel.isLogVisible()).toBe(false)
+    })
+
+    it('grows the panel upward when log is shown', () => {
+        const origHeight = panel.bounds.height
+        panel.onKeyDown('l')
+        expect(panel.bounds.height).toBeGreaterThan(origHeight)
+        panel.onKeyDown('l')
+        expect(panel.bounds.height).toBe(origHeight)
+    })
+
+    it('captures combat:start event into the log', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        const log = panel.getCombatLog()
+        expect(log.length).toBe(1)
+        expect(log[0]).toContain('combat started')
+    })
+
+    it('captures combat:turnStart for player with "You" label', () => {
+        EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
+        const log = panel.getCombatLog()
+        expect(log[0]).toContain("You's turn")
+    })
+
+    it('captures combat:turnStart for non-player with entity id', () => {
+        EventBus.emit('combat:turnStart', { entityId: 42, isPlayer: false })
+        const log = panel.getCombatLog()
+        expect(log[0]).toContain('Entity#42')
+    })
+
+    it('captures combat:hit with damage and damage type', () => {
+        EventBus.emit('combat:hit', { attackerId: 1, targetId: 2, damage: 15, damageType: 'normal' })
+        const log = panel.getCombatLog()
+        expect(log[0]).toContain('hit for 15')
+        expect(log[0]).toContain('normal')
+    })
+
+    it('captures combat:miss', () => {
+        EventBus.emit('combat:miss', { attackerId: 1, targetId: 2 })
+        expect(panel.getCombatLog()[0]).toBe('* miss')
+    })
+
+    it('captures combat:death', () => {
+        EventBus.emit('combat:death', { entityId: 1, killerId: 2 })
+        expect(panel.getCombatLog()[0]).toBe('X death')
+    })
+
+    it('captures combat:turnEnd', () => {
+        EventBus.emit('combat:turnEnd', { entityId: playerEntityId })
+        expect(panel.getCombatLog()[0]).toContain('You ends turn')
+    })
+
+    it('marks inCombat true after combat:start, false after combat:end', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        panel.onKeyDown('l')
+        expect(panel.getCombatLog().some(m => m.includes('combat started'))).toBe(true)
+        EventBus.emit('combat:end', undefined)
+        expect(panel.getCombatLog().some(m => m.includes('combat ended'))).toBe(true)
+    })
+
+    it('truncates log to MAX_LOG_LINES (50)', () => {
+        for (let i = 0; i < 60; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        expect(panel.getCombatLog().length).toBe(50)
+        expect(panel.getCombatLog()[0]).toBe('msg 10')
+    })
+
+    it('does not throw when render is called in either state', () => {
+        expect(() => mgr.render()).not.toThrow()
+        panel.onKeyDown('l')
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('clamps scroll offset at top with ArrowUp', () => {
+        for (let i = 0; i < 30; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        panel.onKeyDown('l')
+        expect(panel.getLogScrollOffset()).toBe(16) // 30 - 14 visible rows
+        panel.onKeyDown('ArrowUp')
+        expect(panel.getLogScrollOffset()).toBe(15)
+        // Push scroll up many times to test the floor
+        for (let i = 0; i < 100; i++) {panel.onKeyDown('ArrowUp')}
+        expect(panel.getLogScrollOffset()).toBe(0)
+    })
+
+    it('clamps scroll offset at bottom with ArrowDown', () => {
+        for (let i = 0; i < 30; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        panel.onKeyDown('l')
+        const maxOffset = 30 - 14
+        expect(panel.getLogScrollOffset()).toBe(maxOffset)
+        for (let i = 0; i < 100; i++) {panel.onKeyDown('ArrowDown')}
+        expect(panel.getLogScrollOffset()).toBe(maxOffset)
+    })
+
+    it('PageUp and PageDown jump by visible-row chunks', () => {
+        for (let i = 0; i < 50; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        panel.onKeyDown('l')
+        // initial offset = 50 - 14 = 36
+        panel.onKeyDown('PageUp')
+        expect(panel.getLogScrollOffset()).toBe(22) // 36 - 14
+        panel.onKeyDown('PageDown')
+        expect(panel.getLogScrollOffset()).toBe(36)
+    })
+
+    it('Home and End snap to top and bottom', () => {
+        for (let i = 0; i < 50; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        panel.onKeyDown('l')
+        expect(panel.getLogScrollOffset()).toBe(36)
+        panel.onKeyDown('Home')
+        expect(panel.getLogScrollOffset()).toBe(0)
+        panel.onKeyDown('End')
+        expect(panel.getLogScrollOffset()).toBe(36)
+    })
+
+    it('scroll keys have no effect when log is closed', () => {
+        for (let i = 0; i < 30; i++) {
+            panel.pushLogMessage(`msg ${i}`)
+        }
+        expect(panel.isLogVisible()).toBe(false)
+        panel.onKeyDown('ArrowDown')
+        expect(panel.getLogScrollOffset()).toBe(0)
+    })
+})
+
+describe('GamePanel: END TURN button', () => {
+    let mgr: UIManagerImpl
+    let panel: GamePanel
+    let playerEntityId: number
+
+    beforeEach(() => {
+        EventBus.clear('combat:start')
+        EventBus.clear('combat:end')
+        EventBus.clear('combat:turnStart')
+        EventBus.clear('combat:turnEnd')
+        EventBus.clear('combat:hit')
+        EventBus.clear('combat:miss')
+        EventBus.clear('combat:death')
+        playerEntityId = createPlayerEntity({ name: 'TURN TEST' })
+        mgr = new UIManagerImpl(800, 600)
+        panel = new GamePanel(800, 600, playerEntityId)
+        mgr.register(panel)
+    })
+
+    afterEach(() => {
+        EventBus.clear('combat:start')
+        EventBus.clear('combat:end')
+        EventBus.clear('combat:turnStart')
+        EventBus.clear('combat:turnEnd')
+        EventBus.clear('combat:hit')
+        EventBus.clear('combat:miss')
+        EventBus.clear('combat:death')
+    })
+
+    it('does not throw when END TURN clicked before combat starts', () => {
+        expect(() => mgr.render()).not.toThrow()
+        // E key is a no-op when not in combat
+        expect(panel.onKeyDown('E')).toBe(false)
+    })
+
+    it('E key is a no-op when not in player turn', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        // Player turn is false until turnStart fires
+        expect(panel.onKeyDown('e')).toBe(false)
+    })
+
+    it('E key is consumed (returns true) during player turn', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
+        // E key is consumed by gamePanel during player turn
+        expect(panel.onKeyDown('E')).toBe(true)
+    })
+
+    it('renders without throwing in combat during player turn', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('renders without throwing in combat during enemy turn', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        EventBus.emit('combat:turnStart', { entityId: 999, isPlayer: false })
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('renders the log overlay without throwing during combat', () => {
+        EventBus.emit('combat:start', { combatants: [playerEntityId] })
+        EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
+        EventBus.emit('combat:hit', { attackerId: 1, targetId: 2, damage: 5, damageType: 'fire' })
+        panel.onKeyDown('l')
+        expect(() => mgr.render()).not.toThrow()
+    })
+})
+
+describe('GamePanel: weapon name resolution', () => {
+    let mgr: UIManagerImpl
+    let panel: GamePanel
+    let playerEntityId: number
+
+    beforeEach(() => {
+        playerEntityId = createPlayerEntity({ name: 'WEAPON TEST' })
+        mgr = new UIManagerImpl(800, 600)
+        panel = new GamePanel(800, 600, playerEntityId)
+        mgr.register(panel)
+    })
+
+    it('renders "None" when no weapon is equipped', () => {
+        expect(() => mgr.render()).not.toThrow()
+    })
+
+    it('renders a PID hex fallback when weapon is equipped but PRO data is unavailable', () => {
+        const inv = EntityManager.get<'inventory'>(playerEntityId, 'inventory')!
+        inv.equippedWeaponPrimary = 0x0000008C
+        expect(() => mgr.render()).not.toThrow()
+    })
+})

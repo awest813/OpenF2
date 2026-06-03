@@ -187,6 +187,86 @@ export const FALLOUT_RED: UIColor = { r: 195, g: 0, b: 0, a: 255 }
 export const FALLOUT_BLACK: UIColor = { r: 0, g: 0, b: 0, a: 255 }
 export const FALLOUT_DARK_GRAY: UIColor = { r: 40, g: 40, b: 40, a: 255 }
 
+// ---------------------------------------------------------------------------
+// Shared drawing helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a UIColor to a CSS rgba() string. */
+export function cssColor(c: UIColor): string {
+    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
+}
+
+/** Fill a rectangle in the given UI color. */
+export function fillRect(
+    ctx: OffscreenCanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number,
+    color: UIColor,
+): void {
+    ctx.fillStyle = cssColor(color)
+    ctx.fillRect(x, y, w, h)
+}
+
+/**
+ * Stroke a rectangle in the given UI color. Coordinates are nudged by 0.5px
+ * so the 1-pixel border renders crisp on the integer pixel grid.
+ */
+export function strokeRect(
+    ctx: OffscreenCanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number,
+    color: UIColor,
+    lineWidth = 1,
+): void {
+    ctx.strokeStyle = cssColor(color)
+    ctx.lineWidth = lineWidth
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+}
+
+/**
+ * Word-wrap `text` into lines that each fit within `maxWidth` pixels.
+ *
+ * Explicit `\n` line breaks (and `\r\n`) are honoured first; each resulting
+ * paragraph is then word-wrapped using `ctx.measureText` for accurate glyph
+ * widths. Empty paragraphs (from `\n\n`) produce visual blank lines.
+ */
+export function wrapText(
+    ctx: OffscreenCanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+): string[] {
+    const paragraphs = text.replace(/\r\n/g, '\n').split('\n')
+    const result: string[] = []
+    for (const paragraph of paragraphs) {
+        const words = paragraph.split(' ')
+        let line = ''
+        for (const word of words) {
+            const test = line ? line + ' ' + word : word
+            if (ctx.measureText(test).width > maxWidth && line) {
+                result.push(line)
+                line = word
+            } else {
+                line = test
+            }
+        }
+        result.push(line)
+    }
+    return result
+}
+
+/**
+ * Clamp a list scroll offset so the focused row stays visible. Used by
+ * panels with keyboard-navigated scrollable lists (world map, inventory,
+ * loot, save/load).
+ */
+export function clampListOffset(
+    selectedIndex: number,
+    currentOffset: number,
+    visibleRows: number,
+): number {
+    if (selectedIndex < currentOffset) {return selectedIndex}
+    if (selectedIndex >= currentOffset + visibleRows) {return selectedIndex - visibleRows + 1}
+    return currentOffset
+}
+
 export abstract class UIPanel {
     readonly name: string
     bounds: Rect

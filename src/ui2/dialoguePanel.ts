@@ -12,7 +12,7 @@
  * Panel name: 'dialogue'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect, wrapText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,8 @@ export class DialoguePanel extends UIPanel {
      * Used by `onKeyDown` to enforce scroll bounds without re-measuring.
      */
     private _replyLines: string[] = []
+    /** Index of the currently hovered option (-1 = none). */
+    private _hoveredIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('dialogue', {
@@ -68,6 +70,7 @@ export class DialoguePanel extends UIPanel {
         this._options = []
         this._replyScrollLine = 0
         this._replyLines = []
+        this._hoveredIndex = -1
     }
 
     /** Append a player-response option. */
@@ -96,7 +99,7 @@ export class DialoguePanel extends UIPanel {
 
         // Build wrapped lines using ctx.measureText for accurate wrapping.
         const replyMaxW = width - PADDING * 2 - 12
-        this._replyLines = buildLines(ctx, this._reply, replyMaxW)
+        this._replyLines = wrapText(ctx, this._reply, replyMaxW)
 
         // Clamp scroll offset in case text changed since last keypress.
         this._replyScrollLine = Math.max(0, Math.min(
@@ -134,8 +137,12 @@ export class DialoguePanel extends UIPanel {
         for (let i = 0; i < this._options.length; i++) {
             const opt = this._options[i]
             const oy = optY0 + i * OPTION_ROW_H
+            // Hover highlight
+            if (i === this._hoveredIndex) {
+                fillRect(ctx, PADDING, oy, width - PADDING * 2, OPTION_ROW_H, FALLOUT_DARK_GRAY)
+            }
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(i === this._hoveredIndex ? FALLOUT_AMBER : FALLOUT_GREEN)
             ctx.fillText(`${i + 1}. ${opt.text}`, PADDING + 4, oy + 16)
         }
 
@@ -158,6 +165,18 @@ export class DialoguePanel extends UIPanel {
             }
         }
         return true // consume all clicks within the panel
+    }
+
+    override onMouseMove(x: number, y: number): void {
+        const optY0 = 26 + REPLY_HEIGHT + 14
+        for (let i = 0; i < this._options.length; i++) {
+            const oy = optY0 + i * OPTION_ROW_H
+            if (y >= oy && y < oy + OPTION_ROW_H && x >= PADDING && x < this.bounds.width - PADDING) {
+                this._hoveredIndex = i
+                return
+            }
+        }
+        this._hoveredIndex = -1
     }
 
     override onKeyDown(key: string): boolean {
@@ -190,57 +209,4 @@ export class DialoguePanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
-
-/**
- * Split `text` into wrapped lines that each fit within `maxWidth` pixels.
- * Explicit `\n` (or `\r\n`) line breaks are honoured first; each resulting
- * paragraph is then independently word-wrapped using `ctx.measureText` for
- * accurate glyph-width measurement.
- */
-function buildLines(
-    ctx: OffscreenCanvasRenderingContext2D,
-    text: string,
-    maxWidth: number,
-): string[] {
-    // Normalise CRLF → LF then split on hard line breaks.
-    const paragraphs = text.replace(/\r\n/g, '\n').split('\n')
-    const result: string[] = []
-    for (const paragraph of paragraphs) {
-        const words = paragraph.split(' ')
-        let line = ''
-        for (const word of words) {
-            const test = line ? line + ' ' + word : word
-            if (ctx.measureText(test).width > maxWidth && line) {
-                result.push(line)
-                line = word
-            } else {
-                line = test
-            }
-        }
-        result.push(line)  // Empty paragraphs (e.g. from \n\n) intentionally push '' for a visual blank line.
-    }
-    return result
-}
+// (cssColor / fillRect / strokeRect / wrapText now live in uiPanel.ts)

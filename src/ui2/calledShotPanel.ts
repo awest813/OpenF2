@@ -13,7 +13,7 @@
  * Panel name: 'calledShot'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,10 @@ export class CalledShotPanel extends UIPanel {
         torso: -1, head: -1, eyes: -1, groin: -1,
         leftArm: -1, rightArm: -1, leftLeg: -1, rightLeg: -1,
     }
+    /** Index of the currently keyboard-focused region (-1 = none). */
+    private _focusedIndex = -1
+    /** Index of the currently hovered region (-1 = none). */
+    private _hoveredIndex = -1
 
     constructor(screenWidth: number, screenHeight: number) {
         super('calledShot', {
@@ -80,6 +84,9 @@ export class CalledShotPanel extends UIPanel {
         for (const region of BODY_REGIONS) {
             this.hitChances[region] = chances[region] ?? -1
         }
+        // Focus the first hittable region so keyboard nav works immediately.
+        this._focusedIndex = BODY_REGIONS.findIndex(r => this.hitChances[r] >= 0)
+        this._hoveredIndex = -1
         this.show()
     }
 
@@ -110,12 +117,22 @@ export class CalledShotPanel extends UIPanel {
             const chance = this.hitChances[region]
             const chanceText = chance < 0 ? '--' : `${chance}%`
             const chanceColor = chance < 0 ? FALLOUT_DARK_GRAY : chance < 25 ? FALLOUT_RED : FALLOUT_AMBER
+            const isHighlighted = i === this._focusedIndex || i === this._hoveredIndex
+            const isHittable = chance >= 0
 
+            // Highlight row when hovered/focused (only if region is targetable)
+            if (isHighlighted && isHittable) {
+                fillRect(ctx, REGIONS_X, ry, REGION_W, ROW_H - 2, FALLOUT_DARK_GRAY)
+            }
             strokeRect(ctx, REGIONS_X, ry, REGION_W, ROW_H - 2, FALLOUT_DARK_GRAY, 1)
 
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText(REGION_LABELS[region], REGIONS_X + 6, ry + 17)
+            ctx.fillStyle = cssColor(
+                isHighlighted && isHittable ? FALLOUT_AMBER :
+                    isHittable ? FALLOUT_GREEN : FALLOUT_DARK_GRAY,
+            )
+            // Number hint (1-8) for keyboard selection
+            ctx.fillText(`${i + 1}. ${REGION_LABELS[region]}`, REGIONS_X + 6, ry + 17)
 
             ctx.fillStyle = cssColor(chanceColor)
             ctx.fillText(chanceText, REGIONS_X + CHANCE_X_OFF + 4, ry + 17)
@@ -149,6 +166,7 @@ export class CalledShotPanel extends UIPanel {
             const ry = REGIONS_Y + i * ROW_H
             if (x >= REGIONS_X && x < REGIONS_X + REGION_W && y >= ry && y < ry + ROW_H - 2) {
                 const region = BODY_REGIONS[i]
+                if (this.hitChances[region] < 0) {return true} // ignore impossible regions
                 EventBus.emit('calledShot:regionSelected', { region })
                 this.hide()
                 return true
@@ -158,9 +176,51 @@ export class CalledShotPanel extends UIPanel {
         return true
     }
 
+    override onMouseMove(x: number, y: number): void {
+        for (let i = 0; i < BODY_REGIONS.length; i++) {
+            const ry = REGIONS_Y + i * ROW_H
+            if (x >= REGIONS_X && x < REGIONS_X + REGION_W && y >= ry && y < ry + ROW_H - 2) {
+                this._hoveredIndex = i
+                return
+            }
+        }
+        this._hoveredIndex = -1
+    }
+
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
             this.hide()
+            return true
+        }
+        // Number keys 1–8 select a body region directly when targetable.
+        const digit = parseInt(key)
+        if (!isNaN(digit) && digit >= 1 && digit <= BODY_REGIONS.length) {
+            const region = BODY_REGIONS[digit - 1]
+            if (this.hitChances[region] >= 0) {
+                EventBus.emit('calledShot:regionSelected', { region })
+                this.hide()
+            }
+            return true
+        }
+        if (key === 'ArrowDown' || key === 'ArrowUp') {
+            const dir = key === 'ArrowDown' ? 1 : -1
+            const hittable = BODY_REGIONS
+                .map((r, i) => ({ r, i }))
+                .filter(({ r }) => this.hitChances[r] >= 0)
+            if (hittable.length === 0) {return true}
+            const currentPos = hittable.findIndex(({ i }) => i === this._focusedIndex)
+            const nextPos = currentPos < 0
+                ? (dir > 0 ? 0 : hittable.length - 1)
+                : (currentPos + dir + hittable.length) % hittable.length
+            this._focusedIndex = hittable[nextPos].i
+            return true
+        }
+        if (key === 'Enter' && this._focusedIndex >= 0 && this._focusedIndex < BODY_REGIONS.length) {
+            const region = BODY_REGIONS[this._focusedIndex]
+            if (this.hitChances[region] >= 0) {
+                EventBus.emit('calledShot:regionSelected', { region })
+                this.hide()
+            }
             return true
         }
         return false
@@ -171,26 +231,4 @@ export class CalledShotPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)

@@ -15,7 +15,7 @@
  * Panel name: 'inventory'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -60,6 +60,7 @@ export class InventoryPanel extends UIPanel {
 
     private _scrollOffset = 0
     private _selectedIndex = -1  // -1 = none
+    private _hoveredIndex = -1   // -1 = none
 
     constructor(screenWidth: number, screenHeight: number) {
         super('inventory', {
@@ -73,6 +74,7 @@ export class InventoryPanel extends UIPanel {
 
     protected override onShow(): void {
         this._selectedIndex = -1
+        this._hoveredIndex  = -1
         this._scrollOffset  = 0
     }
 
@@ -108,11 +110,14 @@ export class InventoryPanel extends UIPanel {
             const absIdx = i + this._scrollOffset
             const iy = LIST_Y + i * ITEM_ROW_H
             const isSelected = absIdx === this._selectedIndex
+            const isHovered  = absIdx === this._hoveredIndex
             if (isSelected) {
                 fillRect(ctx, LIST_X + 2, iy + 2, LIST_W - 4, ITEM_ROW_H - 2, FALLOUT_DARK_GRAY)
+            } else if (isHovered) {
+                fillRect(ctx, LIST_X + 2, iy + 2, LIST_W - 4, ITEM_ROW_H - 2, { r: 20, g: 20, b: 20, a: 255 })
             }
             ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(isSelected ? FALLOUT_AMBER : FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(isSelected ? FALLOUT_AMBER : isHovered ? FALLOUT_AMBER : FALLOUT_GREEN)
             const label = item.name.length > MAX_ITEM_NAME_LEN ? item.name.slice(0, MAX_ITEM_NAME_LEN) : item.name
             ctx.fillText(`${label}  x${item.amount}`, LIST_X + 6, iy + 14)
         }
@@ -203,6 +208,18 @@ export class InventoryPanel extends UIPanel {
         return true
     }
 
+    override onMouseMove(x: number, y: number): void {
+        if (x >= LIST_X && x < LIST_X + LIST_W && y >= LIST_Y && y < LIST_Y + MAX_ROWS * ITEM_ROW_H) {
+            const row = Math.floor((y - LIST_Y) / ITEM_ROW_H)
+            const absIdx = row + this._scrollOffset
+            if (absIdx >= 0 && absIdx < this.items.length) {
+                this._hoveredIndex = absIdx
+                return
+            }
+        }
+        this._hoveredIndex = -1
+    }
+
     override onKeyDown(key: string): boolean {
         if (key === 'Escape' || key === 'i' || key === 'I') {
             this.hide()
@@ -264,29 +281,7 @@ export class InventoryPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)
 
 function drawSlot(
     ctx: OffscreenCanvasRenderingContext2D,

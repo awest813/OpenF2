@@ -14,7 +14,7 @@
  *   panel.show()
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor } from './uiPanel.js'
 import { modRegistry } from '../mods.js'
 
 const PANEL_WIDTH  = 220
@@ -129,9 +129,7 @@ export class MapViewerPanel extends UIPanel {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
+// (cssColor now lives in uiPanel.ts)
 
 function basename(path: string): string {
     const idx = path.lastIndexOf('/')

@@ -17,7 +17,7 @@
  * Panel name: 'barter'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -77,6 +77,8 @@ export class BarterPanel extends UIPanel {
     private _selected: SelectedItem | null = null
     /** True while the most recent offer attempt was refused (cleared on next successful offer or openWith). */
     private _offerRefused = false
+    /** Currently hovered column + row, for visual feedback. */
+    private _hovered: SelectedItem | null = null
 
     constructor(screenWidth: number, screenHeight: number) {
         super('barter', {
@@ -95,6 +97,7 @@ export class BarterPanel extends UIPanel {
         this.playerTable = []
         this.merchantTable = []
         this._selected = null
+        this._hovered = null
         this._offerRefused = false
         this.show()
     }
@@ -174,11 +177,14 @@ export class BarterPanel extends UIPanel {
             const item = items[i]
             const iy = y + 4 + i * ITEM_ROW_H
             const isSelected = this._selected?.col === colId && this._selected?.index === i
+            const isHovered  = this._hovered?.col  === colId && this._hovered?.index  === i
             if (isSelected) {
+                fillRect(ctx, x + 2, iy - 2, COL_W - 4, ITEM_ROW_H, FALLOUT_GREEN)
+            } else if (isHovered) {
                 fillRect(ctx, x + 2, iy - 2, COL_W - 4, ITEM_ROW_H, FALLOUT_DARK_GRAY)
             }
             ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(isSelected ? FALLOUT_BLACK : isHovered ? FALLOUT_AMBER : FALLOUT_GREEN)
             const label = item.name.length > MAX_ITEM_NAME_LEN ? item.name.slice(0, MAX_ITEM_NAME_LEN) : item.name
             ctx.fillText(`${label} x${item.amount}`, x + 4, iy + 11)
         }
@@ -235,10 +241,69 @@ export class BarterPanel extends UIPanel {
         return true
     }
 
+    override onMouseMove(x: number, y: number): void {
+        const cols: Array<{ x: number; id: ColumnId; items: BarterItem[] }> = [
+            { x: LEFT_INV_X,  id: 'leftInv',  items: this.playerInventory },
+            { x: LEFT_TBL_X,  id: 'leftTbl',  items: this.playerTable },
+            { x: RIGHT_TBL_X, id: 'rightTbl', items: this.merchantTable },
+            { x: RIGHT_INV_X, id: 'rightInv', items: this.merchantInventory },
+        ]
+        for (const col of cols) {
+            if (x >= col.x && x < col.x + COL_W && y >= COL_Y && y < COL_Y + COL_H) {
+                const relY = y - COL_Y - 4
+                const idx = Math.floor(relY / ITEM_ROW_H)
+                if (idx >= 0 && idx < col.items.length) {
+                    this._hovered = { col: col.id, index: idx }
+                    return
+                }
+            }
+        }
+        this._hovered = null
+    }
+
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
             EventBus.emit('barter:talkRequested', {})
             this.hide()
+            return true
+        }
+        if (key === 'o' || key === 'O') {
+            this._tryOffer()
+            return true
+        }
+        // Tab cycles selection through the four columns in left-to-right order.
+        if (key === 'Tab') {
+            const order: ColumnId[] = ['leftInv', 'leftTbl', 'rightTbl', 'rightInv']
+            const startIdx = this._selected ? order.indexOf(this._selected.col) : -1
+            for (let step = 1; step <= order.length; step++) {
+                const nextCol = order[(startIdx + step + order.length) % order.length]
+                const list = this._getList(nextCol)
+                if (list.length > 0) {
+                    this._selected = { col: nextCol, index: 0 }
+                    return true
+                }
+            }
+            return true
+        }
+        if (key === 'ArrowDown' || key === 'ArrowUp') {
+            if (!this._selected) {return true}
+            const list = this._getList(this._selected.col)
+            if (list.length === 0) {return true}
+            const delta = key === 'ArrowDown' ? 1 : -1
+            const next = Math.max(0, Math.min(list.length - 1, this._selected.index + delta))
+            this._selected = { col: this._selected.col, index: next }
+            return true
+        }
+        // Enter moves the selected item across (inv ↔ table).
+        if (key === 'Enter') {
+            if (this._selected) {
+                const dest: ColumnId =
+                    this._selected.col === 'leftInv'  ? 'leftTbl'  :
+                        this._selected.col === 'leftTbl'  ? 'leftInv'  :
+                            this._selected.col === 'rightInv' ? 'rightTbl' : 'rightInv'
+                this._moveItem(this._selected, dest)
+                this._selected = null
+            }
             return true
         }
         return false
@@ -316,30 +381,6 @@ export class BarterPanel extends UIPanel {
 
 function totalValue(items: BarterItem[]): number {
     return items.reduce((sum, i) => sum + i.value * i.amount, 0)
-}
-
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
 }
 
 function drawHeader(

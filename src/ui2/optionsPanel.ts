@@ -6,7 +6,7 @@
  * CLOSE button or Escape.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { Config } from '../config.js'
 
 // ---------------------------------------------------------------------------
@@ -44,6 +44,11 @@ const TOGGLES: ToggleEntry[] = [
 // ---------------------------------------------------------------------------
 
 export class OptionsPanel extends UIPanel {
+    /** Index of the keyboard-focused toggle (-1 = none). */
+    private _focusedIndex = -1
+    /** Index of the currently hovered toggle (-1 = none). */
+    private _hoveredIndex = -1
+
     constructor(screenWidth: number, screenHeight: number) {
         super('options', {
             x: Math.floor((screenWidth - PANEL_WIDTH) / 2),
@@ -52,6 +57,11 @@ export class OptionsPanel extends UIPanel {
             height: PANEL_HEIGHT,
         })
         this.zOrder = 15
+    }
+
+    protected override onShow(): void {
+        this._focusedIndex = -1
+        this._hoveredIndex = -1
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -74,10 +84,16 @@ export class OptionsPanel extends UIPanel {
             const y = START_Y + i * ROW_H
             const on = t.get()
             const btnX = width - BTN_X_OFFSET
+            const isFocused = i === this._focusedIndex || i === this._hoveredIndex
+
+            // Row highlight when hovered or keyboard-focused
+            if (isFocused) {
+                fillRect(ctx, 8, y - 2, width - 16, ROW_H, FALLOUT_DARK_GRAY)
+            }
 
             // Label
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            ctx.fillStyle = cssColor(isFocused ? FALLOUT_GREEN : FALLOUT_GREEN)
             ctx.fillText(t.label, 14, y + 14)
 
             // Toggle button
@@ -100,18 +116,23 @@ export class OptionsPanel extends UIPanel {
         ctx.textAlign = 'center'
         ctx.fillText('CLOSE', width / 2, closeBtnY + 15)
         ctx.textAlign = 'left'
+
+        // Footer hint
+        ctx.font = '9px monospace'
+        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
+        ctx.fillText('↑↓ select  Enter/Space toggle  Esc close', 14, height - 6)
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
         const { width, height } = this.bounds
 
-        // Toggle button hits
-        const btnX = width - BTN_X_OFFSET
+        // Toggle button hits (or clicking anywhere on a row toggles it)
         for (let i = 0; i < TOGGLES.length; i++) {
             const y0 = START_Y + i * ROW_H
-            if (x >= btnX && x < btnX + BTN_W && y >= y0 && y < y0 + BTN_H) {
+            if (y >= y0 - 2 && y < y0 + ROW_H - 2 && x >= 8 && x < width - 8) {
                 const t = TOGGLES[i]
                 t.set(!t.get())
+                this._focusedIndex = i
                 return true
             }
         }
@@ -127,9 +148,40 @@ export class OptionsPanel extends UIPanel {
         return true // consume all clicks within the panel
     }
 
+    override onMouseMove(x: number, y: number): void {
+        const { width } = this.bounds
+        for (let i = 0; i < TOGGLES.length; i++) {
+            const y0 = START_Y + i * ROW_H
+            if (y >= y0 - 2 && y < y0 + ROW_H - 2 && x >= 8 && x < width - 8) {
+                this._hoveredIndex = i
+                return
+            }
+        }
+        this._hoveredIndex = -1
+    }
+
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
             this.hide()
+            return true
+        }
+        if (key === 'ArrowDown') {
+            this._focusedIndex = this._focusedIndex < 0
+                ? 0
+                : Math.min(this._focusedIndex + 1, TOGGLES.length - 1)
+            return true
+        }
+        if (key === 'ArrowUp') {
+            if (this._focusedIndex < 0) {
+                this._focusedIndex = TOGGLES.length - 1
+            } else {
+                this._focusedIndex = Math.max(0, this._focusedIndex - 1)
+            }
+            return true
+        }
+        if ((key === 'Enter' || key === ' ') && this._focusedIndex >= 0 && this._focusedIndex < TOGGLES.length) {
+            const t = TOGGLES[this._focusedIndex]
+            t.set(!t.get())
             return true
         }
         return false
@@ -140,26 +192,4 @@ export class OptionsPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
-
-function fillRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-): void {
-    ctx.fillStyle = cssColor(color)
-    ctx.fillRect(x, y, w, h)
-}
-
-function strokeRect(
-    ctx: OffscreenCanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number,
-    color: UIColor,
-    lineWidth = 1,
-): void {
-    ctx.strokeStyle = cssColor(color)
-    ctx.lineWidth = lineWidth
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-}
+// (cssColor / fillRect / strokeRect now live in uiPanel.ts)

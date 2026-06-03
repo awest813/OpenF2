@@ -17,7 +17,7 @@
  *   panel.show()
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor } from './uiPanel.js'
 
 const PANEL_WIDTH  = 230
 const PANEL_HEIGHT = 180
@@ -115,6 +115,4 @@ export class PrototypeInspectorPanel extends UIPanel {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cssColor(c: UIColor): string {
-    return `rgba(${c.r},${c.g},${c.b},${c.a / 255})`
-}
+// (cssColor now lives in uiPanel.ts)
