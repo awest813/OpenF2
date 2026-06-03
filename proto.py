@@ -16,8 +16,10 @@ limitations under the License.
 
 # Parser/converter for Fallout 1 and 2 .PRO files to a JSON format
 
-# Fallout 1 mode
-FO1 = True
+# Game mode: set to True for Fallout 1, False for Fallout 2.
+# Affects critter damageType field parsing (see readCritter).
+# Override via --fo1 / --fo2 CLI flags, or set before calling readPRO.
+FO1 = False
 
 from io import BufferedReader
 import sys, os, struct, json
@@ -96,7 +98,7 @@ def readDrugEffect(f):
 def readItem(f: BufferedReader):
 	obj: Dict[str, Any] = {}
 
-	flagsExt = repr(f.read(3))
+	rawFlagsExt = f.read(3)
 	attackMode = ord(f.read(1))
 	scriptID = read32(f)
 	objSubType = read32(f)
@@ -107,11 +109,9 @@ def readItem(f: BufferedReader):
 	invFRM = read32(f)
 	soundID = ord(f.read(1))
 
-	# FIXME: `flagsExt` is of `bytes` type that can't represented as JSON without additional conversions.
-	# obj["flagsExt"] = flagsExt
-	obj["itemFlags"] = ord(flagsExt[0])
-	obj["actionFlags"] = ord(flagsExt[1])
-	obj["weaponFlags"] = ord(flagsExt[2])
+	obj["itemFlags"] = rawFlagsExt[0]
+	obj["actionFlags"] = rawFlagsExt[1]
+	obj["weaponFlags"] = rawFlagsExt[2]
 	obj["attackMode"] = attackMode
 	obj["scriptID"] = scriptID
 	obj["subType"] = objSubType

@@ -45,7 +45,7 @@ export function parseIni(text: string) {
             }
 
             if (ini[category] === undefined) {ini[category] = {}}
-            ini[category][kv[1]] = kv[2]
+            ini[category][kv[1].trim()] = kv[2].trim()
         }
     }
 
@@ -105,8 +105,7 @@ export function getRandomInt(min: number, max: number) {
 }
 
 export function rollSkillCheck(skill: number, modifier: number, isBounded: boolean) {
-    const tempSkill = skill + modifier
-    if (isBounded) {clamp(0, 95, tempSkill)}
+    const tempSkill = isBounded ? clamp(0, 95, skill + modifier) : skill + modifier
 
     const roll = getRandomInt(0, 100)
     return roll < tempSkill
@@ -217,11 +216,11 @@ export class BinaryReader {
 }
 
 export function assert(value: boolean, message: string) {
-    if (!value) {throw 'AssertionError: ' + message}
+    if (!value) {throw new Error('AssertionError: ' + message)}
 }
 
 export function assertEq<T>(value: T, expected: T, message: string) {
-    if (value !== expected) {throw `AssertionError: value (${value}) does not match expected (${expected}): ${message}`}
+    if (value !== expected) {throw new Error(`AssertionError: value (${value}) does not match expected (${expected}): ${message}`)}
 }
 
 declare function structuredClone(value: any, options?: StructuredSerializeOptions): any

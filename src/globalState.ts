@@ -163,8 +163,8 @@ export default {
     lastFPSTime: number
 
     floatMessages: FloatMessage[]
-    renderer: Renderer
-    audioEngine: AudioEngine
+    renderer: Renderer | null
+    audioEngine: AudioEngine | null
     $fpsOverlay: HTMLElement | null
 
     centerTile: Point

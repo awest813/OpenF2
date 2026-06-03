@@ -67,14 +67,15 @@ function objectSwapItem(a: Obj, item: Obj, b: Obj, amount: number) {
         console.warn('objectSwapItem: item (' + item + ') does not exist in source — skipping swap')
         return
     }
-    if (amount !== undefined && amount < item.amount) {
+    const invItem = a.inventory[idx]
+    if (amount !== undefined && amount < invItem.amount) {
         // just deduct amount from a and give amount to b
-        item.amount -= amount
-        b.addInventoryItem(cloneItem(item), amount)
+        invItem.amount -= amount
+        b.addInventoryItem(cloneItem(invItem), amount)
     } else {
         // just swap them
         a.inventory.splice(idx, 1)
-        b.addInventoryItem(item, amount || 1)
+        b.addInventoryItem(invItem, amount || 1)
     }
 }
 
@@ -678,23 +679,23 @@ export class Obj {
     }
 
     get isDoor(): boolean {
-        return this.type === 'scenery' && this.pro.extra.subType === 0 // SCENERY_DOOR
+        return this.type === 'scenery' && this.pro?.extra?.subType === 0 // SCENERY_DOOR
     }
 
     get isStairs(): boolean {
-        return this.type === 'scenery' && this.pro.extra.subType === 1 // SCENERY_STAIRS
+        return this.type === 'scenery' && this.pro?.extra?.subType === 1 // SCENERY_STAIRS
     }
 
     get isLadder(): boolean {
         return (
             this.type === 'scenery' &&
-            (this.pro.extra.subType === 3 || // SCENERY_LADDER_BOTTOM
-                this.pro.extra.subType === 4)
+            (this.pro?.extra?.subType === 3 || // SCENERY_LADDER_BOTTOM
+                this.pro?.extra?.subType === 4)
         ) // SCENERY_LADDER_TOP
     }
 
     get isContainer(): boolean {
-        return this.type === 'item' && this.pro.extra.subType === 1 // SUBTYPE_CONTAINER
+        return this.type === 'item' && this.pro?.extra?.subType === 1 // SUBTYPE_CONTAINER
     }
 
     get isExplosive(): boolean {

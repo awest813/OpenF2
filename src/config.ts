@@ -80,7 +80,7 @@ export const Config = {
         worldmap: 'p',
         calledShot: 'z',
         saveKey: 'n',
-        loadKey: 'm',
+        loadKey: 'l',
     },
 
     scripting: {

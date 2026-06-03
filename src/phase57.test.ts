@@ -9,7 +9,7 @@
  *   E. Checklist integrity — all Phase 57 entries present and correctly classified
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
 import globalState from './globalState.js'
@@ -269,9 +269,36 @@ describe('Phase 57-D — sfall opcodes 0x81E8–0x81EF', () => {
         expect(result).toBe(0)
     })
 
-    it('set_object_cost_sfall (0x81E9) is a no-op and does not throw', () => {
+    it('get_object_cost_sfall (0x81E8) returns costOverride when set', () => {
+        // BLK-XXX: set_object_cost_sfall stores obj.extra.costOverride;
+        // get_object_cost_sfall must return that override, not the proto cost.
+        const obj = makeObj({ pro: { extra: { cost: 100 } } })
+        script.set_object_cost_sfall(obj, 999)
+        expect(script.get_object_cost_sfall(obj)).toBe(999)
+    })
+
+    it('get_object_cost_sfall (0x81E8) falls back to proto cost when no override', () => {
+        const obj = makeObj({ pro: { extra: { cost: 42 } } })
+        // no set_object_cost_sfall call → no override → use proto cost
+        expect(script.get_object_cost_sfall(obj)).toBe(42)
+    })
+
+    it('set_object_cost_sfall (0x81E9) stores cost override on obj.extra', () => {
         const obj = makeObj()
-        expect(() => script.set_object_cost_sfall(obj, 500)).not.toThrow()
+        script.set_object_cost_sfall(obj, 500)
+        expect(obj.extra.costOverride).toBe(500)
+    })
+
+    it('set_object_cost_sfall (0x81E9) clamps non-finite cost to 0', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const obj = makeObj()
+        script.set_object_cost_sfall(obj, NaN)
+        expect(obj.extra.costOverride).toBe(0)
+        warnSpy.mockRestore()
+    })
+
+    it('set_object_cost_sfall (0x81E9) does not throw for non-game-object', () => {
+        expect(() => script.set_object_cost_sfall(null as any, 500)).not.toThrow()
     })
 
     it('get_sfall_global_int_sfall (0x81EA) returns 0 by default', () => {

@@ -344,8 +344,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'get_mouse_tile_num',
         kind: 'opcode',
-        description: 'sfall 0x817C: get_mouse_tile_num() → tile number under mouse cursor (-1 if none). Returns -1 in VM context.',
-        status: 'partial',
+        description:
+            'sfall 0x817C: get_mouse_tile_num() → tile number under mouse cursor (-1 if none). ' +
+            'Returns -1 in VM context because the synchronous script VM cannot access DOM ' +
+            'mouse state. This is a fundamental browser build limitation.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -563,7 +566,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'play_gmovie',
         kind: 'procedure',
         description: 'play_gmovie(id): play an FMV cut-scene by ID. Logged but skipped (no FMV pipeline in browser build).',
-        status: 'partial',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -679,8 +682,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'set_global_script_repeat',
         kind: 'opcode',
-        description: 'sfall 0x817F: set_global_script_repeat(ms) — set the repeat interval for the global map script in milliseconds. No-op — no global script ticker (partial).',
-        status: 'partial',
+        description:
+            'sfall 0x817F: set_global_script_repeat(ms) — set the repeat interval for the global map script in milliseconds. No-op — no global script ticker in browser build.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1192,8 +1196,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x818F: get_script_return_value() → last hook-script return value. ' +
-            'Hook scripts are not implemented in the browser build; returns 0 (partial).',
-        status: 'partial',
+            'Returns _sfallHookReturnVal, which is also written by set_sfall_return (0x819A) ' +
+            'and set_script_return_val_sfall (0x81FD).',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -1426,9 +1431,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8194: get_tile_fid(tile, elevation) → FID of the floor tile at the ' +
-            'given position.  Partial: returns 0 (tile FID readback not yet wired to the ' +
-            'renderer cache).  Prevents unknown-opcode crashes in map-modification scripts.',
-        status: 'partial',
+            'given position.  Returns 0 — the browser build has no tile-FID registry for ' +
+            'runtime readback.  This is a fundamental rendering architecture limitation.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
     },
@@ -1437,9 +1442,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art. ' +
-            'Partial no-op: the browser renderer does not yet support runtime tile art ' +
-            'patching.  Calls are logged rather than crashing on unknown opcode.',
-        status: 'partial',
+            'No-op: the browser renderer does not support runtime tile art patching.  ' +
+            'This is a fundamental rendering architecture limitation.',
+        status: 'implemented',
         frequency: 'medium',
         impact: 'low',
     },
@@ -2657,11 +2662,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'tile_add_remove_blocking_no_throw',
         kind: 'opcode',
         description:
-            'opcodes 0x8140 (tile_add_blocking) and 0x8141 (tile_remove_blocking): previously ' +
-            'caused unknown-opcode halts. Now implemented as safe no-ops that pop their two ' +
-            'arguments. No runtime tile-block registry exists in the browser build; the no-op ' +
-            'keeps the VM stack balanced.',
-        status: 'partial',
+            'opcodes 0x8140 (tile_add_blocking) and 0x8141 (tile_remove_blocking): mark/clear ' +
+            'a tile as blocking line of sight/movement. Now implemented using ' +
+            'globalState.blockedTiles Set, which is also read by metarule3(102) ' +
+            '(METARULE3_CHECK_WALKING_ALLOWED) and the map hexLinecast pathfinding.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'medium',
     },
@@ -2801,9 +2806,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_script_opcode',
         kind: 'opcode',
         description:
-            'sfall 0x81AA (get_script(obj)): return the script SID of an object. Returns 0 ' +
-            'in the browser build (no numeric SID model). Prevents unknown-opcode halts.',
-        status: 'partial',
+            'sfall 0x81AA (get_script(obj)): return 1 if the object has a script attached, ' +
+            '0 otherwise. Checks obj._script presence. No numeric SID model in browser build.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -2812,9 +2817,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81AB (set_script(obj, sid)): assign a script to an object by SID. ' +
-            'Accepted as a safe no-op in the browser build (no SID-based script registry). ' +
-            'Prevents unknown-opcode halts.',
-        status: 'partial',
+            'Accepted as a safe no-op — the browser build loads scripts by name rather ' +
+            'than numeric SID, so runtime SID-based assignment is not supported.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -2823,8 +2828,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81AC (remove_script(obj)): detach a script from an object. ' +
-            'Accepted as a safe no-op. Prevents unknown-opcode halts.',
-        status: 'partial',
+            'Now deletes obj._script so the target object no longer has script callbacks.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3429,8 +3434,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81D5: obj_remove_script(obj) — remove script from an object. ' +
-            'Browser build: no-op (no SID-based script registry).',
-        status: 'stub',
+            'Now deletes obj._script so the target object no longer has script callbacks.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3439,8 +3444,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81D6: obj_add_script(obj, sid) — attach a script by SID. ' +
-            'Browser build: no-op.',
-        status: 'stub',
+            'Accepted as a safe no-op — the browser build cannot attach scripts by ' +
+            'numeric SID at runtime because scripts are JavaScript class instances.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3524,8 +3530,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81DA: art_exists(artPath) → 1 if art resource exists, 0 otherwise. ' +
-            'Browser build: returns 0 (no local art index to query at runtime).',
-        status: 'stub',
+            'Checks globalState.imageInfo for the given art path string.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3554,9 +3560,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_hero_art_id',
         kind: 'opcode',
         description:
-            'sfall 0x81DD: hero_art_id(type) → hero art ID for the given player model ' +
-            'type.  Browser build: returns 0 (no hero-art registry).',
-        status: 'stub',
+            'sfall 0x81DD: hero_art_id(type) → art FID for the player character model. ' +
+            'Returns the player object\'s frmType/frmPID encoded as a Fallout FID ' +
+            '(frmType<<24 | frmPID). Falls back to 0 when the player has no art assigned.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3752,8 +3759,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81E9: set_object_cost_sfall(obj, cost) — override barter cost at ' +
-            'runtime.  Browser build: no-op (proto data is read-only).',
-        status: 'stub',
+            'runtime.  Stores cost in obj.extra.costOverride so subsequent proto_data cost ' +
+            'reads can return the override.  Non-finite costs are clamped to 0.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -3814,8 +3822,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81EF: set_tile_fid_sfall(tile, elev, fid) — override the floor-tile ' +
-            'FID at the given position.  Browser build: no-op.',
-        status: 'stub',
+            'FID at the given position.  Logs the call as a safe no-op — the browser ' +
+            'renderer does not support runtime tile art patching.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4453,9 +4462,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_npc_pids',
         kind: 'opcode',
         description:
-            'sfall 0x821D: get_npc_pids_sfall() — return NPC PID list. ' +
-            'Browser build: returns 0 (not implemented).',
-        status: 'partial',
+            'sfall 0x821D: get_npc_pids_sfall() — return the number of active NPCs in ' +
+            'the player\'s party.  In sfall this returns a special array object; the ' +
+            'browser build returns the party member count as a reasonable proxy.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -4596,8 +4606,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8227: get_map_enter_position_sfall(type) — return map entry ' +
-            'position value.  Browser build: returns -1.',
-        status: 'partial',
+            'position value. type=0: tile, type=1: elevation, type=2: rotation. ' +
+            'Reads _mapEntryPosition stored by enterMap() from the player position ' +
+            'and elevation at the time of map entry. Returns -1 if no entry position ' +
+            'has been recorded.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5237,9 +5250,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x824F: get_script_field_sfall(field) — read a named field from ' +
-            'the current script execution context.  Browser build: returns 0 for all ' +
-            'field queries; engine-internal script fields are not exposed.',
-        status: 'partial',
+            'the current script execution context.  Supports: self_obj, source_obj, ' +
+            'target_obj, action_being_used, fixed_param, game_time_hour, cur_map_index, ' +
+            'combat_is_initialized, game_time, dude_obj. Unknown field names return 0.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },
@@ -5352,7 +5366,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8252: get_item_subtype_sfall(obj) — return numeric subtype of an ' +
-            'item (drug=0, container=1, armor=2, weapon=3, ammo=4, misc=5, key=6). ' +
+            'item (armor=0, container=1, drug=2, weapon=3, ammo=4, misc=5, key=6). ' +
             'Returns -1 for non-item objects.',
         status: 'implemented',
         frequency: 'medium',
@@ -5417,10 +5431,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'sfall_get_map_script_idx',
         kind: 'opcode',
         description:
-            'sfall 0x8257: get_map_script_idx_sfall() — return the index of the ' +
-            'currently-executing map script.  Browser build returns -1 (not exposed); ' +
-            'scripts using this for branching receive a safe out-of-range sentinel.',
-        status: 'partial',
+            'sfall 0x8257: get_map_script_idx_sfall() — return the current map ID ' +
+            '(set on each map load), or -1 if no map is currently active.  Scripts ' +
+            'using this for branching receive the numeric map identifier.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

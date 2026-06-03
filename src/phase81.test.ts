@@ -424,14 +424,14 @@ describe('Phase 81-F-4 — sfall 0x829C: get_item_type_sfall', () => {
         expect(script.get_item_type_sfall(weapon)).toBe(3)
     })
 
-    it('returns 2 for armor', () => {
+    it('returns 0 for armor (canonical FO2 mapping)', () => {
         const armor = makeItemObj('armor')
-        expect(script.get_item_type_sfall(armor)).toBe(2)
+        expect(script.get_item_type_sfall(armor)).toBe(0)
     })
 
-    it('returns 0 for drug', () => {
+    it('returns 2 for drug (canonical FO2 mapping)', () => {
         const drug = makeItemObj('drug')
-        expect(script.get_item_type_sfall(drug)).toBe(0)
+        expect(script.get_item_type_sfall(drug)).toBe(2)
     })
 
     it('returns 4 for ammo', () => {

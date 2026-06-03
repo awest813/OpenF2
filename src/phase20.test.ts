@@ -461,9 +461,9 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
         expect(e!.status).toBe('implemented')
     })
 
-    it('set_global_script_repeat is marked partial', () => {
+    it('set_global_script_repeat is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'set_global_script_repeat')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('partial')
+        expect(e!.status).toBe('implemented')
     })
 })

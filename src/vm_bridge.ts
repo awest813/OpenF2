@@ -60,7 +60,7 @@ export namespace ScriptVMBridge {
 
     function varName(this: ScriptVM, value: any): string {
         if(typeof value === "number")
-            {return this.intfile.identifiers[value]}
+            {return this.intfile.identifiers[value] ?? String(value)}
         return value
     }
 
@@ -122,7 +122,7 @@ export namespace ScriptVMBridge {
        // place it at the critter's current tile.
        ,0x80D7: bridged("drop_obj", 1, false)
 
-       ,0x8016: function() { this.mapScript()[this.pop()] = 0 } // op_export_var
+       ,0x8016: function() { this.mapScript()[varName.call(this, this.pop())] = 0 } // op_export_var
        ,0x8015: function() { const name = varName.call(this, this.pop()); this.mapScript()[name] = this.pop() } // op_store_external
        ,0x8014: function() { this.push(this.mapScript()[varName.call(this, this.pop())]) } // op_fetch_external
 
@@ -245,20 +245,19 @@ export namespace ScriptVMBridge {
        ,0x8129: bridged("gdialog_mod_barter", 1, false)
        ,0x80DE: bridged("start_gdialog", 5, false)
        ,0x811C: bridged("gsay_start", 0) // void?
-       //,0x811D: bridged("gsay_end", 0) // void?
        ,0x811E: bridged("gsay_reply", 2, false)
        ,0x80DF: bridged("end_dialogue", 0) // void?
        ,0x8120: bridged("gsay_message", 3, false)
-       //,0x806B: bridged("display", 1)
        ,0x814E: bridged("gdialog_set_barter_mod", 1, false)
 
        ,0x811D: function() { // gsay_end
-            // halt where we are, saving our return address.
-            // we will resume when the dialogue system resumes us on dialogue exit
-            // usually to run cleanup code.
+            // Halt where we are, saving our return address.  We will resume
+            // when the dialogue system resumes us on dialogue exit, usually
+            // to run cleanup code.  Call gsay_end() first so any exception
+            // doesn't leave the VM in a bad state with a pushed return addr.
+            this.scriptObj.gsay_end()
             this.retStack.push(this.pc + 2)
             this.halted = true
-            this.scriptObj.gsay_end()
        }
 
        // giq_option
@@ -433,7 +432,7 @@ export namespace ScriptVMBridge {
        ,0x81A4: bridged("set_global_script_type", 1, false) // set_global_script_type(type) — set global script type (0=map, 1=combat)
        ,0x81A5: bridged("get_year", 0)                  // get_year() → in-game calendar year
        ,0x81A6: bridged("get_month", 0)                 // get_month() → in-game calendar month (1–12)
-       ,0x81A7: bridged("get_day", 0)                   // get_day() → in-game calendar day of month (1–31)
+       ,0x81A7: bridged("get_day", 0)                   // get_day() → in-game calendar day of month (1–30)
 
        // sfall extended opcodes 0x81A8–0x81A9 — combat free movement
        ,0x81A8: bridged("get_combat_free_move", 1)       // get_combat_free_move(obj) → free AP for movement this combat turn
@@ -483,33 +482,32 @@ export namespace ScriptVMBridge {
        // Phase 49 — sfall extended opcodes 0x81AA–0x81AD
        // -----------------------------------------------------------------------
 
-       // 0x81AA — get_script(obj): return the script SID attached to an object.
-       // The browser build does not expose script handles as integers; return 0
-       // (no-script / unknown) rather than crashing.  Scripts that use the
-       // return value for further calls will see a falsy 0, which typically
-       // causes them to skip script-manipulation logic gracefully.
-       ,0x81AA: function() {
-            const obj = this.pop()
-            // Guard: obj must be a non-null object with a _script property.
-            // _sid is not present in the browser build; always return 0.
-            const hasScript = obj !== null && obj !== 0 && typeof obj === 'object' && !!(obj as any)._script
-            this.push(hasScript ? 0 : 0) // always 0 — no numeric SID model
-        } // get_script(obj) → 0 (partial: no SID model in browser build)
+        // 0x81AA — get_script(obj): return whether an object has a script attached.
+        // The browser build does not expose script handles as integers; returns 1
+        // when the object has a _script property and 0 otherwise.
+        ,0x81AA: function() {
+             const obj = this.pop()
+             const hasScript = obj !== null && obj !== 0 && typeof obj === 'object' && !!(obj as any)._script
+             this.push(hasScript ? 1 : 0)
+         } // get_script(obj) → 0|1 (has script?)
 
-       // 0x81AB — set_script(obj, sid): assign a script to an object by SID.
-       // The browser build loads scripts by name rather than numeric SID; accept
-       // the arguments and no-op rather than crashing.
-       ,0x81AB: function() {
-            this.pop() // sid
-            this.pop() // obj
-        } // set_script(obj, sid) — no-op (no SID-based script registry)
+        // 0x81AB — set_script(obj, sid): assign a script to an object by SID.
+        // The browser build loads scripts by name rather than numeric SID; accept
+        // the arguments and no-op rather than crashing.
+        ,0x81AB: function() {
+             this.pop() // sid
+             this.pop() // obj
+         } // set_script(obj, sid) — no-op (no SID-based script registry)
 
-       // 0x81AC — remove_script(obj): detach the script from an object.
-       // Accepted but not implemented; scripts that remove their own script will
-       // continue to run (cannot self-terminate from within the VM call chain).
-       ,0x81AC: function() {
-            this.pop() // obj
-        } // remove_script(obj) — no-op
+        // 0x81AC — remove_script(obj): detach the script from an object.
+        // Clears obj._script so the target object no longer has script callbacks.
+        ,0x81AC: function() {
+             const obj = this.pop()
+             if (obj && typeof obj === 'object' && (obj as any)._script) {
+                 console.log('[remove_script] removing script from object pid=' + ((obj as any).pid ?? '?'))
+                 delete (obj as any)._script
+             }
+         } // remove_script(obj) — clear script reference
 
        // 0x81AD — get_critter_current_hp2 (alias): same as get_critter_hp (0x8183).
        // Some sfall-using mods call this opcode for NPC heal checks.
@@ -715,13 +713,27 @@ export namespace ScriptVMBridge {
        // Browser build: partial — always returns 0 (no per-object disable flag).
        ,0x81D4: bridged("obj_is_disabled_sfall", 1) // obj_is_disabled(obj) → 0
 
-       // 0x81D5 — obj_remove_script(obj): remove script from an object.
-       // Equivalent to remove_script; accepted as a safe no-op.
-       ,0x81D5: function() { this.pop() } // obj_remove_script(obj) — no-op
+        // 0x81D5 — obj_remove_script(obj): remove script from an object.
+        // Clears obj._script so the target object no longer has script callbacks.
+        ,0x81D5: function() {
+            const obj = this.pop()
+            if (obj && typeof obj === 'object' && (obj as any)._script) {
+                console.log('[obj_remove_script] removing script from object pid=' + ((obj as any).pid ?? '?'))
+                delete (obj as any)._script
+            }
+        } // obj_remove_script(obj) — clear script reference
 
-       // 0x81D6 — obj_add_script(obj, script_id): attach a script by SID.
-       // Browser build: no SID-based script registry; no-op.
-       ,0x81D6: function() { this.pop(); this.pop() } // obj_add_script(obj, sid) — no-op
+        // 0x81D6 — obj_add_script(obj, script_id): attach a script by SID.
+        // The browser build does not support SID-based script assignment at runtime
+        // because scripts are JavaScript class instances compiled from int files.
+        // Logs the attempt and no-ops.
+        ,0x81D6: function() {
+            const _sid = this.pop()
+            const obj = this.pop()
+            if (obj && typeof obj === 'object') {
+                console.log('[obj_add_script] cannot attach script SID=' + _sid + ' at runtime — no-op')
+            }
+        } // obj_add_script(obj, sid) — runtime attach not supported
 
        // 0x81D7 — obj_run_proc(obj, proc_name): run a named procedure on an object.
        // BLK-120: now attempts to call the named procedure on obj._script.  The proc
@@ -779,8 +791,14 @@ export namespace ScriptVMBridge {
         }
 
        // 0x81DA — art_exists(artPath): check whether an art resource exists.
-       // Browser build: returns 0 (no local art index; cannot check at runtime).
-       ,0x81DA: function() { this.pop(); this.push(0) } // art_exists(artPath) → 0
+        // Checks globalState.imageInfo for the given art path (if populated).
+        ,0x81DA: function() {
+            const artPath = this.pop()
+            const exists = typeof artPath === 'string' &&
+                globalState.imageInfo != null &&
+                !!globalState.imageInfo[artPath]
+            this.push(exists ? 1 : 0)
+        } // art_exists(artPath) → 0|1
 
        // 0x81DB — obj_item_subtype(obj): return the item subtype of an object as an
        // integer (0=weapon, 1=ammo, 2=misc, 3=key, 4=armor, 5=container, 6=drug).
@@ -791,9 +809,15 @@ export namespace ScriptVMBridge {
        // its current XP.  Equivalent to the existing get_npc_level (0x8162).
        ,0x81DC: bridged("get_npc_level", 1) // get_critter_level(obj) → level
 
-       // 0x81DD — hero_art_id(type): return the art ID for the player character model
-       // of the given gender/type.  Browser build: returns 0 (no hero-art registry).
-       ,0x81DD: function() { this.pop(); this.push(0) } // hero_art_id(type) → 0
+        // 0x81DD — hero_art_id(type): return the art ID for the player character model
+        // of the given gender/type.  Returns the player's frmPID with type encoded in high byte.
+        ,0x81DD: function() {
+            const _type = this.pop()
+            const player = globalState.player
+            const frmPID = (player as any)?.frmPID ?? (player as any)?.fid ?? 0
+            const frmType = (player as any)?.frmType ?? 0
+            this.push((frmType << 24) | (frmPID & 0xffffff))
+        } // hero_art_id(type) → art FID
 
        // 0x81DE — get_current_inven_size(critter): return the current total size
        // (in item-size units) of a critter's inventory.  Equivalent to critter_inven_size.

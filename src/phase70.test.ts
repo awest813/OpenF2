@@ -291,6 +291,7 @@ describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
     })
 
     // ---- 0x8252 get_item_subtype_sfall ----
+    // FO2 canonical mapping: armor=0, container=1, drug=2, weapon=3, ammo=4, misc=5, key=6
     it('get_item_subtype_sfall returns correct index for weapon', () => {
         const obj = makeObj({ type: 'item', subtype: 'weapon' })
         expect(script.get_item_subtype_sfall(obj)).toBe(3)
@@ -303,7 +304,7 @@ describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
 
     it('get_item_subtype_sfall returns correct index for armor', () => {
         const obj = makeObj({ type: 'item', subtype: 'armor' })
-        expect(script.get_item_subtype_sfall(obj)).toBe(2)
+        expect(script.get_item_subtype_sfall(obj)).toBe(0)
     })
 
     it('get_item_subtype_sfall returns -1 for critter', () => {
@@ -382,7 +383,7 @@ describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
     })
 
     // ---- 0x8257 get_map_script_idx_sfall ----
-    it('get_map_script_idx_sfall returns -1', () => {
+    it('get_map_script_idx_sfall returns -1 when no map is active', () => {
         expect(script.get_map_script_idx_sfall()).toBe(-1)
     })
 

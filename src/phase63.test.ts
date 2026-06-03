@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
+import globalState from './globalState.js'
 
 vi.mock('./player.js', () => ({ Player: class MockPlayer {} }))
 vi.mock('./ui.js', async (importOriginal) => {
@@ -238,8 +239,19 @@ describe('Phase 63-C — sfall opcodes 0x8218–0x821F', () => {
     })
 
     // ---- 0x821D get_npc_pids_sfall ----
-    it('get_npc_pids_sfall returns 0 (not implemented in browser build)', () => {
+    it('get_npc_pids_sfall returns 0 when party is empty', () => {
         expect(script.get_npc_pids_sfall()).toBe(0)
+    })
+
+    it('get_npc_pids_sfall returns party member count', () => {
+        const savedParty = globalState.gParty
+        const fakeParty = { getPartyMembers: () => [{ pid: 100 }, { pid: 101 }] }
+        ;(globalState as any).gParty = fakeParty
+        try {
+            expect(script.get_npc_pids_sfall()).toBe(2)
+        } finally {
+            (globalState as any).gParty = savedParty
+        }
     })
 
     // ---- 0x821E get_proto_num_sfall ----

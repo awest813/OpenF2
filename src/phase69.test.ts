@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
+import globalState from './globalState.js'
 
 vi.mock('./player.js', () => ({ Player: class MockPlayer {} }))
 vi.mock('./ui.js', async (importOriginal) => {
@@ -313,13 +314,53 @@ describe('Phase 69-E — sfall opcodes 0x8248–0x824F', () => {
     })
 
     // ---- 0x824F get_script_field_sfall ----
-    it('get_script_field_sfall returns 0 for any field', () => {
-        expect(script.get_script_field_sfall('fixed_param')).toBe(0)
-        expect(script.get_script_field_sfall(99)).toBe(0)
+    it('get_script_field_sfall returns 0 for unknown field names', () => {
+        expect(script.get_script_field_sfall('bogus_field')).toBe(0)
     })
 
-    it('get_script_field_sfall does not throw', () => {
-        expect(() => script.get_script_field_sfall(null)).not.toThrow()
+    it('get_script_field_sfall returns 0 for non-string arguments', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        expect(script.get_script_field_sfall(99)).toBe(0)
+        expect(script.get_script_field_sfall(null)).toBe(0)
+        warnSpy.mockRestore()
+    })
+
+    it('get_script_field_sfall reads fixed_param from script context', () => {
+        script.fixed_param = 42
+        expect(script.get_script_field_sfall('fixed_param')).toBe(42)
+    })
+
+    it('get_script_field_sfall reads action_being_used from script context', () => {
+        script.action_being_used = 7
+        expect(script.get_script_field_sfall('action_being_used')).toBe(7)
+    })
+
+    it('get_script_field_sfall reads game_time_hour from script context', () => {
+        script.game_time_hour = 1430
+        expect(script.get_script_field_sfall('game_time_hour')).toBe(1430)
+    })
+
+    it('get_script_field_sfall reads cur_map_index from script context', () => {
+        script.cur_map_index = 5
+        expect(script.get_script_field_sfall('cur_map_index')).toBe(5)
+    })
+
+    it('get_script_field_sfall reads combat_is_initialized from script context', () => {
+        script.combat_is_initialized = 1
+        expect(script.get_script_field_sfall('combat_is_initialized')).toBe(1)
+    })
+
+    it('get_script_field_sfall returns 0 for dude_obj when player is null', () => {
+        const savedPlayer = globalState.player
+        ;(globalState as any).player = null
+        expect(script.get_script_field_sfall('dude_obj')).toBe(0)
+        ;(globalState as any).player = savedPlayer
+    })
+
+    it('get_script_field_sfall handles field names case-insensitively', () => {
+        script.fixed_param = 42
+        expect(script.get_script_field_sfall('FIXED_PARAM')).toBe(42)
+        expect(script.get_script_field_sfall('Fixed_Param')).toBe(42)
     })
 })
 

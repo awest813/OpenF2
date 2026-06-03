@@ -380,6 +380,23 @@ describe('Phase 80-F-5 — sfall 0x8295/0x8296: get/add_kill_counter_sfall', () 
     it('add_kill_counter_sfall does not throw', () => {
         expect(() => script.add_kill_counter_sfall(1, 5)).not.toThrow()
     })
+
+    it('add_kill_counter_sfall increments (does not overwrite) existing count', () => {
+        // BLK-XXX: add_kill_counter must increment; previously delegated to
+        // set_critter_kills which overwrote.  Verify the fix.
+        script.set_critter_kills(2, 3)
+        script.add_kill_counter_sfall(2, 4)
+        expect(script.get_kill_counter_sfall(2)).toBe(7)
+    })
+
+    it('add_kill_counter_sfall accumulates across multiple calls', () => {
+        // Reset to a known starting point to avoid bleed from other tests.
+        script.set_critter_kills(7, 0)
+        script.add_kill_counter_sfall(7, 1)
+        script.add_kill_counter_sfall(7, 2)
+        script.add_kill_counter_sfall(7, 3)
+        expect(script.get_kill_counter_sfall(7)).toBe(6)
+    })
 })
 
 describe('Phase 80-F-6 — sfall 0x8297: get_player_elevation_sfall', () => {

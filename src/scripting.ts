@@ -486,6 +486,10 @@ export namespace Scripting {
     }
 
     export function dialogueReply(id: number): void {
+        if (id < 0 || id >= dialogueOptionProcs.length) {
+            warn('dialogueReply: invalid id ' + id + ' (have ' + dialogueOptionProcs.length + ' options)')
+            return
+        }
         const f = dialogueOptionProcs[id]
         dialogueOptionProcs = []
         f()
@@ -509,11 +513,14 @@ export namespace Scripting {
         info('[dialogue exit]')
 
         if (currentDialogueObject) {
-            // resume from when we halted in gsay_end
-            const vm = currentDialogueObject._script!._vm!
-            vm.pc = vm.popAddr()
-            info(`[resuming from gsay_end (pc=0x${vm.pc.toString(16)})]`)
-            vm.run()
+            const vm = currentDialogueObject._script?._vm
+            if (vm) {
+                vm.pc = vm.popAddr()
+                info(`[resuming from gsay_end (pc=0x${vm.pc.toString(16)})]`)
+                vm.run()
+            } else {
+                warn('dialogueExit: no VM for dialogue object')
+            }
         }
 
         currentDialogueObject = null
@@ -4278,8 +4285,9 @@ export namespace Scripting {
         }
         get_script_return_value(): number {
             // Return the most recent sfall hook-script return value.
-            // Hook scripts are not implemented in the browser build; return 0.
-            return 0
+            // Reads from _sfallHookReturnVal, which is also written by
+            // set_script_return_val_sfall (0x81FD) and set_sfall_return (0x819A).
+            return _sfallHookReturnVal
         }
 
         load_map(map: number | string, startLocation: number) {
@@ -4979,13 +4987,15 @@ export namespace Scripting {
 
         // sfall 0x81E8 — get_object_cost_sfall(obj):
         // Return the base barter/store cost of an item from its proto data.
-        // Equivalent to proto_data(obj, ITEM_DATA_COST) for items.
-        // Returns 0 for critters and non-game objects.
+        // If a cost override has been set via set_object_cost_sfall, return that
+        // override instead.  Returns 0 for critters and non-game objects.
         get_object_cost_sfall(obj: Obj): number {
             if (!isGameObject(obj)) {
                 warn('get_object_cost_sfall: not a game object: ' + obj, undefined, this)
                 return 0
             }
+            const override = (obj as any).extra?.costOverride
+            if (override !== undefined) {return override}
             const pro = (obj as any).pro
             if (pro?.extra?.cost !== undefined) {return pro.extra.cost}
             if (pro?.cost !== undefined) {return pro.cost}
@@ -4993,10 +5003,19 @@ export namespace Scripting {
         }
 
         // sfall 0x81E9 — set_object_cost_sfall(obj, cost):
-        // Override the barter cost for an object.  Browser build: no-op (proto data
-        // is read-only at runtime).
-        set_object_cost_sfall(_obj: Obj, _cost: number): void {
-            log('set_object_cost_sfall', arguments)
+        // Override the barter cost for an object.  Stores the override on obj.extra.costOverride
+        // so subsequent get_object_cost_sfall (proto_data cost field) reads return the override.
+        set_object_cost_sfall(obj: Obj, cost: number): void {
+            if (!isGameObject(obj)) {
+                warn('set_object_cost_sfall: not a game object', undefined, this)
+                return
+            }
+            if (typeof cost !== 'number' || !isFinite(cost)) {
+                warn('set_object_cost_sfall: non-finite cost (' + cost + ') — clamping to 0', undefined, this)
+                cost = 0
+            }
+            if (!(obj as any).extra) {(obj as any).extra = {}}
+            ;(obj as any).extra.costOverride = Math.max(0, Math.floor(cost))
         }
 
         // sfall 0x81EA — get_sfall_global_int_sfall(index):
@@ -5521,26 +5540,26 @@ export namespace Scripting {
 
         // sfall 0x8218 — get_year_sfall():
         // Return the current in-game year (2241 at game start).
-        // Derived from gameTickTime: 10 ticks = 1 second; 1 year = 365 * 86400 seconds.
+        // Derived from gameTickTime: 10 ticks = 1 second; 1 year = 360 days (12×30).
         get_year_sfall(): number {
             const totalSecs = globalState.gameTickTime / 10
-            return 2241 + Math.floor(totalSecs / (365 * 86400))
+            return 2241 + Math.floor(totalSecs / (360 * 86400))
         }
 
         // sfall 0x8219 — get_month_sfall():
         // Return the current in-game month (1–12).
-        // Uses a 30-day month approximation (Fallout 2 uses 365-day years, 30-day months).
+        // Fallout 2 uses 360-day years with 12 months of 30 days each.
         get_month_sfall(): number {
             const totalSecs = globalState.gameTickTime / 10
-            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            const dayOfYear = Math.floor(totalSecs / 86400) % 360
             return Math.floor(dayOfYear / 30) + 1
         }
 
         // sfall 0x821A — get_day_sfall():
-        // Return the current in-game day of the month (1–30, approximate).
+        // Return the current in-game day of the month (1–30).
         get_day_sfall(): number {
             const totalSecs = globalState.gameTickTime / 10
-            const dayOfYear = Math.floor(totalSecs / 86400) % 365
+            const dayOfYear = Math.floor(totalSecs / 86400) % 360
             return (dayOfYear % 30) + 1
         }
 
@@ -5563,10 +5582,11 @@ export namespace Scripting {
         // opcode entry in vm_bridge.ts is a second binding to the same function.
 
         // sfall 0x821D — get_npc_pids_sfall():
-        // Return an array of PIDs of active party member NPCs.
-        // Browser build: returns 0 (not implemented; party tracking is minimal).
+        // Return the number of active NPCs in the player's party.
+        // In sfall this returns a special array object; the browser build
+        // returns the count as a reasonable proxy.
         get_npc_pids_sfall(): number {
-            return 0
+            return globalState.gParty?.getPartyMembers().length ?? 0
         }
 
         // sfall 0x821E — get_proto_num_sfall(obj):
@@ -5682,9 +5702,15 @@ export namespace Scripting {
 
         // sfall 0x8227 — get_map_enter_position_sfall(type):
         // Return a map-entry position value.
-        // type=0: tile, type=1: elevation, type=2: rotation
-        // Browser build: returns -1 (no saved map-entry position).
+        // type=0: tile number, type=1: elevation, type=2: rotation
+        // Returns the stored entry position set by the map loader, or -1
+        // when no entry position has been recorded.
         get_map_enter_position_sfall(type: number): number {
+            const entryPos = (globalState as any)._mapEntryPosition
+            if (!entryPos) {return -1}
+            if (type === 0) {return entryPos.tile}
+            if (type === 1) {return entryPos.elevation}
+            if (type === 2) {return entryPos.rotation}
             return -1
         }
 
@@ -6032,17 +6058,7 @@ export namespace Scripting {
                 return 0
             }
             const critter = obj as Critter
-            const statNames: Record<number, string> = {
-                0: 'STR', 1: 'PER', 2: 'END', 3: 'CHA', 4: 'INT', 5: 'AGI', 6: 'LUK',
-                7: 'Max HP', 8: 'AP', 9: 'AC', 10: 'Melee', 11: 'Carry',
-                12: 'Sequence', 13: 'Healing Rate', 14: 'Critical Chance', 15: 'Better Criticals',
-                16: 'DT Normal', 17: 'DT Laser', 18: 'DT Fire', 19: 'DT Plasma',
-                20: 'DT Electrical', 21: 'DT EMP', 22: 'DT Explosive',
-                23: 'DR Normal', 24: 'DR Laser', 25: 'DR Fire', 26: 'DR Plasma',
-                27: 'DR Electrical', 28: 'DR EMP', 29: 'DR Explosive',
-                30: 'DR Radiation', 31: 'DR Poison',
-            }
-            const name = statNames[stat_id]
+            const name = statMap[stat_id]
             if (!name) {
                 log('get_base_stat_sfall: unknown stat id ' + stat_id + ' — returning 0', arguments)
                 return 0
@@ -6059,12 +6075,7 @@ export namespace Scripting {
                 return
             }
             const critter = obj as Critter
-            const statNames: Record<number, string> = {
-                0: 'STR', 1: 'PER', 2: 'END', 3: 'CHA', 4: 'INT', 5: 'AGI', 6: 'LUK',
-                7: 'Max HP', 8: 'AP', 9: 'AC', 10: 'Melee', 11: 'Carry',
-                12: 'Sequence', 13: 'Healing Rate', 14: 'Critical Chance',
-            }
-            const name = statNames[stat_id]
+            const name = statMap[stat_id]
             if (!name) {
                 warn('set_base_stat_sfall: unknown stat id ' + stat_id + ' — ignoring', undefined, this)
                 return
@@ -6157,12 +6168,44 @@ export namespace Scripting {
         }
 
         // sfall 0x824F — get_script_field_sfall(field):
-        // Read a named field from the current script execution context.  In the
-        // browser build the full set of engine-internal script fields is not exposed;
-        // returns 0 for all field queries so calling scripts do not crash.
+        // Read a named field from the current script execution context.
+        // Supports known string field names (case-insensitive):
+        //   "self_obj", "source_obj", "target_obj", "action_being_used",
+        //   "fixed_param", "game_time_hour", "cur_map_index",
+        //   "combat_is_initialized", "game_time", "dude_obj"
+        // Returns 0 for unknown fields or when the field value is falsy.
         get_script_field_sfall(field: any): number {
-            log('get_script_field_sfall: field=' + field + ' — returning 0', arguments)
-            return 0
+            if (typeof field !== 'string') {
+                warn('get_script_field_sfall: field must be a string, got ' + typeof field, undefined, this)
+                return 0
+            }
+            const key = field.toLowerCase()
+            const script = this
+            switch (key) {
+                case 'self_obj':
+                    return isGameObject(script.self_obj) ? 1 : 0
+                case 'source_obj':
+                    return isGameObject(script.source_obj) ? 1 : 0
+                case 'target_obj':
+                    return isGameObject(script.target_obj) ? 1 : 0
+                case 'action_being_used':
+                    return script.action_being_used ?? 0
+                case 'fixed_param':
+                    return script.fixed_param ?? 0
+                case 'game_time_hour':
+                    return script.game_time_hour ?? 0
+                case 'cur_map_index':
+                    return script.cur_map_index ?? 0
+                case 'combat_is_initialized':
+                    return script.combat_is_initialized ?? 0
+                case 'game_time':
+                    return script.game_time ?? 0
+                case 'dude_obj':
+                    return isGameObject(globalState.player) ? 1 : 0
+                default:
+                    log('get_script_field_sfall: unknown field "' + field + '"', arguments)
+                    return 0
+            }
         }
 
         // ---------------------------------------------------------------------------
@@ -6204,9 +6247,9 @@ export namespace Scripting {
             if (!isGameObject(obj)) {return -1}
             if (obj.type !== 'item') {return -1}
             const subtypeMap: Record<string, number> = {
-                drug: 0,
+                armor: 0,
                 container: 1,
-                armor: 2,
+                drug: 2,
                 weapon: 3,
                 ammo: 4,
                 misc: 5,
@@ -6259,11 +6302,12 @@ export namespace Scripting {
         }
 
         // sfall 0x8257 — get_map_script_idx_sfall():
-        // Return the index of the currently-executing map script.  Browser build
-        // returns -1 (not exposed); scripts that rely on this for branching will
-        // receive a safe out-of-range sentinel.
+        // Return the index of the currently-executing map script.
+        // Reads cur_map_index from the Script instance (set by the script
+        // execution context). Returns -1 when no map is active.
         get_map_script_idx_sfall(): number {
-            return -1
+            const idx = this.cur_map_index
+            return idx !== null && idx !== undefined ? idx : -1
         }
 
         // -----------------------------------------------------------------------
@@ -6866,17 +6910,16 @@ export namespace Scripting {
         }
 
         // sfall 0x8295 — get_kill_counter_sfall(critterType):
-        // Return the number of kills of the given critter type accumulated so far.
-        // Browser build: returns 0 — per-type kill tracking is not implemented.
-        get_kill_counter_sfall(_critterType: number): number {
-            return 0
+        // Return the number of kills of the given critter type.
+        get_kill_counter_sfall(critterType: number): number {
+            return this.get_critter_kills(critterType)
         }
 
         // sfall 0x8296 — add_kill_counter_sfall(critterType, count):
-        // Add count to the kill counter for the given critter type.
-        // Browser build: no-op — per-type kill tracking is not implemented.
-        add_kill_counter_sfall(_critterType: number, _count: number): void {
-            // no-op
+        // Increment the kill counter for the given critter type by count.
+        add_kill_counter_sfall(critterType: number, count: number): void {
+            const current = this.get_critter_kills(critterType)
+            this.set_critter_kills(critterType, current + count)
         }
 
         // sfall 0x8297 — get_player_elevation_sfall():
@@ -6950,9 +6993,9 @@ export namespace Scripting {
         get_item_type_sfall(item: Obj): number {
             if (!isGameObject(item) || item.type !== 'item') {return -1}
             const subtypeMap: Record<string, number> = {
-                drug: 0,
+                armor: 0,
                 container: 1,
-                armor: 2,
+                drug: 2,
                 weapon: 3,
                 ammo: 4,
                 misc: 5,
@@ -7614,7 +7657,7 @@ export namespace Scripting {
                 warn('get_critter_team_sfall: not a critter: ' + obj, undefined, this)
                 return 0
             }
-            return (obj as any)._teamNum ?? 0
+            return (obj as any).teamNum ?? 0
         }
 
         // sfall 0x82D7 — set_critter_team_sfall(obj, team):
@@ -7625,7 +7668,7 @@ export namespace Scripting {
                 warn('set_critter_team_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            ;(obj as any)._teamNum = typeof team === 'number' ? team : 0
+            ;(obj as any).teamNum = typeof team === 'number' ? team : 0
         }
 
         // -----------------------------------------------------------------------
@@ -8984,6 +9027,17 @@ export namespace Scripting {
         gameObjects = objects
         currentMapID = mapID
         mapFirstRun = isFirstRun
+
+        // Record the map entry position for get_map_enter_position_sfall.
+        // Uses the player's current tile and the given elevation.
+        const playerObj = globalState.player
+        if (playerObj?.position) {
+            ;(globalState as any)._mapEntryPosition = {
+                tile: toTileNum(playerObj.position),
+                elevation: elevation,
+                rotation: playerObj.orientation ?? 0
+            }
+        }
 
         if (mapScript && mapScript.map_enter_p_proc !== undefined) {
             info('calling map enter')

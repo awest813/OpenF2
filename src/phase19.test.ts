@@ -401,9 +401,9 @@ describe('Phase 19-F — checklist entries for Phase 19 features', () => {
         expect(entry!.status).toBe('implemented')
     })
 
-    it('has an entry for get_mouse_tile_num marked partial', () => {
+    it('has an entry for get_mouse_tile_num marked implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'get_mouse_tile_num')
         expect(entry).toBeDefined()
-        expect(entry!.status).toBe('partial')
+        expect(entry!.status).toBe('implemented')
     })
 })

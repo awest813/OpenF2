@@ -64,7 +64,7 @@ function makeCritter(opts: {
         perkRanks: {} as Record<number, number>,
         charTraits: new Set<number>(),
         aiNum: 1,
-        teamNum: -1,
+        teamNum: undefined as any,
         dead: false,
         hasAnimation: (_name: string) => false,
         staticAnimation: vi.fn(),

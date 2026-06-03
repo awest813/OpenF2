@@ -396,11 +396,11 @@ describe('Phase 48-K — dialogue_reaction (0x814D) no-op safe', () => {
 // Phase 48-L — tile_add/remove_blocking (0x8140/0x8141) no crash
 // ===========================================================================
 
-describe('Phase 48-L — tile blocking opcodes (0x8140/0x8141) are safe no-ops', () => {
-    it('checklist entry tile_add_remove_blocking_no_throw is present', () => {
+describe('Phase 48-L — tile blocking opcodes (0x8140/0x8141) implemented', () => {
+    it('checklist entry tile_add_remove_blocking_no_throw is present as implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'tile_add_remove_blocking_no_throw')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
     })
 })
 

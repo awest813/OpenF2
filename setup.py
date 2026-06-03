@@ -14,7 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-# Setup script to import Fallout 2 data for DarkFO
+# Setup script to import Fallout 2 data for OpenF2
+#
+# Usage:  python setup.py FALLOUT2_INSTALL_DIR [OPTIONS]
+#
+# Options:
+#   --no-extract-dat    Skip DAT extraction (use existing data/ directory)
+#   --no-export-images  Skip FRM→PNG image conversion
+#   --fo1               Parse protos in Fallout 1 mode
+#
+# The pipeline runs these stages in order:
+#   1. Verify master.dat, critter.dat exist in the install dir
+#   2. Parse critical hit tables and elevator tables from fallout2.exe
+#   3. Extract master.dat + critter.dat → data/
+#   4. Convert FRM images → art/*.png + art/imageMap.json
+#   5. Convert proto files → proto/pro.json
+#   6. Convert map files → maps/*.json + maps/*.images.json
 
 from __future__ import print_function
 import sys, os, glob, json, traceback
@@ -80,7 +95,9 @@ def parse_crit_table():
 		info("Parsing critical table from fallout2.exe...")
 		try:
 			with open(EXE_PATH, "rb") as fp:
-				# TODO: Don't hardcode paths, and need version check!
+				# Critical table offsets are for the vanilla US Fallout 2 v1.02d EXE.
+				# If these offsets are wrong for your EXE version, the extraction
+				# will produce incorrect data — check parseCritTable.py for details.
 				critTables = parseCritTable.readCriticalTables(fp, 0x000fef78, 0x00106597)
 				json.dump(critTables, open("lut/criticalTables.json", "w"))
 				info("Done parsing critical table")
@@ -158,7 +175,11 @@ def export_pros():
 
 	return True
 
-# TODO: extract audio using convertAudio
+# Audio conversion is not integrated into this pipeline.
+# To convert audio separately, run:
+#   python convertAudio.py FALLOUT2_INSTALL_DIR
+# This requires acm2wav.exe on your PATH.
+# See convertAudio.py for details.
 
 def export_maps():
 	# Export MAPs
@@ -185,7 +206,7 @@ def main():
 	global SRC_DIR, NO_EXTRACT_DAT, NO_EXPORT_IMAGES
 
 	if len(sys.argv) < 2:
-		print("USAGE:", sys.argv[0], "FALLOUT2_INSTALL_DIR [--no-extract-dat] [--no-export-images]")
+		print("USAGE:", sys.argv[0], "FALLOUT2_INSTALL_DIR [--no-extract-dat] [--no-export-images] [--fo1]")
 		return
 
 	NO_EXTRACT_DAT = "--no-extract-dat" in sys.argv
@@ -195,6 +216,11 @@ def main():
 	NO_EXPORT_IMAGES = "--no-export-images" in sys.argv
 	if NO_EXPORT_IMAGES:
 		sys.argv.remove("--no-export-images")
+
+	# Set proto parser game mode before any proto parsing happens
+	if "--fo1" in sys.argv:
+		proto.FO1 = True
+		sys.argv.remove("--fo1")
 
 	SRC_DIR = sys.argv[1]
 

@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
+import globalState from './globalState.js'
 
 vi.mock('./player.js', () => ({ Player: class MockPlayer {} }))
 vi.mock('./ui.js', async (importOriginal) => {
@@ -251,10 +252,30 @@ describe('Phase 64-D — sfall opcodes 0x8220–0x8227', () => {
     })
 
     // ---- 0x8227 get_map_enter_position_sfall ----
-    it('get_map_enter_position_sfall returns -1 (not implemented)', () => {
+    it('get_map_enter_position_sfall returns -1 when no entry position recorded', () => {
+        // Clear any previously set entry position
+        delete (globalState as any)._mapEntryPosition
         expect(script.get_map_enter_position_sfall(0)).toBe(-1)
         expect(script.get_map_enter_position_sfall(1)).toBe(-1)
         expect(script.get_map_enter_position_sfall(2)).toBe(-1)
+    })
+
+    it('get_map_enter_position_sfall returns tile for type=0', () => {
+        ;(globalState as any)._mapEntryPosition = { tile: 1234, elevation: 1, rotation: 3 }
+        expect(script.get_map_enter_position_sfall(0)).toBe(1234)
+        delete (globalState as any)._mapEntryPosition
+    })
+
+    it('get_map_enter_position_sfall returns elevation for type=1', () => {
+        ;(globalState as any)._mapEntryPosition = { tile: 1234, elevation: 1, rotation: 3 }
+        expect(script.get_map_enter_position_sfall(1)).toBe(1)
+        delete (globalState as any)._mapEntryPosition
+    })
+
+    it('get_map_enter_position_sfall returns rotation for type=2', () => {
+        ;(globalState as any)._mapEntryPosition = { tile: 1234, elevation: 1, rotation: 3 }
+        expect(script.get_map_enter_position_sfall(2)).toBe(3)
+        delete (globalState as any)._mapEntryPosition
     })
 })
 

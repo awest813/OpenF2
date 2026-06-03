@@ -85,15 +85,14 @@ export class AssetStoreImpl {
             return `proto/${relativePath}`
         }
 
-        // For version-specific categories, overlay has first say
+        // For version-specific categories, check mod overlays first
         for (const overlay of this.overlays) {
-            // Overlay lookup is a hint; actual existence check happens at fetch time
             const candidate = `${overlay.basePath}/${category}/${relativePath}`
-            // We cannot synchronously check existence in a browser, so we return
-            // the overlay path and let the caller fall back on 404.
-            // A future build step could emit a JSON manifest of all asset
-            // paths in the overlay so the browser can verify them at boot.
-            void candidate
+            // NOTE: In a browser we cannot synchronously test file existence.
+            // Return the highest-priority overlay path and let the caller
+            // fall back on a 404.  A future build step could emit a JSON
+            // manifest of overlay paths so the browser can verify at boot.
+            return candidate
         }
 
         const prefix = dataPathPrefix(this.version)

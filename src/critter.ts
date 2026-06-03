@@ -20,11 +20,6 @@ import { hexDirectionTo } from './geometry.js'
 import { Critter, WeaponObj } from './object.js'
 import { Scripting } from './scripting.js'
 
-const weaponSkins: { [weapon: string]: string } = {
-    uzi: 'i',
-    rifle: 'j',
-}
-
 const weaponAnims: { [weapon: string]: { [anim: string]: string } } = {
     punch: { idle: 'aa', attack: 'aq' },
 }

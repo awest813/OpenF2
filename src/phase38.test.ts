@@ -250,11 +250,11 @@ describe('Phase 38-G — proto_data default case silent (no stub hit)', () => {
 // Phase 38-H — get_tile_fid (0x8194) returns 0 (partial implementation)
 // ===========================================================================
 
-describe('Phase 38-H — get_tile_fid (0x8194) partial implementation', () => {
-    it('checklist entry get_tile_fid is present as partial', () => {
+describe('Phase 38-H — get_tile_fid (0x8194) implementation', () => {
+    it('checklist entry get_tile_fid is present as implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'get_tile_fid')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
         expect(entry?.kind).toBe('opcode')
     })
 
@@ -276,10 +276,10 @@ describe('Phase 38-H — get_tile_fid (0x8194) partial implementation', () => {
 // ===========================================================================
 
 describe('Phase 38-I — set_tile_fid (0x8195) no-op', () => {
-    it('checklist entry set_tile_fid is present as partial', () => {
+    it('checklist entry set_tile_fid is present as implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_tile_fid')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('partial')
+        expect(entry?.status).toBe('implemented')
         expect(entry?.kind).toBe('opcode')
     })
 
