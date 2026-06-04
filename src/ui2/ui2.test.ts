@@ -293,6 +293,25 @@ describe('UIManagerImpl.handleMouseMove', () => {
         mgr.handleMouseMove(300, 300)
         expect(called).toBe(false)
     })
+
+    it('notifies previous hovered panel with -1, -1 when mouse moves off it', () => {
+        const mgr = new UIManagerImpl(640, 480)
+        const coords: Array<{ x: number; y: number }> = []
+        const panel = new TestPanel('p', { x: 0, y: 0, width: 100, height: 100 })
+        ;(panel as any).onMouseMove = (x: number, y: number) => { coords.push({ x, y }) }
+        panel.show()
+        mgr.register(panel)
+
+        // Move inside
+        mgr.handleMouseMove(50, 50)
+        // Move outside
+        mgr.handleMouseMove(300, 300)
+
+        expect(coords).toEqual([
+            { x: 50, y: 50 },
+            { x: -1, y: -1 }
+        ])
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -755,20 +774,20 @@ describe('SaveLoadPanel', () => {
         expect(panel.selectedSlot).toBe(0)
     })
 
-    it('ArrowUp from -1 (no selection) stays at -1', () => {
+    it('ArrowUp from -1 (no selection) selects slot 0', () => {
         const panel = new SaveLoadPanel(800, 600)
         panel.openAs('save')
         expect(panel.selectedSlot).toBe(-1)
         panel.onKeyDown('ArrowUp')
-        expect(panel.selectedSlot).toBe(-1)
+        expect(panel.selectedSlot).toBe(0)
     })
 
-    it('ArrowDown does not go past max slot', () => {
+    it('ArrowDown does not go past slot 9 (10-slot panel)', () => {
         const panel = new SaveLoadPanel(800, 600)
         panel.openAs('save')
-        panel.selectedSlot = 4  // 5 slots, index 0-4
+        panel.selectedSlot = 9
         panel.onKeyDown('ArrowDown')
-        expect(panel.selectedSlot).toBe(4)
+        expect(panel.selectedSlot).toBe(9)
     })
 
     it('is centered on screen', () => {
@@ -790,18 +809,132 @@ describe('SaveLoadPanel', () => {
         expect(panel.selectedSlot).toBe(0)
     })
 
-    it('number key 5 selects slot 4 (last slot)', () => {
+    it('number key 9 selects slot 8', () => {
         const panel = new SaveLoadPanel(800, 600)
         panel.openAs('save')
-        panel.onKeyDown('5')
-        expect(panel.selectedSlot).toBe(4)
+        panel.onKeyDown('9')
+        expect(panel.selectedSlot).toBe(8)
     })
 
-    it('number key out of range is ignored', () => {
+    it('number key 0 selects slot 9 (last slot)', () => {
         const panel = new SaveLoadPanel(800, 600)
         panel.openAs('save')
-        panel.onKeyDown('6')
+        panel.onKeyDown('0')
+        expect(panel.selectedSlot).toBe(9)
+    })
+
+    it('Tab key switches between save and load mode', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        expect(panel.isSave).toBe(true)
+        panel.onKeyDown('Tab')
+        expect(panel.isSave).toBe(false)
+        panel.onKeyDown('Tab')
+        expect(panel.isSave).toBe(true)
+    })
+
+    it('Tab resets selectedSlot to -1', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 3
+        panel.onKeyDown('Tab')
         expect(panel.selectedSlot).toBe(-1)
+    })
+
+    it('inline name input: character keys append to name buffer when input active', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        // Select a slot to enable name input, then activate it
+        panel.selectedSlot = 0
+        ;(panel as any)._inputActive = true
+        ;(panel as any)._nameBuffer = ''
+        panel.onKeyDown('H')
+        panel.onKeyDown('i')
+        expect((panel as any)._nameBuffer).toBe('Hi')
+    })
+
+    it('inline name input: Backspace removes last character', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 0
+        ;(panel as any)._inputActive = true
+        ;(panel as any)._nameBuffer = 'Test'
+        panel.onKeyDown('Backspace')
+        expect((panel as any)._nameBuffer).toBe('Tes')
+    })
+
+    it('inline name input: Enter deactivates input without clearing name', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 0
+        ;(panel as any)._inputActive = true
+        ;(panel as any)._nameBuffer = 'MySave'
+        panel.onKeyDown('Enter')
+        expect((panel as any)._inputActive).toBe(false)
+        expect((panel as any)._nameBuffer).toBe('MySave')
+    })
+
+    it('inline name input: name buffer capped at MAX_NAME_LEN', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 0
+        ;(panel as any)._inputActive = true
+        ;(panel as any)._nameBuffer = 'A'.repeat(32)  // MAX_NAME_LEN = 32
+        panel.onKeyDown('X')  // should be ignored
+        expect((panel as any)._nameBuffer.length).toBe(32)
+    })
+
+    it('overwrite confirmation: Y key executes save and emits game:saveToSlot', () => {
+        const events: Array<{ slot: number; name?: string }> = []
+        const handler = (p: { slot: number; name?: string }) => { events.push(p) }
+        EventBus.on('game:saveToSlot', handler)
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 2
+        ;(panel as any)._confirmState = 'pending'
+        ;(panel as any)._pendingName = 'OldSave'
+        ;(panel as any)._nameBuffer = 'NewSave'
+        panel.onKeyDown('y')
+        expect((panel as any)._confirmState).toBe('none')
+        expect(events.some(e => e.slot === 2)).toBe(true)
+        EventBus.off('game:saveToSlot', handler)
+    })
+
+    it('overwrite confirmation: N key cancels and keeps slot selected', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 1
+        ;(panel as any)._confirmState = 'pending'
+        panel.onKeyDown('n')
+        expect((panel as any)._confirmState).toBe('none')
+        expect(panel.selectedSlot).toBe(1)  // slot still selected
+    })
+
+    it('Escape during confirmation cancels it', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        panel.selectedSlot = 1
+        ;(panel as any)._confirmState = 'pending'
+        panel.onKeyDown('Escape')
+        expect((panel as any)._confirmState).toBe('none')
+        expect(panel.visible).toBe(true)  // panel stays open
+    })
+
+    it('onShow defaults to save mode and refreshes slot list', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('load')  // put it in load mode
+        panel.hide()
+        panel.show()  // generic show — should reset to save
+        expect(panel.isSave).toBe(true)
+        expect(panel.selectedSlot).toBe(-1)
+    })
+
+    it('mouse-exit signal (-1,-1) clears hover state', () => {
+        const panel = new SaveLoadPanel(800, 600)
+        panel.openAs('save')
+        ;(panel as any)._hoveredSlot = 3
+        panel.onMouseMove(-1, -1)
+        expect((panel as any)._hoveredSlot).toBe(-1)
     })
 })
 
@@ -1474,6 +1607,33 @@ describe('LootPanel', () => {
         expect(panel.playerInventory).toHaveLength(1)
         expect(panel.playerInventory[0].name).toBe('Knife')
     })
+
+    it('clicking empty column space transfers selected item to that column', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([], [{ name: 'Knife', amount: 1 }])
+        // Select the container item (containerX = 460 - 16 - 160 = 284)
+        panel.onMouseDown(284 + 10, 42 + 5, 'l')
+        expect(panel._selectedSide).toBe('container')
+
+        // Click on the empty space at the bottom of the player's column (COL_Y=42, COL_H=220)
+        panel.onMouseDown(16 + 10, 42 + 200, 'l')
+        expect(panel.containerInventory).toHaveLength(0)
+        expect(panel.playerInventory).toHaveLength(1)
+        expect(panel.playerInventory[0].name).toBe('Knife')
+    })
+
+    it('clicking outside columns and buttons clears the selection', () => {
+        const panel = new LootPanel(800, 600)
+        panel.openWith([], [{ name: 'Knife', amount: 1 }])
+        // Select the container item
+        panel.onMouseDown(284 + 10, 42 + 5, 'l')
+        expect(panel._selectedSide).toBe('container')
+
+        // Click outside (e.g. at x=230, y=30)
+        panel.onMouseDown(230, 30, 'l')
+        expect(panel._selectedSide).toBeNull()
+        expect(panel._selectedIndex).toBe(-1)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1598,6 +1758,19 @@ describe('InventoryPanel', () => {
         panel.onKeyDown('Enter')
         expect(spy).not.toHaveBeenCalled()
         EventBus.clear('inventory:useItem')
+    })
+
+    it('clicking outside list and buttons clears the selection', () => {
+        const panel = new InventoryPanel(800, 600)
+        panel.items = [{ name: 'Stimpak', amount: 1, canUse: true }]
+        panel.show()
+        // Select item via clicking list (LIST_X=16, LIST_Y=80)
+        panel.onMouseDown(16 + 10, 80 + 5, 'l')
+        expect(panel._selectedIndex).toBe(0)
+
+        // Click outside (e.g. at x=350, y=50)
+        panel.onMouseDown(350, 50, 'l')
+        expect(panel._selectedIndex).toBe(-1)
     })
 })
 // WorldMapPanel
@@ -1993,13 +2166,13 @@ describe('SaveLoadPanel Integration', () => {
 
     it('allows selecting slots by clicking on slot rows', () => {
         panel.openAs('save')
-        
-        // Clicks inside slot 0: y starts at 60 (SLOT_START_Y)
-        panel.onMouseDown(50, 60 + 5, 'l')
+
+        // New geometry: PANEL_WIDTH=480, SLOT_START_Y=72, SLOT_H=32, SLOT_PAD_X=14
+        // Slot 0 occupies y=[72, 101], slot 2 occupies y=[136, 165]
+        panel.onMouseDown(50, 72 + 5, 'l')
         expect(panel.selectedSlot).toBe(0)
 
-        // Clicks inside slot 2: y starts at 60 + 2 * 28 = 116
-        panel.onMouseDown(50, 116 + 5, 'l')
+        panel.onMouseDown(50, 72 + 2 * 32 + 5, 'l')
         expect(panel.selectedSlot).toBe(2)
     })
 
@@ -2020,41 +2193,43 @@ describe('SaveLoadPanel Integration', () => {
     it('clicking close button hides the panel', () => {
         panel.openAs('save')
         expect(panel.visible).toBe(true)
-        
-        // Close button starts at x = width / 2 + 10 = 170, y = height - 36 = 244
-        panel.onMouseDown(170 + 10, 244 + 5, 'l')
+
+        // Geometry: PANEL_WIDTH=480, PANEL_HEIGHT=400
+        // Close button: x = 480/2 + 4 = 244, y = 400 - 36 = 364
+        panel.onMouseDown(244 + 10, 364 + 5, 'l')
         expect(panel.visible).toBe(false)
     })
 
-    it('confirming save slot selection emits game:saveToSlot', () => {
+    it('confirming save slot selection emits game:saveToSlot with slot and name', () => {
         panel.openAs('save')
-        panel.onMouseDown(50, 60 + 5, 'l') // select slot 0
-        
+        panel.onMouseDown(50, 72 + 5, 'l')  // select slot 0 (empty slot — no confirm dialog)
+
         const saveSpy = vi.fn()
         EventBus.on('game:saveToSlot', saveSpy)
 
-        // Action button starts at x = width / 2 - 70 = 90, y = height - 36 = 244
-        panel.onMouseDown(90 + 10, 244 + 5, 'l')
+        // Use keyboard Enter to confirm (slot is empty → no overwrite prompt → direct emit)
+        panel.onKeyDown('Enter')
 
-        expect(saveSpy).toHaveBeenCalledWith({ slot: 0 })
+        expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({ slot: 0 }))
         expect(panel.visible).toBe(false)
         EventBus.clear('game:saveToSlot')
     })
 
     it('confirming load slot selection emits game:loadFromSlot', () => {
         panel.openAs('load')
-        panel.onMouseDown(50, 60 + 28 + 5, 'l') // select slot 1
-        
+        panel.onMouseDown(50, 72 + 32 + 5, 'l')  // select slot 1
+
         const loadSpy = vi.fn()
         EventBus.on('game:loadFromSlot', loadSpy)
 
-        panel.onMouseDown(90 + 10, 244 + 5, 'l')
+        panel.onKeyDown('Enter')
 
         expect(loadSpy).toHaveBeenCalledWith({ slot: 1 })
         expect(panel.visible).toBe(false)
         EventBus.clear('game:loadFromSlot')
     })
 })
+
 
 // ---------------------------------------------------------------------------
 // GamePanel: combat log, END TURN button, weapon name resolution

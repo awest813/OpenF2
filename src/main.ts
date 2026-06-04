@@ -48,7 +48,7 @@ import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 import { EventBus } from './eventBus.js'
 import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
-import { save, load, saveList } from './saveload.js'
+import { save, load } from './saveload.js'
 
 // Return the skill ID used by the Fallout 2 engine
 function getSkillID(skill: Skills): number {
@@ -348,23 +348,13 @@ function initUIManager(): void {
         globalState.uiMode = UIMode.none
     })
 
-    EventBus.on('game:saveToSlot', ({ slot }) => {
-        const defaultName = 'Save Slot ' + (slot + 1)
-        const name = typeof window !== 'undefined' && typeof window.prompt === 'function'
-            ? window.prompt('Save Name?', defaultName)
-            : defaultName
-
-        if (name) {
-            saveList((saves) => {
-                const existing = saves.find(s => s.id === slot)
-                if (existing && typeof window !== 'undefined' && typeof window.confirm === 'function') {
-                    if (!window.confirm('Are you sure you want to overwrite that save slot?')) {
-                        return
-                    }
-                }
-                save(name, slot)
-            })
-        }
+    EventBus.on('game:saveToSlot', ({ slot, name: payloadName }) => {
+        // The SaveLoadPanel supplies the name directly; fall back to a
+        // sensible default so legacy callers (tests, debug console) still work.
+        const name = (payloadName && payloadName.trim()) ? payloadName.trim() : `Save Slot ${slot + 1}`
+        save(name, slot, () => {
+            EventBus.emit('game:saveComplete', { slot, name })
+        })
     })
 
     EventBus.on('game:loadFromSlot', ({ slot }) => {

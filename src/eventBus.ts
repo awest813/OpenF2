@@ -92,8 +92,11 @@ export interface EngineEvents {
     'calledShot:regionSelected': { region: string }
 
     // Save / Load
-    'game:saveToSlot': { slot: number }
+    /** name is the save title chosen by the player in the UI; omit to use a default. */
+    'game:saveToSlot': { slot: number; name?: string }
     'game:loadFromSlot': { slot: number }
+    /** Fired after a save completes successfully. */
+    'game:saveComplete': { slot: number; name: string }
 
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }

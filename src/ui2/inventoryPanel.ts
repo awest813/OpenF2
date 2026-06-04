@@ -205,6 +205,8 @@ export class InventoryPanel extends UIPanel {
             return true
         }
 
+        // Clicked outside list and buttons — clear selection
+        this._selectedIndex = -1
         return true
     }
 

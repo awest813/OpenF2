@@ -207,9 +207,13 @@ function switchToMemoryStore(reason: string): void {
 
 export function formatSaveDate(save: SaveGame): string {
     const date = new Date(save.timestamp)
-    return `${
-        date.getMonth() + 1
-    }/${date.getDate()}/${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    const yyyy = date.getFullYear()
+    const hh = String(date.getHours()).padStart(2, '0')
+    const min = String(date.getMinutes()).padStart(2, '0')
+    const ss = String(date.getSeconds()).padStart(2, '0')
+    return `${mm}/${dd}/${yyyy} ${hh}:${min}:${ss}`
 }
 
 function withTransaction(f: (trans: IDBTransaction) => void, finished?: () => void) {

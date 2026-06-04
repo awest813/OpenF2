@@ -17,6 +17,8 @@ Scripting system/engine for DarkFO
 */
 /* eslint-disable prefer-rest-params */
 
+declare const __dirname: string
+
 import { Combat } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
 import { lookupScriptName } from './data.js'
@@ -37,7 +39,7 @@ import { Player } from './player.js'
 import { makePID, loadPRO } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
 import { Lightmap } from './lightmap.js'
-import { fromTileNum, isValidTileNum, toTileNum } from './tile.js'
+import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
@@ -51,6 +53,108 @@ import { PERK_MAP } from './character/perks.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
+
+    let tilesList: string[] = []
+    let tilesIndexMap: Map<string, number> | null = null
+
+    function loadTilesList(): void {
+        if (tilesIndexMap !== null) return
+        tilesIndexMap = new Map<string, number>()
+        try {
+            let text = ''
+            if (typeof window === 'undefined' || typeof XMLHttpRequest === 'undefined') {
+                // Node.js environment
+                const fs = (globalThis as any).nodeFs
+                const path = (globalThis as any).nodePath
+                if (fs && path) {
+                    const proc = (globalThis as any).process
+                    let tilesPath = ''
+                    if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
+                        tilesPath = path.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
+                    }
+                    if (!tilesPath || !fs.existsSync(tilesPath)) {
+                        const dir = typeof __dirname !== 'undefined' ? __dirname : ''
+                        if (dir) {
+                            tilesPath = path.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
+                        }
+                    }
+                    if (tilesPath && fs.existsSync(tilesPath)) {
+                        text = fs.readFileSync(tilesPath, 'utf8')
+                    }
+                } else {
+                    const req = (globalThis as any).require
+                    if (typeof req === 'function') {
+                        const fsReq = req('fs')
+                        const pathReq = req('path')
+                        const proc = (globalThis as any).process
+                        let tilesPath = ''
+                        if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
+                            tilesPath = pathReq.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
+                        }
+                        if (!tilesPath || !fsReq.existsSync(tilesPath)) {
+                            const dir = typeof __dirname !== 'undefined' ? __dirname : ''
+                            if (dir) {
+                                tilesPath = pathReq.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
+                            }
+                        }
+                        if (tilesPath && fsReq.existsSync(tilesPath)) {
+                            text = fsReq.readFileSync(tilesPath, 'utf8')
+                        }
+                    }
+                }
+            } else {
+                // Browser environment
+                text = getFileText('data/art/tiles/tiles.lst')
+            }
+            if (text) {
+                tilesList = text.split(/\r?\n/).map(line => line.trim().toLowerCase().replace(/\.frm$/, ''))
+                for (let i = 0; i < tilesList.length; i++) {
+                    if (tilesList[i]) {
+                        tilesIndexMap.set(tilesList[i], i)
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load tiles.lst:', e)
+        }
+    }
+
+    function getTileFID(tile: number, elevation: number): number {
+        if (!isValidTileNum(tile)) {
+            return 0
+        }
+        const map = globalState.gMap
+        if (!map || !map.mapObj || elevation < 0 || elevation >= map.numLevels) {
+            return 0
+        }
+        const level = map.mapObj.levels[elevation]
+        if (!level || !level.tiles || !level.tiles.floor) {
+            return 0
+        }
+        const hexPos = fromTileNum(tile)
+        const tilePos = hexToTile(hexPos)
+        const floor = level.tiles.floor
+        if (tilePos.y < 0 || tilePos.y >= floor.length) {
+            return 0
+        }
+        const row = floor[tilePos.y]
+        if (tilePos.x < 0 || tilePos.x >= row.length) {
+            return 0
+        }
+        const tileName = row[tilePos.x]
+        if (!tileName) {
+            return 0
+        }
+        loadTilesList()
+        if (!tilesIndexMap) {
+            return 0
+        }
+        const index = tilesIndexMap.get(tileName.toLowerCase())
+        if (index === undefined) {
+            return 0
+        }
+        return 0x04000000 | index
+    }
 
     export function setUseElevatorHandler(handler: () => void): void {
         useElevatorHandler = handler
@@ -3912,10 +4016,7 @@ export namespace Scripting {
         // Used by map scripts that inspect or modify the visual appearance of tiles.
         get_tile_fid(tile: number, elevation: number): number {
             log('get_tile_fid', arguments, 'tiles')
-            // Tile FID read-back is not yet wired to the renderer's tile cache.
-            // Return 0 as a safe partial implementation so scripts that check the
-            // return value do not use stale data to make destructive decisions.
-            return 0
+            return getTileFID(tile, elevation)
         }
 
         // sfall extended opcode — set tile FID at tile/elevation (0x8195).
@@ -5052,8 +5153,8 @@ export namespace Scripting {
         // sfall 0x81EE — get_tile_fid_sfall(tile, elev):
         // Return the FID (Frame ID) of the floor tile at the given tile/elevation.
         // Browser build: partial — no tile-FID registry; returns 0.
-        get_tile_fid_sfall(_tile: number, _elev: number): number {
-            return 0
+        get_tile_fid_sfall(tile: number, elev: number): number {
+            return getTileFID(tile, elev)
         }
 
         // sfall 0x81EF — set_tile_fid_sfall(tile, elev, fid):

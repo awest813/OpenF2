@@ -538,3 +538,40 @@ describe('save storage runtime resilience', () => {
         expect(Scripting.getGlobalVar(gvarKey)).toBe(123)
     })
 })
+
+import { formatSaveDate } from './saveload.js'
+
+describe('formatSaveDate', () => {
+    it('zero-pads single-digit month, day, hour, minute, second', () => {
+        // 2025-01-03 09:05:07 UTC → "01/03/2025 HH:05:07" (hour varies by TZ, so check structure)
+        const ts = new Date('2025-01-03T09:05:07').getTime()
+        const mockSave = { timestamp: ts } as any
+        const result = formatSaveDate(mockSave)
+        // Match "MM/DD/YYYY HH:MM:SS" — each segment must be 2 digits
+        expect(result).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/)
+    })
+
+    it('returns "01" for January (not "1")', () => {
+        // Force a known timestamp where month = January = 1
+        const ts = new Date(2025, 0, 5, 9, 7, 3).getTime()  // Jan 5, 09:07:03
+        const result = formatSaveDate({ timestamp: ts } as any)
+        const [datePart] = result.split(' ')
+        const [month] = datePart.split('/')
+        expect(month).toBe('01')
+    })
+
+    it('returns "09" for hour 9 (not "9")', () => {
+        // Force hour = 9
+        const ts = new Date(2025, 5, 15, 9, 0, 0).getTime()
+        const result = formatSaveDate({ timestamp: ts } as any)
+        const [, timePart] = result.split(' ')
+        const [hour] = timePart.split(':')
+        expect(hour).toBe('09')
+    })
+
+    it('handles double-digit values correctly (no extra padding)', () => {
+        const ts = new Date(2025, 11, 25, 14, 30, 45).getTime()  // Dec 25, 14:30:45
+        const result = formatSaveDate({ timestamp: ts } as any)
+        expect(result).toMatch(/^12\/25\/2025 14:30:45$/)
+    })
+})

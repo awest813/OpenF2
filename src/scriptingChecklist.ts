@@ -1431,8 +1431,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8194: get_tile_fid(tile, elevation) → FID of the floor tile at the ' +
-            'given position.  Returns 0 — the browser build has no tile-FID registry for ' +
-            'runtime readback.  This is a fundamental rendering architecture limitation.',
+            'given position. Fully implemented; maps floor map names back to tiles.lst indices.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -3811,9 +3810,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81EE: get_tile_fid_sfall(tile, elev) — return the FID of the floor ' +
-            'tile at the given position.  Browser build: partial — returns 0 (no tile FID ' +
-            'registry).',
-        status: 'partial',
+            'tile at the given position. Fully implemented; maps floor map names back to tiles.lst indices.',
+        status: 'implemented',
         frequency: 'low',
         impact: 'low',
     },

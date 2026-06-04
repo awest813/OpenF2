@@ -180,12 +180,12 @@ export interface UIColor {
     a: number  // 0–255
 }
 
-export const FALLOUT_GREEN: UIColor = { r: 0, g: 195, b: 0, a: 255 }
-export const FALLOUT_DARK_GREEN: UIColor = { r: 0, g: 100, b: 0, a: 255 }
-export const FALLOUT_AMBER: UIColor = { r: 255, g: 165, b: 0, a: 255 }
-export const FALLOUT_RED: UIColor = { r: 195, g: 0, b: 0, a: 255 }
-export const FALLOUT_BLACK: UIColor = { r: 0, g: 0, b: 0, a: 255 }
-export const FALLOUT_DARK_GRAY: UIColor = { r: 40, g: 40, b: 40, a: 255 }
+export const FALLOUT_GREEN: UIColor      = { r: 0,   g: 195, b: 0,   a: 255 }
+export const FALLOUT_DARK_GREEN: UIColor = { r: 0,   g: 100, b: 0,   a: 255 }
+export const FALLOUT_AMBER: UIColor      = { r: 255, g: 165, b: 0,   a: 255 }
+export const FALLOUT_RED: UIColor        = { r: 195, g: 0,   b: 0,   a: 255 }
+export const FALLOUT_BLACK: UIColor      = { r: 0,   g: 0,   b: 0,   a: 255 }
+export const FALLOUT_DARK_GRAY: UIColor  = { r: 40,  g: 40,  b: 40,  a: 255 }
 
 // ---------------------------------------------------------------------------
 // Shared drawing helpers
@@ -337,6 +337,7 @@ export class UIManagerImpl {
     private ctx: OffscreenCanvasRenderingContext2D
     private _busOpenHandler: ((e: { panelName: string }) => void) | null = null
     private _busCloseHandler: ((e: { panelName: string }) => void) | null = null
+    private lastHoveredPanel: UIPanel | null = null
     /** Optional bitmap font renderer for pixel-accurate Fallout fonts. */
     fontRenderer: BitmapFontRenderer | null = null
 
@@ -400,13 +401,23 @@ export class UIManagerImpl {
     }
 
     handleMouseMove(x: number, y: number): void {
+        let foundPanel: UIPanel | null = null
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
             if (!panel.visible) {continue}
             if (panel.containsPoint(x, y)) {
-                panel.onMouseMove(x - panel.bounds.x, y - panel.bounds.y)
-                return
+                foundPanel = panel
+                break
             }
+        }
+
+        if (this.lastHoveredPanel && this.lastHoveredPanel !== foundPanel) {
+            this.lastHoveredPanel.onMouseMove(-1, -1)
+        }
+        this.lastHoveredPanel = foundPanel
+
+        if (foundPanel) {
+            foundPanel.onMouseMove(x - foundPanel.bounds.x, y - foundPanel.bounds.y)
         }
     }
 

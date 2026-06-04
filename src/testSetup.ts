@@ -51,3 +51,8 @@ if (typeof OffscreenCanvas === 'undefined') {
         }
     }
 }
+
+import { readFileSync, existsSync } from 'fs'
+import { join, resolve } from 'path'
+(global as any).nodeFs = { readFileSync, existsSync };
+(global as any).nodePath = { join, resolve };

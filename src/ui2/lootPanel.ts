@@ -182,13 +182,13 @@ export class LootPanel extends UIPanel {
         // Player column click
         if (x >= playerX && x < playerX + COL_W && y >= COL_Y && y < COL_Y + COL_H) {
             const idx = Math.floor((y - COL_Y - 4) / ITEM_ROW_H)
-            if (idx >= 0 && idx < this.playerInventory.length) {
+            if (this._selectedSide === 'container') {
+                // Move selected container item to player
+                this._moveItem('container', this._selectedIndex, 'player')
+                this._selectedSide  = null
+                this._selectedIndex = -1
+            } else if (idx >= 0 && idx < this.playerInventory.length) {
                 if (this._selectedSide === 'player' && this._selectedIndex === idx) {
-                    this._selectedSide  = null
-                    this._selectedIndex = -1
-                } else if (this._selectedSide === 'container') {
-                    // Move selected container item to player
-                    this._moveItem('container', this._selectedIndex, 'player')
                     this._selectedSide  = null
                     this._selectedIndex = -1
                 } else {
@@ -202,13 +202,13 @@ export class LootPanel extends UIPanel {
         // Container column click
         if (x >= containerX && x < containerX + COL_W && y >= COL_Y && y < COL_Y + COL_H) {
             const idx = Math.floor((y - COL_Y - 4) / ITEM_ROW_H)
-            if (idx >= 0 && idx < this.containerInventory.length) {
+            if (this._selectedSide === 'player') {
+                // Move selected player item to container
+                this._moveItem('player', this._selectedIndex, 'container')
+                this._selectedSide  = null
+                this._selectedIndex = -1
+            } else if (idx >= 0 && idx < this.containerInventory.length) {
                 if (this._selectedSide === 'container' && this._selectedIndex === idx) {
-                    this._selectedSide  = null
-                    this._selectedIndex = -1
-                } else if (this._selectedSide === 'player') {
-                    // Move selected player item to container
-                    this._moveItem('player', this._selectedIndex, 'container')
                     this._selectedSide  = null
                     this._selectedIndex = -1
                 } else {
@@ -219,6 +219,9 @@ export class LootPanel extends UIPanel {
             return true
         }
 
+        // Clicked outside columns and buttons — clear selection
+        this._selectedSide = null
+        this._selectedIndex = -1
         return true
     }
 

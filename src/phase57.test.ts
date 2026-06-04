@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
 import globalState from './globalState.js'
+import { fromTileNum, hexToTile } from './tile.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -340,9 +341,41 @@ describe('Phase 57-D — sfall opcodes 0x81E8–0x81EF', () => {
         }
     })
 
-    it('get_tile_fid_sfall (0x81EE) returns 0', () => {
+    it('get_tile_fid_sfall (0x81EE) returns 0 when no map is active', () => {
         const result = script.get_tile_fid_sfall(100, 0)
         expect(result).toBe(0)
+    })
+
+    it('get_tile_fid_sfall resolves the correct tile FID from the active map', () => {
+        const savedMap = globalState.gMap
+
+        // Translate hex tile 20100 to square tile position
+        const hexPos = fromTileNum(20100)
+        const tilePos = hexToTile(hexPos)
+
+        // Make an empty 100x100 grid, populate our target cell
+        const floorGrid = Array.from({ length: 100 }, () => Array(100).fill('grid000'))
+        floorGrid[tilePos.y][tilePos.x] = 'brick02' // index 3 in tiles.lst
+
+        ;(globalState as any).gMap = {
+            numLevels: 1,
+            mapObj: {
+                levels: [
+                    {
+                        tiles: {
+                            floor: floorGrid
+                        }
+                    }
+                ]
+            }
+        }
+
+        try {
+            const fid = script.get_tile_fid_sfall(20100, 0)
+            expect(fid).toBe(0x04000000 | 3) // brick02 is line 4 (index 3) in tiles.lst
+        } finally {
+            ;(globalState as any).gMap = savedMap
+        }
     })
 
     it('set_tile_fid_sfall (0x81EF) is a no-op and does not throw', () => {

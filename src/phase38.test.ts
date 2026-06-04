@@ -20,6 +20,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, stubChecklistSummary, drainStubHits } from './scriptingChecklist.js'
+import globalState from './globalState.js'
+import { fromTileNum, hexToTile } from './tile.js'
 
 // ===========================================================================
 // Phase 38-A — get_pc_stat unknown-index returns 0 (not throw)
@@ -263,6 +265,39 @@ describe('Phase 38-H — get_tile_fid (0x8194) implementation', () => {
         expect(() => script.get_tile_fid(1000, 0)).not.toThrow()
         expect(script.get_tile_fid(1000, 0)).toBe(0)
         expect(script.get_tile_fid(0, 2)).toBe(0)
+    })
+
+    it('get_tile_fid resolves the correct tile FID from the active map', () => {
+        const script = new (Scripting as any).Script()
+        const savedMap = globalState.gMap
+
+        // Translate hex tile 20100 to square tile position
+        const hexPos = fromTileNum(20100)
+        const tilePos = hexToTile(hexPos)
+
+        // Make an empty 100x100 grid, populate our target cell
+        const floorGrid = Array.from({ length: 100 }, () => Array(100).fill('grid000'))
+        floorGrid[tilePos.y][tilePos.x] = 'brick01' // index 2 in tiles.lst
+
+        ;(globalState as any).gMap = {
+            numLevels: 1,
+            mapObj: {
+                levels: [
+                    {
+                        tiles: {
+                            floor: floorGrid
+                        }
+                    }
+                ]
+            }
+        }
+
+        try {
+            const fid = script.get_tile_fid(20100, 0)
+            expect(fid).toBe(0x04000000 | 2) // brick01 is line 3 (index 2) in tiles.lst
+        } finally {
+            ;(globalState as any).gMap = savedMap
+        }
     })
 
     it('get_tile_fid description mentions 0x8194', () => {
