@@ -98,6 +98,11 @@ export interface EngineEvents {
     /** Fired after a save completes successfully. */
     'game:saveComplete': { slot: number; name: string }
 
+    // New game / character creation (Slice C / P0-1)
+    'game:newGameRequested': Record<string, never>
+    'game:characterCreated': { name: string; mapName: string }
+    'game:enterWorld': { mapName: string }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

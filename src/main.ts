@@ -20,7 +20,8 @@ import { heart } from './heart.js'
 import { hexDistance, hexesInRadius, hexFromScreen, hexNeighbors } from './geometry.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
-import { initGame } from './init.js'
+import { initGame, enterWorldMap } from './init.js'
+import { shouldSkipMainMenu } from './character/chargen.js'
 import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -361,6 +362,25 @@ function initUIManager(): void {
         load(slot)
     })
 
+    // Slice C / P0-1: New Game → chargen → enter world
+    EventBus.on('game:newGameRequested', () => {
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        EventBus.emit('ui:openPanel', { panelName: 'characterCreation' })
+    })
+
+    EventBus.on('game:characterCreated', ({ mapName }) => {
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        try {
+            enterWorldMap(mapName || 'artemple')
+            EventBus.emit('game:enterWorld', { mapName: mapName || 'artemple' })
+            EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
+        } catch (err) {
+            console.error('[main] Failed to enter world after chargen:', err)
+            EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+        }
+    })
+
     mgr.connectEventBus()
 
     globalState.uiManager = mgr
@@ -445,8 +465,16 @@ window.onload = async function () {
                 globalState.proMap = value
 
                 // continue initialization
-                initGame()
+                const skipMenu = shouldSkipMainMenu()
+                initGame({ skipMapLoad: !skipMenu })
                 globalState.isInitializing = false
+
+                // Campaign boot: show main menu when no ?map query is present.
+                if (!skipMenu) {
+                    EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+                } else {
+                    EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
+                }
             })
         })
     })

@@ -47,3 +47,5 @@ export * from './scriptDebuggerPanel.js'
 export * from './prototypeInspectorPanel.js'
 
 export * from './registerPanels.js'
+export * from './mainMenuPanel.js'
+export * from './characterCreationPanel.js'

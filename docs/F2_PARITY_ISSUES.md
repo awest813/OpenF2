@@ -35,20 +35,15 @@ These are hard blockers. Nothing downstream matters until they are closed.
 
 ### P0-1 — There is no new-game flow: no main menu, no character creation
 
-**Evidence**
-- `src/init.ts:38-48` — boot goes straight to `gMap.loadMap(location.search.slice(1))`,
-  falling back to `loadMap('artemple')`. There is no menu, no intro, no character step.
-- `grep -rn "mainMenu\|newGame\|characterCreation\|charCreation" src` → **0 hits**.
-- `src/player.ts:35-36` — the player is hardcoded:
-  `new StatSet({ AGI: 8, INT: 8, STR: 8, CHA: 8, HP: 100 })`, 10 skill points, no tag
-  skills, no traits, `gender = 'male'`, `name = 'Player'`.
-- `src/player.ts:48` — `inventory = [createObjectWithPID(41).setAmount(1337)]` (1337 caps
-  debug loadout).
+**Status:** Partially addressed on the full-parity branch (Slice C). Cold boot without a
+`?map` query opens `MainMenuPanel` → `CharacterCreationPanel` → `enterWorldMap('artemple')`
+with SPECIAL/tags/traits applied to `globalState.player` and the debug 1337-caps loadout
+cleared. Remaining: Credits/Quit, derived-stat preview polish, intro cinematic, post-chargen
+autosave.
 
-**Gap.** No main menu (New Game / Load / Options / Credits / Quit), no SPECIAL point
-allocation, no tag-skill selection (3 of 18), no trait selection (2 of 16), no
-name/age/gender, no character-creation preview of derived stats, and no "start in
-Arroyo Temple of Trials" handoff.
+**Evidence (historical @ `cbcb8d1`)**
+- `src/init.ts` — previously boot went straight to `gMap.loadMap(...)`.
+- Player was hardcoded with debug SPECIAL / 1337 caps.
 
 **Acceptance.** From a cold browser load: main menu → New Game → character creation
 (SPECIAL/tags/traits/name/age/gender, all validated against F2 rules) → Temple of Trials

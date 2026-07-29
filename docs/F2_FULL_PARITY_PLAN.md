@@ -56,8 +56,8 @@ Out of scope until after campaign certification (matches existing freeze):
 | Blocker matrix | No open HIGH/CRITICAL | True, but issues were crash/hardening focused |
 | Tests | 5089 / “all green” | 5103/5164; 61 failures |
 | Assets in repo | Implied playable | Only `nullmap`; no `data/scripts` |
-| New game / chargen | — | Missing |
-| Character model | Working | Dual ECS + Critter models (diverged) |
+| New game / chargen | — | Slice C: menu + chargen + Temple handoff (remaining polish) |
+| Character model | Working | Critter source of truth + ECS projection (HUD/sheet); deeper writes remain |
 | Skilldex | Working | 2/8 skills (Lockpick, Repair) |
 | Ending | Certified via scaffold | No `ENDGAME.TXT` / slide selection |
 | Combat AI | Partial | Uses 2 of ~20 AI.TXT fields |
@@ -219,10 +219,10 @@ Small PRs preferred; each slice should leave tests green.
 
 | Slice | Scope | Primary issues |
 |---|---|---|
-| A | Docs honesty + skip asset tests + checklist status split | P0-5, P0-4 partial, P3-* |
-| B | Unify character model + HUD/sheet adapters | P0-2, P2-3 |
-| C | Main menu + chargen + New Game handoff | P0-1 |
-| D | Skilldex 6 missing skills | P0-3 |
+| A | Docs honesty + skip asset tests + checklist status split | P0-5, P0-4 partial, P3-* | Done |
+| B | Unify character model + HUD/sheet adapters | P0-2, P2-3 | Done (adapter) |
+| C | Main menu + chargen + New Game handoff | P0-1 | Done (core flow) |
+| D | Skilldex 6 missing skills | P0-3 | Next |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 |
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 |
 | G | Rest / holodisks / party | P1-11, P1-3 |
@@ -246,7 +246,9 @@ Small PRs preferred; each slice should leave tests green.
 
 ## Immediate next actions
 
-1. Land this plan + issue list; set gate to `NOT_READY` (this PR).
-2. Start **Slice A** follow-up: asset tests skip + checklist status vocabulary.
-3. Start **Slice B** in parallel: character-model unification spike with one
-   HUD-HP-follows-combat regression.
+1. ~~Land this plan + issue list; set gate to `NOT_READY`.~~
+2. ~~Slice A: asset tests skip + checklist status vocabulary.~~
+3. ~~Slice B: Critter → ECS projection for HUD.~~
+4. ~~Slice C: main menu + chargen + Temple handoff.~~
+5. **Slice D:** Skilldex remaining skills (Sneak, Steal, Traps, First Aid, Doctor, Science).
+6. Continue P0-2: perk grant / XP award through Critter model.

@@ -29,14 +29,14 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 | Engine lifecycle | Working | `src/engine.ts` module lifecycle state machine |
 | Asset loading | Working | `src/assetStore.ts`, `src/mods.ts`; repo ships almost no converted game data |
 | Map loading/traversal | Working | `src/map.ts` + scaffold/world tests |
-| Entity system | Diverged | ECS player entity ≠ `globalState.player` Critter (P0-2) |
+| Entity system | Adapter in progress | Critter → ECS projection for HUD/sheet (P0-2); dual write paths remain |
 | Rendering | Working (WebGL) | `src/renderer.ts`, `src/webglrenderer.ts` |
 | UI panels | Dual stacks | `src/ui2/*` + legacy `src/ui.ts` (P1-10) |
 | Audio | Partial | SFX/music path exists; speech/movies missing (P1-9) |
 | Save/load | Working (hardened) | `src/saveload.ts`, schema v20 |
 | Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
 | Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
-| New game / chargen | Missing | Boots straight into map (P0-1) |
+| New game / chargen | In progress (Slice C) | Main menu + chargen UI; `?map` still skips for dev (P0-1) |
 | Skilldex | Partial | 2/8 skills (P0-3) |
 | Dialogue/barter | Working core | Edge fidelity + reaction model remain |
 | Ending / endgame slides | Missing | No ENDGAME.TXT selection (P1-8) |

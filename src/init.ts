@@ -25,27 +25,27 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { saveLoadInit } from './saveload.js'
 import { initUI, uiLog } from './ui.js'
 import { Worldmap } from './worldmap.js'
+import { shouldSkipMainMenu } from './character/chargen.js'
 
-export function initGame() {
-    // initialize player
+export interface InitGameOptions {
+    /** When true, do not load a map yet (main-menu / chargen path). */
+    skipMapLoad?: boolean
+}
+
+export function initGame(options: InitGameOptions = {}): void {
     globalState.player = new Player()
-
-    // initialize map
     globalState.gMap = new GameMap()
 
-    uiLog('Welcome to DarkFO')
+    uiLog('Welcome to OpenF2')
 
-    if (location.search !== '') {
-        // load map from query string (e.g. URL ending in ?modmain)
-        // also check if it's trying to connect to a remote server
-
-        const query = location.search.slice(1)
-
+    if (shouldSkipMainMenu()) {
+        // Dev shortcut: `?artemple` (or any map name) loads immediately.
         globalState.gMap.loadMap(location.search.slice(1))
-    } // load starting map
-    else {
+    } else if (!options.skipMapLoad) {
+        // Legacy / test path: boot straight into Temple of Trials.
         globalState.gMap.loadMap('artemple')
     }
+    // else: main-menu path — map loads later via enterWorldMap() after chargen.
 
     if (Config.engine.doCombat === true) {
         CriticalEffects.loadTable()
@@ -72,9 +72,19 @@ export function initGame() {
     initUI()
 
     if (Config.ui.hideRoofWhenUnder) {
-        // Only show roofs if the player is not under them
         Events.on('playerMoved', (e: Point) => {
             Config.ui.showRoof = !globalState.gMap.hasRoofAt(e)
         })
     }
+}
+
+/** Load a map after chargen or an explicit enter-world request. */
+export function enterWorldMap(mapName: string): void {
+    if (!globalState.gMap) {
+        globalState.gMap = new GameMap()
+    }
+    if (!globalState.player) {
+        globalState.player = new Player()
+    }
+    globalState.gMap.loadMap(mapName)
 }

@@ -15,6 +15,8 @@ import { ScriptDebuggerPanel } from './scriptDebuggerPanel.js'
 import { DebugOverlayPanel } from './debugOverlay.js'
 import { MapViewerPanel } from './mapViewerPanel.js'
 import { PrototypeInspectorPanel } from './prototypeInspectorPanel.js'
+import { MainMenuPanel } from './mainMenuPanel.js'
+import { CharacterCreationPanel } from './characterCreationPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 
 export const PRIMARY_GAMEPLAY_PANEL_NAMES = [
@@ -39,6 +41,8 @@ export function registerDefaultPanels(
     manager.register(new CharacterScreen(screenWidth, screenHeight, playerEntityId))
     manager.register(new OptionsPanel(screenWidth, screenHeight))
     manager.register(new SaveLoadPanel(screenWidth, screenHeight))
+    manager.register(new MainMenuPanel(screenWidth, screenHeight))
+    manager.register(new CharacterCreationPanel(screenWidth, screenHeight))
 
     manager.register(new DialoguePanel(screenWidth, screenHeight))
     manager.register(new BarterPanel(screenWidth, screenHeight))
