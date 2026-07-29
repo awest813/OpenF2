@@ -26,6 +26,7 @@ import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
+import { useSkilldexSkill } from './skilldex.js'
 import { UIMode } from './uiMode.js'
 import {
     uiCalledShot,
@@ -51,19 +52,6 @@ import { EventBus } from './eventBus.js'
 import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { save, load } from './saveload.js'
 
-// Return the skill ID used by the Fallout 2 engine
-function getSkillID(skill: Skills): number {
-    switch (skill) {
-        case Skills.Lockpick:
-            return 9
-        case Skills.Repair:
-            return 13
-    }
-
-    console.log('unimplemented skill %d', skill)
-    return -1
-}
-
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
 
@@ -72,12 +60,7 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
         return
     }
 
-    if (skillRequiresTarget(skill)) {
-        // use the skill on the object
-        Scripting.useSkillOn(globalState.player, getSkillID(skill), obj)
-    } else {
-        console.log('passive skills are not implemented')
-    }
+    useSkilldexSkill(skill, obj)
 }
 
 export function playerUse(obj?: Obj) {

@@ -17,6 +17,7 @@ import { MapViewerPanel } from './mapViewerPanel.js'
 import { PrototypeInspectorPanel } from './prototypeInspectorPanel.js'
 import { MainMenuPanel } from './mainMenuPanel.js'
 import { CharacterCreationPanel } from './characterCreationPanel.js'
+import { SkilldexPanel } from './skilldexPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 
 export const PRIMARY_GAMEPLAY_PANEL_NAMES = [
@@ -43,6 +44,7 @@ export function registerDefaultPanels(
     manager.register(new SaveLoadPanel(screenWidth, screenHeight))
     manager.register(new MainMenuPanel(screenWidth, screenHeight))
     manager.register(new CharacterCreationPanel(screenWidth, screenHeight))
+    manager.register(new SkilldexPanel(screenWidth, screenHeight))
 
     manager.register(new DialoguePanel(screenWidth, screenHeight))
     manager.register(new BarterPanel(screenWidth, screenHeight))

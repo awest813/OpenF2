@@ -12,18 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/** Skilldex-selectable skills (Fallout 2 order for the eight active skills). */
 export enum Skills {
     None = 0,
+    Sneak,
     Lockpick,
+    Steal,
+    Traps,
+    FirstAid,
+    Doctor,
+    Science,
     Repair,
 }
 
+/** True when the skill needs a world/object target after Skilldex selection. */
 export function skillRequiresTarget(skill: Skills): boolean {
     switch (skill) {
+        case Skills.Sneak:
+        case Skills.None:
+            return false
         case Skills.Lockpick:
         case Skills.Repair:
+        case Skills.Steal:
+        case Skills.Traps:
+        case Skills.FirstAid:
+        case Skills.Doctor:
+        case Skills.Science:
             return true
-        case Skills.None:
         default:
             return false
     }

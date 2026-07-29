@@ -58,7 +58,7 @@ Out of scope until after campaign certification (matches existing freeze):
 | Assets in repo | Implied playable | Only `nullmap`; no `data/scripts` |
 | New game / chargen | — | Slice C: menu + chargen + Temple handoff (remaining polish) |
 | Character model | Working | Critter source of truth + ECS projection (HUD/sheet); deeper writes remain |
-| Skilldex | Working | 2/8 skills (Lockpick, Repair) |
+| Skilldex | Working | 8/8 Skilldex selectable; Steal/Traps fidelity polish remains |
 | Ending | Certified via scaffold | No `ENDGAME.TXT` / slide selection |
 | Combat AI | Partial | Uses 2 of ~20 AI.TXT fields |
 | Perks / traits | Partial | ~17 perks / 4 traits vs ~119 / 16 |
@@ -217,18 +217,18 @@ All of the following must be true:
 
 Small PRs preferred; each slice should leave tests green.
 
-| Slice | Scope | Primary issues |
-|---|---|---|
+| Slice | Scope | Primary issues | Status |
+|---|---|---|---|
 | A | Docs honesty + skip asset tests + checklist status split | P0-5, P0-4 partial, P3-* | Done |
 | B | Unify character model + HUD/sheet adapters | P0-2, P2-3 | Done (adapter) |
 | C | Main menu + chargen + New Game handoff | P0-1 | Done (core flow) |
-| D | Skilldex 6 missing skills | P0-3 | Next |
-| E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 |
-| F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 |
-| G | Rest / holodisks / party | P1-11, P1-3 |
-| H | Rep + AI + car | P1-7, P1-1, P1-6 |
-| I | Movies/speech + endgame | P1-9, P1-8 |
-| J | UI consolidation + region re-cert wave 1–N | P1-10, P0-5 |
+| D | Skilldex 6 missing skills | P0-3 | Done (core dispatch) |
+| E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | |
+| F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | |
+| G | Rest / holodisks / party | P1-11, P1-3 | |
+| H | Rep + AI + car | P1-7, P1-1, P1-6 | |
+| I | Movies/speech + endgame | P1-9, P1-8 | |
+| J | UI consolidation + region re-cert wave 1–N | P1-10, P0-5 | |
 
 ---
 
@@ -250,5 +250,6 @@ Small PRs preferred; each slice should leave tests green.
 2. ~~Slice A: asset tests skip + checklist status vocabulary.~~
 3. ~~Slice B: Critter → ECS projection for HUD.~~
 4. ~~Slice C: main menu + chargen + Temple handoff.~~
-5. **Slice D:** Skilldex remaining skills (Sneak, Steal, Traps, First Aid, Doctor, Science).
+5. ~~**Slice D:** Skilldex remaining skills.~~
 6. Continue P0-2: perk grant / XP award through Critter model.
+7. Slice E: `get_tile_fid` + Arroyo real-script smoke.

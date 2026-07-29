@@ -37,7 +37,7 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 | Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
 | Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
 | New game / chargen | In progress (Slice C) | Main menu + chargen UI; `?map` still skips for dev (P0-1) |
-| Skilldex | Partial | 2/8 skills (P0-3) |
+| Skilldex | In progress (Slice D) | All 8 Skilldex skills selectable; Steal inventory UI / trap damage polish remain (P0-3) |
 | Dialogue/barter | Working core | Edge fidelity + reaction model remain |
 | Ending / endgame slides | Missing | No ENDGAME.TXT selection (P1-8) |
 | Multiplayer | Missing (experimental) | Not part of core path |

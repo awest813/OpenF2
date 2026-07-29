@@ -30,6 +30,7 @@ const HUD_BUTTONS: Array<{ label: string; panel: string | null }> = [
     { label: 'INV',  panel: 'inventory' },
     { label: 'PIPBOY', panel: 'pipboy' },
     { label: 'CHAR', panel: 'characterScreen' },
+    { label: 'SKILL', panel: 'skilldex' },
     { label: 'MAP',  panel: 'worldMap' },
     { label: 'OPT',  panel: 'options' },
     { label: 'SAVE', panel: 'saveLoad' },
