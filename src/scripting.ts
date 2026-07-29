@@ -52,7 +52,6 @@ import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
-import { applyRadiationGain } from './character/radiationPoison.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -2368,8 +2367,9 @@ export namespace Scripting {
                 warn('radiation_add: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
-            // Apply through resistance (Rad-X timed bonus + DR Radiation).
-            applyRadiationGain(obj as Critter, amount)
+            // Scripts pass absolute increments; resistance is applied by engine helpers
+            // (applyRadiationGain / irradiated hexes), not inside this opcode.
+            (obj as Critter).stats.modifyBase('Radiation Level', amount)
         }
 
         // combat

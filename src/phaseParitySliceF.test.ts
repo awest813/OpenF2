@@ -135,11 +135,10 @@ describe('Parity Slice F — radiation and poison', () => {
         expect(radiationGauge(RAD_CRITICAL)).toBe(3)
     })
 
-    it('applyRadiationGain respects Rad-X resistance', () => {
+    it('applyRadiationGain is the resistance-aware path (Rad-X)', () => {
         const player = globalState.player as Player
         applyDrugToCritter(player, { name: 'Rad-X' })
         const taken = applyRadiationGain(player, 100)
-        // 50% resist from Rad-X alone → ~50 taken (base DR may add more)
         expect(taken).toBeLessThanOrEqual(50)
         expect(player.stats.getBase('Radiation Level')).toBe(taken)
     })
@@ -162,11 +161,10 @@ describe('Parity Slice F — radiation and poison', () => {
         expect(player.getStat('HP')).toBe(hpBefore - 4)
     })
 
-    it('radiation_add opcode goes through resistance helper', () => {
+    it('radiation_add opcode still applies the raw script amount', () => {
         const player = globalState.player as Player
-        applyDrugToCritter(player, { name: 'Rad-X' })
         const script = new (Scripting as any).Script()
-        script.radiation_add(player, 100)
-        expect(player.stats.getBase('Radiation Level')).toBeLessThanOrEqual(50)
+        script.radiation_add(player, 20)
+        expect(player.stats.getBase('Radiation Level')).toBe(20)
     })
 })
