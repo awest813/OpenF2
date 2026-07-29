@@ -98,11 +98,18 @@ describe('Parity P1-1 — attack_who targeting', () => {
     }
 
     it('attack_who=strongest prefers high Max HP', () => {
-        const ally = makeCritter({ name: 'Vic', team: 0, x: 20, y: 20, hp: 50, maxHp: 50, pid: 16777278 })
-        globalState.gParty.addPartyMember(ally)
-        globalState.gParty.setAttackWho(ally, 'strongest')
+        // Use AI.TXT packet (no party allow-list) so strongest is accepted.
+        const ally = makeCritter({
+            name: 'Bruiser',
+            team: 0,
+            x: 20,
+            y: 20,
+            hp: 50,
+            maxHp: 50,
+            ai: { info: { attack_who: 'strongest', min_hp: 0 } },
+        })
 
-        const tank = makeCritter({ name: 'Tank', team: 1, x: 24, y: 20, hp: 80, maxHp: 80 })
+        const tank = makeCritter({ name: 'Tank', team: 1, x: 22, y: 20, hp: 80, maxHp: 80 })
         const weak = makeCritter({ name: 'Weak', team: 1, x: 22, y: 20, hp: 10, maxHp: 20 })
 
         const combat = Object.create(Combat.prototype) as Combat

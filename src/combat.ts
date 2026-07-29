@@ -1162,38 +1162,40 @@ export class Combat {
             const minToHit = parseAiInt(obj.ai.info.min_to_hit, 0)
             const called = shouldAttemptCalledShot(obj.ai.info.called_freq)
             const region = called ? 'eyes' : 'torso'
-            const hitPct = this.getHitChance(obj, target, region).hit
-            if (minToHit > 0 && hitPct < minToHit) {
-                this.log(`[AI HOLD FIRE] hit% ${hitPct} < min_to_hit ${minToHit}`)
-                // Try creeping closer when out of preferred accuracy; otherwise end turn.
-                if (target.position && distance > 1 && AP.getAvailableMoveAP() > 0) {
-                    const neighbors = hexNeighbors(target.position)
-                    neighbors.sort((a, b) => {
-                        if (!obj.position) return 0
-                        return hexDistance(obj.position, a) - hexDistance(obj.position, b)
-                    })
-                    for (const n of neighbors) {
-                        if (
-                            obj.walkTo(
-                                n,
-                                false,
-                                () => {
-                                    obj.clearAnim()
-                                    this.doAITurn(obj, idx, depth + 1)
-                                },
-                                Math.min(AP.getAvailableMoveAP(), 3)
-                            ) !== false
-                        ) {
-                            const moveCost = Math.max(0, obj.path.path.length - 1)
-                            if (AP.subtractMoveAP(moveCost) === false) {
-                                AP.combat = 0
-                                AP.move = 0
+            if (minToHit > 0 && typeof (target as any).getStat === 'function') {
+                const hitPct = this.getHitChance(obj, target, region).hit
+                if (hitPct < minToHit) {
+                    this.log(`[AI HOLD FIRE] hit% ${hitPct} < min_to_hit ${minToHit}`)
+                    // Try creeping closer when out of preferred accuracy; otherwise end turn.
+                    if (target.position && distance > 1 && AP.getAvailableMoveAP() > 0) {
+                        const neighbors = hexNeighbors(target.position)
+                        neighbors.sort((a, b) => {
+                            if (!obj.position) return 0
+                            return hexDistance(obj.position, a) - hexDistance(obj.position, b)
+                        })
+                        for (const n of neighbors) {
+                            if (
+                                obj.walkTo(
+                                    n,
+                                    false,
+                                    () => {
+                                        obj.clearAnim()
+                                        this.doAITurn(obj, idx, depth + 1)
+                                    },
+                                    Math.min(AP.getAvailableMoveAP(), 3)
+                                ) !== false
+                            ) {
+                                const moveCost = Math.max(0, obj.path.path.length - 1)
+                                if (AP.subtractMoveAP(moveCost) === false) {
+                                    AP.combat = 0
+                                    AP.move = 0
+                                }
+                                return
                             }
-                            return
                         }
                     }
+                    return this.nextTurn()
                 }
-                return this.nextTurn()
             }
 
             this.log(canBurst ? '[BURST ATTACKING]' : called ? '[CALLED SHOT]' : '[ATTACKING]')
