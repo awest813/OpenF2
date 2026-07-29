@@ -115,6 +115,10 @@ export interface EngineEvents {
     'movie:play': { movieID: number; movieId: string; title: string }
     'movie:end': { movieID: number; movieId: string }
 
+    /** Screen fades (P2-2). */
+    'screen:fadeOut': { durationMs: number }
+    'screen:fadeIn': { durationMs: number }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

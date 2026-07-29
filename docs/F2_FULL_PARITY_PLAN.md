@@ -227,8 +227,8 @@ Small PRs preferred; each slice should leave tests green.
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | Done (core tables + runtime; save/load of timed effects still open) |
 | G | Rest / holodisks / party / automap | P1-11, P1-3, P1-1 partial | Done (core + rest interrupts); full AI.TXT still open |
 | F+ | Timed chem save/load | P1-5 | Done (schema v22 `timedEffects`) |
-| H | Rep + AI + car | P1-7, P1-1, P1-6 | Car+trunk (v24/v25); town rep; AI attack_who/run_away/min_to_hit/called_freq/chem/best_weapon |
-| I | Movies/speech + endgame | P1-9, P1-8 | Endgame slide select + metarule(1); movie ID registry + play_gmovie events; speech/FMV assets still open |
+| H | Rep + AI + car | P1-7, P1-1, P1-6 | Car trunk+park (v24–v26); town rep; AI distance/area/chem/best_weapon/attack_who/… |
+| I | Movies/speech + endgame | P1-9, P1-8 | Endgame slides + menu return; movie events; speech/FMV assets still open |
 | J | UI consolidation + region re-cert wave 1–N | P1-10, P0-5 | |
 
 ---

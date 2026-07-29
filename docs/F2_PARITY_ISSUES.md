@@ -157,17 +157,18 @@ regions to `NOT_STARTED` and re-earn them. Until then the gate status must read
 
 **Status.** Partial. AI.TXT now also drives `attack_who` (party control or packet),
 `run_away_mode` HP thresholds (via `fleeHpThreshold`), `min_to_hit` (hold fire / creep),
-`called_freq` (aimed eyes shots), `chem_use` (stimpak when hurt), and `best_weapon`
-(suppress burst for melee/unarmed prefs). Party `disposition` still biases
-`Combat.findTarget`. Still open: weapon swapping for `best_weapon`, `distance`,
-`area_attack_mode`, `hurt_too_much`.
+`called_freq` (aimed eyes shots), `chem_use` (stimpak when hurt), `best_weapon`
+(suppress burst for melee/unarmed prefs), `distance` (stay/snipe/charge advance policy),
+and `area_attack_mode` (burst gating by hit%). Party `disposition` still biases
+`Combat.findTarget`. Still open: weapon swapping for `best_weapon`, `hurt_too_much`,
+friendly-fire checks for `be_careful`.
 
 **Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts`); helpers in
 `src/combatAi.ts`.
 
-**Gap.** Unused: full `best_weapon` swap, `distance`, `area_attack_mode`,
-`hurt_too_much`, `chem_primary_desire`, `secondary_freq`. Cover and burst positioning
-remain incomplete.
+**Gap.** Unused: full `best_weapon` inventory swap, `hurt_too_much`,
+`chem_primary_desire`, `secondary_freq`. Cover and burst cone positioning remain
+incomplete.
 
 **Acceptance.** AI turn resolution consumes the full packet. Regression tests per
 disposition/`attack_who`/`run_away_mode` combination using real AI.TXT rows.
@@ -233,12 +234,13 @@ withdrawal onset/penalties, and save/load persistence of active effects and addi
 ### P1-6 — No Highwayman car
 
 **Status.** Partial (Slice H). `src/car.ts` tracks ownership (`hasCar`, save v24),
-fuel burn on world-map travel ticks, 2× travel speed when fueled, and a persistent
-**trunk inventory** (save v25) openable from Pip-Boy DATA. sfall `set_car_fuel_amount`
-and GVAR 18 imply ownership. Still open: Den acquisition quest, per-town
-parking/placement, car-stolen plot.
+fuel burn on world-map travel ticks, 2× travel speed when fueled, a persistent
+**trunk inventory** (save v25), and **per-map parking** (`carPark`, save v26) recorded
+when opening the world map. sfall `set_car_fuel_amount` and GVAR 18 imply ownership.
+Still open: Den acquisition quest, spawning a parked car object on town maps,
+car-stolen plot.
 
-**Gap.** Den acquisition, per-town parking/placement, car-stolen plot, and
+**Gap.** Den acquisition, parked-object placement on town maps, car-stolen plot, and
 FO2-accurate fuel economics remain.
 
 **Acceptance.** Car acquirable in the Den, drivable on the world map with correct
@@ -273,12 +275,12 @@ reaction checks and barter pricing.
 **Status.** Partial (Slice I stub). `src/endgame.ts` parses ENDGAME.TXT (or a built-in
 table keyed by `GVAR_ENDGAME_MOVIE_*` 408+), selects matching slides, builds a
 `CinematicSequence` with a credits beat, and is triggered by `metarule(1)` /
-`signalEndGame`. Emits `endgame:start` / `endgame:credits` / `endgame:returnToMenu`.
-Still open: real ending art + narrator VO, death-vs-victory art paths, main-menu
-UI handoff wiring.
+`signalEndGame`. Emits `endgame:start` / `endgame:credits` / `endgame:returnToMenu`
+(main.ts opens MainMenuPanel). Still open: real ending art + narrator VO, death-vs-victory
+art paths.
 
 **Gap.** Asset-backed slides/narration ACM, full Oil Rig victory script integration
-smoke, and return-to-menu UI panel.
+smoke.
 
 **Acceptance.** Reaching the Oil Rig ending trigger selects the correct slide set from
 quest/reputation state, plays them with narration, and rolls credits back to the main
@@ -352,9 +354,13 @@ texture re-upload may still lag — checklist `partial`).
 Previously returned 0 against a populated floor grid (`phase38` / `phase57`).
 
 ### P2-2 — No screen fades
-`grep -rniE "fadeIn|fadeOut"` → 0 hits. Fallout 2 fades on every map change, dialogue
-entry/exit, death, and cutscene. Their absence is immediately visible and also masks
-loading hitches.
+
+**Status.** Partial. `src/fade.ts` tracks fade level and emits `screen:fadeOut` /
+`screen:fadeIn`; `gfade_out` / `gfade_in` drive it (CSS opacity on `#cnv` in browser).
+Still open: map-change / dialogue auto-fades, duration parity with FO2 tick timing in
+all call sites.
+
+**Gap.** Not all map/dialogue/death transitions call fade helpers yet.
 
 ### P2-3 — Carry weight is unenforced in real gameplay
 `Obj.addInventoryItem` (`src/object.ts:637`) has no weight check. The only enforcement

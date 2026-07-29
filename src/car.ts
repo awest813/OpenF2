@@ -1,8 +1,8 @@
 /**
  * Highwayman car travel helpers (parity Slice H / P1-6).
  *
- * Ownership + fuel burn + world-map speed bonus + persistent trunk inventory.
- * Den acquisition quest / per-town parking remain out of scope.
+ * Ownership + fuel burn + world-map speed bonus + persistent trunk inventory
+ * + per-map parking snapshot. Den acquisition quest remains out of scope.
  */
 
 import globalState from './globalState.js'
@@ -17,8 +17,17 @@ export const CAR_FUEL_BURN_PER_TICK = 12
 /** Speed multiplier when the player owns a fueled car. */
 export const CAR_SPEED_MULT = 2
 
+export interface CarParkState {
+    mapName: string
+    x: number
+    y: number
+    elevation: number
+}
+
 /** Live trunk contents (not on globalState — serialized explicitly into saves). */
 let carTrunk: Obj[] = []
+/** Last town-map parking spot for the Highwayman (save v26). */
+let carPark: CarParkState | null = null
 
 export function hasCar(): boolean {
     return !!globalState.hasCar
@@ -26,6 +35,7 @@ export function hasCar(): boolean {
 
 export function setHasCar(owned: boolean): void {
     globalState.hasCar = !!owned
+    if (!owned) carPark = null
 }
 
 export function getCarFuel(): number {
@@ -123,4 +133,65 @@ export function openCarTrunk(): boolean {
 
 export function canOpenCarTrunk(): boolean {
     return hasCar() && !globalState.inCombat && !!globalState.player
+}
+
+/** Park the Highwayman on a local map (called when leaving town via world map). */
+export function parkCar(mapName: string, x: number, y: number, elevation: number = 0): boolean {
+    if (!hasCar()) return false
+    if (!mapName || typeof mapName !== 'string') return false
+    if (![x, y, elevation].every((n) => typeof n === 'number' && Number.isFinite(n))) return false
+    carPark = {
+        mapName: mapName.toLowerCase(),
+        x: Math.floor(x),
+        y: Math.floor(y),
+        elevation: Math.max(0, Math.floor(elevation)),
+    }
+    setHasCar(true)
+    return true
+}
+
+/** Park using the player's current map/position when available. */
+export function parkCarAtPlayer(): boolean {
+    if (!hasCar()) return false
+    const mapName = (globalState.gMap as any)?.name as string | undefined
+    const pos = globalState.player?.position
+    if (!mapName || !pos) return false
+    return parkCar(mapName, pos.x, pos.y, globalState.currentElevation ?? 0)
+}
+
+export function getCarPark(): CarParkState | null {
+    return carPark ? { ...carPark } : null
+}
+
+export function clearCarPark(): void {
+    carPark = null
+}
+
+/** True when the car is parked on the given map name. */
+export function isCarParkedOnMap(mapName: string | null | undefined): boolean {
+    if (!carPark || !mapName) return false
+    return carPark.mapName === mapName.toLowerCase()
+}
+
+export function serializeCarPark(): CarParkState | null {
+    return getCarPark()
+}
+
+export function hydrateCarPark(raw: CarParkState | null | undefined): void {
+    if (!raw || typeof raw !== 'object') {
+        carPark = null
+        return
+    }
+    const mapName = typeof raw.mapName === 'string' ? raw.mapName.toLowerCase() : ''
+    const x = typeof raw.x === 'number' && Number.isFinite(raw.x) ? Math.floor(raw.x) : NaN
+    const y = typeof raw.y === 'number' && Number.isFinite(raw.y) ? Math.floor(raw.y) : NaN
+    const elevation =
+        typeof raw.elevation === 'number' && Number.isFinite(raw.elevation)
+            ? Math.max(0, Math.floor(raw.elevation))
+            : 0
+    if (!mapName || !Number.isFinite(x) || !Number.isFinite(y)) {
+        carPark = null
+        return
+    }
+    carPark = { mapName, x, y, elevation }
 }

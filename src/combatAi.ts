@@ -180,3 +180,90 @@ export function bestWeaponSuppressesBurst(bestWeapon: unknown): boolean {
     const pref = normalizeBestWeapon(bestWeapon)
     return pref === 'melee' || pref === 'melee_over_ranged' || pref === 'unarmed'
 }
+
+export type AiDistance =
+    | 'stay_close'
+    | 'charge'
+    | 'snipe'
+    | 'on_your_own'
+    | 'stay'
+
+export type AiAreaAttack =
+    | 'always'
+    | 'sometimes'
+    | 'be_sure'
+    | 'be_careful'
+    | 'be_absolutely_sure'
+
+export function normalizeDistance(raw: unknown, fallback: AiDistance = 'on_your_own'): AiDistance {
+    if (raw === undefined || raw === null) return fallback
+    const key = String(raw).trim().toLowerCase()
+    const allowed: AiDistance[] = ['stay_close', 'charge', 'snipe', 'on_your_own', 'stay']
+    return (allowed as string[]).includes(key) ? (key as AiDistance) : fallback
+}
+
+export function normalizeAreaAttack(raw: unknown, fallback: AiAreaAttack = 'sometimes'): AiAreaAttack {
+    if (raw === undefined || raw === null) return fallback
+    const key = String(raw).trim().toLowerCase()
+    const allowed: AiAreaAttack[] = [
+        'always',
+        'sometimes',
+        'be_sure',
+        'be_careful',
+        'be_absolutely_sure',
+    ]
+    return (allowed as string[]).includes(key) ? (key as AiAreaAttack) : fallback
+}
+
+/**
+ * Should the AI advance toward the target this turn?
+ * `stay` never moves; `snipe` only closes if far beyond preferred range;
+ * `charge` always closes when out of weapon range.
+ */
+export function shouldAdvanceOnTarget(
+    distanceMode: unknown,
+    distanceToTarget: number,
+    weaponRange: number
+): boolean {
+    const mode = normalizeDistance(distanceMode)
+    if (mode === 'stay') return false
+    if (distanceToTarget <= weaponRange) {
+        // Already in range — snipe/stay_close hold; charge may still nudge in.
+        return mode === 'charge' && distanceToTarget > Math.max(1, weaponRange - 1)
+    }
+    // Out of range
+    if (mode === 'snipe') {
+        // Only close if badly out of range (more than 1.5× weapon range).
+        return distanceToTarget > weaponRange * 1.5
+    }
+    if (mode === 'stay_close') {
+        // Close but prefer not sprinting across the map.
+        return distanceToTarget <= weaponRange + 8
+    }
+    return true // charge / on_your_own
+}
+
+/**
+ * Whether burst/area attack is allowed under area_attack_mode + hit%.
+ * `rng` in [0,1) for sometimes/be_careful rolls.
+ */
+export function allowAreaAttack(
+    areaMode: unknown,
+    hitPercent: number,
+    rng: () => number = Math.random
+): boolean {
+    const mode = normalizeAreaAttack(areaMode)
+    const hit = typeof hitPercent === 'number' && Number.isFinite(hitPercent) ? hitPercent : 50
+    switch (mode) {
+        case 'always':
+            return true
+        case 'sometimes':
+            return rng() < 0.5
+        case 'be_careful':
+            return hit >= 50 && rng() < 0.35
+        case 'be_sure':
+            return hit >= 70
+        case 'be_absolutely_sure':
+            return hit >= 85
+    }
+}

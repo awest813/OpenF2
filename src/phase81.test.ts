@@ -564,8 +564,8 @@ describe('Phase 81-F-6 — sfall 0x829F: get_distance_sfall', () => {
 // ===========================================================================
 
 describe('Phase 81-G — Save schema v19→v20 migration', () => {
-    it('SAVE_VERSION is now 25', () => {
-        expect(SAVE_VERSION).toBe(25)
+    it('SAVE_VERSION is now 26', () => {
+        expect(SAVE_VERSION).toBe(26)
     })
 
     function makeV19Save(overrides: Record<string, any> = {}): Record<string, any> {

@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 25
+export const SAVE_VERSION = 26
 
 export interface SaveGame {
     id?: number
@@ -357,6 +357,11 @@ export interface SaveGame {
      */
     carTrunk?: SerializedObj[]
 
+    /**
+     * Highwayman parking spot on a local map (v26+ / P1-6).
+     */
+    carPark?: { mapName: string; x: number; y: number; elevation: number } | null
+
     player: {
         position: Point
         orientation: number
@@ -565,6 +570,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.carTrunk === undefined) {save.carTrunk = []}
             save.version = 25
             // falls through
+        case 25:
+            // v25 → v26: Highwayman parking spot (P1-6).
+            if (save.carPark === undefined) {save.carPark = null}
+            save.version = 26
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -683,6 +693,29 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     save.hasCar = save.hasCar === true
     if (!Array.isArray(save.carTrunk)) {
         save.carTrunk = []
+    }
+    if (save.carPark !== null && save.carPark !== undefined) {
+        if (typeof save.carPark !== 'object' || Array.isArray(save.carPark)) {
+            save.carPark = null
+        } else {
+            const p = save.carPark as any
+            if (typeof p.mapName !== 'string' ||
+                typeof p.x !== 'number' || !Number.isFinite(p.x) ||
+                typeof p.y !== 'number' || !Number.isFinite(p.y)) {
+                save.carPark = null
+            } else {
+                save.carPark = {
+                    mapName: String(p.mapName).toLowerCase(),
+                    x: Math.floor(p.x),
+                    y: Math.floor(p.y),
+                    elevation: typeof p.elevation === 'number' && Number.isFinite(p.elevation)
+                        ? Math.max(0, Math.floor(p.elevation))
+                        : 0,
+                }
+            }
+        }
+    } else {
+        save.carPark = null
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

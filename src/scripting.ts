@@ -65,6 +65,7 @@ import {
 } from './quest/townReputation.js'
 import { signalEndGame } from './endgame.js'
 import { playMovie } from './movies.js'
+import { fadeIn, fadeOut } from './fade.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -3721,14 +3722,13 @@ export namespace Scripting {
         }
 
         gfade_out(time: number) {
-            // BLK-122: Screen fade-out — apply CSS opacity transition on the canvas.
+            // P2-2: logical fade + CSS opacity via fade.ts
             log('gfade_out', arguments)
-            this.gfade_out_css(time)
+            fadeOut(typeof time === 'number' ? time : 5)
         }
         gfade_in(time: number) {
-            // BLK-122: Screen fade-in — restore CSS opacity on the canvas.
             log('gfade_in', arguments)
-            this.gfade_in_css(time)
+            fadeIn(typeof time === 'number' ? time : 5)
         }
 
         // timing
@@ -8675,26 +8675,13 @@ export namespace Scripting {
             }
         }
 
-        // BLK-122 — gfade_out real CSS implementation:
-        // Fade the game canvas to black using a CSS transition.  Safe in Node.js.
+        // BLK-122 / P2-2 — gfade CSS helpers delegate to fade.ts (kept for tests).
         gfade_out_css(_time: number): void {
-            if (typeof document === 'undefined') {return}
-            const cnv = document.getElementById('cnv')
-            if (cnv) {
-                cnv.style.transition = 'opacity 0.5s ease-in-out'
-                cnv.style.opacity = '0'
-            }
+            fadeOut(typeof _time === 'number' ? _time : 5)
         }
 
-        // BLK-122 — gfade_in real CSS implementation:
-        // Restore the game canvas from a previous fade-out.  Safe in Node.js.
         gfade_in_css(_time: number): void {
-            if (typeof document === 'undefined') {return}
-            const cnv = document.getElementById('cnv')
-            if (cnv) {
-                cnv.style.transition = 'opacity 0.5s ease-in-out'
-                cnv.style.opacity = '1'
-            }
+            fadeIn(typeof _time === 'number' ? _time : 5)
         }
 
         _serialize(): SerializedScript {

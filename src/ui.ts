@@ -37,6 +37,7 @@ import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
 import { xpForLevel } from './ecs/derivedStats.js'
 import { UIMode } from './uiMode.js'
 import { EventBus } from './eventBus.js'
+import { parkCarAtPlayer } from './car.js'
 
 // UI system
 
@@ -1362,6 +1363,8 @@ export function uiCloseWorldMap() {
 
 export function uiWorldMap(onAreaMap = false) {
     assertNoLegacyGameplayPanelFallback('worldMap', 'uiWorldMap')
+    // P1-6: park Highwayman at current town position when opening world map.
+    parkCarAtPlayer()
     globalState.uiMode = UIMode.worldMap
     show($id('worldMapContainer'))
 

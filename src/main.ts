@@ -370,6 +370,20 @@ function initUIManager(): void {
         }
     })
 
+    // P1-8: ending credits → return to main menu.
+    EventBus.on('endgame:returnToMenu', () => {
+        try {
+            globalState.inCombat = false
+            globalState.combat = null
+        } catch {
+            // ignore
+        }
+        EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
+        EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+    })
+
     mgr.connectEventBus()
 
     globalState.uiManager = mgr

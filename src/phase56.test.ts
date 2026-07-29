@@ -68,7 +68,7 @@ function makePlayerObj(overrides: Record<string, any> = {}): any {
 
 describe('Phase 56-A — BLK-048: Player name/gender save schema v17', () => {
     it('SAVE_VERSION was 18 (now superseded to 25)', () => {
-        expect(SAVE_VERSION).toBe(25)
+        expect(SAVE_VERSION).toBe(26)
     })
 
     it('migrateSave adds playerName="Player" for saves without the field', () => {

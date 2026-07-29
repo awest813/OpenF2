@@ -32,6 +32,8 @@ import {
     shouldAttemptCalledShot,
     chemUseHpRatioThreshold,
     bestWeaponSuppressesBurst,
+    shouldAdvanceOnTarget,
+    allowAreaAttack,
     type AiAttackWho,
 } from './combatAi.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
@@ -1115,6 +1117,12 @@ export class Combat {
 
         // are we in firing distance?
         if (distance > fireDistance) {
+            // P1-1: honour distance preference (stay / snipe may refuse to close).
+            const distanceMode = partyCtrl?.distance ?? obj.ai.info.distance
+            if (!shouldAdvanceOnTarget(distanceMode, distance, fireDistance)) {
+                this.log('[AI HOLDS DISTANCE]')
+                return this.nextTurn()
+            }
             this.log('[AI CREEPS]')
             // BLK-094: Guard against null target.position — target may not yet have a
             // tile assignment during scripted combat.  Skip the creep attempt entirely.
@@ -1183,6 +1191,16 @@ export class Combat {
             // P1-1: best_weapon melee/unarmed prefs suppress burst.
             const bestWeapon = partyCtrl?.bestWeapon ?? obj.ai.info.best_weapon
             if (bestWeaponSuppressesBurst(bestWeapon)) {canBurst = false}
+            // P1-1: area_attack_mode gates burst by hit% / chance.
+            if (canBurst) {
+                const areaMode = partyCtrl?.areaAttackMode ?? obj.ai.info.area_attack_mode
+                const hitForBurst = typeof (target as any).getStat === 'function'
+                    ? this.getHitChance(obj, target, 'torso').hit
+                    : 50
+                if (!allowAreaAttack(areaMode, hitForBurst)) {
+                    canBurst = false
+                }
+            }
             const attackCost = canBurst ? this.getBurstAPCost(obj) : this.getAttackAPCost(obj)
 
             if (AP.getAvailableCombatAP() >= attackCost) {

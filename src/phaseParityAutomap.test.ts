@@ -104,7 +104,7 @@ describe('Automap fog-of-war', () => {
             timedEffects: {},
         })
         expect(migrated.version).toBe(SAVE_VERSION)
-        expect(SAVE_VERSION).toBe(25)
+        expect(SAVE_VERSION).toBe(26)
         expect(migrated.automap).toEqual({})
     })
 })

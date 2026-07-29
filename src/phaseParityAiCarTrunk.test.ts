@@ -191,8 +191,8 @@ describe('Parity P1-6 — car trunk (save v25)', () => {
         globalState.inCombat = prevCombat
     })
 
-    it('SAVE_VERSION is 25 and v24 migrates empty carTrunk', () => {
-        expect(SAVE_VERSION).toBe(25)
+    it('SAVE_VERSION is 26 and v24 migrates empty carTrunk', () => {
+        expect(SAVE_VERSION).toBe(26)
         const migrated = migrateSave({
             version: 24,
             name: 'trunk-mig',
@@ -205,7 +205,7 @@ describe('Parity P1-6 — car trunk (save v25)', () => {
             party: [],
             savedMaps: {},
         } as any)
-        expect(migrated.version).toBe(25)
+        expect(migrated.version).toBe(26)
         expect(migrated.carTrunk).toEqual([])
         expect(migrated.hasCar).toBe(true)
     })

@@ -19,6 +19,7 @@ import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER
 import { EventBus } from '../eventBus.js'
 import globalState from '../globalState.js'
 import { loadAreas } from '../data.js'
+import { parkCarAtPlayer } from '../car.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -85,6 +86,9 @@ export class WorldMapPanel extends UIPanel {
         this._isTransitionLocked = false
         this._keyboardSelectedIndex = -1
         this._keyboardSelectedEntranceIndex = -1
+
+        // P1-6: snapshot Highwayman parking when opening the world map from a town.
+        parkCarAtPlayer()
 
         if (!globalState.mapAreas) {
             try {
