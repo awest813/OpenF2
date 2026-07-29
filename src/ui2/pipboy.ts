@@ -17,6 +17,7 @@ import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, 
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { QuestLog, QuestState } from '../quest/questLog.js'
+import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,8 @@ export class PipBoyPanel extends UIPanel {
     // ── Status tab ─────────────────────────────────────────────────────────
 
     private _renderStatus(ctx: OffscreenCanvasRenderingContext2D): void {
+        // Keep Pip-Boy vitals aligned with the live Critter (P0-2 / Slice B).
+        syncPlayerEntityFromCritter()
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         if (!stats) {
             drawText(ctx, 'No stats available.', 10, 20, FALLOUT_DARK_GRAY)

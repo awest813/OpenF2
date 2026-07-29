@@ -63,55 +63,43 @@ export namespace Scripting {
         try {
             let text = ''
             if (typeof window === 'undefined' || typeof XMLHttpRequest === 'undefined') {
-                // Node.js environment
+                // Node.js environment — prefer converted art export, fall back to lut fixture
+                const candidatePaths: string[] = []
                 const fs = (globalThis as any).nodeFs
                 const path = (globalThis as any).nodePath
-                if (fs && path) {
+                const req = typeof (globalThis as any).require === 'function' ? (globalThis as any).require : null
+                const fsMod = fs || (req ? req('fs') : null)
+                const pathMod = path || (req ? req('path') : null)
+                if (fsMod && pathMod) {
                     const proc = (globalThis as any).process
-                    let tilesPath = ''
                     if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
-                        tilesPath = path.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
+                        candidatePaths.push(pathMod.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst'))
+                        candidatePaths.push(pathMod.join(proc.cwd(), 'lut', 'tiles.lst'))
                     }
-                    if (!tilesPath || !fs.existsSync(tilesPath)) {
-                        const dir = typeof __dirname !== 'undefined' ? __dirname : ''
-                        if (dir) {
-                            tilesPath = path.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
-                        }
+                    const dir = typeof __dirname !== 'undefined' ? __dirname : ''
+                    if (dir) {
+                        candidatePaths.push(pathMod.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst'))
+                        candidatePaths.push(pathMod.resolve(dir, '..', 'lut', 'tiles.lst'))
                     }
-                    if (tilesPath && fs.existsSync(tilesPath)) {
-                        text = fs.readFileSync(tilesPath, 'utf8')
-                    }
-                } else {
-                    const req = (globalThis as any).require
-                    if (typeof req === 'function') {
-                        const fsReq = req('fs')
-                        const pathReq = req('path')
-                        const proc = (globalThis as any).process
-                        let tilesPath = ''
-                        if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
-                            tilesPath = pathReq.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
-                        }
-                        if (!tilesPath || !fsReq.existsSync(tilesPath)) {
-                            const dir = typeof __dirname !== 'undefined' ? __dirname : ''
-                            if (dir) {
-                                tilesPath = pathReq.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
-                            }
-                        }
-                        if (tilesPath && fsReq.existsSync(tilesPath)) {
-                            text = fsReq.readFileSync(tilesPath, 'utf8')
+                    for (const tilesPath of candidatePaths) {
+                        if (tilesPath && fsMod.existsSync(tilesPath)) {
+                            text = fsMod.readFileSync(tilesPath, 'utf8')
+                            break
                         }
                     }
                 }
             } else {
-                // Browser environment
-                text = getFileText('data/art/tiles/tiles.lst')
+                // Browser environment — try converted art, then lut fixture
+                text = getFileText('data/art/tiles/tiles.lst') || getFileText('lut/tiles.lst') || ''
             }
             if (text) {
                 tilesList = text.split(/\r?\n/).map(line => line.trim().toLowerCase().replace(/\.frm$/, ''))
                 for (let i = 0; i < tilesList.length; i++) {
-                    if (tilesList[i]) {
-                        tilesIndexMap.set(tilesList[i], i)
+                    // Skip blanks and comment lines so fixtures can document indices.
+                    if (!tilesList[i] || tilesList[i].startsWith('#')) {
+                        continue
                     }
+                    tilesIndexMap.set(tilesList[i], i)
                 }
             }
         } catch (e) {

@@ -425,10 +425,10 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
         expect(e!.status).toBe('implemented')
     })
 
-    it('metarule3_107 is marked implemented (distance-based visibility check)', () => {
+    it('metarule3_107 is marked partial (always-visible / no fog-of-war)', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'metarule3_107')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('implemented')
+        expect(e!.status).toBe('partial')
     })
 
     it('has_trait_hands_count is marked implemented', () => {
@@ -464,6 +464,6 @@ describe('Phase 20-F — checklist entries for Phase 20 features', () => {
     it('set_global_script_repeat is marked implemented', () => {
         const e = SCRIPTING_STUB_CHECKLIST.find((x) => x.id === 'set_global_script_repeat')
         expect(e).toBeDefined()
-        expect(e!.status).toBe('implemented')
+        expect(e!.status).toBe('safe_stub')
     })
 })

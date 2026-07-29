@@ -365,7 +365,7 @@ describe('Phase 36-G — Phase 36 checklist integrity', () => {
             expect(entry, `entry '${id}' not found`).toBeDefined()
             expect(entry!.description.length).toBeGreaterThan(10)
             expect(['opcode', 'procedure', 'metarule']).toContain(entry!.kind)
-            expect(['stub', 'partial', 'implemented']).toContain(entry!.status)
+            expect(['stub', 'partial', 'safe_stub', 'implemented']).toContain(entry!.status)
         }
     })
 

@@ -311,10 +311,10 @@ describe('Phase 38-H — get_tile_fid (0x8194) implementation', () => {
 // ===========================================================================
 
 describe('Phase 38-I — set_tile_fid (0x8195) no-op', () => {
-    it('checklist entry set_tile_fid is present as implemented', () => {
+    it('checklist entry set_tile_fid is present as safe_stub (no runtime tile patching)', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_tile_fid')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('implemented')
+        expect(entry?.status).toBe('safe_stub')
         expect(entry?.kind).toBe('opcode')
     })
 
@@ -510,7 +510,7 @@ describe('Phase 38-K — Phase 38 checklist integrity', () => {
             const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === id)
             expect(entry!.description.length, `${id} description too short`).toBeGreaterThan(10)
             expect(['opcode', 'procedure', 'metarule'], `${id} has invalid kind`).toContain(entry!.kind)
-            expect(['stub', 'partial', 'implemented'], `${id} has invalid status`).toContain(entry!.status)
+            expect(['stub', 'partial', 'safe_stub', 'implemented'], `${id} has invalid status`).toContain(entry!.status)
         }
     })
 

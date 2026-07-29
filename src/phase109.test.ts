@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { describeIfConvertedAssets, describeIfScriptAssets, hasConvertedGameData } from './testScriptAssets.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -80,6 +81,11 @@ let proJson: any
 let allArtPaths: Set<string>
 
 beforeAll(() => {
+    if (!hasConvertedGameData()) {
+        proJson = { items: {}, critters: {} }
+        allArtPaths = new Set()
+        return
+    }
     proJson = loadProJson()
     allArtPaths = collectArtPaths(ART_DIR, 'art/')
 })
@@ -88,7 +94,7 @@ beforeAll(() => {
 // A. Proto data integrity
 // ===========================================================================
 
-describe('Phase 109-A — Proto JSON: item and critter counts match extracted files', () => {
+describeIfConvertedAssets('Phase 109-A — Proto JSON: item and critter counts match extracted files', () => {
     it('items count matches proto/items directory', () => {
         const itemCount = (proJson.items.PSObject?.Properties || Object.keys(proJson.items)).length
         const filesOnDisk = fs.readdirSync(path.join(PROTO_DIR, 'items'))
@@ -137,7 +143,7 @@ describe('Phase 109-A — Proto JSON: item and critter counts match extracted fi
 // B. Art path existence
 // ===========================================================================
 
-describe('Phase 109-B — Art directory coverage: extracted FRM files exist', () => {
+describeIfConvertedAssets('Phase 109-B — Art directory coverage: extracted FRM files exist', () => {
     it('art/items directory has at least 100 FRM files', () => {
         const itemsDir = path.join(ART_DIR, 'items')
         const count = fs.readdirSync(itemsDir).filter(f => f.toLowerCase().endsWith('.frm')).length
@@ -197,7 +203,7 @@ describe('Phase 109-B — Art directory coverage: extracted FRM files exist', ()
 // C. Script INT parsing — all scripts parse cleanly
 // ===========================================================================
 
-describe('Phase 109-C — All extracted .int scripts parse without error', () => {
+describeIfScriptAssets('Phase 109-C — All extracted .int scripts parse without error', () => {
     const intFiles = fs.readdirSync(SCRIPTS_DIR)
         .filter(f => f.toLowerCase().endsWith('.int'))
         .map(f => f.replace(/\.int$/i, ''))
@@ -217,7 +223,7 @@ describe('Phase 109-C — All extracted .int scripts parse without error', () =>
 // D. Known-script procedure tables
 // ===========================================================================
 
-describe('Phase 109-D — Known scripts have expected procedure tables', () => {
+describeIfScriptAssets('Phase 109-D — Known scripts have expected procedure tables', () => {
     it('arvillag.int defines map_enter_p_proc and start', () => {
         const loaded = loadIntFile('arvillag')
         expect(loaded).not.toBeNull()
@@ -279,7 +285,7 @@ describe('Phase 109-D — Known scripts have expected procedure tables', () => {
 // E. PID encoding / decoding round-trips
 // ===========================================================================
 
-describe('Phase 109-E — PID encoding round-trips with real proto data', () => {
+describeIfConvertedAssets('Phase 109-E — PID encoding round-trips with real proto data', () => {
     it('makePID(type, id) produces correct values for known items', () => {
         expect(makePID(PROType.Item, 1)).toBe(0x00000001)
         expect(makePID(PROType.Item, 10)).toBe(0x0000000A)
@@ -321,7 +327,7 @@ describe('Phase 109-E — PID encoding round-trips with real proto data', () => 
 //     indexing (data_member N) maps to the correct fields.
 // ===========================================================================
 
-describe('Phase 109-F — Proto field mapping: verify proto_data member indices', () => {
+describeIfConvertedAssets('Phase 109-F — Proto field mapping: verify proto_data member indices', () => {
     it('leather armor (key 1): textID=200, frmPID=33, frmType=0, subType=0 (armor)', () => {
         const item = proJson.items['1']
         expect(item.textID).toBe(200)
@@ -423,7 +429,7 @@ describe('Phase 109-F — Proto field mapping: verify proto_data member indices'
 // G. Art directory coverage — proto-referenced art paths exist on disk
 // ===========================================================================
 
-describe('Phase 109-G — Proto-referenced art paths resolve to real FRM files', () => {
+describeIfConvertedAssets('Phase 109-G — Proto-referenced art paths resolve to real FRM files', () => {
     it('item protos reference art paths that exist in art/items/', () => {
         const itemsDir = path.join(ART_DIR, 'items')
         const frmFiles = new Set(

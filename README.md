@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
 [![TypeScript](https://img.shields.io/badge/engine-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-5103%2F5164%20passing-yellow.svg)](#project-metrics)
+[![Tests](https://img.shields.io/badge/tests-5013%20passing%20(16%20skipped)-green.svg)](#project-metrics)
 [![Platform](https://img.shields.io/badge/platform-browser%20first-orange.svg)](#mission)
 
 **OpenF2** is an open-source reimplementation of the Fallout 2 engine written in TypeScript and WebGL.
@@ -37,12 +37,11 @@ This summary is based on current code in `src/` and live test execution (validat
 
 ### Test Metrics (Verified)
 
-- **Test Files:** 117 passing / 122 total (5 failing)
-- **Individual Tests:** 5,103 passing / 5,164 total
-- **Failed Tests:** 61 — mostly Phase 100/107 real-script corpora when `data/scripts` is absent, plus `get_tile_fid` regressions
+- **Test Files:** 123 passing / 123 total (asset corpora skipped when absent)
+- **Individual Tests:** 5,013 passing / 16 skipped / 0 failing
 - **Typecheck:** `tsc --noEmit` clean
-- **Code Size:** ~99.5k lines of TypeScript in `src/`
 - **Campaign gate:** `NOT_READY` — see `docs/F2_RELEASE_GATE.md`
+- **Code Size:** ~99.5k lines of TypeScript in `src/`
 
 ### Engine Status Dashboard
 
@@ -57,11 +56,13 @@ This summary is based on current code in `src/` and live test execution (validat
 | Audio | **Working** | `src/audio.ts` HTML5 backend |
 | Save/Load | **Working (hardened)** | `src/saveload.ts`, versioned migrations in `src/saveSchema.ts` |
 | Combat loop | **Working (playable)** | `src/combat.ts` with 66+ integration tests; AI fidelity partial |
-| Script runtime / VM | **Partial (largest remaining gap)** | `src/vm.ts`, 99 VM tests passing; scripting procedures partial |
-| Dialogue/Barter | **Working (parity ongoing)** | UI functional; edge cases remain in script/dialogue bridge |
-| World map + encounters | **Working** | `src/worldmap.ts`, 40+ encounter/travel tests passing |
-| Quest scripting | **Partial** | Quest log functional; 100+ quest script tests; procedural gaps remain |
-| Weather/cinematics | **Partial** | Movie/fade procedures incomplete in `src/scripting.ts` |
+| Script runtime / VM | **Broad surface; fidelity uneven** | 807 checklist entries marked implemented (incl. safe no-ops); see parity plan |
+| Dialogue/Barter | **Working (parity ongoing)** | UI functional; reaction/edge cases remain |
+| World map + encounters | **Working** | `src/worldmap.ts`; specials / placement simplified |
+| Quest scripting | **Partial** | Infrastructure exists; real `.int` corpus not in repo |
+| New game / chargen | **Missing** | Boot jumps to map; hardcoded player (P0-1) |
+| Ending / endgame | **Missing** | No ENDGAME.TXT slide selection (P1-8) |
+| Weather/cinematics | **Partial** | Generic slide player; movies log-only |
 | Multiplayer / netplay | **Missing** | No production multiplayer subsystem in `src/` |
 
 ### Current Script Runtime Snapshot

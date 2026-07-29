@@ -59,11 +59,14 @@ Reason:
 
 ## Latest validation evidence
 
-- Full regression run: `npm test` → **5103 passed / 61 failed** (122 files).
+- Full regression run (clean checkout, no converted assets): `npm test` →
+  **5013 passed / 16 skipped / 0 failed** (123 files).
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
+- Asset-dependent suites (`phase100`/`107`/`109` script/proto corpora) now **skip**
+  when `data/scripts` / converted data are absent (Slice A).
+- Checklist status vocabulary includes `safe_stub` (Slice A / P3-2).
+- HUD/Pip-Boy project live Critter HP via `playerProjection.ts` (Slice B / P0-2 adapter).
 - Scaffold suites (`phase26`/`phase34`/`phase35`) still pass as state-machine smoke;
   they are **not** treated as campaign completion evidence.
-- Crash-hardening and sfall surface through Phase 109 remain valuable foundation work;
-  they do not substitute for Tier 0 playability systems.
 
 **Plan of record for reaching READY:** `docs/F2_FULL_PARITY_PLAN.md`.

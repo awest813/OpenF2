@@ -22,6 +22,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
+import { describeIfScriptAssets } from './testScriptAssets.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -162,7 +163,7 @@ function runProcedure(
 // Parse-only phase — all 19 scripts must parse without throwing
 // ---------------------------------------------------------------------------
 
-describe('Phase 100-A — First-Three-Areas: all scripts parse without error', () => {
+describeIfScriptAssets('Phase 100-A — First-Three-Areas: all scripts parse without error', () => {
     for (const name of ALL_AREA_SCRIPTS) {
         it(`${name}.int parses cleanly`, () => {
             expect(() => {
@@ -177,7 +178,7 @@ describe('Phase 100-A — First-Three-Areas: all scripts parse without error', (
 // Lifecycle proc phase — every script's available procs run without hard crash
 // ---------------------------------------------------------------------------
 
-describe('Phase 100-B — Arroyo scripts: lifecycle procs execute without crash', () => {
+describeIfScriptAssets('Phase 100-B — Arroyo scripts: lifecycle procs execute without crash', () => {
     for (const name of ARROYO_SCRIPTS) {
         it(`${name}: at least one lifecycle proc runs without throwing`, () => {
             const loaded = loadIntFile(name)
@@ -218,7 +219,7 @@ describe('Phase 100-B — Arroyo scripts: lifecycle procs execute without crash'
     }
 })
 
-describe('Phase 100-C — Klamath scripts: lifecycle procs execute without crash', () => {
+describeIfScriptAssets('Phase 100-C — Klamath scripts: lifecycle procs execute without crash', () => {
     for (const name of KLAMATH_SCRIPTS) {
         it(`${name}: at least one lifecycle proc runs without throwing`, () => {
             const loaded = loadIntFile(name)
@@ -257,7 +258,7 @@ describe('Phase 100-C — Klamath scripts: lifecycle procs execute without crash
     }
 })
 
-describe('Phase 100-D — Modoc scripts: lifecycle procs execute without crash', () => {
+describeIfScriptAssets('Phase 100-D — Modoc scripts: lifecycle procs execute without crash', () => {
     for (const name of MODOC_SCRIPTS) {
         it(`${name}: at least one lifecycle proc runs without throwing`, () => {
             const loaded = loadIntFile(name)
@@ -300,7 +301,7 @@ describe('Phase 100-D — Modoc scripts: lifecycle procs execute without crash',
 // Procedure inventory — document what each script exposes
 // ---------------------------------------------------------------------------
 
-describe('Phase 100-E — Procedure inventory: all scripts define expected procs', () => {
+describeIfScriptAssets('Phase 100-E — Procedure inventory: all scripts define expected procs', () => {
     it('arvillag.int defines map_enter_p_proc (Arroyo village entry)', () => {
         const loaded = loadIntFile('arvillag')
         expect(loaded).not.toBeNull()
@@ -341,7 +342,7 @@ describe('Phase 100-E — Procedure inventory: all scripts define expected procs
 // Step-count sanity — scripts must not infinite-loop
 // ---------------------------------------------------------------------------
 
-describe('Phase 100-F — Step-count sanity: scripts halt within step budget', () => {
+describeIfScriptAssets('Phase 100-F — Step-count sanity: scripts halt within step budget', () => {
     const MAX_STEPS = Config.engine.vmMaxStepsPerCall > 0
         ? Config.engine.vmMaxStepsPerCall
         : 1_000_000
