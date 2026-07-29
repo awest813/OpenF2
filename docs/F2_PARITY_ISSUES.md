@@ -190,9 +190,9 @@ to the live character model, level-up perk picker reachable from gameplay, and
 **Status.** Partial (Slice G). `src/party.ts` tracks follow/wait, distance, disposition,
 and other combat-control fields per member; `src/partyDefs.ts` embeds FO2-aligned
 companion rows (Sulik/Vic/Myron/Marcus/…) with level tiers; `metarule(19/25)` report
-follow + waiting flags; save schema **v21** persists `partyControls`. Still open:
-trade-with-companion UI, full combat AI honouring disposition/attack_who, world-map
-formation, and loading a real `party.txt` from assets (parser ready via `parsePartyTxt`).
+follow + waiting flags; save schema **v21** persists `partyControls`; **companion trade**
+via Pip-Boy DATA / `openCompanionTrade` + live `LootPanel.openWithLive`. Still open:
+full combat AI honouring disposition/attack_who, world-map formation, dialogue trade nodes.
 
 **Acceptance.** Companions recruit, follow across maps and into encounters, level with the
 player per `party.txt` tiers, obey combat-control settings, and survive save/load with
@@ -216,10 +216,11 @@ items, and persist across save/load.
 
 ### P1-5 — No drug, addiction, or timed-effect system
 
-**Status.** Partial (Slice F). `src/character/timedEffects.ts` tables Buffout, Mentats,
+**Status.** Partial (Slice F + v22 save). `src/character/timedEffects.ts` tables Buffout, Mentats,
 Psycho, Jet, Rad-X, RadAway, Antidote, Nuka-Cola, stimpaks; `use` / `useObjOn` call
-`applyDrugToCritter`; expiry + withdrawal tick from `main.ts`. Still open: alcohol set,
-Chem Reliant/Resistant multipliers, Jet quest hook, save/load of active effects.
+`applyDrugToCritter`; expiry + withdrawal tick from `main.ts`; **save/load** via
+`timedEffects` on SaveGame (schema v22). Still open: alcohol set, Chem Reliant/Resistant
+multipliers, Jet quest hook.
 
 **Acceptance.** A timed-modifier subsystem with per-drug tables, addiction rolls,
 withdrawal onset/penalties, and save/load persistence of active effects and addictions.

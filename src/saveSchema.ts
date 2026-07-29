@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 21
+export const SAVE_VERSION = 22
 
 export interface SaveGame {
     id?: number
@@ -314,6 +314,33 @@ export interface SaveGame {
         appliedLevelPid: number
     }>
 
+    /**
+     * Active drug / addiction clocks (added in v22 / Slice F+G).
+     * SPECIAL deltas are already in Critter stats; this restores expiry + addiction flags.
+     */
+    timedEffects?: {
+        player?: {
+            effects: Array<{
+                drugId: string
+                expiresAt: number
+                appliedMods: Record<string, number>
+                radResistBonus: number
+            }>
+            addictions: Array<{ drugId: string; withdrawing: boolean }>
+            withdrawalApplied: string[]
+        }
+        members?: Record<string, {
+            effects: Array<{
+                drugId: string
+                expiresAt: number
+                appliedMods: Record<string, number>
+                radResistBonus: number
+            }>
+            addictions: Array<{ drugId: string; withdrawing: boolean }>
+            withdrawalApplied: string[]
+        }>
+    }
+
     player: {
         position: Point
         orientation: number
@@ -500,6 +527,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.partyControls === undefined) {save.partyControls = {}}
             save.version = 21
             // falls through
+        case 21:
+            // v21 → v22: timed drug / addiction clocks (Slice F persist).
+            if (save.timedEffects === undefined) {save.timedEffects = {}}
+            save.version = 22
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -600,6 +632,9 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (v && typeof v === 'object' && !Array.isArray(v)) cleaned[k] = v
         }
         save.partyControls = cleaned
+    }
+    if (!save.timedEffects || typeof save.timedEffects !== 'object' || Array.isArray(save.timedEffects)) {
+        save.timedEffects = {}
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

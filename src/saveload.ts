@@ -20,6 +20,7 @@ import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
 import { Scripting } from './scripting.js'
 import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
+import { serializeTimedEffects, hydrateTimedEffects } from './character/timedEffects.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
@@ -165,6 +166,8 @@ function applyExtraSaveState(save: SaveGame): void {
             }
         }
     }
+    // Slice F: restore timed chem / addiction clocks onto live Critters.
+    hydrateTimedEffects(save.timedEffects)
 }
 
 // Saving and loading support
@@ -444,6 +447,9 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     if (globalState.gParty && typeof globalState.gParty.serializeControls === 'function') {
         save.partyControls = globalState.gParty.serializeControls()
     }
+
+    // Slice F: timed chem / addiction clocks.
+    save.timedEffects = serializeTimedEffects()
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     // BLK-080: Guard against null gMap in the log message — save() can be called

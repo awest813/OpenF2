@@ -29,6 +29,7 @@ import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
 import { useSkilldexSkill } from './skilldex.js'
+import { openCompanionTrade, canTradeWithPartyMember } from './partyTrade.js'
 import { UIMode } from './uiMode.js'
 import {
     uiCalledShot,
@@ -270,6 +271,9 @@ export function playerUse(obj?: Obj) {
                     return
                 }
                 Scripting.talk(who._script, who)
+            } else if (who.dead !== true && canTradeWithPartyMember(who)) {
+                // Living party member without dialogue — open inventory share
+                openCompanionTrade(who)
             } else if (who.dead === true) {
                 // loot a dead body
                 uiLoot(obj)
@@ -649,7 +653,11 @@ heart.keydown = (k: string) => {
         if (obj !== undefined) {
             console.log('PID: ' + obj.pid)
             console.log('inventory: ' + JSON.stringify(obj.inventory))
-            uiLoot(obj)
+            if (canTradeWithPartyMember(obj as Critter)) {
+                openCompanionTrade(obj as Critter)
+            } else {
+                uiLoot(obj)
+            }
         }
     }
 

@@ -292,3 +292,108 @@ export function resetTimedEffects(): void {
     addictions.clear()
     withdrawalApplied.clear()
 }
+
+export interface SerializedCritterTimedState {
+    effects: ActiveTimedEffect[]
+    addictions: AddictionState[]
+    withdrawalApplied: string[]
+}
+
+export interface SerializedTimedEffects {
+    /** Player timed state (object identity does not survive save/load). */
+    player?: SerializedCritterTimedState
+    /** Party members keyed by PID string. */
+    members?: Record<string, SerializedCritterTimedState>
+}
+
+function packTimedState(critter: object): SerializedCritterTimedState | null {
+    const effects = activeEffects.get(critter) ?? []
+    const addicts = addictions.get(critter) ?? []
+    const wd = withdrawalApplied.get(critter)
+    if (effects.length === 0 && addicts.length === 0 && (!wd || wd.size === 0)) {
+        return null
+    }
+    return {
+        effects: effects.map((e) => ({
+            drugId: e.drugId,
+            expiresAt: e.expiresAt,
+            appliedMods: { ...(e.appliedMods ?? {}) },
+            radResistBonus: e.radResistBonus ?? 0,
+        })),
+        addictions: addicts.map((a) => ({ drugId: a.drugId, withdrawing: !!a.withdrawing })),
+        withdrawalApplied: wd ? [...wd] : [],
+    }
+}
+
+function unpackTimedState(critter: object, data: SerializedCritterTimedState): void {
+    if (!data) return
+    if (Array.isArray(data.effects) && data.effects.length > 0) {
+        activeEffects.set(
+            critter,
+            data.effects.map((e) => ({
+                drugId: String(e.drugId),
+                expiresAt: typeof e.expiresAt === 'number' ? e.expiresAt : 0,
+                appliedMods: { ...(e.appliedMods ?? {}) },
+                radResistBonus: typeof e.radResistBonus === 'number' ? e.radResistBonus : 0,
+            })),
+        )
+    }
+    if (Array.isArray(data.addictions) && data.addictions.length > 0) {
+        addictions.set(
+            critter,
+            data.addictions.map((a) => ({
+                drugId: String(a.drugId),
+                withdrawing: !!a.withdrawing,
+            })),
+        )
+    }
+    if (Array.isArray(data.withdrawalApplied) && data.withdrawalApplied.length > 0) {
+        withdrawalApplied.set(critter, new Set(data.withdrawalApplied.map(String)))
+    }
+}
+
+/**
+ * Snapshot timed chem state for save games.
+ * SPECIAL mods are already baked into Critter base stats — this only restores clocks.
+ */
+export function serializeTimedEffects(): SerializedTimedEffects {
+    const out: SerializedTimedEffects = {}
+    const player = globalState.player as object | null
+    if (player) {
+        const packed = packTimedState(player)
+        if (packed) out.player = packed
+    }
+    const party = globalState.gParty
+    if (party && typeof party.getPartyMembers === 'function') {
+        for (const member of party.getPartyMembers()) {
+            const pid = (member as any)?.pid
+            if (typeof pid !== 'number') continue
+            const packed = packTimedState(member)
+            if (!packed) continue
+            if (!out.members) out.members = {}
+            out.members[String(pid)] = packed
+        }
+    }
+    return out
+}
+
+/**
+ * Restore timed chem maps onto the live player / party Critters after load.
+ * Does not re-apply SPECIAL deltas (saved stats already include them).
+ */
+export function hydrateTimedEffects(data: SerializedTimedEffects | null | undefined): void {
+    resetTimedEffects()
+    if (!data || typeof data !== 'object') return
+    const player = globalState.player as object | null
+    if (player && data.player) {
+        unpackTimedState(player, data.player)
+    }
+    if (data.members && globalState.gParty && typeof globalState.gParty.getPartyMemberByPID === 'function') {
+        for (const [key, packed] of Object.entries(data.members)) {
+            const pid = Number(key)
+            if (!Number.isFinite(pid) || !packed) continue
+            const member = globalState.gParty.getPartyMemberByPID(pid)
+            if (member) unpackTimedState(member, packed)
+        }
+    }
+}

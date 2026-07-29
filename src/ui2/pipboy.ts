@@ -26,6 +26,8 @@ import {
 import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
 import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
 import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
+import { openCompanionTrade } from '../partyTrade.js'
+import { Critter } from '../object.js'
 import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
@@ -89,6 +91,8 @@ export class PipBoyPanel extends UIPanel {
     private _restButtons: Array<{ x: number; y: number; w: number; h: number; hours: number }> = []
     /** Hit regions for holodisk list rows. */
     private _holodiskRows: Array<{ y: number; h: number; id: string }> = []
+    /** Hit regions for party trade rows on the DATA tab. */
+    private _partyTradeRows: Array<{ y: number; h: number; member: Critter }> = []
 
     constructor(
         screenWidth: number,
@@ -420,7 +424,27 @@ export class PipBoyPanel extends UIPanel {
 
     private _renderData(ctx: OffscreenCanvasRenderingContext2D): void {
         this._holodiskRows = []
+        this._partyTradeRows = []
         let y = 18
+
+        // Party trade (P1-3)
+        drawLabel(ctx, 'PARTY', 10, y); y += 18
+        const members = globalState.gParty?.getPartyMembers?.() ?? []
+        if (members.length === 0) {
+            drawText(ctx, 'No companions.', 16, y, FALLOUT_DARK_GRAY); y += 16
+        } else {
+            for (const member of members) {
+                if ((member as Critter).dead) continue
+                const rowH = 16
+                this._partyTradeRows.push({ y, h: rowH, member: member as Critter })
+                const waiting = globalState.gParty.getControl?.(member as Critter)?.waiting
+                const label = `${member.name || 'Companion'}${waiting ? ' (waiting)' : ''} — trade`
+                drawText(ctx, label, 16, y + 12, FALLOUT_GREEN)
+                y += rowH
+            }
+        }
+
+        y += 12
         drawLabel(ctx, 'ARCHIVES', 10, y); y += 18
         const disks = getHolodisks()
         if (disks.length === 0) {
@@ -490,6 +514,13 @@ export class PipBoyPanel extends UIPanel {
             }
         }
         if (this.activeTab === 'data' && contentY >= 0) {
+            for (const row of this._partyTradeRows) {
+                if (contentY >= row.y && contentY < row.y + row.h) {
+                    this.hide()
+                    openCompanionTrade(row.member)
+                    return true
+                }
+            }
             for (const row of this._holodiskRows) {
                 if (contentY >= row.y && contentY < row.y + row.h) {
                     this._selectedHolodiskId = row.id
