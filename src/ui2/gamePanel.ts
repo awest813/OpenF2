@@ -18,6 +18,7 @@ import { EventBus } from '../eventBus.js'
 import { getMessage } from '../util.js'
 import { loadPRO } from '../pro.js'
 import globalState from '../globalState.js'
+import { syncPlayerEntityFromCritter, readPlayerHudSnapshot } from '../playerProjection.js'
 
 const PANEL_HEIGHT = 99
 const LOG_PANEL_HEIGHT = 200
@@ -29,6 +30,7 @@ const HUD_BUTTONS: Array<{ label: string; panel: string | null }> = [
     { label: 'INV',  panel: 'inventory' },
     { label: 'PIPBOY', panel: 'pipboy' },
     { label: 'CHAR', panel: 'characterScreen' },
+    { label: 'SKILL', panel: 'skilldex' },
     { label: 'MAP',  panel: 'worldMap' },
     { label: 'OPT',  panel: 'options' },
     { label: 'SAVE', panel: 'saveLoad' },
@@ -146,22 +148,33 @@ export class GamePanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_DARK_GRAY)
 
+        // P0-2 / Slice B: project live Critter HP/AP onto the ECS entity before
+        // reading UI state, so combat damage is visible in the HUD.
+        syncPlayerEntityFromCritter()
+
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const inv = EntityManager.get<'inventory'>(this.playerEntityId, 'inventory')
-        if (!stats) {return}
+        const live = readPlayerHudSnapshot()
+        if (!stats && !live) {return}
+
+        const currentHp = live?.currentHp ?? stats!.currentHp
+        const maxHp = live?.maxHp ?? stats!.maxHp
+        const maxAP = live?.maxAP ?? stats!.maxAP
+        const currentAP = live?.currentAP
+            ?? EntityManager.get<'combat'>(this.playerEntityId, 'combat')?.combatAP
+            ?? maxAP
+        const displayName = live?.name ?? this.playerName
 
         // --- Player name ---
         drawLabel(ctx, 'NAME', 20, 14, FALLOUT_DARK_GRAY)
-        drawValue(ctx, this.playerName, 20, 30, FALLOUT_GREEN)
+        drawValue(ctx, displayName, 20, 30, FALLOUT_GREEN)
 
         // --- HP display ---
-        const hpColor = hpColorFor(stats)
+        const hpColor = hpColorFor({ currentHp, maxHp } as StatsComponent)
         drawLabel(ctx, 'HP', 20, 50, FALLOUT_DARK_GRAY)
-        drawValue(ctx, `${stats.currentHp}/${stats.maxHp}`, 20, 66, hpColor)
+        drawValue(ctx, `${currentHp}/${maxHp}`, 20, 66, hpColor)
 
         // --- AP bar ---
-        const maxAP = stats.maxAP
-        const currentAP = EntityManager.get<'combat'>(this.playerEntityId, 'combat')?.combatAP ?? maxAP
         drawLabel(ctx, 'AP', 140, 14, FALLOUT_DARK_GRAY)
         drawAPBar(ctx, 140, 22, currentAP, maxAP)
         // Numeric AP value below the bar so players know the exact count.

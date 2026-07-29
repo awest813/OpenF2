@@ -354,9 +354,9 @@ describe('Phase 16-F — checklist reflects de-stubbed procedures', () => {
         expect(['partial', 'implemented']).toContain(entry?.status)
     })
 
-    it('play_gmovie is listed as implemented in the checklist', () => {
+    it('play_gmovie is listed as safe_stub in the checklist (no FMV pipeline)', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'play_gmovie')
-        expect(entry?.status).toBe('implemented')
+        expect(entry?.status).toBe('safe_stub')
     })
 
     it('new sfall opcodes 0x8170–0x8174 are all implemented', () => {

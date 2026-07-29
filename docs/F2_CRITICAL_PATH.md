@@ -31,27 +31,42 @@ Each critical region is evaluated against the same required systems:
 
 ---
 
+## Certification honesty note (2026-07-29)
+
+Earlier revisions marked every region `CERTIFIED` and the release gate `READY` based on
+synthetic scaffold harnesses (`phase26`/`phase34`/`phase35`) that assign globals and map
+names without loading real Fallout 2 maps or executing real `.int` scripts.
+
+Those scaffolds remain useful as **state-machine smoke tests**, but they do **not**
+constitute campaign certification. Region status below is reset to `NOT_STARTED`.
+Re-certification rules and sequencing live in:
+
+- [`F2_FULL_PARITY_PLAN.md`](./F2_FULL_PARITY_PLAN.md)
+- [`F2_PARITY_ISSUES.md`](./F2_PARITY_ISSUES.md) (P0-5)
+
+---
+
 ## Region checklist
 
 Legend:
 - Status: `NOT_STARTED` | `IN_PROGRESS` | `CERTIFIED` | `BLOCKED`
-- Blockers link to `docs/F2_BLOCKER_MATRIX.md` entries.
+- Blockers link to `docs/F2_BLOCKER_MATRIX.md` and `docs/F2_PARITY_ISSUES.md`.
 
 | Region | scripts | dialogue | barter | combat | world_map | cinematics | reputation_karma_globals | Status | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| Arroyo | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
-| Klamath | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
-| Den | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase26 + phase27/30/32 + phase35 full-route scaffold |
-| Modoc | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Vault City | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Gecko | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Broken Hills | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| New Reno | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| NCR | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Redding | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| San Francisco | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Navarro | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34 + phase27/30/32 + phase35 full-route scaffold |
-| Enclave / Oil Rig | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | ☑ | CERTIFIED | Certified via phase34/35 ending-route scaffold and persistence checks |
+| Arroyo | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Klamath | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Den | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Modoc | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Vault City | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Gecko | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Broken Hills | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| New Reno | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| NCR | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Redding | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| San Francisco | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Navarro | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
+| Enclave / Oil Rig | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | NOT_STARTED | Scaffold smoke exists; real-asset re-cert pending |
 
 ---
 
@@ -64,3 +79,7 @@ Legend:
    - corresponding automated regression coverage,
    - checklist status update in this file.
 4. End-to-end release gate requires all regions certified and final Oil Rig ending flow completion.
+5. **Real-asset rule:** a region is only `CERTIFIED` when its real maps load, its real
+   scripts execute through `ScriptVM` without progression-blocking unsupported-opcode
+   hits, and its quest gates advance under a scripted or recorded playthrough. Synthetic
+   harnesses that assign globals without map/script execution are not sufficient.

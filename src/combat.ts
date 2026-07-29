@@ -25,6 +25,18 @@ import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
 import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
+import {
+    fleeHpThreshold,
+    normalizeAttackWho,
+    parseAiInt,
+    shouldAttemptCalledShot,
+    chemUseHpRatioThreshold,
+    bestWeaponSuppressesBurst,
+    shouldAdvanceOnTarget,
+    allowAreaAttack,
+    type AiAttackWho,
+} from './combatAi.js'
+import { applyDrugToCritter } from './character/timedEffects.js'
 
 // Turn-based combat system
 
@@ -839,18 +851,75 @@ export class Combat {
         // BLK-059: Guard null positions in the sort comparator to avoid crashes when
         // combatants lack a position (e.g. freshly added or off-map).
         if (!obj.position) {return targets[0] ?? null}
+
+        // Slice G / P1-1: party combat-control disposition biases target choice.
+        // P1-1 deepen: party attackWho overrides AI.TXT attack_who when present.
+        const partyCtrl = globalState.gParty?.getControl?.(obj)
+        const disposition = partyCtrl?.disposition
+        const attackWho: AiAttackWho = normalizeAttackWho(
+            partyCtrl?.attackWho ?? obj.ai?.info?.attack_who,
+            'closest'
+        )
+        const playerPos = globalState.player?.position
+
         targets.sort((a, b) => {
             let da = a.position ? hexDistance(obj.position!, a.position) : Infinity
             let db = b.position ? hexDistance(obj.position!, b.position) : Infinity
-            
-            // AI Heuristic: 'finish off weak targets' by discounting effective distance
-            if (a.getStat('Max HP') > 0) {
-                const aRatio = Math.max(0, a.getStat('HP') / a.getStat('Max HP'))
-                if (aRatio < 0.3) da -= 3
+
+            const aMax = a.getStat('Max HP') || 0
+            const bMax = b.getStat('Max HP') || 0
+            const aHp = a.getStat('HP') || 0
+            const bHp = b.getStat('HP') || 0
+            let aRatio = aMax > 0 ? Math.max(0, aHp / aMax) : 1
+            let bRatio = bMax > 0 ? Math.max(0, bHp / bMax) : 1
+
+            // Baseline: finish off very weak targets
+            if (aRatio < 0.3) da -= 3
+            if (bRatio < 0.3) db -= 3
+
+            switch (attackWho) {
+                case 'closest':
+                    // Distance already primary; neutralize weak-target bias a bit
+                    break
+                case 'strongest':
+                    da -= aMax / 20
+                    db -= bMax / 20
+                    da -= aRatio * 2
+                    db -= bRatio * 2
+                    break
+                case 'weakest':
+                    da += aRatio * 4
+                    db += bRatio * 4
+                    da += aHp / 20
+                    db += bHp / 20
+                    break
+                case 'whomever_attacking_me': {
+                    const aFocus = (a as any).combatTarget === obj || (a as any)._lastAttacked === obj
+                    const bFocus = (b as any).combatTarget === obj || (b as any)._lastAttacked === obj
+                    if (aFocus) da -= 8
+                    if (bFocus) db -= 8
+                    break
+                }
+                case 'whomever':
+                default:
+                    break
             }
-            if (b.getStat('Max HP') > 0) {
-                const bRatio = Math.max(0, b.getStat('HP') / b.getStat('Max HP'))
-                if (bRatio < 0.3) db -= 3
+
+            if (disposition === 'aggressive' || disposition === 'berserk') {
+                if (aRatio < 0.5) da -= 2
+                if (bRatio < 0.5) db -= 2
+                if (disposition === 'berserk') {
+                    da -= 1
+                    db -= 1
+                }
+            } else if (disposition === 'defensive' && playerPos) {
+                // Prefer threats near the player
+                if (a.position) da += hexDistance(playerPos, a.position) * 0.5
+                if (b.position) db += hexDistance(playerPos, b.position) * 0.5
+            } else if (disposition === 'coward') {
+                // Prefer weaker / less threatening targets
+                if (aRatio > 0.6) da += 2
+                if (bRatio > 0.6) db += 2
             }
 
             return da - db
@@ -937,9 +1006,43 @@ export class Combat {
             // out of AP
             {return this.nextTurn()}
 
+        // P1-1: chem_use — spend a stimpak when hurt enough (party control or AI.TXT).
+        const partyCtrlEarly = globalState.gParty?.getControl?.(obj)
+        const chemUse = partyCtrlEarly?.chemUse ?? obj.ai.info.chem_use
+        const chemThreshold = chemUseHpRatioThreshold(chemUse)
+        if (chemThreshold !== null) {
+            const maxHpChem = obj.getStat('Max HP') || 0
+            const hpChem = obj.getStat('HP') || 0
+            const ratio = maxHpChem > 0 ? hpChem / maxHpChem : 1
+            if (ratio <= chemThreshold && Array.isArray(obj.inventory)) {
+                const stimIdx = obj.inventory.findIndex((it: any) => {
+                    const n = String(it?.name ?? it?.pro?.name ?? '').toLowerCase()
+                    return n.includes('stimpak') || n.includes('stim pack') || it?.pid === 40
+                })
+                if (stimIdx >= 0 && AP.getAvailableCombatAP() >= 1) {
+                    const stim = obj.inventory[stimIdx]
+                    applyDrugToCritter(obj, stim, { skipHeal: false })
+                    obj.inventory.splice(stimIdx, 1)
+                    AP.subtractCombatAP(1)
+                    this.log('[AI USED STIMPAK]')
+                }
+            }
+        }
+
         // behaviors
 
-        if (obj.getStat('HP') <= obj.ai.info.min_hp) {
+        // Party coward disposition flees earlier than AI.TXT min_hp alone.
+        // P1-1: also honour run_away_mode HP%-of-max thresholds.
+        const partyCtrl = partyCtrlEarly ?? globalState.gParty?.getControl?.(obj)
+        const partyDisposition = partyCtrl?.disposition
+        const maxHp = obj.getStat('Max HP') || 0
+        const runAwayMode = partyCtrl?.runAwayMode ?? obj.ai.info.run_away_mode
+        let fleeHp = fleeHpThreshold(maxHp, parseAiInt(obj.ai.info.min_hp, 0), runAwayMode)
+        if (partyDisposition === 'coward') {
+            fleeHp = Math.max(fleeHp, Math.floor(maxHp * 0.5))
+        }
+
+        if (obj.getStat('HP') <= fleeHp) {
             // hp <= min fleeing hp, so flee
             this.log('[AI FLEES]')
 
@@ -1014,6 +1117,12 @@ export class Combat {
 
         // are we in firing distance?
         if (distance > fireDistance) {
+            // P1-1: honour distance preference (stay / snipe may refuse to close).
+            const distanceMode = partyCtrl?.distance ?? obj.ai.info.distance
+            if (!shouldAdvanceOnTarget(distanceMode, distance, fireDistance)) {
+                this.log('[AI HOLDS DISTANCE]')
+                return this.nextTurn()
+            }
             this.log('[AI CREEPS]')
             // BLK-094: Guard against null target.position — target may not yet have a
             // tile assignment during scripted combat.  Skip the creep attempt entirely.
@@ -1079,11 +1188,64 @@ export class Combat {
                 && this.getBurstAPCost(obj) <= AP.getAvailableCombatAP()
             // If scripts forced a non-ranged mode, suppress burst.
             if (modeOverride !== undefined && modeOverride < 2) {canBurst = false}
+            // P1-1: best_weapon melee/unarmed prefs suppress burst.
+            const bestWeapon = partyCtrl?.bestWeapon ?? obj.ai.info.best_weapon
+            if (bestWeaponSuppressesBurst(bestWeapon)) {canBurst = false}
+            // P1-1: area_attack_mode gates burst by hit% / chance.
+            if (canBurst) {
+                const areaMode = partyCtrl?.areaAttackMode ?? obj.ai.info.area_attack_mode
+                const hitForBurst = typeof (target as any).getStat === 'function'
+                    ? this.getHitChance(obj, target, 'torso').hit
+                    : 50
+                if (!allowAreaAttack(areaMode, hitForBurst)) {
+                    canBurst = false
+                }
+            }
             const attackCost = canBurst ? this.getBurstAPCost(obj) : this.getAttackAPCost(obj)
 
             if (AP.getAvailableCombatAP() >= attackCost) {
             // if we are in range, do we have enough AP to attack?
-            this.log(canBurst ? '[BURST ATTACKING]' : '[ATTACKING]')
+            // P1-1: honour AI.TXT min_to_hit — skip shot if hit% is too low.
+            const minToHit = parseAiInt(obj.ai.info.min_to_hit, 0)
+            const called = shouldAttemptCalledShot(obj.ai.info.called_freq)
+            const region = called ? 'eyes' : 'torso'
+            if (minToHit > 0 && typeof (target as any).getStat === 'function') {
+                const hitPct = this.getHitChance(obj, target, region).hit
+                if (hitPct < minToHit) {
+                    this.log(`[AI HOLD FIRE] hit% ${hitPct} < min_to_hit ${minToHit}`)
+                    // Try creeping closer when out of preferred accuracy; otherwise end turn.
+                    if (target.position && distance > 1 && AP.getAvailableMoveAP() > 0) {
+                        const neighbors = hexNeighbors(target.position)
+                        neighbors.sort((a, b) => {
+                            if (!obj.position) return 0
+                            return hexDistance(obj.position, a) - hexDistance(obj.position, b)
+                        })
+                        for (const n of neighbors) {
+                            if (
+                                obj.walkTo(
+                                    n,
+                                    false,
+                                    () => {
+                                        obj.clearAnim()
+                                        this.doAITurn(obj, idx, depth + 1)
+                                    },
+                                    Math.min(AP.getAvailableMoveAP(), 3)
+                                ) !== false
+                            ) {
+                                const moveCost = Math.max(0, obj.path.path.length - 1)
+                                if (AP.subtractMoveAP(moveCost) === false) {
+                                    AP.combat = 0
+                                    AP.move = 0
+                                }
+                                return
+                            }
+                        }
+                    }
+                    return this.nextTurn()
+                }
+            }
+
+            this.log(canBurst ? '[BURST ATTACKING]' : called ? '[CALLED SHOT]' : '[ATTACKING]')
             if (AP.subtractCombatAP(attackCost) === false) {
                 this.log('[AI ATTACK ABORTED: AP desync]')
                 return this.nextTurn()
@@ -1102,7 +1264,7 @@ export class Combat {
 
             const attackFn = canBurst
                 ? (cb: () => void) => this.burstAttack(obj, target, cb)
-                : (cb: () => void) => this.attack(obj, target, 'torso', cb)
+                : (cb: () => void) => this.attack(obj, target, region, cb)
 
             attackFn(() => {
                 obj.clearAnim()

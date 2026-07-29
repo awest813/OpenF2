@@ -2,6 +2,12 @@
 
 This matrix tracks procedure/opcode fidelity for Fallout 2 critical-path certification.
 
+> **Note (2026-07-29):** `scriptingChecklist.ts` currently marks 807/807 entries
+> `implemented`, including many safe no-ops. This matrix’s historical “partial”
+> rows remain useful for fidelity work. Campaign-level gaps and sequencing live in
+> [`F2_PARITY_ISSUES.md`](./F2_PARITY_ISSUES.md) and
+> [`F2_FULL_PARITY_PLAN.md`](./F2_FULL_PARITY_PLAN.md).
+
 ## Method
 
 - Source-of-truth inventory: `src/scriptingChecklist.ts`

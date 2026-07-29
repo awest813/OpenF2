@@ -307,14 +307,14 @@ describe('Phase 38-H — get_tile_fid (0x8194) implementation', () => {
 })
 
 // ===========================================================================
-// Phase 38-I — set_tile_fid (0x8195) is a no-op
+// Phase 38-I — set_tile_fid (0x8195) map floor patch
 // ===========================================================================
 
-describe('Phase 38-I — set_tile_fid (0x8195) no-op', () => {
-    it('checklist entry set_tile_fid is present as implemented', () => {
+describe('Phase 38-I — set_tile_fid (0x8195) map floor patch', () => {
+    it('checklist entry set_tile_fid is present as partial (map data, renderer may lag)', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_tile_fid')
         expect(entry).toBeDefined()
-        expect(entry?.status).toBe('implemented')
+        expect(entry?.status).toBe('partial')
         expect(entry?.kind).toBe('opcode')
     })
 
@@ -327,6 +327,25 @@ describe('Phase 38-I — set_tile_fid (0x8195) no-op', () => {
         const script = new (Scripting as any).Script()
         const result = script.set_tile_fid(0, 0, 1)
         expect(result).toBeUndefined()
+    })
+
+    it('set_tile_fid round-trips with get_tile_fid on a live floor grid', () => {
+        const script = new (Scripting as any).Script()
+        const savedMap = globalState.gMap
+        const hexPos = fromTileNum(20100)
+        const tilePos = hexToTile(hexPos)
+        const floorGrid = Array.from({ length: 100 }, () => Array(100).fill('grid000'))
+        ;(globalState as any).gMap = {
+            numLevels: 1,
+            mapObj: { levels: [{ tiles: { floor: floorGrid } }] },
+        }
+        try {
+            script.set_tile_fid(20100, 0, 0x04000000 | 2) // brick01
+            expect(floorGrid[tilePos.y][tilePos.x]).toBe('brick01')
+            expect(script.get_tile_fid(20100, 0)).toBe(0x04000000 | 2)
+        } finally {
+            ;(globalState as any).gMap = savedMap
+        }
     })
 })
 
@@ -510,7 +529,7 @@ describe('Phase 38-K — Phase 38 checklist integrity', () => {
             const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === id)
             expect(entry!.description.length, `${id} description too short`).toBeGreaterThan(10)
             expect(['opcode', 'procedure', 'metarule'], `${id} has invalid kind`).toContain(entry!.kind)
-            expect(['stub', 'partial', 'implemented'], `${id} has invalid status`).toContain(entry!.status)
+            expect(['stub', 'partial', 'safe_stub', 'implemented'], `${id} has invalid status`).toContain(entry!.status)
         }
     })
 

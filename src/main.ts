@@ -20,11 +20,16 @@ import { heart } from './heart.js'
 import { hexDistance, hexesInRadius, hexFromScreen, hexNeighbors } from './geometry.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
-import { initGame } from './init.js'
+import { initGame, enterWorldMap } from './init.js'
+import { shouldSkipMainMenu } from './character/chargen.js'
+import { tickTimedEffects } from './character/timedEffects.js'
+import { tickRadiationAndPoison } from './character/radiationPoison.js'
 import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
+import { useSkilldexSkill } from './skilldex.js'
+import { openCompanionTrade, canTradeWithPartyMember } from './partyTrade.js'
 import { UIMode } from './uiMode.js'
 import {
     uiCalledShot,
@@ -50,19 +55,6 @@ import { EventBus } from './eventBus.js'
 import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { save, load } from './saveload.js'
 
-// Return the skill ID used by the Fallout 2 engine
-function getSkillID(skill: Skills): number {
-    switch (skill) {
-        case Skills.Lockpick:
-            return 9
-        case Skills.Repair:
-            return 13
-    }
-
-    console.log('unimplemented skill %d', skill)
-    return -1
-}
-
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
 
@@ -71,12 +63,7 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
         return
     }
 
-    if (skillRequiresTarget(skill)) {
-        // use the skill on the object
-        Scripting.useSkillOn(globalState.player, getSkillID(skill), obj)
-    } else {
-        console.log('passive skills are not implemented')
-    }
+    useSkilldexSkill(skill, obj)
 }
 
 export function playerUse(obj?: Obj) {
@@ -284,6 +271,9 @@ export function playerUse(obj?: Obj) {
                     return
                 }
                 Scripting.talk(who._script, who)
+            } else if (who.dead !== true && canTradeWithPartyMember(who)) {
+                // Living party member without dialogue — open inventory share
+                openCompanionTrade(who)
             } else if (who.dead === true) {
                 // loot a dead body
                 uiLoot(obj)
@@ -359,6 +349,39 @@ function initUIManager(): void {
 
     EventBus.on('game:loadFromSlot', ({ slot }) => {
         load(slot)
+    })
+
+    // Slice C / P0-1: New Game → chargen → enter world
+    EventBus.on('game:newGameRequested', () => {
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        EventBus.emit('ui:openPanel', { panelName: 'characterCreation' })
+    })
+
+    EventBus.on('game:characterCreated', ({ mapName }) => {
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        try {
+            enterWorldMap(mapName || 'artemple')
+            EventBus.emit('game:enterWorld', { mapName: mapName || 'artemple' })
+            EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
+        } catch (err) {
+            console.error('[main] Failed to enter world after chargen:', err)
+            EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+        }
+    })
+
+    // P1-8: ending credits → return to main menu.
+    EventBus.on('endgame:returnToMenu', () => {
+        try {
+            globalState.inCombat = false
+            globalState.combat = null
+        } catch {
+            // ignore
+        }
+        EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
+        EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
     })
 
     mgr.connectEventBus()
@@ -445,8 +468,16 @@ window.onload = async function () {
                 globalState.proMap = value
 
                 // continue initialization
-                initGame()
+                const skipMenu = shouldSkipMainMenu()
+                initGame({ skipMapLoad: !skipMenu })
                 globalState.isInitializing = false
+
+                // Campaign boot: show main menu when no ?map query is present.
+                if (!skipMenu) {
+                    EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+                } else {
+                    EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
+                }
             })
         })
     })
@@ -636,7 +667,11 @@ heart.keydown = (k: string) => {
         if (obj !== undefined) {
             console.log('PID: ' + obj.pid)
             console.log('inventory: ' + JSON.stringify(obj.inventory))
-            uiLoot(obj)
+            if (canTradeWithPartyMember(obj as Critter)) {
+                openCompanionTrade(obj as Critter)
+            } else {
+                uiLoot(obj)
+            }
         }
     }
 
@@ -797,6 +832,12 @@ heart.update = function () {
         }
 
         globalState.audioEngine.tick()
+
+        // Slice F / P1-4 / P1-5: drug expiry + rad/poison DoT on the player.
+        if (globalState.player && (globalState.player as Critter).stats) {
+            tickTimedEffects(globalState.player as Critter)
+            tickRadiationAndPoison(globalState.gameTickTime)
+        }
     }
 
     for (const obj of globalState.gMap.getObjects()) {

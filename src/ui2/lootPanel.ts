@@ -14,6 +14,7 @@
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
+import type { Obj } from '../object.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -53,6 +54,9 @@ export class LootPanel extends UIPanel {
     private _selectedIndex = -1
     private _hoveredSide: 'player' | 'container' | null = null
     private _hoveredIndex = -1
+    /** Live Critter inventories (companion trade) — mutated in lockstep with snapshots. */
+    private _livePlayer: Obj[] | null = null
+    private _liveContainer: Obj[] | null = null
 
     constructor(screenWidth: number, screenHeight: number) {
         super('loot', {
@@ -66,8 +70,26 @@ export class LootPanel extends UIPanel {
 
     /** Populate inventories and show the panel. */
     openWith(playerInventory: LootItem[], containerInventory: LootItem[]): void {
+        this._livePlayer = null
+        this._liveContainer = null
         this.playerInventory    = playerInventory.map(i => ({ ...i }))
         this.containerInventory = containerInventory.map(i => ({ ...i }))
+        this._selectedSide  = null
+        this._selectedIndex = -1
+        this._hoveredSide   = null
+        this._hoveredIndex  = -1
+        this.show()
+    }
+
+    /**
+     * Open against live Critter inventory arrays (companion trade / corpse loot).
+     * Moves mutate the underlying Obj[] as well as the display snapshots.
+     */
+    openWithLive(playerInventory: Obj[], containerInventory: Obj[]): void {
+        this._livePlayer = playerInventory
+        this._liveContainer = containerInventory
+        this.playerInventory = snapshotLoot(playerInventory)
+        this.containerInventory = snapshotLoot(containerInventory)
         this._selectedSide  = null
         this._selectedIndex = -1
         this._hoveredSide   = null
@@ -86,7 +108,7 @@ export class LootPanel extends UIPanel {
         ctx.font = 'bold 12px monospace'
         ctx.fillStyle = cssColor(FALLOUT_GREEN)
         ctx.textAlign = 'center'
-        ctx.fillText('LOOT', width / 2, 18)
+        ctx.fillText(this._liveContainer ? 'TRADE' : 'LOOT', width / 2, 18)
         ctx.textAlign = 'left'
 
         // Column headers
@@ -95,7 +117,7 @@ export class LootPanel extends UIPanel {
         ctx.font = '9px monospace'
         ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
         ctx.fillText('YOUR INVENTORY',  playerX,    COL_Y - 6)
-        ctx.fillText('CONTAINER',        containerX, COL_Y - 6)
+        ctx.fillText(this._liveContainer ? 'COMPANION' : 'CONTAINER', containerX, COL_Y - 6)
 
         // Draw inventory columns
         this._drawColumn(ctx, playerX,    COL_Y, this.playerInventory,    'player')
@@ -313,6 +335,15 @@ export class LootPanel extends UIPanel {
         } else {
             to.push({ ...item })
         }
+
+        if (this._livePlayer && this._liveContainer) {
+            liveTransfer(
+                fromSide === 'player' ? this._livePlayer : this._liveContainer,
+                toSide === 'player' ? this._livePlayer : this._liveContainer,
+                item.name,
+                item.amount,
+            )
+        }
     }
 
     private _takeAll(): void {
@@ -325,6 +356,19 @@ export class LootPanel extends UIPanel {
             }
         }
         this.containerInventory = []
+
+        if (this._livePlayer && this._liveContainer) {
+            while (this._liveContainer.length > 0) {
+                const obj = this._liveContainer.shift()!
+                const key = lootItemKey(obj)
+                const existing = this._livePlayer.find((o) => lootItemKey(o) === key)
+                if (existing) {
+                    existing.amount = (existing.amount ?? 1) + (obj.amount ?? 1)
+                } else {
+                    this._livePlayer.push(obj)
+                }
+            }
+        }
     }
 
     private _close(): void {
@@ -332,7 +376,41 @@ export class LootPanel extends UIPanel {
             playerInventory:    this.playerInventory.slice(),
             containerInventory: this.containerInventory.slice(),
         })
+        this._livePlayer = null
+        this._liveContainer = null
         this.hide()
+    }
+}
+
+function lootItemKey(obj: { name?: string; pid?: number }): string {
+    if (obj.name) return String(obj.name)
+    if (typeof obj.pid === 'number') return `pid:${obj.pid}`
+    return '?'
+}
+
+function snapshotLoot(inv: Obj[]): LootItem[] {
+    return inv.map((i) => ({
+        name: lootItemKey(i),
+        amount: typeof i.amount === 'number' ? i.amount : 1,
+    }))
+}
+
+function liveTransfer(from: Obj[], to: Obj[], name: string, amount: number): void {
+    const idx = from.findIndex((o) => lootItemKey(o) === name)
+    if (idx < 0) return
+    const obj = from[idx]
+    const stack = obj.amount ?? 1
+    if (stack > amount) {
+        obj.amount = stack - amount
+        const clone = Object.assign({}, obj, { amount }) as Obj
+        const existing = to.find((o) => lootItemKey(o) === name)
+        if (existing) existing.amount = (existing.amount ?? 1) + amount
+        else to.push(clone)
+    } else {
+        from.splice(idx, 1)
+        const existing = to.find((o) => lootItemKey(o) === name)
+        if (existing) existing.amount = (existing.amount ?? 1) + stack
+        else to.push(obj)
     }
 }
 

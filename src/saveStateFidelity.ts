@@ -38,6 +38,7 @@ export interface SaveDataState {
     }
     gParty: {
         serialize: () => SaveGame['party']
+        serializeControls?: () => NonNullable<SaveGame['partyControls']>
     }
     dirtyMapCache: SaveGame['savedMaps']
     questLog: {
@@ -83,6 +84,7 @@ export interface LoadDataState {
     }
     gParty: {
         deserialize: (party: SaveGame['party']) => void
+        deserializeControls?: (controls: NonNullable<SaveGame['partyControls']>) => void
     }
     dirtyMapCache: SaveGame['savedMaps']
     questLog: QuestLog
@@ -114,6 +116,11 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
             karma: state.player.karma,
         },
         party: state.gParty.serialize(),
+        partyControls: state.gParty.serializeControls
+            ? state.gParty.serializeControls()
+            : {},
+        timedEffects: {},
+        automap: {},
         savedMaps: { [curMap.name]: curMap, ...state.dirtyMapCache },
         questLog: state.questLog.serialize(),
         reputation: state.reputation.serialize(),
@@ -176,6 +183,9 @@ export function hydrateStateFromSave(
     state.playerPerkRanks = save.playerPerkRanks ? { ...save.playerPerkRanks } : {}
 
     state.gParty.deserialize(save.party)
+    if (save.partyControls && typeof state.gParty.deserializeControls === 'function') {
+        state.gParty.deserializeControls(save.partyControls)
+    }
 
     state.questLog = QuestLog.deserialize(save.questLog ?? { entries: [] })
     state.reputation = Reputation.deserialize(save.reputation ?? { karma: 0, reputations: {} })

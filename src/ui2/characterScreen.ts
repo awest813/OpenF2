@@ -8,8 +8,14 @@
 import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, UIColor, cssColor, wrapText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
-import { spendSkillPoint, getSkillPointCost } from '../character/leveling.js'
+import { getSkillPointCost } from '../character/leveling.js'
 import { getAvailablePerks, grantPerk, PERK_MAP, PERKS, Perk } from '../character/perks.js'
+import {
+    syncPlayerEntityFromCritter,
+    spendCritterSkillPoint,
+    ECS_SKILL_TO_DISPLAY,
+    recordCritterPerkGrant,
+} from '../playerProjection.js'
 
 type TabName = 'stats' | 'skills' | 'perks'
 
@@ -64,7 +70,14 @@ export class CharacterScreen extends UIPanel {
         this.zOrder = 10
     }
 
+    protected override onShow(): void {
+        syncPlayerEntityFromCritter()
+    }
+
     render(ctx: OffscreenCanvasRenderingContext2D): void {
+        // Keep sheet aligned with Critter model (combat / chargen / scripts).
+        syncPlayerEntityFromCritter()
+
         const { width, height } = this.bounds
 
         // Background
@@ -375,15 +388,17 @@ export class CharacterScreen extends UIPanel {
             }
         }
 
-        // Skill +1 buttons (only in skills tab)
+        // Skill +1 buttons (only in skills tab) — spend on Critter, then project to ECS.
         if (this.activeTab === 'skills') {
             const skills = EntityManager.get<'skills'>(this.playerEntityId, 'skills')
-            const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
-            if (skills && stats) {
+            if (skills) {
                 let sy = 60 + 36  // offset by header and tab area
                 for (const { key } of SKILL_NAMES) {
                     if (y >= sy - 13 && y < sy + 3 && x >= 248 && x < 270) {
-                        spendSkillPoint(stats, skills, key)
+                        const display = ECS_SKILL_TO_DISPLAY[key]
+                        if (display) {
+                            spendCritterSkillPoint(display)
+                        }
                         return true
                     }
                     sy += 18
@@ -454,6 +469,8 @@ export class CharacterScreen extends UIPanel {
                                     if (success) {
                                         player.acquiredPerks.push(item.perk.id)
                                         player.perksAvailable = Math.max(0, player.perksAvailable - 1)
+                                        // Critter is source of truth for perk ranks / owed credits.
+                                        recordCritterPerkGrant(item.perk.id)
                                     }
                                 }
                                 return true

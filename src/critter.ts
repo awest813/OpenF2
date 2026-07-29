@@ -19,6 +19,7 @@ import globalState from './globalState.js'
 import { hexDirectionTo } from './geometry.js'
 import { Critter, WeaponObj } from './object.js'
 import { Scripting } from './scripting.js'
+import { educatedPerkRanks } from './character/perks.js'
 
 const weaponAnims: { [weapon: string]: { [anim: string]: string } } = {
     punch: { idle: 'aa', attack: 'aq' },
@@ -374,9 +375,8 @@ export function critterKill(
                     // This mirrors the formula in give_exp_points().
                     const intScore: number = typeof player.getStat === 'function'
                         ? (player.getStat('INT') ?? 5) : 5
-                    /** Perk ID 47 = Educated: +2 skill points per level per rank. */
-                    const PERK_ID_EDUCATED = 47
-                    const educatedBonus = ((player.perkRanks as Record<number, number>)?.[PERK_ID_EDUCATED] ?? 0) * 2
+                    // Educated: UI id 11; FO2/script aliases 18 and 47.
+                    const educatedBonus = educatedPerkRanks(player.perkRanks as Record<number, number>) * 2
                     const points = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
                     if (player.skills && typeof player.skills.skillPoints === 'number') {
                         player.skills.skillPoints += points

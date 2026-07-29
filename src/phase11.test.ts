@@ -42,7 +42,7 @@ describe('Phase 1 — scripting stub checklist', () => {
             expect(entry.id).toBeTruthy()
             expect(['opcode', 'procedure', 'metarule', 'bug']).toContain(entry.kind)
             expect(entry.description.length).toBeGreaterThan(0)
-            expect(['stub', 'partial', 'implemented']).toContain(entry.status)
+            expect(['stub', 'partial', 'safe_stub', 'implemented']).toContain(entry.status)
             expect(['high', 'medium', 'low']).toContain(entry.frequency)
             expect(['blocker', 'high', 'medium', 'low']).toContain(entry.impact)
         }
@@ -55,7 +55,7 @@ describe('Phase 1 — scripting stub checklist', () => {
 
     it('stubChecklistSummary returns counts that sum to total entries', () => {
         const summary = stubChecklistSummary()
-        expect(summary.stub + summary.partial + summary.implemented).toBe(SCRIPTING_STUB_CHECKLIST.length)
+        expect(summary.stub + summary.partial + summary.safe_stub + summary.implemented).toBe(SCRIPTING_STUB_CHECKLIST.length)
     })
 
     it('known high-frequency stubs appear in the checklist', () => {

@@ -129,10 +129,14 @@ describe('Phase 35-A — full critical-path scaffold run', () => {
 })
 
 describe('Phase 35-B — release-gate artifact sanity', () => {
-    it('release gate records READY once region certification and full-route scaffold evidence are present', () => {
+    it('release gate records NOT_READY until real-asset certification replaces scaffolds', () => {
+        // phase35 remains a useful state-machine smoke test, but it is not
+        // campaign completion evidence. Gate status must stay NOT_READY until
+        // regions are re-certified under the real-asset rule.
         const gate = readFileSync(new URL('../docs/F2_RELEASE_GATE.md', import.meta.url), 'utf8')
-        expect(gate).toContain('**Status:** `READY`')
-        expect(gate).toContain('- [x] All regions certified')
-        expect(gate).toContain('- [x] Full playthrough to ending completed')
+        expect(gate).toContain('**Status:** `NOT_READY`')
+        expect(gate).toContain('F2_FULL_PARITY_PLAN.md')
+        expect(gate).toContain('- [ ] All regions certified (real-asset rule)')
+        expect(gate).toContain('- [ ] Full playthrough to ending completed (real content)')
     })
 })

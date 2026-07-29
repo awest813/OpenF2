@@ -47,8 +47,8 @@ afterEach(() => {
 // ===========================================================================
 
 describe('Phase 66-A — BLK-071: carFuel save schema v18 migration', () => {
-    it('SAVE_VERSION was 18 (now superseded to 20)', () => {
-        expect(SAVE_VERSION).toBe(20)
+    it('SAVE_VERSION was 18 (now superseded to 25)', () => {
+        expect(SAVE_VERSION).toBe(26)
     })
 
     it('migrates a v17 save to v18 and sets carFuel = 0', () => {

@@ -23,7 +23,8 @@ import { lookupInterfaceArt } from './pro.js'
 import { objectBoundingBox } from './renderer.js'
 import { formatSaveDate, load, save, SaveGame, saveList } from './saveload.js'
 import { Scripting } from './scripting.js'
-import { Skills } from './skills.js'
+import { Skills, skillRequiresTarget } from './skills.js'
+import { SKILLDEX_ENTRIES, useSkilldexSkill } from './skilldex.js'
 import { fromTileNum } from './tile.js'
 import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl, ElementOptions } from './dom.js'
 import { CSSBoundingBox, Widget, WindowFrame, SmallButton, Label, List, ListItem } from './widgets.js'
@@ -35,6 +36,8 @@ import { lazyLoadImage } from './images.js'
 import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
 import { xpForLevel } from './ecs/derivedStats.js'
 import { UIMode } from './uiMode.js'
+import { EventBus } from './eventBus.js'
+import { parkCarAtPlayer } from './car.js'
 
 // UI system
 
@@ -68,6 +71,11 @@ function initSkilldex() {
     function useSkill(skill: Skills) {
         return () => {
             skilldexWindow.close()
+            if (!skillRequiresTarget(skill)) {
+                // Passive Skilldex skills (Sneak) apply immediately.
+                useSkilldexSkill(skill)
+                return
+            }
             globalState.uiMode = UIMode.useSkill
             globalState.skillMode = skill
             console.log('[UI] Using skill:', skill)
@@ -84,8 +92,10 @@ function initSkilldex() {
         368
     )
         .add(new Label(65, 13, 'Skilldex'))
-        .add(new Label(25, 85, 'Lockpick').onClick(useSkill(Skills.Lockpick)))
-        .add(new Label(25, 300, 'Repair').onClick(useSkill(Skills.Repair)))
+
+    for (const entry of SKILLDEX_ENTRIES) {
+        skilldexWindow.add(new Label(25, entry.labelY, entry.label).onClick(useSkill(entry.skill)))
+    }
 
     lazyLoadImage(skilldexWindow.background, () => globalState.renderer.addWindow(skilldexWindow))
 }
@@ -429,6 +439,15 @@ export function initUI() {
     $id('endContainer').addEventListener('webkitAnimationIteration', uiEndCombatAnimationDone)
 
     $id('skilldexButton').onclick = () => {
+        if (Config.ui.forceUI2OnlyGameplayPanels && globalState.uiManager) {
+            EventBus.emit('ui:openPanel', { panelName: 'skilldex' })
+            return
+        }
+        // Prefer UI2 Skilldex when available; fall back to legacy window.
+        if (globalState.uiManager) {
+            EventBus.emit('ui:openPanel', { panelName: 'skilldex' })
+            return
+        }
         skilldexWindow.toggle()
     }
 
@@ -1344,6 +1363,8 @@ export function uiCloseWorldMap() {
 
 export function uiWorldMap(onAreaMap = false) {
     assertNoLegacyGameplayPanelFallback('worldMap', 'uiWorldMap')
+    // P1-6: park Highwayman at current town position when opening world map.
+    parkCarAtPlayer()
     globalState.uiMode = UIMode.worldMap
     show($id('worldMapContainer'))
 

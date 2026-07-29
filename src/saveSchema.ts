@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 20
+export const SAVE_VERSION = 26
 
 export interface SaveGame {
     id?: number
@@ -297,6 +297,71 @@ export interface SaveGame {
      */
     partyMembersHp?: Record<string, number>
 
+    /**
+     * Party combat-control / follow state keyed by member PID string (added in v21).
+     * Waiting, distance, disposition, and companion level-tier progress.
+     */
+    partyControls?: Record<string, {
+        waiting: boolean
+        distance: string
+        disposition: string
+        attackWho: string
+        bestWeapon: string
+        areaAttackMode: string
+        chemUse: string
+        runAwayMode: string
+        levelIndex: number
+        appliedLevelPid: number
+    }>
+
+    /**
+     * Active drug / addiction clocks (added in v22 / Slice F+G).
+     * SPECIAL deltas are already in Critter stats; this restores expiry + addiction flags.
+     */
+    timedEffects?: {
+        player?: {
+            effects: Array<{
+                drugId: string
+                expiresAt: number
+                appliedMods: Record<string, number>
+                radResistBonus: number
+            }>
+            addictions: Array<{ drugId: string; withdrawing: boolean }>
+            withdrawalApplied: string[]
+        }
+        members?: Record<string, {
+            effects: Array<{
+                drugId: string
+                expiresAt: number
+                appliedMods: Record<string, number>
+                radResistBonus: number
+            }>
+            addictions: Array<{ drugId: string; withdrawing: boolean }>
+            withdrawalApplied: string[]
+        }>
+    }
+
+    /**
+     * Local automap fog-of-war: mapName|elevation → visited tile numbers (v23).
+     */
+    automap?: Record<string, number[]>
+
+    /**
+     * True when the player owns the Highwayman (v24+ / P1-6 stub).
+     * Empty tank still counts as owned once acquired.
+     */
+    hasCar?: boolean
+
+    /**
+     * Highwayman trunk inventory (v25+ / P1-6).
+     */
+    carTrunk?: SerializedObj[]
+
+    /**
+     * Highwayman parking spot on a local map (v26+ / P1-6).
+     */
+    carPark?: { mapName: string; x: number; y: number; elevation: number } | null
+
     player: {
         position: Point
         orientation: number
@@ -478,6 +543,38 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // set here) — the load path treats undefined as "use stat default".
             save.version = 20
             // falls through
+        case 20:
+            // v20 → v21: party combat-control / follow state (Slice G / P1-3).
+            if (save.partyControls === undefined) {save.partyControls = {}}
+            save.version = 21
+            // falls through
+        case 21:
+            // v21 → v22: timed drug / addiction clocks (Slice F persist).
+            if (save.timedEffects === undefined) {save.timedEffects = {}}
+            save.version = 22
+            // falls through
+        case 22:
+            // v22 → v23: local automap visited tiles (P1-11).
+            if (save.automap === undefined) {save.automap = {}}
+            save.version = 23
+            // falls through
+        case 23:
+            // v23 → v24: Highwayman ownership flag (P1-6).
+            if (save.hasCar === undefined) {
+                save.hasCar = typeof save.carFuel === 'number' && save.carFuel > 0
+            }
+            save.version = 24
+            // falls through
+        case 24:
+            // v24 → v25: Highwayman trunk inventory (P1-6).
+            if (save.carTrunk === undefined) {save.carTrunk = []}
+            save.version = 25
+            // falls through
+        case 25:
+            // v25 → v26: Highwayman parking spot (P1-6).
+            if (save.carPark === undefined) {save.carPark = null}
+            save.version = 26
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -569,6 +666,57 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // Normalize partyMembersHp (BLK-138): must be a string→number record with
     // non-negative integer values.  Invalid entries are silently dropped.
     save.partyMembersHp = sanitizeStringNumericRecord(save.partyMembersHp)
+    // Normalize partyControls (v21): keep only object-valued entries keyed by pid string.
+    if (!save.partyControls || typeof save.partyControls !== 'object' || Array.isArray(save.partyControls)) {
+        save.partyControls = {}
+    } else {
+        const cleaned: Record<string, any> = {}
+        for (const [k, v] of Object.entries(save.partyControls)) {
+            if (v && typeof v === 'object' && !Array.isArray(v)) cleaned[k] = v
+        }
+        save.partyControls = cleaned
+    }
+    if (!save.timedEffects || typeof save.timedEffects !== 'object' || Array.isArray(save.timedEffects)) {
+        save.timedEffects = {}
+    }
+    if (!save.automap || typeof save.automap !== 'object' || Array.isArray(save.automap)) {
+        save.automap = {}
+    } else {
+        const cleaned: Record<string, number[]> = {}
+        for (const [k, v] of Object.entries(save.automap)) {
+            if (Array.isArray(v)) {
+                cleaned[k] = v.filter((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0).map((n) => n | 0)
+            }
+        }
+        save.automap = cleaned
+    }
+    save.hasCar = save.hasCar === true
+    if (!Array.isArray(save.carTrunk)) {
+        save.carTrunk = []
+    }
+    if (save.carPark !== null && save.carPark !== undefined) {
+        if (typeof save.carPark !== 'object' || Array.isArray(save.carPark)) {
+            save.carPark = null
+        } else {
+            const p = save.carPark as any
+            if (typeof p.mapName !== 'string' ||
+                typeof p.x !== 'number' || !Number.isFinite(p.x) ||
+                typeof p.y !== 'number' || !Number.isFinite(p.y)) {
+                save.carPark = null
+            } else {
+                save.carPark = {
+                    mapName: String(p.mapName).toLowerCase(),
+                    x: Math.floor(p.x),
+                    y: Math.floor(p.y),
+                    elevation: typeof p.elevation === 'number' && Number.isFinite(p.elevation)
+                        ? Math.max(0, Math.floor(p.elevation))
+                        : 0,
+                }
+            }
+        }
+    } else {
+        save.carPark = null
+    }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {

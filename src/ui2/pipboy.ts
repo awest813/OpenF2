@@ -17,12 +17,41 @@ import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, 
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { QuestLog, QuestState } from '../quest/questLog.js'
+import { syncPlayerEntityFromCritter } from '../playerProjection.js'
+import {
+    readPlayerRadiationLevel,
+    readPlayerPoisonLevel,
+    radiationBand,
+} from '../character/radiationPoison.js'
+import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
+import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
+import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
+import { openCompanionTrade } from '../partyTrade.js'
+import { canOpenCarTrunk, openCarTrunk, getCarTrunk, hasCar, getCarFuel } from '../car.js'
+import { Critter } from '../object.js'
+import { buildPipBoyMapData, markPlayerExplored } from '../character/automap.js'
+import {
+    karmaTitle,
+    currentTownStanding,
+    listActiveReputationFlags,
+} from '../quest/townReputation.js'
+import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type PipBoyTab = 'status' | 'items' | 'map' | 'quests'
+type PipBoyTab = 'status' | 'items' | 'map' | 'quests' | 'rest' | 'data'
+
+const PIPBOY_TABS: PipBoyTab[] = ['status', 'items', 'map', 'quests', 'rest', 'data']
+const PIPBOY_TAB_LABEL: Record<PipBoyTab, string> = {
+    status: 'STAT',
+    items: 'INV',
+    map: 'MAP',
+    quests: 'QST',
+    rest: 'REST',
+    data: 'DATA',
+}
 
 /** Minimal map cell for the local-area grid display. */
 export interface PipBoyMapCell {
@@ -61,6 +90,18 @@ export class PipBoyPanel extends UIPanel {
     private _itemScrollOffset = 0
     /** Scroll offset (in rows) for the QUESTS tab. */
     private _questScrollOffset = 0
+    /** Last rest outcome message for the REST tab. */
+    private _restMessage = ''
+    /** Selected holodisk id on the DATA tab. */
+    private _selectedHolodiskId: string | null = null
+    /** Hit regions for REST duration buttons (content-local coords). */
+    private _restButtons: Array<{ x: number; y: number; w: number; h: number; hours: number }> = []
+    /** Hit regions for holodisk list rows. */
+    private _holodiskRows: Array<{ y: number; h: number; id: string }> = []
+    /** Hit regions for party trade rows on the DATA tab. */
+    private _partyTradeRows: Array<{ y: number; h: number; member: Critter }> = []
+    /** Hit region for Highwayman trunk on the DATA tab. */
+    private _carTrunkRow: { y: number; h: number } | null = null
 
     constructor(
         screenWidth: number,
@@ -96,7 +137,7 @@ export class PipBoyPanel extends UIPanel {
         drawCenteredText(ctx, 'PIP-BOY 2000', width / 2, 19, FALLOUT_GREEN, 'bold 14px monospace')
 
         // Tabs
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const tabW = Math.floor(width / tabs.length)
         for (let i = 0; i < tabs.length; i++) {
             const tab = tabs[i]
@@ -104,10 +145,10 @@ export class PipBoyPanel extends UIPanel {
             const active = tab === this.activeTab
             fillRect(ctx, tx, 30, tabW, 22, active ? FALLOUT_GREEN : { r: 0, g: 40, b: 0, a: 255 })
             strokeRect(ctx, tx, 30, tabW, 22, FALLOUT_GREEN, 1)
-            ctx.font = '10px monospace'
+            ctx.font = '9px monospace'
             ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
             ctx.textAlign = 'center'
-            ctx.fillText(tab.toUpperCase(), tx + tabW / 2, 45)
+            ctx.fillText(PIPBOY_TAB_LABEL[tab], tx + tabW / 2, 45)
         }
         ctx.textAlign = 'left'
 
@@ -122,6 +163,8 @@ export class PipBoyPanel extends UIPanel {
             case 'items':  this._renderItems(ctx);  break
             case 'map':    this._renderMap(ctx);    break
             case 'quests': this._renderQuests(ctx); break
+            case 'rest':   this._renderRest(ctx);   break
+            case 'data':   this._renderData(ctx);   break
         }
         ctx.restore()
 
@@ -136,6 +179,8 @@ export class PipBoyPanel extends UIPanel {
     // ── Status tab ─────────────────────────────────────────────────────────
 
     private _renderStatus(ctx: OffscreenCanvasRenderingContext2D): void {
+        // Keep Pip-Boy vitals aligned with the live Critter (P0-2 / Slice B).
+        syncPlayerEntityFromCritter()
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         if (!stats) {
             drawText(ctx, 'No stats available.', 10, 20, FALLOUT_DARK_GRAY)
@@ -159,6 +204,63 @@ export class PipBoyPanel extends UIPanel {
         drawStat(ctx, 'Damage',    `${stats.damageResistance}%`,    16, y, FALLOUT_GREEN); y += 16
         drawStat(ctx, 'Radiation', `${stats.radiationResistance}%`, 16, y, FALLOUT_GREEN); y += 16
         drawStat(ctx, 'Poison',    `${stats.poisonResistance}%`,    16, y, FALLOUT_GREEN); y += 16
+
+        y += 8
+
+        // ── Exposure (Critter levels — P1-4) ──────────
+        const radLevel = readPlayerRadiationLevel()
+        const poisonLevel = readPlayerPoisonLevel()
+        drawLabel(ctx, 'EXPOSURE', 10, y); y += 18
+        const radColor = radLevel >= 300 ? FALLOUT_RED : radLevel >= 150 ? FALLOUT_AMBER : FALLOUT_GREEN
+        drawStat(ctx, 'Rad Level', `${radLevel} (${radiationBand(radLevel)})`, 16, y, radColor); y += 16
+        const poiColor = poisonLevel > 0 ? FALLOUT_AMBER : FALLOUT_GREEN
+        drawStat(ctx, 'Poison Level', String(poisonLevel), 16, y, poiColor); y += 16
+
+        const player = globalState.player as object | null
+        if (player) {
+            const effects = getActiveEffects(player)
+            const addicts = getAddictions(player)
+            if (effects.length > 0 || addicts.length > 0) {
+                y += 8
+                drawLabel(ctx, 'CHEMS', 10, y); y += 18
+                if (effects.length > 0) {
+                    drawStat(ctx, 'Active', effects.map((e) => e.drugId).join(', '), 16, y, FALLOUT_GREEN)
+                    y += 16
+                }
+                if (addicts.length > 0) {
+                    const labels = addicts.map((a) => a.withdrawing ? `${a.drugId} (wd)` : a.drugId)
+                    drawStat(ctx, 'Addiction', labels.join(', '), 16, y, FALLOUT_AMBER)
+                    y += 16
+                }
+            }
+        }
+
+        y += 8
+
+        // ── Reputation (P1-7) ─────────────────────────
+        const rep = globalState.reputation
+        if (rep) {
+            drawLabel(ctx, 'REPUTATION', 10, y); y += 18
+            const title = karmaTitle(rep.getKarma())
+            drawStat(ctx, 'Karma', `${rep.getKarma()} (${title})`, 16, y, FALLOUT_GREEN); y += 16
+            const standing = currentTownStanding(rep, (globalState.gMap as any)?.name)
+            if (standing) {
+                drawStat(
+                    ctx,
+                    standing.displayName,
+                    `${standing.tier} (${standing.value})`,
+                    16,
+                    y,
+                    standing.value < 0 ? FALLOUT_AMBER : FALLOUT_GREEN
+                )
+                y += 16
+            }
+            const flags = listActiveReputationFlags(rep)
+            if (flags.length > 0) {
+                drawStat(ctx, 'Flags', flags.join(', '), 16, y, FALLOUT_AMBER)
+                y += 16
+            }
+        }
 
         y += 8
 
@@ -220,6 +322,11 @@ export class PipBoyPanel extends UIPanel {
     // ── Map tab ────────────────────────────────────────────────────────────
 
     private _renderMap(ctx: OffscreenCanvasRenderingContext2D): void {
+        // Refresh from live automap each paint so exploration stays current.
+        markPlayerExplored(1)
+        const live = buildPipBoyMapData(40)
+        if (live) this.mapData = live
+
         if (!this.mapData) {
             drawText(ctx, 'No map data loaded.', 10, 24, FALLOUT_DARK_GRAY)
             drawText(ctx, 'Explore to reveal the map.', 10, 42, FALLOUT_DARK_GRAY)
@@ -323,18 +430,168 @@ export class PipBoyPanel extends UIPanel {
         }
     }
 
+    // ── Rest tab (alarm clock) ─────────────────────────────────────────────
+
+    private _renderRest(ctx: OffscreenCanvasRenderingContext2D): void {
+        this._restButtons = []
+        let y = 18
+        drawLabel(ctx, 'ALARM CLOCK', 10, y); y += 18
+        drawText(ctx, 'Rest to advance game time and heal.', 16, y, FALLOUT_DARK_GRAY); y += 20
+
+        if (!canRest()) {
+            drawText(ctx, globalState.inCombat ? 'Cannot rest during combat.' : 'No player.', 16, y, FALLOUT_RED)
+            y += 20
+        }
+
+        const durations = [1, 3, 6, 12, 24]
+        const btnW = 56
+        const btnH = 22
+        let x = 16
+        for (const hours of durations) {
+            this._restButtons.push({ x, y, w: btnW, h: btnH, hours })
+            fillRect(ctx, x, y, btnW, btnH, { r: 0, g: 50, b: 0, a: 255 })
+            strokeRect(ctx, x, y, btnW, btnH, FALLOUT_GREEN, 1)
+            drawCenteredText(ctx, `${hours}h`, x + btnW / 2, y + 15, FALLOUT_GREEN, '11px monospace')
+            x += btnW + 8
+        }
+        y += btnH + 16
+
+        if (this._restMessage) {
+            drawText(ctx, this._restMessage, 16, y, FALLOUT_AMBER)
+        }
+    }
+
+    // ── Data / holodisk archives ───────────────────────────────────────────
+
+    private _renderData(ctx: OffscreenCanvasRenderingContext2D): void {
+        this._holodiskRows = []
+        this._partyTradeRows = []
+        this._carTrunkRow = null
+        let y = 18
+
+        // Party trade (P1-3)
+        drawLabel(ctx, 'PARTY', 10, y); y += 18
+        const members = globalState.gParty?.getPartyMembers?.() ?? []
+        if (members.length === 0) {
+            drawText(ctx, 'No companions.', 16, y, FALLOUT_DARK_GRAY); y += 16
+        } else {
+            for (const member of members) {
+                if ((member as Critter).dead) continue
+                const rowH = 16
+                this._partyTradeRows.push({ y, h: rowH, member: member as Critter })
+                const waiting = globalState.gParty.getControl?.(member as Critter)?.waiting
+                const label = `${member.name || 'Companion'}${waiting ? ' (waiting)' : ''} — trade`
+                drawText(ctx, label, 16, y + 12, FALLOUT_GREEN)
+                y += rowH
+            }
+        }
+
+        y += 12
+        // Highwayman trunk (P1-6)
+        drawLabel(ctx, 'VEHICLE', 10, y); y += 18
+        if (hasCar()) {
+            const rowH = 16
+            this._carTrunkRow = { y, h: rowH }
+            const n = getCarTrunk().length
+            const fuel = getCarFuel()
+            drawText(ctx, `Highwayman trunk (${n} items, fuel ${fuel}) — open`, 16, y + 12, FALLOUT_GREEN)
+            y += rowH
+        } else {
+            drawText(ctx, 'No vehicle.', 16, y, FALLOUT_DARK_GRAY); y += 16
+        }
+
+        y += 12
+        drawLabel(ctx, 'ARCHIVES', 10, y); y += 18
+        const disks = getHolodisks()
+        if (disks.length === 0) {
+            drawText(ctx, 'No holodisks in archive.', 16, y, FALLOUT_DARK_GRAY)
+            return
+        }
+
+        for (const disk of disks) {
+            const rowH = 16
+            this._holodiskRows.push({ y, h: rowH, id: disk.id })
+            const selected = disk.id === this._selectedHolodiskId
+            const color = selected ? FALLOUT_AMBER : disk.read ? FALLOUT_GREEN : FALLOUT_AMBER
+            drawText(ctx, `${disk.read ? ' ' : '*'} ${disk.title}`, 16, y + 12, color)
+            y += rowH
+        }
+
+        y += 12
+        const selected = disks.find((d) => d.id === this._selectedHolodiskId) ?? disks[0]
+        if (selected) {
+            drawLabel(ctx, selected.title.toUpperCase(), 10, y); y += 18
+            const lines = selected.body.split('\n')
+            for (const line of lines) {
+                drawText(ctx, line, 16, y, FALLOUT_GREEN, '10px monospace')
+                y += 14
+                if (y > this.bounds.height - 80) break
+            }
+        }
+    }
+
+    private _doRest(hours: number): void {
+        const result: TimeAdvanceResult = restForHours(hours)
+        if (result.refusedReason === 'combat') {
+            this._restMessage = 'Cannot rest during combat.'
+            return
+        }
+        if (result.refusedReason) {
+            this._restMessage = 'Rest failed.'
+            return
+        }
+        this._restMessage = result.interrupted
+            ? `Rest interrupted after ${result.hoursCompleted ?? 0}h! Healed ${result.hpHealed} HP.`
+            : `Rested ${hours}h. Healed ${result.hpHealed} HP.` +
+              (result.eventsFired ? ` (${result.eventsFired} timed events)` : '')
+    }
+
     // ── Input handling ─────────────────────────────────────────────────────
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
         const { width } = this.bounds
         // Tab hit detection
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const tabW = Math.floor(width / tabs.length)
         if (y >= 30 && y < 52) {
             const idx = Math.floor(x / tabW)
             if (idx >= 0 && idx < tabs.length) {
                 this._switchTab(tabs[idx])
                 return true
+            }
+        }
+
+        // Content is translated by +56 in render
+        const contentY = y - 56
+        if (this.activeTab === 'rest' && contentY >= 0) {
+            for (const btn of this._restButtons) {
+                if (x >= btn.x && x < btn.x + btn.w && contentY >= btn.y && contentY < btn.y + btn.h) {
+                    this._doRest(btn.hours)
+                    return true
+                }
+            }
+        }
+        if (this.activeTab === 'data' && contentY >= 0) {
+            for (const row of this._partyTradeRows) {
+                if (contentY >= row.y && contentY < row.y + row.h) {
+                    this.hide()
+                    openCompanionTrade(row.member)
+                    return true
+                }
+            }
+            if (this._carTrunkRow && contentY >= this._carTrunkRow.y && contentY < this._carTrunkRow.y + this._carTrunkRow.h) {
+                if (canOpenCarTrunk()) {
+                    this.hide()
+                    openCarTrunk()
+                }
+                return true
+            }
+            for (const row of this._holodiskRows) {
+                if (contentY >= row.y && contentY < row.y + row.h) {
+                    this._selectedHolodiskId = row.id
+                    markHolodiskRead(row.id)
+                    return true
+                }
             }
         }
         return true  // consume all clicks
@@ -346,7 +603,7 @@ export class PipBoyPanel extends UIPanel {
             return true
         }
         // Tab cycling
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const idx = tabs.indexOf(this.activeTab)
         if (key === 'ArrowRight' || key === 'Tab') {
             this._switchTab(tabs[(idx + 1) % tabs.length])
@@ -366,6 +623,12 @@ export class PipBoyPanel extends UIPanel {
             if (this.activeTab === 'items') {this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)}
             else if (this.activeTab === 'quests') {this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)}
             return true
+        }
+        // Rest shortcuts 1/3/6
+        if (this.activeTab === 'rest') {
+            if (key === '1') { this._doRest(1); return true }
+            if (key === '3') { this._doRest(3); return true }
+            if (key === '6') { this._doRest(6); return true }
         }
         return false
     }

@@ -6,9 +6,17 @@
  *   - `id`         : unique key (opcode hex or procedure name)
  *   - `kind`       : 'opcode' | 'procedure' | 'metarule'
  *   - `description`: human-readable explanation
- *   - `status`     : 'stub' | 'partial' | 'implemented'
+ *   - `status`     : 'stub' | 'partial' | 'safe_stub' | 'implemented'
  *   - `frequency`  : rough call frequency from Fallout 2 data ('high'|'medium'|'low')
  *   - `impact`     : progression impact if missing ('blocker'|'high'|'medium'|'low')
+ *
+ * Status vocabulary:
+ *   - `implemented` — behaviorally complete for campaign use
+ *   - `partial`     — real behavior for some inputs/paths; incomplete elsewhere
+ *   - `safe_stub`   — intentionally no-op / constant return that will not crash,
+ *                     but is not behaviorally faithful (was previously marked
+ *                     `implemented`, which hid fidelity gaps — see P3-2)
+ *   - `stub`        — missing / unsupported; may hit `recordStubHit`
  *
  * Runtime instrumentation is provided via `recordStubHit` / `drainStubHits`.
  * These are automatically called by the `stub()` helper in scripting.ts.
@@ -19,7 +27,7 @@
 // Checklist entries
 // ---------------------------------------------------------------------------
 
-export type StubStatus = 'stub' | 'partial' | 'implemented'
+export type StubStatus = 'stub' | 'partial' | 'safe_stub' | 'implemented'
 export type StubFrequency = 'high' | 'medium' | 'low'
 export type StubImpact = 'blocker' | 'high' | 'medium' | 'low'
 
@@ -566,7 +574,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'play_gmovie',
         kind: 'procedure',
         description: 'play_gmovie(id): play an FMV cut-scene by ID. Logged but skipped (no FMV pipeline in browser build).',
-        status: 'implemented',
+        status: 'safe_stub',
         frequency: 'medium',
         impact: 'low',
     },
@@ -635,7 +643,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_107',
         kind: 'metarule',
         description: 'METARULE3_TILE_VISIBLE(107): returns 1 if the given tile is currently visible. Always 1 — no fog-of-war system yet (partial).',
-        status: 'implemented',
+        status: 'partial',
         frequency: 'low',
         impact: 'low',
     },
@@ -684,7 +692,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x817F: set_global_script_repeat(ms) — set the repeat interval for the global map script in milliseconds. No-op — no global script ticker in browser build.',
-        status: 'implemented',
+        status: 'safe_stub',
         frequency: 'low',
         impact: 'low',
     },
@@ -774,7 +782,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_102',
         kind: 'metarule',
         description: 'METARULE3_CHECK_WALKING_ALLOWED(102): 1 if movement is allowed at the given tile. No path-blocking registry in VM; always returns 1 (partial).',
-        status: 'implemented',
+        status: 'partial',
         frequency: 'low',
         impact: 'low',
     },
@@ -1440,10 +1448,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'set_tile_fid',
         kind: 'opcode',
         description:
-            'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art. ' +
-            'No-op: the browser renderer does not support runtime tile art patching.  ' +
-            'This is a fundamental rendering architecture limitation.',
-        status: 'implemented',
+            'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art ' +
+            'name in the live map floor grid (get_tile_fid round-trips). Renderer texture ' +
+            're-upload may lag until map refresh — partial visual parity.',
+        status: 'partial',
         frequency: 'medium',
         impact: 'low',
     },
@@ -3820,9 +3828,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81EF: set_tile_fid_sfall(tile, elev, fid) — override the floor-tile ' +
-            'FID at the given position.  Logs the call as a safe no-op — the browser ' +
-            'renderer does not support runtime tile art patching.',
-        status: 'implemented',
+            'FID at the given position. Patches the live map floor grid (same as 0x8195); ' +
+            'renderer texture re-upload may lag — partial visual parity.',
+        status: 'partial',
         frequency: 'low',
         impact: 'low',
     },
@@ -9415,8 +9423,20 @@ export function stubHitCount(): number {
  *
  * Useful for CI dashboards and progress tracking.
  */
-export function stubChecklistSummary(): { stub: number; partial: number; implemented: number } {
-    const summary = { stub: 0, partial: 0, implemented: 0 }
-    for (const entry of SCRIPTING_STUB_CHECKLIST) {summary[entry.status]++}
+export function stubChecklistSummary(): {
+    stub: number
+    partial: number
+    safe_stub: number
+    implemented: number
+} {
+    const summary = { stub: 0, partial: 0, safe_stub: 0, implemented: 0 }
+    for (const entry of SCRIPTING_STUB_CHECKLIST) {
+        summary[entry.status]++
+    }
     return summary
+}
+
+/** True when an entry has real campaign behavior (not a deliberate no-op). */
+export function isBehaviorallyComplete(status: StubStatus): boolean {
+    return status === 'implemented'
 }

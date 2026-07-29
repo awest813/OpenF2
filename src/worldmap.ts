@@ -26,6 +26,7 @@ import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js
 import { Config } from './config.js'
 import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
 import { applyEncounterCritterLoadout } from './encounterLoadout.js'
+import { burnCarFuelOnTravel, worldmapTravelSpeed } from './car.js'
 
 // World Map system
 
@@ -831,7 +832,10 @@ export namespace Worldmap {
                 return
             }
             const currentSquare = worldmap.squares[squarePos.x][squarePos.y]
-            const speed = WORLDMAP_SPEED / worldmap.terrainSpeed[currentSquare.terrainType]
+            let speed = WORLDMAP_SPEED / worldmap.terrainSpeed[currentSquare.terrainType]
+            // P1-6: Highwayman speed bonus + fuel burn while travelling.
+            speed = worldmapTravelSpeed(speed)
+            burnCarFuelOnTravel()
 
             if (len < speed) {
                 const destination = clampPointToWorldBounds(worldmapPlayer.target)

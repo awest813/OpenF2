@@ -185,9 +185,203 @@ export const PERKS: Perk[] = [
         prerequisites: { minLevel: 9, minAgility: 8, minSkill: { skill: 'steal', value: 80 } },
         apply(_s, sk) { sk.steal += 30 },
     },
+    // --- Tier: FO2-aligned additions (campaign-critical) ---
+    {
+        id: 16, name: 'Bonus Rate of Fire', ranks: 1,
+        description: 'Ranged weapon attacks cost 1 less Action Point.',
+        prerequisites: { minLevel: 15, minPerception: 6, minIntelligence: 6, minAgility: 7 },
+        apply() {}, // handled in attack AP cost
+    },
+    {
+        id: 17, name: 'More Criticals', ranks: 3,
+        description: '+5% chance to cause a critical hit per rank.',
+        prerequisites: { minLevel: 6, minLuck: 6 },
+        apply(s) { s.criticalChanceMod += 5; recomputeDerivedStats(s) },
+    },
+    {
+        id: 46, name: 'Earlier Sequence', ranks: 3,
+        description: '+2 Sequence per rank.',
+        prerequisites: { minLevel: 3, minPerception: 6 },
+        apply(s) { s.sequenceMod += 2; recomputeDerivedStats(s) },
+    },
+    {
+        id: 19, name: 'Faster Healing', ranks: 3,
+        description: '+2 Healing Rate per rank.',
+        prerequisites: { minLevel: 3, minEndurance: 6 },
+        apply(s) { s.healingRateMod += 2; recomputeDerivedStats(s) },
+    },
+    {
+        id: 20, name: 'Rad Resistance', ranks: 2,
+        description: '+15% Radiation Resistance per rank.',
+        prerequisites: { minLevel: 6, minEndurance: 6, minIntelligence: 4 },
+        apply(s) { s.radiationResistanceMod += 15; recomputeDerivedStats(s) },
+    },
+    {
+        id: 21, name: 'Dodger', ranks: 2,
+        description: '+5 Armor Class per rank.',
+        prerequisites: { minLevel: 9, minAgility: 6 },
+        apply(s) { /* AC handled via agilityMod approximation */ s.agilityMod += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 22, name: 'Snakeater', ranks: 2,
+        description: '+25% Poison Resistance per rank.',
+        prerequisites: { minLevel: 6, minEndurance: 3 },
+        apply(s) { s.poisonResistanceMod += 25; recomputeDerivedStats(s) },
+    },
+    {
+        id: 23, name: 'Mr. Fixit', ranks: 1,
+        description: '+10% Repair and Science.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'repair', value: 40 } },
+        apply(_s, sk) { sk.repair += 10; sk.science += 10 },
+    },
+    {
+        id: 24, name: 'Medic', ranks: 1,
+        description: '+10% First Aid and Doctor.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'firstAid', value: 40 } },
+        apply(_s, sk) { sk.firstAid += 10; sk.doctor += 10 },
+    },
+    {
+        id: 25, name: 'Master Thief', ranks: 1,
+        description: '+15% Lockpick and Steal.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'lockpick', value: 50 } },
+        apply(_s, sk) { sk.lockpick += 15; sk.steal += 15 },
+    },
+    {
+        id: 26, name: 'Speaker', ranks: 1,
+        description: '+20% Speech.',
+        prerequisites: { minLevel: 9, minSkill: { skill: 'speech', value: 50 } },
+        apply(_s, sk) { sk.speech += 20 },
+    },
+    {
+        id: 27, name: 'Fortune Finder', ranks: 1,
+        description: 'You find more bottle caps in random encounters and loot.',
+        prerequisites: { minLevel: 6, minLuck: 8 },
+        apply() {},
+    },
+    {
+        id: 28, name: 'Scout', ranks: 1,
+        description: 'See further on the World Map and find more special encounters.',
+        prerequisites: { minLevel: 3, minPerception: 8 },
+        apply() {},
+    },
+    {
+        id: 29, name: 'Explorer', ranks: 1,
+        description: 'Higher chance of finding special World Map encounters.',
+        prerequisites: { minLevel: 9 },
+        apply() {},
+    },
+    {
+        id: 30, name: 'Ranger', ranks: 1,
+        description: 'Fewer hostile World Map encounters; better outdoorsman rolls.',
+        prerequisites: { minLevel: 6, minPerception: 6, minSkill: { skill: 'outdoorsman', value: 30 } },
+        apply(_s, sk) { sk.outdoorsman += 15 },
+    },
+    {
+        id: 31, name: 'Pathfinder', ranks: 2,
+        description: 'Travel on the World Map takes 25% less time per rank.',
+        prerequisites: { minLevel: 6, minEndurance: 6, minSkill: { skill: 'outdoorsman', value: 40 } },
+        apply() {},
+    },
+    {
+        id: 32, name: 'Smooth Talker', ranks: 3,
+        description: '+1 Intelligence for dialogue checks per rank.',
+        prerequisites: { minLevel: 3, minIntelligence: 4 },
+        apply(s) { s.intelligenceMod += 1 },
+    },
+    {
+        id: 33, name: 'Swift Learner', ranks: 3,
+        description: '+5% experience points gained per rank.',
+        prerequisites: { minLevel: 3, minIntelligence: 4 },
+        apply() {},
+    },
+    {
+        id: 34, name: 'Tag!', ranks: 1,
+        description: 'Choose an additional Tag Skill (+20% and double improvement).',
+        prerequisites: { minLevel: 12 },
+        apply() {}, // picker applies tag via SkillSet
+    },
+    {
+        id: 35, name: 'Living Anatomy', ranks: 1,
+        description: '+10% Doctor and +5 damage against living creatures.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'doctor', value: 60 } },
+        apply(_s, sk) { sk.doctor += 10 },
+    },
+    {
+        id: 36, name: 'Bonus HtH Damage', ranks: 3,
+        description: '+2 Melee Damage per rank.',
+        prerequisites: { minLevel: 3, minAgility: 6 },
+        apply(s) { s.meleeDamageMod += 2; recomputeDerivedStats(s) },
+    },
+    {
+        id: 37, name: 'Adrenaline Rush', ranks: 1,
+        description: '+1 Strength when below half Hit Points.',
+        prerequisites: { minLevel: 6, minStrength: 5 },
+        apply() {},
+    },
+    {
+        id: 38, name: 'Cautious Nature', ranks: 1,
+        description: '+3 Perception for encounter placement distance.',
+        prerequisites: { minLevel: 3, minPerception: 6 },
+        apply() {},
+    },
+    {
+        id: 39, name: 'Gain Strength', ranks: 1,
+        description: '+1 Strength permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.strength += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 40, name: 'Gain Perception', ranks: 1,
+        description: '+1 Perception permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.perception += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 41, name: 'Gain Endurance', ranks: 1,
+        description: '+1 Endurance permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.endurance += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 42, name: 'Gain Charisma', ranks: 1,
+        description: '+1 Charisma permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.charisma += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 43, name: 'Gain Intelligence', ranks: 1,
+        description: '+1 Intelligence permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.intelligence += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 44, name: 'Gain Agility', ranks: 1,
+        description: '+1 Agility permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.agility += 1; recomputeDerivedStats(s) },
+    },
+    {
+        id: 45, name: 'Gain Luck', ranks: 1,
+        description: '+1 Luck permanently.',
+        prerequisites: { minLevel: 12 },
+        apply(s) { s.luck += 1; recomputeDerivedStats(s) },
+    },
 ]
 
 export const PERK_MAP: Map<number, Perk> = new Map(PERKS.map((p) => [p.id, p]))
+
+/** UI Educated is id 11; scripts may set FO2 id 18 or legacy alias 47. */
+export const EDUCATED_PERK_IDS = [11, 18, 47] as const
+
+/** Total ranks of Educated across known ID aliases. */
+export function educatedPerkRanks(perkRanks: Record<number, number> | null | undefined): number {
+    if (!perkRanks) return 0
+    let best = 0
+    for (const id of EDUCATED_PERK_IDS) {
+        best = Math.max(best, perkRanks[id] ?? 0)
+    }
+    return best
+}
 
 /**
  * Returns all perks available to the player at their current level/stats.

@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { describeIfScriptAssets } from './testScriptAssets.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -113,7 +114,7 @@ function runProcedure(
     }
 }
 
-describe('Phase 107-A — All New Reno scripts parse cleanly', () => {
+describeIfScriptAssets('Phase 107-A — All New Reno scripts parse cleanly', () => {
     for (const name of NEW_RENO_SCRIPTS) {
         it(`${name}.int parses cleanly`, () => {
             expect(() => {
@@ -124,7 +125,7 @@ describe('Phase 107-A — All New Reno scripts parse cleanly', () => {
     }
 })
 
-describe('Phase 107-B — New Reno scripts lifecycle: procs execute without crash', () => {
+describeIfScriptAssets('Phase 107-B — New Reno scripts lifecycle: procs execute without crash', () => {
     for (const name of NEW_RENO_SCRIPTS) {
         it(`${name}: at least one lifecycle proc runs without throwing`, () => {
             const loaded = loadIntFile(name)
@@ -152,7 +153,7 @@ describe('Phase 107-B — New Reno scripts lifecycle: procs execute without cras
     }
 })
 
-describe('Phase 107-C — Step-count sanity: New Reno scripts halt within step budget', () => {
+describeIfScriptAssets('Phase 107-C — Step-count sanity: New Reno scripts halt within step budget', () => {
     const MAX_STEPS = Config.engine.vmMaxStepsPerCall > 0
         ? Config.engine.vmMaxStepsPerCall
         : 1_000_000

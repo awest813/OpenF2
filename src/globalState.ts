@@ -87,6 +87,8 @@ export default {
     ambientLightLevel: 65536, // Ambient light level (0 = dark, 65536 = fully lit)
     gameUIDisabled: false, // True when scripts have disabled UI interaction
     carFuel: 0, // car fuel level (sfall get/set_car_fuel_amount); persisted in save v18+
+    /** True when the player owns the Highwayman (P1-6 stub; save v24+). */
+    hasCar: false,
     /** BLK-111: true when the current map was entered via a save/load, false on first visit. */
     mapLoadedFromSave: false,
     critterKillCounts: null, // kill-type kill counts (sfall get/set_critter_kills)
@@ -191,6 +193,9 @@ export default {
      * Persisted in save schema v18+ so the car remains fueled after reloading.
      */
     carFuel: number
+
+    /** Player owns the Highwayman (Slice H / P1-6; save v24+). */
+    hasCar: boolean
 
     /**
      * BLK-111: Set to true by the save/load system whenever the current map entry

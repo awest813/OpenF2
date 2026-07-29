@@ -98,6 +98,27 @@ export interface EngineEvents {
     /** Fired after a save completes successfully. */
     'game:saveComplete': { slot: number; name: string }
 
+    // New game / character creation (Slice C / P0-1)
+    'game:newGameRequested': Record<string, never>
+    'game:characterCreated': { name: string; mapName: string }
+    'game:enterWorld': { mapName: string }
+
+    /** Pip-Boy / rest clock interrupted by a potential encounter. */
+    'rest:interrupted': { hoursCompleted: number; hoursRequested: number; danger: string }
+
+    /** Ending slideshow (P1-8). */
+    'endgame:start': { reason: number; slideCount: number; narrIds: string[] }
+    'endgame:credits': { slideCount: number }
+    'endgame:returnToMenu': Record<string, never>
+
+    /** Game movie playback (P1-9 stub). */
+    'movie:play': { movieID: number; movieId: string; title: string }
+    'movie:end': { movieID: number; movieId: string }
+
+    /** Screen fades (P2-2). */
+    'screen:fadeOut': { durationMs: number }
+    'screen:fadeIn': { durationMs: number }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

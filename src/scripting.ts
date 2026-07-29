@@ -49,7 +49,23 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
-import { PERK_MAP } from './character/perks.js'
+import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
+import { syncPlayerEntityFromCritter } from './playerProjection.js'
+import { applyDrugToCritter } from './character/timedEffects.js'
+import { advanceGameTime, bindTimedEventList } from './character/rest.js'
+import { setCarFuel, setHasCar } from './car.js'
+import {
+    syncReputationFromGvar,
+    pullReputationFromGvars,
+    GVAR_PLAYER_GOT_CAR,
+    resolveTownIdFromMapName,
+    getTownRepValue,
+    townRepTier,
+    reactionBiasForTier,
+} from './quest/townReputation.js'
+import { signalEndGame } from './endgame.js'
+import { playMovie } from './movies.js'
+import { fadeIn, fadeOut } from './fade.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -63,55 +79,43 @@ export namespace Scripting {
         try {
             let text = ''
             if (typeof window === 'undefined' || typeof XMLHttpRequest === 'undefined') {
-                // Node.js environment
+                // Node.js environment — prefer converted art export, fall back to lut fixture
+                const candidatePaths: string[] = []
                 const fs = (globalThis as any).nodeFs
                 const path = (globalThis as any).nodePath
-                if (fs && path) {
+                const req = typeof (globalThis as any).require === 'function' ? (globalThis as any).require : null
+                const fsMod = fs || (req ? req('fs') : null)
+                const pathMod = path || (req ? req('path') : null)
+                if (fsMod && pathMod) {
                     const proc = (globalThis as any).process
-                    let tilesPath = ''
                     if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
-                        tilesPath = path.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
+                        candidatePaths.push(pathMod.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst'))
+                        candidatePaths.push(pathMod.join(proc.cwd(), 'lut', 'tiles.lst'))
                     }
-                    if (!tilesPath || !fs.existsSync(tilesPath)) {
-                        const dir = typeof __dirname !== 'undefined' ? __dirname : ''
-                        if (dir) {
-                            tilesPath = path.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
-                        }
+                    const dir = typeof __dirname !== 'undefined' ? __dirname : ''
+                    if (dir) {
+                        candidatePaths.push(pathMod.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst'))
+                        candidatePaths.push(pathMod.resolve(dir, '..', 'lut', 'tiles.lst'))
                     }
-                    if (tilesPath && fs.existsSync(tilesPath)) {
-                        text = fs.readFileSync(tilesPath, 'utf8')
-                    }
-                } else {
-                    const req = (globalThis as any).require
-                    if (typeof req === 'function') {
-                        const fsReq = req('fs')
-                        const pathReq = req('path')
-                        const proc = (globalThis as any).process
-                        let tilesPath = ''
-                        if (typeof proc !== 'undefined' && typeof proc.cwd === 'function') {
-                            tilesPath = pathReq.join(proc.cwd(), 'data', 'art', 'tiles', 'tiles.lst')
-                        }
-                        if (!tilesPath || !fsReq.existsSync(tilesPath)) {
-                            const dir = typeof __dirname !== 'undefined' ? __dirname : ''
-                            if (dir) {
-                                tilesPath = pathReq.resolve(dir, '..', 'data', 'art', 'tiles', 'tiles.lst')
-                            }
-                        }
-                        if (tilesPath && fsReq.existsSync(tilesPath)) {
-                            text = fsReq.readFileSync(tilesPath, 'utf8')
+                    for (const tilesPath of candidatePaths) {
+                        if (tilesPath && fsMod.existsSync(tilesPath)) {
+                            text = fsMod.readFileSync(tilesPath, 'utf8')
+                            break
                         }
                     }
                 }
             } else {
-                // Browser environment
-                text = getFileText('data/art/tiles/tiles.lst')
+                // Browser environment — try converted art, then lut fixture
+                text = getFileText('data/art/tiles/tiles.lst') || getFileText('lut/tiles.lst') || ''
             }
             if (text) {
                 tilesList = text.split(/\r?\n/).map(line => line.trim().toLowerCase().replace(/\.frm$/, ''))
                 for (let i = 0; i < tilesList.length; i++) {
-                    if (tilesList[i]) {
-                        tilesIndexMap.set(tilesList[i], i)
+                    // Skip blanks and comment lines so fixtures can document indices.
+                    if (!tilesList[i] || tilesList[i].startsWith('#')) {
+                        continue
                     }
+                    tilesIndexMap.set(tilesList[i], i)
                 }
             }
         } catch (e) {
@@ -156,6 +160,41 @@ export namespace Scripting {
         return 0x04000000 | index
     }
 
+    /** Patch the live map floor name from an FID (script-visible; renderer may lag). */
+    function setTileFID(tile: number, elevation: number, fid: number): void {
+        if (!isValidTileNum(tile)) {
+            return
+        }
+        if (typeof fid !== 'number' || !Number.isFinite(fid)) {
+            return
+        }
+        const map = globalState.gMap
+        if (!map || !map.mapObj || elevation < 0 || elevation >= map.numLevels) {
+            return
+        }
+        const level = map.mapObj.levels[elevation]
+        if (!level || !level.tiles || !level.tiles.floor) {
+            return
+        }
+        const hexPos = fromTileNum(tile)
+        const tilePos = hexToTile(hexPos)
+        const floor = level.tiles.floor
+        if (tilePos.y < 0 || tilePos.y >= floor.length) {
+            return
+        }
+        const row = floor[tilePos.y]
+        if (!row || tilePos.x < 0 || tilePos.x >= row.length) {
+            return
+        }
+        loadTilesList()
+        const index = fid & 0xffff
+        const name = tilesList[index]
+        if (!name || name.startsWith('#')) {
+            return
+        }
+        row[tilePos.x] = name
+    }
+
     export function setUseElevatorHandler(handler: () => void): void {
         useElevatorHandler = handler
     }
@@ -170,6 +209,7 @@ export namespace Scripting {
     const globalVars: any = {
         0: 0, // GVAR_PLAYER_REPUTATION (karma) — start at neutral to match Reputation
         //10: 1, // GVAR_START_ARROYO_TRIAL (1 = TRIAL_FIGHT)
+        47: 50, // GVAR_TOWN_REP_ARROYO — FO2 default Idolized
         531: 1, // GVAR_TALKED_TO_ELDER
         452: 2, // GVAR_DEN_VIC_KNOWN
         88: 0, // GVAR_VAULT_RAIDERS
@@ -497,6 +537,14 @@ export namespace Scripting {
             if (gvar === 0 && globalState.reputation) {
                 globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
             }
+            syncReputationFromGvar(globalState.reputation, gvar, value)
+            if (gvar === GVAR_PLAYER_GOT_CAR) {
+                setHasCar(typeof value === 'number' ? value !== 0 : !!value)
+            }
+        }
+        // Ensure Reputation town/flag mirrors match the full GVAR table after bulk load.
+        if (globalState.reputation) {
+            pullReputationFromGvars(globalState.reputation, globalVars)
         }
     }
 
@@ -826,6 +874,11 @@ export namespace Scripting {
             if (gvar === 0 && globalState.reputation) {
                 globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
             }
+            syncReputationFromGvar(globalState.reputation, gvar, value)
+            // GVAR_PLAYER_GOT_CAR (18) — Highwayman ownership flag.
+            if (gvar === GVAR_PLAYER_GOT_CAR) {
+                setHasCar(typeof value === 'number' ? value !== 0 : !!value)
+            }
             info('set_global_var: ' + gvar + ' = ' + value, 'gvars')
             log('set_global_var', arguments, 'gvars')
         }
@@ -1051,10 +1104,12 @@ export namespace Scripting {
                 // Additional metarule IDs — de-stubbed with safe defaults
                 // -----------------------------------------------------------------------
                 case 1:
-                    // METARULE_SIGNAL_END_GAME: trigger end-game sequence for given reason.
-                    // Browser build has no end-game cinematic pipeline; treat as no-op.
-                    log('metarule', arguments)
-                    return 0
+                    // METARULE_SIGNAL_END_GAME: trigger end-game slideshow (P1-8).
+                    {
+                        const reason = typeof target === 'number' && Number.isFinite(target) ? target : 0
+                        signalEndGame(reason, globalVars, { play: true })
+                        return 0
+                    }
                 case 2:
                     // METARULE_TIMER_FIRED: 1 if the timed event for `target` has elapsed.
                     // Without a running timer-fired table, default to 0 (not fired).
@@ -1068,10 +1123,12 @@ export namespace Scripting {
                     // No radiation display panel in browser build; return 0.
                     return 0
                 case 5:
-                    // METARULE_MOVIE: play a game movie by ID.
-                    // Browser build has no FMV pipeline; treat as no-op and return 0.
-                    log('metarule(5/MOVIE)', arguments)
-                    return 0
+                    // METARULE_MOVIE: play a game movie by ID (P1-9 stub).
+                    {
+                        const movieID = typeof target === 'number' && Number.isFinite(target) ? target : 0
+                        playMovie(movieID)
+                        return 0
+                    }
                 case 6:
                     // METARULE_ARMOR_WORN: 1 if `target` is a critter wearing armor.
                     if (isGameObject(target) && (target as any).equippedArmor) {return 1}
@@ -1109,10 +1166,13 @@ export namespace Scripting {
                     // Check proto flags2 bit for big-gun flag (0x0800 in Fallout 2).
                     if (!isGameObject(target)) {return 0}
                     return ((target as any).extra?.flags2 ?? (target as any).flags2 ?? 0) & 0x0800 ? 1 : 0
-                case 19:
+                case 19: {
                     // METARULE_PARTY_MEMBER_FOLLOW: 1 if the party-member critter is following.
-                    // No follow-mode state tracked; return 0.
-                    return 0
+                    const followTarget = isGameObject(target) ? target : this.self_obj
+                    if (!isGameObject(followTarget) || !globalState.gParty) return 0
+                    if (!globalState.gParty.isPartyMember(followTarget as Critter)) return 0
+                    return globalState.gParty.isFollowing(followTarget as Critter) ? 1 : 0
+                }
                 case 20:
                     // METARULE_IS_BIG_GUN_EQUIPPED: 1 if the player currently wields a big gun.
                     if (!globalState.player) {return 0}
@@ -1121,10 +1181,14 @@ export namespace Scripting {
                         if (!wep) {return 0}
                         return ((wep as any).extra?.flags2 ?? (wep as any).flags2 ?? 0) & 0x0800 ? 1 : 0
                     }
-                case 25:
-                    // METARULE_PARTY_MEMBER_STATE: return the state flags of a party-member critter.
-                    // No per-member state machine; return 0 (normal / no special state).
-                    return 0
+                case 25: {
+                    // METARULE_PARTY_MEMBER_STATE: state flags for a party-member critter.
+                    // Bit 0 = waiting / stay.
+                    const stateTarget = isGameObject(target) ? target : this.self_obj
+                    if (!isGameObject(stateTarget) || !globalState.gParty) return 0
+                    if (!globalState.gParty.isPartyMember(stateTarget as Critter)) return 0
+                    return globalState.gParty.getStateFlags(stateTarget as Critter)
+                }
                 case 26:
                     // METARULE_CRITICAL_HIT_ADJUST: return critical-hit table adjustment for critter.
                     // No per-critter critical table override; return 0 (standard table).
@@ -1401,9 +1465,9 @@ export namespace Scripting {
                 player.level++
                 // BLK-043: Award skill points on level-up (10 + INT/2, minimum 1).
                 // Fallout 2 formula: base 10 + floor(INT / 2) skill points per level.
-                // The Educated perk (perk ID 47) adds +2 per level; check perkRanks.
+                // Educated perk: UI id 11; FO2/script aliases 18 and 47.
                 const intScore = player.getStat('INT') ?? 5
-                const educatedBonus = (player.perkRanks?.[47] ?? 0) * 2
+                const educatedBonus = educatedPerkRanks(player.perkRanks) * 2
                 const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
                 // BLK-174: Guard against null player.skills — the Elder's dialogue
                 // calls give_exp_points(2500) when temple completion is confirmed.
@@ -1422,7 +1486,13 @@ export namespace Scripting {
                 if (player.level % 3 === 0) {
                     globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
                 }
+                // Slice G / P1-3: companion party.txt level tiers track the player.
+                if (globalState.gParty && typeof globalState.gParty.applyLevelTiersForPlayerLevel === 'function') {
+                    globalState.gParty.applyLevelTiersForPlayerLevel(player.level)
+                }
             }
+            // Keep ECS HUD / character sheet aligned with Critter XP (P0-2).
+            syncPlayerEntityFromCritter()
         }
 
         // critters
@@ -2340,6 +2410,8 @@ export namespace Scripting {
                 warn('radiation_add: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
+            // Scripts pass absolute increments; resistance is applied by engine helpers
+            // (applyRadiationGain / irradiated hexes), not inside this opcode.
             (obj as Critter).stats.modifyBase('Radiation Level', amount)
         }
 
@@ -3650,14 +3722,13 @@ export namespace Scripting {
         }
 
         gfade_out(time: number) {
-            // BLK-122: Screen fade-out — apply CSS opacity transition on the canvas.
+            // P2-2: logical fade + CSS opacity via fade.ts
             log('gfade_out', arguments)
-            this.gfade_out_css(time)
+            fadeOut(typeof time === 'number' ? time : 5)
         }
         gfade_in(time: number) {
-            // BLK-122: Screen fade-in — restore CSS opacity on the canvas.
             log('gfade_in', arguments)
-            this.gfade_in_css(time)
+            fadeIn(typeof time === 'number' ? time : 5)
         }
 
         // timing
@@ -3732,7 +3803,8 @@ export namespace Scripting {
                 return
             }
             info('advancing time ' + ticks + ' ticks ' + '(' + ticks / 10 + ' seconds)')
-            globalState.gameTickTime += ticks
+            // Slice G: process due timed events + chem clocks (no rest healing).
+            advanceGameTime(ticks, { heal: false, tickEffects: true, requireOutOfCombat: false })
         }
 
         // sfall extended API
@@ -4020,11 +4092,13 @@ export namespace Scripting {
         }
 
         // sfall extended opcode — set tile FID at tile/elevation (0x8195).
-        // set_tile_fid(tile, elevation, fid) — override the floor tile art.
-        // The browser build does not yet support runtime tile art patching;
-        // calls are logged and treated as a no-op until the renderer gains support.
+        // set_tile_fid(tile, elevation, fid) — override the floor tile art name in
+        // the live map object so subsequent get_tile_fid calls observe the change.
+        // The WebGL renderer may not re-upload tile textures until a map refresh;
+        // script/map state is updated immediately (partial rendering parity).
         set_tile_fid(tile: number, elevation: number, fid: number): void {
             log('set_tile_fid', arguments, 'tiles')
+            setTileFID(tile, elevation, fid)
         }
 
         // sfall extended opcode — get critter flags bitmask (0x8196).
@@ -4405,9 +4479,8 @@ export namespace Scripting {
             else {globalState.gMap.loadMapByID(map)}
         }
         play_gmovie(movieID: number) {
-            // Play a full-motion video clip by ID.  The browser build does not
-            // currently have an FMV pipeline, so we skip playback silently rather
-            // than emitting a stub warning on every intro/cut-scene trigger.
+            // P1-9: resolve FO2 movie ID, emit movie:play / optional cinematic placeholder.
+            playMovie(typeof movieID === 'number' ? movieID : 0)
             log('play_gmovie', arguments)
         }
         mark_area_known(areaType: number, area: number, markState: number) {
@@ -4493,6 +4566,11 @@ export namespace Scripting {
                 return
             }
             globalState.gParty.addPartyMember(obj)
+            // Apply any tiers already owed for the current player level.
+            const pl = globalState.player as any
+            if (pl && typeof pl.level === 'number') {
+                globalState.gParty.applyLevelTiersForPlayerLevel(pl.level)
+            }
         }
         party_remove(obj: Critter) {
             log('party_remove', arguments)
@@ -5158,10 +5236,10 @@ export namespace Scripting {
         }
 
         // sfall 0x81EF — set_tile_fid_sfall(tile, elev, fid):
-        // Override the floor tile FID at the given tile/elevation.
-        // Browser build: no-op (no tile-override system).
-        set_tile_fid_sfall(_tile: number, _elev: number, _fid: number): void {
+        // Override the floor tile FID at the given tile/elevation (same as 0x8195).
+        set_tile_fid_sfall(tile: number, elev: number, fid: number): void {
             log('set_tile_fid_sfall', arguments)
+            setTileFID(tile, elev, fid)
         }
 
         // -----------------------------------------------------------------------
@@ -5837,7 +5915,7 @@ export namespace Scripting {
         // Set the current fuel level of the player's car.
         // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
         set_car_fuel_amount_sfall(amount: number): void {
-            globalState.carFuel = Math.max(0, Math.min(80000, amount))
+            setCarFuel(amount)
         }
 
         // sfall 0x822B — get_critter_ai_packet_sfall(obj):
@@ -7711,7 +7789,16 @@ export namespace Scripting {
                 warn('get_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
                 return 50
             }
-            return (npc as any)._reactionValue ?? 50
+            const base = (npc as any)._reactionValue ?? 50
+            // P1-7: bias reaction by current map's town reputation tier.
+            let bias = 0
+            const mapName = (globalState.gMap as any)?.name as string | undefined
+            const townId = resolveTownIdFromMapName(mapName)
+            if (townId && globalState.reputation) {
+                const tier = townRepTier(getTownRepValue(globalState.reputation, townId))
+                bias = reactionBiasForTier(tier)
+            }
+            return Math.max(0, Math.min(100, base + bias))
         }
 
         // sfall 0x82D1 — set_critter_reaction_sfall(npc, pc, val):
@@ -8588,26 +8675,13 @@ export namespace Scripting {
             }
         }
 
-        // BLK-122 — gfade_out real CSS implementation:
-        // Fade the game canvas to black using a CSS transition.  Safe in Node.js.
+        // BLK-122 / P2-2 — gfade CSS helpers delegate to fade.ts (kept for tests).
         gfade_out_css(_time: number): void {
-            if (typeof document === 'undefined') {return}
-            const cnv = document.getElementById('cnv')
-            if (cnv) {
-                cnv.style.transition = 'opacity 0.5s ease-in-out'
-                cnv.style.opacity = '0'
-            }
+            fadeOut(typeof _time === 'number' ? _time : 5)
         }
 
-        // BLK-122 — gfade_in real CSS implementation:
-        // Restore the game canvas from a previous fade-out.  Safe in Node.js.
         gfade_in_css(_time: number): void {
-            if (typeof document === 'undefined') {return}
-            const cnv = document.getElementById('cnv')
-            if (cnv) {
-                cnv.style.transition = 'opacity 0.5s ease-in-out'
-                cnv.style.opacity = '1'
-            }
+            fadeIn(typeof _time === 'number' ? _time : 5)
         }
 
         _serialize(): SerializedScript {
@@ -8741,9 +8815,11 @@ export namespace Scripting {
 
         // If the item being used is a drug, mark the source critter as
         // "on drugs" so that metarule(18) checks return the correct result
-        // for the duration of the drug effect.
+        // for the duration of the drug effect, and apply timed SPECIAL/addiction.
         if (isDrugItem(obj) && source && (source as any).type === 'critter') {
             markOnDrugs(source)
+            // skipHeal: use_p_proc typically applies stimpak healing.
+            applyDrugToCritter(source as Critter, obj, { skipHeal: true })
         }
 
         obj._script.source_obj = source
@@ -8911,9 +8987,11 @@ export namespace Scripting {
 
         // If the item being used on this target is a drug, mark the target
         // critter as "on drugs" so that metarule(44)/WHO_ON_DRUGS queries return
-        // the correct result (e.g. NPC healer scripts using stimpaks on companions).
+        // the correct result (e.g. NPC healer scripts using stimpaks on companions),
+        // and apply timed SPECIAL/addiction effects.
         if (isDrugItem(item) && (obj as any).type === 'critter') {
             markOnDrugs(obj)
+            applyDrugToCritter(obj as Critter, item, { skipHeal: true })
         }
 
         obj._script.source_obj = item as Obj
@@ -9207,3 +9285,14 @@ export namespace Scripting {
         reset(mapName, mapID)
     }
 }
+
+// Slice G: rest/time-advance module shares the same timed-event queue.
+bindTimedEventList(Scripting.timeEventList)
+
+// P1-7: seed Reputation town/flag mirrors from default GVARs once the module
+// graph finishes (globalState can be undefined mid-circular import).
+Promise.resolve().then(() => {
+    if (globalState?.reputation) {
+        pullReputationFromGvars(globalState.reputation, Scripting.getGlobalVars())
+    }
+})
