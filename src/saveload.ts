@@ -440,6 +440,11 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         }
     }
 
+    // Slice G / P1-3: party combat-control / follow state.
+    if (globalState.gParty && typeof globalState.gParty.serializeControls === 'function') {
+        save.partyControls = globalState.gParty.serializeControls()
+    }
+
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     // BLK-080: Guard against null gMap in the log message — save() can be called
     // from tests or edge cases where no map has been loaded yet.

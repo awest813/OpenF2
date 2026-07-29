@@ -564,8 +564,8 @@ describe('Phase 81-F-6 — sfall 0x829F: get_distance_sfall', () => {
 // ===========================================================================
 
 describe('Phase 81-G — Save schema v19→v20 migration', () => {
-    it('SAVE_VERSION is now 20', () => {
-        expect(SAVE_VERSION).toBe(20)
+    it('SAVE_VERSION is now 21', () => {
+        expect(SAVE_VERSION).toBe(21)
     })
 
     function makeV19Save(overrides: Record<string, any> = {}): Record<string, any> {
@@ -589,19 +589,24 @@ describe('Phase 81-G — Save schema v19→v20 migration', () => {
         }
     }
 
-    it('migrates v19 save to v20 without error', () => {
+    it('migrates v19 save to current without error', () => {
         const raw = makeV19Save()
         expect(() => migrateSave(raw)).not.toThrow()
     })
 
-    it('migrated save has version 20', () => {
+    it('migrated save has current SAVE_VERSION', () => {
         const migrated = migrateSave(makeV19Save())
-        expect(migrated.version).toBe(20)
+        expect(migrated.version).toBe(SAVE_VERSION)
     })
 
     it('migrated save has partyMembersHp defaulting to {}', () => {
         const migrated = migrateSave(makeV19Save())
         expect(migrated.partyMembersHp).toEqual({})
+    })
+
+    it('migrated save has partyControls defaulting to {}', () => {
+        const migrated = migrateSave(makeV19Save())
+        expect(migrated.partyControls).toEqual({})
     })
 
     it('migrated save has playerCurrentHp as undefined (not set in migration)', () => {
@@ -639,7 +644,7 @@ describe('Phase 81-G — Save schema v19→v20 migration', () => {
         expect(migrated.playerCurrentHp).toBe(43)
     })
 
-    it('v1 save migrates all the way to v20 without error', () => {
+    it('v1 save migrates all the way to current without error', () => {
         const raw = {
             version: 1,
             name: 'very old save',
@@ -651,16 +656,18 @@ describe('Phase 81-G — Save schema v19→v20 migration', () => {
             savedMaps: {},
         }
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(20)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.partyMembersHp).toEqual({})
+        expect(migrated.partyControls).toEqual({})
     })
 
-    it('v20 save is a no-op migration', () => {
+    it('v20 save migrates to current and keeps HP fields', () => {
         const raw = makeV19Save({ version: 20, partyMembersHp: { Vic: 50 }, playerCurrentHp: 80 })
         const migrated = migrateSave(raw)
-        expect(migrated.version).toBe(20)
+        expect(migrated.version).toBe(SAVE_VERSION)
         expect(migrated.partyMembersHp?.['Vic']).toBe(50)
         expect(migrated.playerCurrentHp).toBe(80)
+        expect(migrated.partyControls).toEqual({})
     })
 })
 

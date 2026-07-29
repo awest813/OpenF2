@@ -1135,10 +1135,13 @@ export namespace Scripting {
                     // Check proto flags2 bit for big-gun flag (0x0800 in Fallout 2).
                     if (!isGameObject(target)) {return 0}
                     return ((target as any).extra?.flags2 ?? (target as any).flags2 ?? 0) & 0x0800 ? 1 : 0
-                case 19:
+                case 19: {
                     // METARULE_PARTY_MEMBER_FOLLOW: 1 if the party-member critter is following.
-                    // No follow-mode state tracked; return 0.
-                    return 0
+                    const followTarget = isGameObject(target) ? target : this.self_obj
+                    if (!isGameObject(followTarget) || !globalState.gParty) return 0
+                    if (!globalState.gParty.isPartyMember(followTarget as Critter)) return 0
+                    return globalState.gParty.isFollowing(followTarget as Critter) ? 1 : 0
+                }
                 case 20:
                     // METARULE_IS_BIG_GUN_EQUIPPED: 1 if the player currently wields a big gun.
                     if (!globalState.player) {return 0}
@@ -1147,10 +1150,14 @@ export namespace Scripting {
                         if (!wep) {return 0}
                         return ((wep as any).extra?.flags2 ?? (wep as any).flags2 ?? 0) & 0x0800 ? 1 : 0
                     }
-                case 25:
-                    // METARULE_PARTY_MEMBER_STATE: return the state flags of a party-member critter.
-                    // No per-member state machine; return 0 (normal / no special state).
-                    return 0
+                case 25: {
+                    // METARULE_PARTY_MEMBER_STATE: state flags for a party-member critter.
+                    // Bit 0 = waiting / stay.
+                    const stateTarget = isGameObject(target) ? target : this.self_obj
+                    if (!isGameObject(stateTarget) || !globalState.gParty) return 0
+                    if (!globalState.gParty.isPartyMember(stateTarget as Critter)) return 0
+                    return globalState.gParty.getStateFlags(stateTarget as Critter)
+                }
                 case 26:
                     // METARULE_CRITICAL_HIT_ADJUST: return critical-hit table adjustment for critter.
                     // No per-critter critical table override; return 0 (standard table).
@@ -1447,6 +1454,10 @@ export namespace Scripting {
                 // and update it via set_perk_owed() (0x81AF).
                 if (player.level % 3 === 0) {
                     globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
+                }
+                // Slice G / P1-3: companion party.txt level tiers track the player.
+                if (globalState.gParty && typeof globalState.gParty.applyLevelTiersForPlayerLevel === 'function') {
+                    globalState.gParty.applyLevelTiersForPlayerLevel(player.level)
                 }
             }
             // Keep ECS HUD / character sheet aligned with Critter XP (P0-2).
@@ -4526,6 +4537,11 @@ export namespace Scripting {
                 return
             }
             globalState.gParty.addPartyMember(obj)
+            // Apply any tiers already owed for the current player level.
+            const pl = globalState.player as any
+            if (pl && typeof pl.level === 'number') {
+                globalState.gParty.applyLevelTiersForPlayerLevel(pl.level)
+            }
         }
         party_remove(obj: Critter) {
             log('party_remove', arguments)

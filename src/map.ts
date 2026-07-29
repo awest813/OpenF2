@@ -17,7 +17,7 @@ limitations under the License.
 import { Config } from './config.js'
 import { getCurrentMapInfo, lookupMapName } from './data.js'
 import { Events } from './events.js'
-import { hexInDirectionDistance, hexLine, HEX_GRID_SIZE, Point, pointInBoundingBox } from './geometry.js'
+import { hexDistance, hexInDirectionDistance, hexLine, HEX_GRID_SIZE, Point, pointInBoundingBox } from './geometry.js'
 import globalState from './globalState.js'
 import { heart } from './heart.js'
 import { Lightmap } from './lightmap.js'
@@ -250,9 +250,21 @@ export class GameMap {
     placeParty() {
         // set up party members' positions
         globalState.gParty.getPartyMembers().forEach((obj: Critter) => {
+            const ctrl = globalState.gParty.getControl?.(obj)
+            // Waiting / "stay" members keep their current tile when already on-map.
+            // On a fresh map enter they typically have no prior tile in this elevation,
+            // so we still place them once near the player.
+            if (ctrl && (ctrl.waiting || ctrl.distance === 'stay') && obj.position) {
+                const nearPlayer = hexDistance(obj.position, globalState.player.position) <= 8
+                if (nearPlayer) {
+                    return
+                }
+            }
+
             // attempt party member placement around player
             let placed = false
-            for (let dist = 1; dist < 3; dist++) {
+            const maxDist = ctrl?.distance === 'snipe' ? 5 : ctrl?.distance === 'charge' ? 2 : 3
+            for (let dist = 1; dist <= maxDist; dist++) {
                 for (let dir = 0; dir < 6; dir++) {
                     const pos = hexInDirectionDistance(globalState.player.position, dir, dist)
                     if (this.objectsAtPosition(pos).length === 0) {

@@ -187,14 +187,12 @@ to the live character model, level-up perk picker reachable from gameplay, and
 
 ### P1-3 — Party/companion system is a bare list
 
-**Evidence.** `src/party.ts` is 62 lines: `addPartyMember`, `removePartyMember`,
-`getPartyMembers`, `isPartyMember`, `getPartyMemberByPID`, serialize/deserialize.
-
-**Gap.** No `party.txt` loading, no companion level-up tiers (Sulik/Vic/Cassidy/Myron
-scale with player level), no combat-control options (distance / aggression / weapon use),
-no follow/wait ordering, no party inventory access or "trade with companion", no
-companion-specific dialogue hooks, no party members carried across map transitions and
-world-map encounters as a formation.
+**Status.** Partial (Slice G). `src/party.ts` tracks follow/wait, distance, disposition,
+and other combat-control fields per member; `src/partyDefs.ts` embeds FO2-aligned
+companion rows (Sulik/Vic/Myron/Marcus/…) with level tiers; `metarule(19/25)` report
+follow + waiting flags; save schema **v21** persists `partyControls`. Still open:
+trade-with-companion UI, full combat AI honouring disposition/attack_who, world-map
+formation, and loading a real `party.txt` from assets (parser ready via `parsePartyTxt`).
 
 **Acceptance.** Companions recruit, follow across maps and into encounters, level with the
 player per `party.txt` tiers, obey combat-control settings, and survive save/load with

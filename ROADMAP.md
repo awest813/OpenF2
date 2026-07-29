@@ -33,7 +33,7 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 | Rendering | Working (WebGL) | `src/renderer.ts`, `src/webglrenderer.ts` |
 | UI panels | Dual stacks | `src/ui2/*` + legacy `src/ui.ts` (P1-10) |
 | Audio | Partial | SFX/music path exists; speech/movies missing (P1-9) |
-| Save/load | Working (hardened) | `src/saveload.ts`, schema v20 |
+| Save/load | Working (hardened) | `src/saveload.ts`, schema v21 |
 | Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
 | Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
 | New game / chargen | In progress (Slice C) | Main menu + chargen UI; `?map` still skips for dev (P0-1) |
@@ -118,8 +118,8 @@ Prefer small PRs; leave the suite green on a clean (asset-less) checkout.
 | D | Remaining Skilldex skills |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) | Done — see `docs/F2_REAL_ASSET_LANE.md` |
 | F | Perks/traits + drugs + rad/poison (core) | Done — timed save/load still open |
-| G | Rest + holodisk archives (P1-11 core) | Done — party depth / automap still open |
-| H+ | Party / rep / AI / car per full parity plan |
+| G | Rest + holodisk archives + party control (P1-11 / P1-3 core) | Done — trade UI / automap / combat AI hooks still open |
+| H+ | Rep / AI / car per full parity plan |
 
 ### Longer horizon
 

@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 20
+export const SAVE_VERSION = 21
 
 export interface SaveGame {
     id?: number
@@ -297,6 +297,23 @@ export interface SaveGame {
      */
     partyMembersHp?: Record<string, number>
 
+    /**
+     * Party combat-control / follow state keyed by member PID string (added in v21).
+     * Waiting, distance, disposition, and companion level-tier progress.
+     */
+    partyControls?: Record<string, {
+        waiting: boolean
+        distance: string
+        disposition: string
+        attackWho: string
+        bestWeapon: string
+        areaAttackMode: string
+        chemUse: string
+        runAwayMode: string
+        levelIndex: number
+        appliedLevelPid: number
+    }>
+
     player: {
         position: Point
         orientation: number
@@ -478,6 +495,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             // set here) — the load path treats undefined as "use stat default".
             save.version = 20
             // falls through
+        case 20:
+            // v20 → v21: party combat-control / follow state (Slice G / P1-3).
+            if (save.partyControls === undefined) {save.partyControls = {}}
+            save.version = 21
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -569,6 +591,16 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     // Normalize partyMembersHp (BLK-138): must be a string→number record with
     // non-negative integer values.  Invalid entries are silently dropped.
     save.partyMembersHp = sanitizeStringNumericRecord(save.partyMembersHp)
+    // Normalize partyControls (v21): keep only object-valued entries keyed by pid string.
+    if (!save.partyControls || typeof save.partyControls !== 'object' || Array.isArray(save.partyControls)) {
+        save.partyControls = {}
+    } else {
+        const cleaned: Record<string, any> = {}
+        for (const [k, v] of Object.entries(save.partyControls)) {
+            if (v && typeof v === 'object' && !Array.isArray(v)) cleaned[k] = v
+        }
+        save.partyControls = cleaned
+    }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {
