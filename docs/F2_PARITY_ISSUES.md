@@ -87,22 +87,14 @@ the player in combat and asserts the HUD and character sheet both change.
 
 ### P0-3 — Skilldex has only 2 of 8 usable skills
 
-**Evidence**
-- `src/skills.ts:15-19`:
-  ```ts
-  export enum Skills { None = 0, Lockpick, Repair }
-  ```
-- `src/main.ts:53-63` — `getSkillID()` maps only Lockpick (9) and Repair (13), then logs
-  `'unimplemented skill %d'`.
-- `src/main.ts:78` — `console.log('passive skills are not implemented')`.
+**Status:** Partially addressed (Slice D). All 8 Skilldex skills are listed in legacy + UI2
+Skilldex panels; IDs map to FO2 `action_being_used` values; Sneak toggles `pcFlags` SNK_MODE;
+First Aid/Doctor have Critter heal fallback + uses/day; Lockpick/Repair/Steal/Traps/Science
+dispatch `Scripting.useSkillOn`. Remaining fidelity: Steal container UI, trap failure damage,
+Doctor cripple repair, Science terminal UX.
 
-**Gap.** Missing: **Sneak, Steal, Traps, First Aid, Doctor, Science**. That means no
-out-of-combat healing (First Aid / Doctor), no crippled-limb repair, no stealing, no trap
-disarming, no Science on terminals/robots, and no sneak toggle. A large share of F2
-quests, and basic survivability between fights, depend on these.
-
-Related: sneak state *partially* exists as `pcFlags` bit 3 read by
-`scripting.ts:668-670`, but nothing in the UI can set it.
+**Evidence (historical @ `cbcb8d1`)**
+- Skills enum previously only `Lockpick` / `Repair`; Sneak UI could not set SNK_MODE.
 
 **Acceptance.** All 8 Skilldex skills selectable and usable on valid targets, each running
 the F2 success/failure roll and consuming the right resources (First Aid/Doctor uses per
