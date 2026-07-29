@@ -116,7 +116,7 @@ Prefer small PRs; leave the suite green on a clean (asset-less) checkout.
 | B | Unify character model; HUD HP follows combat damage |
 | C | Main menu + chargen + New Game → `artemple` |
 | D | Remaining Skilldex skills |
-| E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) |
+| E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) | Done — see `docs/F2_REAL_ASSET_LANE.md` |
 | F+ | Tier 1 systems per full parity plan |
 
 ### Longer horizon

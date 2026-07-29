@@ -144,6 +144,41 @@ export namespace Scripting {
         return 0x04000000 | index
     }
 
+    /** Patch the live map floor name from an FID (script-visible; renderer may lag). */
+    function setTileFID(tile: number, elevation: number, fid: number): void {
+        if (!isValidTileNum(tile)) {
+            return
+        }
+        if (typeof fid !== 'number' || !Number.isFinite(fid)) {
+            return
+        }
+        const map = globalState.gMap
+        if (!map || !map.mapObj || elevation < 0 || elevation >= map.numLevels) {
+            return
+        }
+        const level = map.mapObj.levels[elevation]
+        if (!level || !level.tiles || !level.tiles.floor) {
+            return
+        }
+        const hexPos = fromTileNum(tile)
+        const tilePos = hexToTile(hexPos)
+        const floor = level.tiles.floor
+        if (tilePos.y < 0 || tilePos.y >= floor.length) {
+            return
+        }
+        const row = floor[tilePos.y]
+        if (!row || tilePos.x < 0 || tilePos.x >= row.length) {
+            return
+        }
+        loadTilesList()
+        const index = fid & 0xffff
+        const name = tilesList[index]
+        if (!name || name.startsWith('#')) {
+            return
+        }
+        row[tilePos.x] = name
+    }
+
     export function setUseElevatorHandler(handler: () => void): void {
         useElevatorHandler = handler
     }
@@ -4008,11 +4043,13 @@ export namespace Scripting {
         }
 
         // sfall extended opcode — set tile FID at tile/elevation (0x8195).
-        // set_tile_fid(tile, elevation, fid) — override the floor tile art.
-        // The browser build does not yet support runtime tile art patching;
-        // calls are logged and treated as a no-op until the renderer gains support.
+        // set_tile_fid(tile, elevation, fid) — override the floor tile art name in
+        // the live map object so subsequent get_tile_fid calls observe the change.
+        // The WebGL renderer may not re-upload tile textures until a map refresh;
+        // script/map state is updated immediately (partial rendering parity).
         set_tile_fid(tile: number, elevation: number, fid: number): void {
             log('set_tile_fid', arguments, 'tiles')
+            setTileFID(tile, elevation, fid)
         }
 
         // sfall extended opcode — get critter flags bitmask (0x8196).
@@ -5146,10 +5183,10 @@ export namespace Scripting {
         }
 
         // sfall 0x81EF — set_tile_fid_sfall(tile, elev, fid):
-        // Override the floor tile FID at the given tile/elevation.
-        // Browser build: no-op (no tile-override system).
-        set_tile_fid_sfall(_tile: number, _elev: number, _fid: number): void {
+        // Override the floor tile FID at the given tile/elevation (same as 0x8195).
+        set_tile_fid_sfall(tile: number, elev: number, fid: number): void {
             log('set_tile_fid_sfall', arguments)
+            setTileFID(tile, elev, fid)
         }
 
         // -----------------------------------------------------------------------

@@ -1,7 +1,8 @@
 {
   "scripts": {
     "test": "vitest run",
-    "test:ui2:gameplay": "vitest run src/ui2/panelParity.test.ts"
+    "test:ui2:gameplay": "vitest run src/ui2/panelParity.test.ts",
+    "test:assets:arroyo": "vitest run src/phaseParitySliceE.test.ts src/phase100.test.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.25.0",

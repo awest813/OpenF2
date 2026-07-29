@@ -223,7 +223,7 @@ Small PRs preferred; each slice should leave tests green.
 | B | Unify character model + HUD/sheet adapters | P0-2, P2-3 | Done (adapter) |
 | C | Main menu + chargen + New Game handoff | P0-1 | Done (core flow) |
 | D | Skilldex 6 missing skills | P0-3 | Done (core dispatch) |
-| E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | |
+| E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | Done (tile FID + opt-in lane) |
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | |
 | G | Rest / holodisks / party | P1-11, P1-3 | |
 | H | Rep + AI + car | P1-7, P1-1, P1-6 | |
@@ -251,5 +251,6 @@ Small PRs preferred; each slice should leave tests green.
 3. ~~Slice B: Critter → ECS projection for HUD.~~
 4. ~~Slice C: main menu + chargen + Temple handoff.~~
 5. ~~**Slice D:** Skilldex remaining skills.~~
-6. Continue P0-2: perk grant / XP award through Critter model.
-7. Slice E: `get_tile_fid` + Arroyo real-script smoke.
+6. ~~Slice E: `get_tile_fid` + Arroyo real-script smoke / opt-in asset lane.~~
+7. Continue P0-2: perk grant / XP award through Critter model.
+8. Slice F: perks/traits + drugs + rad/poison (Tier 1).

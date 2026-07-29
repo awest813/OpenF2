@@ -52,13 +52,16 @@ describe('Parity Slice A — checklist safe_stub vocabulary', () => {
 
     it('known no-ops are safe_stub, not implemented', () => {
         const play = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'play_gmovie')
-        const setTile = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_tile_fid')
         const repeat = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_global_script_repeat')
         expect(play?.status).toBe('safe_stub')
-        expect(setTile?.status).toBe('safe_stub')
         expect(repeat?.status).toBe('safe_stub')
         expect(isBehaviorallyComplete('safe_stub')).toBe(false)
         expect(isBehaviorallyComplete('implemented')).toBe(true)
+    })
+
+    it('set_tile_fid is partial (map data patches; renderer may lag)', () => {
+        expect(SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'set_tile_fid')?.status).toBe('partial')
+        expect(SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_set_tile_fid')?.status).toBe('partial')
     })
 
     it('always-true metarule3 walk/visibility helpers are partial', () => {

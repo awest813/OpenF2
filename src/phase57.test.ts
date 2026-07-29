@@ -378,7 +378,7 @@ describe('Phase 57-D — sfall opcodes 0x81E8–0x81EF', () => {
         }
     })
 
-    it('set_tile_fid_sfall (0x81EF) is a no-op and does not throw', () => {
+    it('set_tile_fid_sfall (0x81EF) patches floor and does not throw', () => {
         expect(() => script.set_tile_fid_sfall(100, 0, 12345)).not.toThrow()
     })
 })

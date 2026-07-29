@@ -344,10 +344,14 @@ state, automap rendered per visited level, and an alarm-clock rest UI that advan
 ## Tier 2 — Fidelity gaps and correctness bugs
 
 ### P2-1 — `get_tile_fid` always returns 0 *(reproducible test failure)*
-`src/scripting.ts:4017` delegates to `getTileFID(tile, elevation)`, which yields 0 against
-a populated floor grid. Fails `src/phase38.test.ts:297` and `src/phase57.test.ts:375`
-(expected `0x04000002` / `0x04000003`, got `0`). Also makes `set_tile_fid`
-(`scripting.ts:4027`) a no-op by design, so scripts that repaint floor tiles do nothing.
+
+**Status:** Addressed (Slice A lut fixture + Slice E). `get_tile_fid` / `get_tile_fid_sfall`
+resolve floor names via `lut/tiles.lst` or `data/art/tiles/tiles.lst`. `set_tile_fid` /
+`set_tile_fid_sfall` now patch the live map floor grid so get/set round-trip (renderer
+texture re-upload may still lag — checklist `partial`).
+
+**Evidence (historical @ `cbcb8d1`)**
+Previously returned 0 against a populated floor grid (`phase38` / `phase57`).
 
 ### P2-2 — No screen fades
 `grep -rniE "fadeIn|fadeOut"` → 0 hits. Fallout 2 fades on every map change, dialogue

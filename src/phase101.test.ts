@@ -562,8 +562,8 @@ describe('Phase 101-N — Checklist integrity', () => {
             const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === id)
             if (allowedSafeStubs.has(id)) {
                 expect(
-                    ['safe_stub', 'implemented'],
-                    `${id} should be safe_stub or implemented, got ${entry?.status}`
+                    ['safe_stub', 'partial', 'implemented'],
+                    `${id} should be safe_stub, partial, or implemented, got ${entry?.status}`
                 ).toContain(entry?.status)
             } else {
                 expect(entry?.status, `${id} should be implemented, got ${entry?.status}`).toBe(

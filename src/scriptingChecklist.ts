@@ -1448,10 +1448,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'set_tile_fid',
         kind: 'opcode',
         description:
-            'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art. ' +
-            'No-op: the browser renderer does not support runtime tile art patching.  ' +
-            'This is a fundamental rendering architecture limitation.',
-        status: 'safe_stub',
+            'sfall 0x8195: set_tile_fid(tile, elevation, fid) — override floor tile art ' +
+            'name in the live map floor grid (get_tile_fid round-trips). Renderer texture ' +
+            're-upload may lag until map refresh — partial visual parity.',
+        status: 'partial',
         frequency: 'medium',
         impact: 'low',
     },
@@ -3828,9 +3828,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81EF: set_tile_fid_sfall(tile, elev, fid) — override the floor-tile ' +
-            'FID at the given position.  Logs the call as a safe no-op — the browser ' +
-            'renderer does not support runtime tile art patching.',
-        status: 'safe_stub',
+            'FID at the given position. Patches the live map floor grid (same as 0x8195); ' +
+            'renderer texture re-upload may lag — partial visual parity.',
+        status: 'partial',
         frequency: 'low',
         impact: 'low',
     },
