@@ -14,45 +14,49 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 ## Current Project Status
 
 - Core engine runtime is functioning (map loading, rendering, input, combat loop, UI panels, save/load).
-- Test suite is active and extensive (validated with `npm test` during this documentation update).
-- Largest remaining risk to complete playability is **scripting/runtime parity** and edge-case fidelity.
+- Large crash-hardening + sfall opcode surface is in place; checklist marks 807 entries implemented
+  (many are safe no-ops — see parity audit).
+- **Campaign completion is NOT READY.** Prior region `CERTIFIED` / gate `READY` claims were
+  scaffold-based and have been reset. See `docs/F2_FULL_PARITY_PLAN.md` and
+  `docs/F2_PARITY_ISSUES.md`.
+- Measured suite @ latest audit: **5103 passed / 61 failed** (asset-absent script corpora +
+  `get_tile_fid`); `tsc --noEmit` clean.
 
 ### System Status Dashboard
 
 | Area | Status | Notes |
 |---|---|---|
 | Engine lifecycle | Working | `src/engine.ts` module lifecycle state machine |
-| Asset loading | Working | `src/assetStore.ts`, `src/mods.ts` |
-| Map loading/traversal | Working | `src/map.ts` + campaign/world tests |
-| Entity system | Working | `src/ecs/*` |
+| Asset loading | Working | `src/assetStore.ts`, `src/mods.ts`; repo ships almost no converted game data |
+| Map loading/traversal | Working | `src/map.ts` + scaffold/world tests |
+| Entity system | Diverged | ECS player entity ≠ `globalState.player` Critter (P0-2) |
 | Rendering | Working (WebGL) | `src/renderer.ts`, `src/webglrenderer.ts` |
-| UI panels | Working, still refining parity | `src/ui2/*`, panel parity tests |
-| Audio | Working | `src/audio.ts` |
-| Save/load | Working (ongoing hardening) | `src/saveload.ts`, schema migrations |
-| Combat | Working, AI fidelity partial | `src/combat.ts`, damage and integration tests |
-| Scripting VM/bridge | Partial | `src/scripting.ts`, checklist-driven parity work |
-| Dialogue/barter edge behavior | Partial | Core loop works; edge-case parity remains |
-| Quest scripting completeness | Partial | Quest infrastructure exists; script parity ongoing |
+| UI panels | Dual stacks | `src/ui2/*` + legacy `src/ui.ts` (P1-10) |
+| Audio | Partial | SFX/music path exists; speech/movies missing (P1-9) |
+| Save/load | Working (hardened) | `src/saveload.ts`, schema v20 |
+| Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
+| Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
+| New game / chargen | Missing | Boots straight into map (P0-1) |
+| Skilldex | Partial | 2/8 skills (P0-3) |
+| Dialogue/barter | Working core | Edge fidelity + reaction model remain |
+| Ending / endgame slides | Missing | No ENDGAME.TXT selection (P1-8) |
 | Multiplayer | Missing (experimental) | Not part of core path |
 
 ---
 
 ## Critical Path to Full Fallout 2 Playability
 
-These items are required for dependable start-to-end playthroughs:
+Plan of record: **`docs/F2_FULL_PARITY_PLAN.md`**. Issue inventory: **`docs/F2_PARITY_ISSUES.md`**.
 
-1. **Complete high-impact script parity**
-   - Continue converting `partial` entries in `src/scriptingChecklist.ts` to implemented behavior.
-2. **Dialogue + barter edge-case completion**
-   - Close remaining conversation branching and barter scripting gaps.
-3. **Animation/script callback fidelity**
-   - Improve `reg_anim_*` and related sequencing behavior used by campaign scripts.
-4. **Campaign progression validation**
-   - Verify major hubs and transitions with real asset playthrough checks.
-5. **Long-session save/load reliability**
-   - Multi-map and quest-heavy round-trip validation.
-6. **Combat AI parity improvements**
-   - Better tactical behavior matching original AI expectations.
+Highest-leverage remaining work (Tier 0 first):
+
+1. **Honest measurement** — asset tests skip when absent; checklist distinguishes safe stubs;
+   certification uses real maps/scripts only.
+2. **Unify character model** — one source of truth for HUD, combat, scripts, perks, weight (P0-2).
+3. **New game + character creation** — main menu → SPECIAL/tags/traits → Temple (P0-1).
+4. **Complete Skilldex** — Sneak, Steal, Traps, First Aid, Doctor, Science (P0-3).
+5. **Real-asset campaign validation** — Arroyo→Oil Rig against converted install (P0-4/P0-5).
+6. **Tier 1 systems** — perks/traits, drugs/rad/poison, party, rest/holodisks, rep, AI, car, endings.
 
 ---
 
@@ -78,9 +82,15 @@ These items are required for dependable start-to-end playthroughs:
 
 ## Phase D — Full Playability Push (Current Focus)
 
-- Scripting procedure/opcode parity completion
-- Dialogue/barter fidelity edge cases
-- Campaign-scale progression + save/load confidence
+Tracked as workstreams WS0–WS6 in `docs/F2_FULL_PARITY_PLAN.md`:
+
+- WS0 honest measurement + certification reset
+- WS1 single character model
+- WS2 new game / chargen
+- WS3 Skilldex completion
+- WS4 real-asset script certification
+- WS5 Tier 1 campaign systems (party, drugs, rep, car, endings, …)
+- WS6 fidelity polish (LOS, fades, combat table audit, …)
 
 ## Phase E — Browser Delivery and Performance
 
@@ -96,25 +106,24 @@ These items are required for dependable start-to-end playthroughs:
 
 ---
 
-## Time Horizon Breakdown
+## Near-term execution slices
 
-### Short Term (Now → next major milestone)
+Prefer small PRs; leave the suite green on a clean (asset-less) checkout.
 
-- Resolve high-impact scripting partials
-- Improve dialogue/barter fidelity in common progression paths
-- Expand regression coverage for scripting + save/load edge cases
+| Slice | Focus |
+|---|---|
+| A | Docs honesty (this work) + asset tests skip + checklist status vocabulary |
+| B | Unify character model; HUD HP follows combat damage |
+| C | Main menu + chargen + New Game → `artemple` |
+| D | Remaining Skilldex skills |
+| E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) |
+| F+ | Tier 1 systems per full parity plan |
 
-### Medium Term
+### Longer horizon
 
-- Validate early-to-mid campaign continuity (Arroyo through early hubs)
-- Improve AI behavior fidelity and encounter consistency
-- Stabilize browser runtime behavior across platforms
-
-### Long Term Vision
-
-- End-to-end Fallout 2 completion with strong fidelity guarantees
-- Browser-first playable release
-- Modding-quality engine tooling and optional rendering backends
+- Region-by-region real-asset re-certification through Oil Rig
+- Ending slides + credits; UI stack consolidation
+- Browser-first playable release with strong fidelity guarantees
 
 ---
 
@@ -149,12 +158,12 @@ They should not delay the core objective of complete Fallout 2 single-player fid
 
 ## How Contributors Can Help
 
-Highest-value contribution areas:
+Highest-value contribution areas (see `docs/F2_FULL_PARITY_PLAN.md`):
 
-1. `src/scripting.ts` + `src/scriptingChecklist.ts`
-2. Script/VM regression tests (`src/phase*.test.ts`, `src/vm.test.ts`)
-3. Dialogue/barter edge-case implementation and test coverage
-4. Save/load campaign fidelity validation
-5. Combat AI behavior parity improvements
+1. Character-model unification (`globalState.player` vs ECS) — P0-2
+2. New game / character creation UI and handoff — P0-1
+3. Skilldex skills beyond Lockpick/Repair — P0-3
+4. Asset-absent test skipping + real-asset opt-in lane — P0-4
+5. Tier 1 systems: perks/traits, party, drugs/rad/poison, rest, endings
 
-When in doubt, pick items that remove remaining partial scripting/runtime behavior on the critical path.
+When in doubt, pick open Tier 0 items in `docs/F2_PARITY_ISSUES.md`.

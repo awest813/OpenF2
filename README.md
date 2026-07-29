@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
 [![TypeScript](https://img.shields.io/badge/engine-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-5026%2F5100%20passing-green.svg)](#project-metrics)
+[![Tests](https://img.shields.io/badge/tests-5103%2F5164%20passing-yellow.svg)](#project-metrics)
 [![Platform](https://img.shields.io/badge/platform-browser%20first-orange.svg)](#mission)
 
 **OpenF2** is an open-source reimplementation of the Fallout 2 engine written in TypeScript and WebGL.
@@ -37,10 +37,12 @@ This summary is based on current code in `src/` and live test execution (validat
 
 ### Test Metrics (Verified)
 
-- **Test Files:** 118 passing / 121 total (97.5%)
-- **Individual Tests:** 5,026 passing / 5,100 total (98.5%)
-- **Failed Tests:** 74 tests, mostly in Phase 100-101 script parsing (known gaps)
-- **Code Size:** ~86,400 lines of TypeScript in `src/`
+- **Test Files:** 117 passing / 122 total (5 failing)
+- **Individual Tests:** 5,103 passing / 5,164 total
+- **Failed Tests:** 61 — mostly Phase 100/107 real-script corpora when `data/scripts` is absent, plus `get_tile_fid` regressions
+- **Typecheck:** `tsc --noEmit` clean
+- **Code Size:** ~99.5k lines of TypeScript in `src/`
+- **Campaign gate:** `NOT_READY` — see `docs/F2_RELEASE_GATE.md`
 
 ### Engine Status Dashboard
 
@@ -88,23 +90,20 @@ These failures indicate **incomplete script data availability at test time**, no
 
 ## Critical Path to First Fully Playable Build
 
-To reach reliable start-to-end Fallout 2 playability on this engine, these are the most important blockers:
+**Plan of record:** [`docs/F2_FULL_PARITY_PLAN.md`](docs/F2_FULL_PARITY_PLAN.md) ·
+**Issue inventory:** [`docs/F2_PARITY_ISSUES.md`](docs/F2_PARITY_ISSUES.md)
 
-1. **Finish high-impact scripting parity**
-   - Complete remaining partial procedures in `src/scripting.ts`
-   - Continue closing checklist gaps in `src/scriptingChecklist.ts`
-2. **Dialogue + barter correctness pass**
-   - Resolve edge-case conversation branches and barter-script interactions
-3. **Animation/script event fidelity**
-   - Complete queued animation callback behavior used by encounter and quest scripts
-4. **Campaign-scale validation**
-   - Run long progression scenarios across major hubs and transitions
-5. **Save/load long-run reliability**
-   - Stress multi-map, multi-quest, long-session save/load cycles with real assets
-6. **Combat AI behavior parity**
-   - Improve tactical and behavior fidelity to original encounter expectations
+Release gate status: **`NOT_READY`** (prior `CERTIFIED`/`READY` claims were scaffold-only and have been reset).
 
-These are the highest leverage items blocking “playable from beginning to end with confidence,” even though many core systems already run.
+Highest-leverage blockers:
+
+1. **Unify the character model** — HUD/ECS vs `globalState.player` Critter divergence (P0-2)
+2. **New game + character creation** — no main menu / SPECIAL / tags / traits flow (P0-1)
+3. **Complete Skilldex** — only Lockpick + Repair are usable (P0-3)
+4. **Real-asset script validation** — clean checkout has no `.int` corpus; phase100/107 fail instead of skip (P0-4)
+5. **Re-certify regions against real maps/scripts** — then Tier 1 systems (party, drugs, rep, car, endings)
+
+Foundation already in place: map loader, ScriptVM, combat loop, world map, save/load (schema v20), UI2 panels, extensive crash-hardening.
 
 ---
 

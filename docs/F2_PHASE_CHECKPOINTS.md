@@ -108,21 +108,30 @@ Gate: **PASS** when ending flow completes without runtime interruption.
 
 ## Phase 9 — Region-by-region certification
 
-- [x] Each region marked `CERTIFIED` in critical-path checklist
-- [x] No unresolved `CRITICAL` blockers in matrix
-- [x] Region-specific regression coverage in place
+> **Reset 2026-07-29:** prior CERTIFIED marks were scaffold-only. Real-asset
+> re-certification is tracked in `docs/F2_FULL_PARITY_PLAN.md` / `F2_PARITY_ISSUES.md` (P0-5).
 
-Gate: **PASS** when all listed critical regions are certified.
+- [ ] Each region marked `CERTIFIED` in critical-path checklist (real-asset rule)
+- [x] No unresolved `CRITICAL` blockers in matrix (crash/hardening track)
+- [ ] Region-specific regression coverage against real maps/scripts in place
+
+Gate: **FAIL / IN PROGRESS** until all listed critical regions are certified under
+the real-asset rule. Scaffold smoke suites alone are not sufficient.
 
 ---
 
 ## Phase 10 — Full playthrough release gate
 
-- [x] One clean end-to-end campaign run reaches ending flow
-- [x] No unresolved campaign-critical blockers
-- [x] Regression suites covering new fixes are green
+> **Reset 2026-07-29:** gate status returned to `NOT_READY`. See
+> `docs/F2_RELEASE_GATE.md` and `docs/F2_FULL_PARITY_PLAN.md`.
 
-Gate: **PASS** when campaign completion is reproducible and test-backed.
+- [ ] One clean end-to-end campaign run reaches ending flow (real content)
+- [ ] No unresolved campaign-critical blockers (parity Tier 0/1 closed)
+- [x] Regression suites covering foundation/hardening fixes are green when assets absent
+      (asset corpora currently fail instead of skip — tracked as P0-4)
+
+Gate: **FAIL / NOT_READY** until campaign completion is reproducible against real
+assets and test-backed under the updated certification rules.
 
 
 ---
