@@ -24,13 +24,25 @@ import {
     radiationBand,
 } from '../character/radiationPoison.js'
 import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
+import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
+import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type PipBoyTab = 'status' | 'items' | 'map' | 'quests'
+type PipBoyTab = 'status' | 'items' | 'map' | 'quests' | 'rest' | 'data'
+
+const PIPBOY_TABS: PipBoyTab[] = ['status', 'items', 'map', 'quests', 'rest', 'data']
+const PIPBOY_TAB_LABEL: Record<PipBoyTab, string> = {
+    status: 'STAT',
+    items: 'INV',
+    map: 'MAP',
+    quests: 'QST',
+    rest: 'REST',
+    data: 'DATA',
+}
 
 /** Minimal map cell for the local-area grid display. */
 export interface PipBoyMapCell {
@@ -69,6 +81,14 @@ export class PipBoyPanel extends UIPanel {
     private _itemScrollOffset = 0
     /** Scroll offset (in rows) for the QUESTS tab. */
     private _questScrollOffset = 0
+    /** Last rest outcome message for the REST tab. */
+    private _restMessage = ''
+    /** Selected holodisk id on the DATA tab. */
+    private _selectedHolodiskId: string | null = null
+    /** Hit regions for REST duration buttons (content-local coords). */
+    private _restButtons: Array<{ x: number; y: number; w: number; h: number; hours: number }> = []
+    /** Hit regions for holodisk list rows. */
+    private _holodiskRows: Array<{ y: number; h: number; id: string }> = []
 
     constructor(
         screenWidth: number,
@@ -104,7 +124,7 @@ export class PipBoyPanel extends UIPanel {
         drawCenteredText(ctx, 'PIP-BOY 2000', width / 2, 19, FALLOUT_GREEN, 'bold 14px monospace')
 
         // Tabs
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const tabW = Math.floor(width / tabs.length)
         for (let i = 0; i < tabs.length; i++) {
             const tab = tabs[i]
@@ -112,10 +132,10 @@ export class PipBoyPanel extends UIPanel {
             const active = tab === this.activeTab
             fillRect(ctx, tx, 30, tabW, 22, active ? FALLOUT_GREEN : { r: 0, g: 40, b: 0, a: 255 })
             strokeRect(ctx, tx, 30, tabW, 22, FALLOUT_GREEN, 1)
-            ctx.font = '10px monospace'
+            ctx.font = '9px monospace'
             ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
             ctx.textAlign = 'center'
-            ctx.fillText(tab.toUpperCase(), tx + tabW / 2, 45)
+            ctx.fillText(PIPBOY_TAB_LABEL[tab], tx + tabW / 2, 45)
         }
         ctx.textAlign = 'left'
 
@@ -130,6 +150,8 @@ export class PipBoyPanel extends UIPanel {
             case 'items':  this._renderItems(ctx);  break
             case 'map':    this._renderMap(ctx);    break
             case 'quests': this._renderQuests(ctx); break
+            case 'rest':   this._renderRest(ctx);   break
+            case 'data':   this._renderData(ctx);   break
         }
         ctx.restore()
 
@@ -363,18 +385,117 @@ export class PipBoyPanel extends UIPanel {
         }
     }
 
+    // ── Rest tab (alarm clock) ─────────────────────────────────────────────
+
+    private _renderRest(ctx: OffscreenCanvasRenderingContext2D): void {
+        this._restButtons = []
+        let y = 18
+        drawLabel(ctx, 'ALARM CLOCK', 10, y); y += 18
+        drawText(ctx, 'Rest to advance game time and heal.', 16, y, FALLOUT_DARK_GRAY); y += 20
+
+        if (!canRest()) {
+            drawText(ctx, globalState.inCombat ? 'Cannot rest during combat.' : 'No player.', 16, y, FALLOUT_RED)
+            y += 20
+        }
+
+        const durations = [1, 3, 6, 12, 24]
+        const btnW = 56
+        const btnH = 22
+        let x = 16
+        for (const hours of durations) {
+            this._restButtons.push({ x, y, w: btnW, h: btnH, hours })
+            fillRect(ctx, x, y, btnW, btnH, { r: 0, g: 50, b: 0, a: 255 })
+            strokeRect(ctx, x, y, btnW, btnH, FALLOUT_GREEN, 1)
+            drawCenteredText(ctx, `${hours}h`, x + btnW / 2, y + 15, FALLOUT_GREEN, '11px monospace')
+            x += btnW + 8
+        }
+        y += btnH + 16
+
+        if (this._restMessage) {
+            drawText(ctx, this._restMessage, 16, y, FALLOUT_AMBER)
+        }
+    }
+
+    // ── Data / holodisk archives ───────────────────────────────────────────
+
+    private _renderData(ctx: OffscreenCanvasRenderingContext2D): void {
+        this._holodiskRows = []
+        let y = 18
+        drawLabel(ctx, 'ARCHIVES', 10, y); y += 18
+        const disks = getHolodisks()
+        if (disks.length === 0) {
+            drawText(ctx, 'No holodisks in archive.', 16, y, FALLOUT_DARK_GRAY)
+            return
+        }
+
+        for (const disk of disks) {
+            const rowH = 16
+            this._holodiskRows.push({ y, h: rowH, id: disk.id })
+            const selected = disk.id === this._selectedHolodiskId
+            const color = selected ? FALLOUT_AMBER : disk.read ? FALLOUT_GREEN : FALLOUT_AMBER
+            drawText(ctx, `${disk.read ? ' ' : '*'} ${disk.title}`, 16, y + 12, color)
+            y += rowH
+        }
+
+        y += 12
+        const selected = disks.find((d) => d.id === this._selectedHolodiskId) ?? disks[0]
+        if (selected) {
+            drawLabel(ctx, selected.title.toUpperCase(), 10, y); y += 18
+            const lines = selected.body.split('\n')
+            for (const line of lines) {
+                drawText(ctx, line, 16, y, FALLOUT_GREEN, '10px monospace')
+                y += 14
+                if (y > this.bounds.height - 80) break
+            }
+        }
+    }
+
+    private _doRest(hours: number): void {
+        const result: TimeAdvanceResult = restForHours(hours)
+        if (result.refusedReason === 'combat') {
+            this._restMessage = 'Cannot rest during combat.'
+            return
+        }
+        if (result.refusedReason) {
+            this._restMessage = 'Rest failed.'
+            return
+        }
+        this._restMessage = `Rested ${hours}h. Healed ${result.hpHealed} HP.` +
+            (result.eventsFired ? ` (${result.eventsFired} timed events)` : '')
+    }
+
     // ── Input handling ─────────────────────────────────────────────────────
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
         const { width } = this.bounds
         // Tab hit detection
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const tabW = Math.floor(width / tabs.length)
         if (y >= 30 && y < 52) {
             const idx = Math.floor(x / tabW)
             if (idx >= 0 && idx < tabs.length) {
                 this._switchTab(tabs[idx])
                 return true
+            }
+        }
+
+        // Content is translated by +56 in render
+        const contentY = y - 56
+        if (this.activeTab === 'rest' && contentY >= 0) {
+            for (const btn of this._restButtons) {
+                if (x >= btn.x && x < btn.x + btn.w && contentY >= btn.y && contentY < btn.y + btn.h) {
+                    this._doRest(btn.hours)
+                    return true
+                }
+            }
+        }
+        if (this.activeTab === 'data' && contentY >= 0) {
+            for (const row of this._holodiskRows) {
+                if (contentY >= row.y && contentY < row.y + row.h) {
+                    this._selectedHolodiskId = row.id
+                    markHolodiskRead(row.id)
+                    return true
+                }
             }
         }
         return true  // consume all clicks
@@ -386,7 +507,7 @@ export class PipBoyPanel extends UIPanel {
             return true
         }
         // Tab cycling
-        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests']
+        const tabs = PIPBOY_TABS
         const idx = tabs.indexOf(this.activeTab)
         if (key === 'ArrowRight' || key === 'Tab') {
             this._switchTab(tabs[(idx + 1) % tabs.length])
@@ -406,6 +527,12 @@ export class PipBoyPanel extends UIPanel {
             if (this.activeTab === 'items') {this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)}
             else if (this.activeTab === 'quests') {this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)}
             return true
+        }
+        // Rest shortcuts 1/3/6
+        if (this.activeTab === 'rest') {
+            if (key === '1') { this._doRest(1); return true }
+            if (key === '3') { this._doRest(3); return true }
+            if (key === '6') { this._doRest(6); return true }
         }
         return false
     }

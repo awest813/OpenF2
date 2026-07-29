@@ -52,6 +52,7 @@ import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
+import { advanceGameTime, bindTimedEventList } from './character/rest.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -3761,7 +3762,8 @@ export namespace Scripting {
                 return
             }
             info('advancing time ' + ticks + ' ticks ' + '(' + ticks / 10 + ' seconds)')
-            globalState.gameTickTime += ticks
+            // Slice G: process due timed events + chem clocks (no rest healing).
+            advanceGameTime(ticks, { heal: false, tickEffects: true, requireOutOfCombat: false })
         }
 
         // sfall extended API
@@ -9242,3 +9244,6 @@ export namespace Scripting {
         reset(mapName, mapID)
     }
 }
+
+// Slice G: rest/time-advance module shares the same timed-event queue.
+bindTimedEventList(Scripting.timeEventList)

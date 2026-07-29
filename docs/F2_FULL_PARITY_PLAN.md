@@ -225,6 +225,7 @@ Small PRs preferred; each slice should leave tests green.
 | D | Skilldex 6 missing skills | P0-3 | Done (core dispatch) |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | Done (tile FID + opt-in lane) |
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | Done (core tables + runtime; save/load of timed effects still open) |
+| G | Rest / holodisks / party | P1-11, P1-3 | Partial — rest + holodisk archives; party depth still open |
 | G | Rest / holodisks / party | P1-11, P1-3 | |
 | H | Rep + AI + car | P1-7, P1-1, P1-6 | |
 | I | Movies/speech + endgame | P1-9, P1-8 | |
@@ -254,5 +255,6 @@ Small PRs preferred; each slice should leave tests green.
 6. ~~Slice E: `get_tile_fid` + Arroyo real-script smoke / opt-in asset lane.~~
 7. ~~Continue P0-2: perk grant / XP award through Critter model.~~
 8. ~~Slice F: perks/traits + drugs + rad/poison (Tier 1 core).~~
-9. Slice G: rest / holodisks / party (Tier 1).
-10. Persist timed drug effects + addictions across save/load.
+9. ~~Slice G (partial): rest + holodisk archives.~~
+10. Slice G continued: party companion depth / `party.txt` tiers.
+11. Persist timed drug effects + addictions across save/load.

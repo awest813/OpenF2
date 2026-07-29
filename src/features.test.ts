@@ -192,19 +192,23 @@ describe('PipBoyPanel — lifecycle', () => {
         panel.onKeyDown('ArrowRight')
         expect((panel as any).activeTab).toBe('quests')
         panel.onKeyDown('ArrowRight')
+        expect((panel as any).activeTab).toBe('rest')
+        panel.onKeyDown('ArrowRight')
+        expect((panel as any).activeTab).toBe('data')
+        panel.onKeyDown('ArrowRight')
         expect((panel as any).activeTab).toBe('status') // wraps around
     })
 
     it('ArrowLeft cycles backwards through tabs', () => {
         expect((panel as any).activeTab).toBe('status')
         panel.onKeyDown('ArrowLeft')
-        expect((panel as any).activeTab).toBe('quests') // wraps backwards
+        expect((panel as any).activeTab).toBe('data') // wraps backwards
     })
 
     it('mouse click on tab region switches active tab', () => {
         // Tab 1 is at x=0..tabW, y=30..52
         const { width } = panel.bounds
-        const tabW = Math.floor(width / 4)
+        const tabW = Math.floor(width / 6)
         // Click on tab index 1 ('items')
         panel.onMouseDown(tabW + 5, 38, 'l')
         expect((panel as any).activeTab).toBe('items')

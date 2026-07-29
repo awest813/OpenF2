@@ -316,14 +316,11 @@ Bug fixes land in one and not the other, and which one runs depends on a config 
 
 ### P1-11 — Pip-Boy is missing holodisks, archives, automaps, and rest
 
-**Evidence.** `src/ui2/pipboy.ts:25` — `type PipBoyTab = 'status' | 'items' | 'map' |
-'quests'`. `grep -rniE "holodisk|automap"` → 0 hits. `grep -rniE "\brest\("|"sleep"` → 0
-hits.
-
-**Gap.** No holodisk reading (several quests hand you holodisks as their only payload), no
-Archives/Status sub-pages matching F2's layout, no automap per map/level, and — critically
-— **no rest/wait system**, so game time cannot be advanced deliberately. Multiple F2
-quests are gated on elapsed days.
+**Status.** Partial (Slice G). `src/character/rest.ts` advances `gameTickTime` with
+timed-event firing, Healing Rate over rest, and chem/rad/poison simulation; Pip-Boy has
+REST + DATA (archives) tabs; `src/character/holodisks.ts` is an in-memory archive with
+serialize helpers. Still open: FO2 automap per visited level, encounter interrupts while
+resting, richer Archives/Status layout, holodisk items from real protos.
 
 **Acceptance.** Holodisks collectible and readable, archives populated by quest/rumor
 state, automap rendered per visited level, and an alarm-clock rest UI that advances
