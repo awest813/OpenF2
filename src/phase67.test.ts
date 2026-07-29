@@ -108,8 +108,8 @@ describe('Phase 67-B — BLK-074: rm_timer_event null-obj guard', () => {
 // ===========================================================================
 
 describe('Phase 67-C — BLK-075: player injury flags save schema v19', () => {
-    it('SAVE_VERSION is now 24 (superseded from 20 → 24)', () => {
-        expect(SAVE_VERSION).toBe(24)
+    it('SAVE_VERSION is now 25 (superseded from 20 → 24)', () => {
+        expect(SAVE_VERSION).toBe(25)
     })
 
     it('migrates a v18 save to v19 and sets playerInjuryFlags = 0', () => {

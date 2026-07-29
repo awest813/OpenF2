@@ -27,6 +27,7 @@ import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
 import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
 import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import { openCompanionTrade } from '../partyTrade.js'
+import { canOpenCarTrunk, openCarTrunk, getCarTrunk, hasCar, getCarFuel } from '../car.js'
 import { Critter } from '../object.js'
 import { buildPipBoyMapData, markPlayerExplored } from '../character/automap.js'
 import {
@@ -99,6 +100,8 @@ export class PipBoyPanel extends UIPanel {
     private _holodiskRows: Array<{ y: number; h: number; id: string }> = []
     /** Hit regions for party trade rows on the DATA tab. */
     private _partyTradeRows: Array<{ y: number; h: number; member: Critter }> = []
+    /** Hit region for Highwayman trunk on the DATA tab. */
+    private _carTrunkRow: { y: number; h: number } | null = null
 
     constructor(
         screenWidth: number,
@@ -463,6 +466,7 @@ export class PipBoyPanel extends UIPanel {
     private _renderData(ctx: OffscreenCanvasRenderingContext2D): void {
         this._holodiskRows = []
         this._partyTradeRows = []
+        this._carTrunkRow = null
         let y = 18
 
         // Party trade (P1-3)
@@ -480,6 +484,20 @@ export class PipBoyPanel extends UIPanel {
                 drawText(ctx, label, 16, y + 12, FALLOUT_GREEN)
                 y += rowH
             }
+        }
+
+        y += 12
+        // Highwayman trunk (P1-6)
+        drawLabel(ctx, 'VEHICLE', 10, y); y += 18
+        if (hasCar()) {
+            const rowH = 16
+            this._carTrunkRow = { y, h: rowH }
+            const n = getCarTrunk().length
+            const fuel = getCarFuel()
+            drawText(ctx, `Highwayman trunk (${n} items, fuel ${fuel}) — open`, 16, y + 12, FALLOUT_GREEN)
+            y += rowH
+        } else {
+            drawText(ctx, 'No vehicle.', 16, y, FALLOUT_DARK_GRAY); y += 16
         }
 
         y += 12
@@ -560,6 +578,13 @@ export class PipBoyPanel extends UIPanel {
                     openCompanionTrade(row.member)
                     return true
                 }
+            }
+            if (this._carTrunkRow && contentY >= this._carTrunkRow.y && contentY < this._carTrunkRow.y + this._carTrunkRow.h) {
+                if (canOpenCarTrunk()) {
+                    this.hide()
+                    openCarTrunk()
+                }
+                return true
             }
             for (const row of this._holodiskRows) {
                 if (contentY >= row.y && contentY < row.y + row.h) {

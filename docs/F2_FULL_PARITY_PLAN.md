@@ -227,7 +227,7 @@ Small PRs preferred; each slice should leave tests green.
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | Done (core tables + runtime; save/load of timed effects still open) |
 | G | Rest / holodisks / party / automap | P1-11, P1-3, P1-1 partial | Done (core + rest interrupts); full AI.TXT still open |
 | F+ | Timed chem save/load | P1-5 | Done (schema v22 `timedEffects`) |
-| H | Rep + AI + car | P1-7, P1-1, P1-6 | Car stub (v24); town rep tiers/titles/GVAR sync + Pip-Boy/reaction/barter; disposition→targeting started |
+| H | Rep + AI + car | P1-7, P1-1, P1-6 | Car+trunk (v24/v25); town rep; AI attack_who/run_away/min_to_hit/called_freq; disposition targeting |
 | I | Movies/speech + endgame | P1-9, P1-8 | |
 | J | UI consolidation + region re-cert wave 1–N | P1-10, P0-5 | |
 

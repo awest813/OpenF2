@@ -21,8 +21,8 @@ import globalState from './globalState.js'
 // ===========================================================================
 
 describe('Phase 55-A — BLK-045: Player armor persistence save schema', () => {
-    it('SAVE_VERSION was 18 (now superseded to 24)', () => {
-        expect(SAVE_VERSION).toBe(24)
+    it('SAVE_VERSION was 18 (now superseded to 25)', () => {
+        expect(SAVE_VERSION).toBe(25)
     })
 
     it('migrateSave v15 → v18 leaves playerArmorPID as undefined (no armor)', () => {

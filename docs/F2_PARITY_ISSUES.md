@@ -155,17 +155,18 @@ regions to `NOT_STARTED` and re-earn them. Until then the gate status must read
 
 ### P1-1 — Combat AI uses 2 of ~20 AI.txt fields
 
-**Status.** Partial. AI.TXT still drives mainly `chance` / `min_hp`; party `disposition`
-now biases `Combat.findTarget` (aggressive / berserk / defensive / coward) and cowards
-flee earlier. Still open: full packet fields (`attack_who`, `run_away_mode`, `called_freq`, …).
+**Status.** Partial. AI.TXT now also drives `attack_who` (party control or packet),
+`run_away_mode` HP thresholds (via `fleeHpThreshold`), `min_to_hit` (hold fire / creep),
+and `called_freq` (aimed eyes shots). Party `disposition` still biases `Combat.findTarget`.
+Still open: `best_weapon`, `distance`, `area_attack_mode`, `chem_use` / stimpaks,
+`hurt_too_much`.
 
-**Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts`); historically
-only `info.chance` and `info.min_hp` were consumed in turn logic.
+**Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts`); helpers in
+`src/combatAi.ts`.
 
-**Gap.** Unused: `attack_who`, `best_weapon`, `distance`, `run_away_mode`,
-`area_attack_mode`, `hurt_too_much`, `chem_use`/`chem_primary_desire`, `secondary_freq`,
-`called_freq`, `min_to_hit`. Weapon selection, cover, stimpak use, burst positioning, and
-aimed shots remain incomplete.
+**Gap.** Unused: `best_weapon`, `distance`, `area_attack_mode`,
+`hurt_too_much`, `chem_use`/`chem_primary_desire`, `secondary_freq`. Weapon selection,
+cover, stimpak use, and burst positioning remain incomplete.
 
 **Acceptance.** AI turn resolution consumes the full packet. Regression tests per
 disposition/`attack_who`/`run_away_mode` combination using real AI.TXT rows.
@@ -230,13 +231,14 @@ withdrawal onset/penalties, and save/load persistence of active effects and addi
 
 ### P1-6 — No Highwayman car
 
-**Status.** Partial (Slice H stub). `src/car.ts` tracks ownership (`hasCar`, save v24),
-fuel burn on world-map travel ticks, and a 2× travel speed when fueled. sfall
-`set_car_fuel_amount` implies ownership. Still open: Den acquisition quest, trunk
-inventory, per-town parking/placement, car-stolen plot.
+**Status.** Partial (Slice H). `src/car.ts` tracks ownership (`hasCar`, save v24),
+fuel burn on world-map travel ticks, 2× travel speed when fueled, and a persistent
+**trunk inventory** (save v25) openable from Pip-Boy DATA. sfall `set_car_fuel_amount`
+and GVAR 18 imply ownership. Still open: Den acquisition quest, per-town
+parking/placement, car-stolen plot.
 
-**Gap.** Den acquisition, trunk inventory, per-town parking/placement, car-stolen plot,
-and FO2-accurate fuel economics remain.
+**Gap.** Den acquisition, per-town parking/placement, car-stolen plot, and
+FO2-accurate fuel economics remain.
 
 **Acceptance.** Car acquirable in the Den, drivable on the world map with correct
 speed/fuel model, trunk usable as persistent storage, parked instance appears on town

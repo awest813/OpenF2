@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 24
+export const SAVE_VERSION = 25
 
 export interface SaveGame {
     id?: number
@@ -352,6 +352,11 @@ export interface SaveGame {
      */
     hasCar?: boolean
 
+    /**
+     * Highwayman trunk inventory (v25+ / P1-6).
+     */
+    carTrunk?: SerializedObj[]
+
     player: {
         position: Point
         orientation: number
@@ -555,6 +560,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             }
             save.version = 24
             // falls through
+        case 24:
+            // v24 → v25: Highwayman trunk inventory (P1-6).
+            if (save.carTrunk === undefined) {save.carTrunk = []}
+            save.version = 25
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -671,6 +681,9 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
         save.automap = cleaned
     }
     save.hasCar = save.hasCar === true
+    if (!Array.isArray(save.carTrunk)) {
+        save.carTrunk = []
+    }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {

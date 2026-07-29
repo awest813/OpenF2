@@ -150,8 +150,8 @@ describe('Parity — Highwayman car stub (P1-6)', () => {
         expect(burnCarFuelOnTravel()).toBe(0)
     })
 
-    it('SAVE_VERSION is 24 and v23 migrates hasCar from fuel', () => {
-        expect(SAVE_VERSION).toBe(24)
+    it('SAVE_VERSION is 25 and v23 migrates hasCar from fuel', () => {
+        expect(SAVE_VERSION).toBe(25)
         const migrated = migrateSave({
             version: 23,
             name: 'car-mig',
@@ -163,7 +163,7 @@ describe('Parity — Highwayman car stub (P1-6)', () => {
             party: [],
             savedMaps: {},
         } as any)
-        expect(migrated.version).toBe(24)
+        expect(migrated.version).toBe(25)
         expect(migrated.hasCar).toBe(true)
 
         const empty = migrateSave({

@@ -22,8 +22,8 @@ import { StatSet } from './char.js'
 // ===========================================================================
 
 describe('Phase 51-A — Player base stats/skills persistence (BLK-035)', () => {
-    it('SAVE_VERSION was 18 (now superseded to 24)', () => {
-        expect(SAVE_VERSION).toBe(24)
+    it('SAVE_VERSION was 18 (now superseded to 25)', () => {
+        expect(SAVE_VERSION).toBe(25)
     })
 
     it('v13 → v14 migration adds playerBaseStats defaulting to {}', () => {

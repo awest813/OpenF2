@@ -1,17 +1,24 @@
 /**
- * Highwayman car travel helpers (parity Slice H / P1-6 minimal).
+ * Highwayman car travel helpers (parity Slice H / P1-6).
  *
- * Ownership + fuel burn + world-map speed bonus. Acquisition/trunk/parking
- * remain out of scope for this stub.
+ * Ownership + fuel burn + world-map speed bonus + persistent trunk inventory.
+ * Den acquisition quest / per-town parking remain out of scope.
  */
 
 import globalState from './globalState.js'
+import { Critter, deserializeObj, Obj, SerializedObj } from './object.js'
+import { LootPanel } from './ui2/lootPanel.js'
+import { UIMode } from './uiMode.js'
+import { uiLog } from './ui.js'
 
 export const CAR_FUEL_MAX = 80000
 /** Fuel burned per world-map travel update tick while the car is moving. */
 export const CAR_FUEL_BURN_PER_TICK = 12
 /** Speed multiplier when the player owns a fueled car. */
 export const CAR_SPEED_MULT = 2
+
+/** Live trunk contents (not on globalState — serialized explicitly into saves). */
+let carTrunk: Obj[] = []
 
 export function hasCar(): boolean {
     return !!globalState.hasCar
@@ -57,4 +64,63 @@ export function burnCarFuelOnTravel(): number {
     const burn = Math.min(CAR_FUEL_BURN_PER_TICK, fuel)
     globalState.carFuel = fuel - burn
     return burn
+}
+
+export function getCarTrunk(): Obj[] {
+    return carTrunk
+}
+
+export function clearCarTrunk(): void {
+    carTrunk = []
+}
+
+export function serializeCarTrunk(): SerializedObj[] {
+    return carTrunk.map((obj) => obj.serialize())
+}
+
+export function hydrateCarTrunk(items: SerializedObj[] | null | undefined): void {
+    if (!Array.isArray(items)) {
+        carTrunk = []
+        return
+    }
+    carTrunk = []
+    for (const raw of items) {
+        try {
+            carTrunk.push(deserializeObj(raw))
+        } catch (err) {
+            console.warn('hydrateCarTrunk: skipped bad item', err)
+        }
+    }
+}
+
+/** Add an object to the trunk (tests / scripts). */
+export function addToCarTrunk(obj: Obj): void {
+    if (!obj) return
+    carTrunk.push(obj)
+}
+
+/**
+ * Open the Highwayman trunk against the player's inventory via LootPanel.
+ * Returns false when the player does not own a car or UI is unavailable.
+ */
+export function openCarTrunk(): boolean {
+    if (!hasCar()) return false
+    if (globalState.inCombat) return false
+    const player = globalState.player as Critter | null
+    if (!player || !Array.isArray(player.inventory)) return false
+
+    const mgr = globalState.uiManager
+    const panel = mgr?.get?.('loot') as LootPanel | undefined
+    if (panel && typeof panel.openWithLive === 'function') {
+        panel.openWithLive(player.inventory as Obj[], carTrunk)
+        globalState.uiMode = UIMode.loot
+        uiLog('Opened Highwayman trunk.')
+        return true
+    }
+    console.warn('openCarTrunk: LootPanel unavailable')
+    return false
+}
+
+export function canOpenCarTrunk(): boolean {
+    return hasCar() && !globalState.inCombat && !!globalState.player
 }

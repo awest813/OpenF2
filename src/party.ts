@@ -21,6 +21,8 @@ import {
     PartyMemberControl,
     PartyDistance,
     PartyDisposition,
+    PartyAttackWho,
+    PartyRunAway,
     PARTY_STATE_WAITING,
     defaultControlFromDef,
     getPartyMemberDef,
@@ -133,6 +135,28 @@ export class Party {
             return
         }
         ctrl.disposition = disposition
+    }
+
+    setAttackWho(obj: Critter, attackWho: PartyAttackWho): void {
+        const ctrl = this.getControl(obj)
+        const def = getPartyMemberDef(obj?.pid)
+        if (!ctrl) return
+        if (def && def.attackWho.length > 0 && !def.attackWho.includes(attackWho)) {
+            console.warn('setAttackWho: %s not allowed for pid %s', attackWho, obj.pid)
+            return
+        }
+        ctrl.attackWho = attackWho
+    }
+
+    setRunAwayMode(obj: Critter, runAwayMode: PartyRunAway): void {
+        const ctrl = this.getControl(obj)
+        const def = getPartyMemberDef(obj?.pid)
+        if (!ctrl) return
+        if (def && def.runAwayMode.length > 0 && !def.runAwayMode.includes(runAwayMode)) {
+            console.warn('setRunAwayMode: %s not allowed for pid %s', runAwayMode, obj.pid)
+            return
+        }
+        ctrl.runAwayMode = runAwayMode
     }
 
     /** True when the member should trail the player (not waiting / stay). */
