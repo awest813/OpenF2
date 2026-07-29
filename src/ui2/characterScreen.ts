@@ -14,6 +14,7 @@ import {
     syncPlayerEntityFromCritter,
     spendCritterSkillPoint,
     ECS_SKILL_TO_DISPLAY,
+    recordCritterPerkGrant,
 } from '../playerProjection.js'
 
 type TabName = 'stats' | 'skills' | 'perks'
@@ -468,6 +469,8 @@ export class CharacterScreen extends UIPanel {
                                     if (success) {
                                         player.acquiredPerks.push(item.perk.id)
                                         player.perksAvailable = Math.max(0, player.perksAvailable - 1)
+                                        // Critter is source of truth for perk ranks / owed credits.
+                                        recordCritterPerkGrant(item.perk.id)
                                     }
                                 }
                                 return true

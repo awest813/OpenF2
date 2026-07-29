@@ -14,6 +14,7 @@
 import globalState from './globalState.js'
 import { EntityManager } from './ecs/entityManager.js'
 import type { SkillsComponent, StatsComponent } from './ecs/components.js'
+import { xpForLevel } from './ecs/derivedStats.js'
 
 const SPECIAL_TO_ECS: Array<[string, keyof StatsComponent]> = [
     ['STR', 'strength'],
@@ -146,6 +147,9 @@ export function syncPlayerEntityFromCritter(): void {
         if (typeof player.xp === 'number') {
             stats.xp = player.xp
         }
+        if (typeof player.level === 'number') {
+            stats.xpToNextLevel = xpForLevel(player.level + 1)
+        }
     }
 
     const combat = EntityManager.get<'combat'>(entityId, 'combat')
@@ -187,7 +191,36 @@ export function syncPlayerEntityFromCritter(): void {
         } else if (Array.isArray(globalState.playerCharTraits)) {
             playerComp.acquiredTraits = [...globalState.playerCharTraits]
         }
+        playerComp.perksAvailable = Math.max(0, globalState.playerPerksOwed ?? 0)
+        if (player.perkRanks && typeof player.perkRanks === 'object') {
+            const acquired: number[] = []
+            for (const [idStr, rank] of Object.entries(player.perkRanks)) {
+                const id = Number(idStr)
+                const r = typeof rank === 'number' ? rank : 0
+                for (let i = 0; i < r; i++) {
+                    acquired.push(id)
+                }
+            }
+            playerComp.acquiredPerks = acquired
+        }
     }
+}
+
+/**
+ * Record a perk pick on the Critter (source of truth) and decrement perks owed.
+ * Call after a successful ECS `grantPerk` (or instead of it when migrating fully).
+ */
+export function recordCritterPerkGrant(perkId: number): void {
+    const player = globalState.player as any
+    if (!player) {
+        return
+    }
+    if (!player.perkRanks || typeof player.perkRanks !== 'object') {
+        player.perkRanks = {}
+    }
+    player.perkRanks[perkId] = (player.perkRanks[perkId] ?? 0) + 1
+    globalState.playerPerksOwed = Math.max(0, (globalState.playerPerksOwed ?? 0) - 1)
+    syncPlayerEntityFromCritter()
 }
 
 /**

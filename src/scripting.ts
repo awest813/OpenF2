@@ -50,6 +50,7 @@ import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
+import { syncPlayerEntityFromCritter } from './playerProjection.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -1446,6 +1447,8 @@ export namespace Scripting {
                     globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
                 }
             }
+            // Keep ECS HUD / character sheet aligned with Critter XP (P0-2).
+            syncPlayerEntityFromCritter()
         }
 
         // critters
