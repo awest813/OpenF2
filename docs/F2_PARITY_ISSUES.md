@@ -228,7 +228,10 @@ withdrawal onset/penalties, and save/load persistence of active effects and addi
 
 ---
 
-### P1-6 — No Highwayman car
+**Status.** Partial (Slice H stub). `src/car.ts` tracks ownership (`hasCar`, save v24),
+fuel burn on world-map travel ticks, and a 2× travel speed when fueled. sfall
+`set_car_fuel_amount` implies ownership. Still open: Den acquisition quest, trunk
+inventory, per-town parking/placement, car-stolen plot.
 
 **Evidence.** `grep -rniE "highwayman|\bcar\b"` finds only `globalState.carFuel` /
 `save.carFuel` (`saveload.ts:396`) and the sfall fuel opcodes. Nothing consumes fuel,
@@ -316,12 +319,13 @@ Bug fixes land in one and not the other, and which one runs depends on a config 
 
 ### P1-11 — Pip-Boy is missing holodisks, archives, automaps, and rest
 
-**Status.** Partial (Slice G). `src/character/rest.ts` advances `gameTickTime` with
-timed-event firing, Healing Rate over rest, and chem/rad/poison simulation; Pip-Boy has
+**Status.** Partial (Slice G + rest interrupts). `src/character/rest.ts` advances
+`gameTickTime` with timed-event firing, Healing Rate over rest, chem/rad/poison
+simulation, and hour-by-hour encounter interrupt rolls (`rest:interrupted`); Pip-Boy has
 REST + DATA (archives) tabs; `src/character/holodisks.ts` is an in-memory archive with
 serialize helpers; **local automap** (`src/character/automap.ts`, save v23) records visited
 hexes and drives the Pip-Boy MAP tab. Still open: FO2 automap FRMs / MAP.MSG names,
-encounter interrupts while resting, richer Archives layout.
+richer Archives layout, map-linked encounter spawn on interrupt.
 
 **Acceptance.** Holodisks collectible and readable, archives populated by quest/rumor
 state, automap rendered per visited level, and an alarm-clock rest UI that advances

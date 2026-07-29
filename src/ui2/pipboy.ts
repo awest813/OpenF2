@@ -490,8 +490,10 @@ export class PipBoyPanel extends UIPanel {
             this._restMessage = 'Rest failed.'
             return
         }
-        this._restMessage = `Rested ${hours}h. Healed ${result.hpHealed} HP.` +
-            (result.eventsFired ? ` (${result.eventsFired} timed events)` : '')
+        this._restMessage = result.interrupted
+            ? `Rest interrupted after ${result.hoursCompleted ?? 0}h! Healed ${result.hpHealed} HP.`
+            : `Rested ${hours}h. Healed ${result.hpHealed} HP.` +
+              (result.eventsFired ? ` (${result.eventsFired} timed events)` : '')
     }
 
     // ── Input handling ─────────────────────────────────────────────────────

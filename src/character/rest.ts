@@ -3,7 +3,7 @@
  *
  * Advances `globalState.gameTickTime`, fires due scripted timed events, applies
  * Healing Rate over rest, and runs chem/rad/poison clocks so large jumps stay
- * consistent with the 10 Hz path.
+ * consistent with the 10 Hz path. Long rests may be interrupted by encounters.
  */
 
 import globalState from '../globalState.js'
@@ -11,6 +11,8 @@ import { Critter } from '../object.js'
 import { tickTimedEffects } from './timedEffects.js'
 import { tickPoison, tickRadiation } from './radiationPoison.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
+import { EventBus } from '../eventBus.js'
+import { Config } from '../config.js'
 
 /** FO2: heal `Healing Rate` HP every 3 game hours while resting. */
 export const TICKS_PER_SECOND = 10
@@ -26,9 +28,22 @@ export interface TimedEventLike {
 
 let timedEventList: TimedEventLike[] | null = null
 
+/** Optional override for tests / scripts (`null` = auto-detect). */
+let restDangerOverride: RestDanger | null = null
+
 /** Called once from scripting.ts after the event queue is created. */
 export function bindTimedEventList(list: TimedEventLike[]): void {
     timedEventList = list
+}
+
+export type RestDanger = 'safe' | 'low' | 'medium' | 'high'
+
+/** Interrupt chance (%) rolled once per rested hour. */
+export const REST_INTERRUPT_CHANCE: Record<RestDanger, number> = {
+    safe: 0,
+    low: 3,
+    medium: 10,
+    high: 25,
 }
 
 export interface TimeAdvanceResult {
@@ -36,6 +51,10 @@ export interface TimeAdvanceResult {
     eventsFired: number
     hpHealed: number
     refusedReason?: 'combat' | 'no_player' | 'invalid'
+    /** True when a rest encounter interrupted the remaining hours. */
+    interrupted?: boolean
+    /** Whole hours completed before interrupt (rest path). */
+    hoursCompleted?: number
 }
 
 export interface AdvanceOptions {
@@ -167,16 +186,104 @@ export function canRest(): boolean {
     return !!globalState.player && !globalState.inCombat
 }
 
-/** Rest for a number of game hours (Pip-Boy alarm clock). */
+/** Force rest danger for tests; pass null to clear. */
+export function setRestDangerOverride(danger: RestDanger | null): void {
+    restDangerOverride = danger
+}
+
+/**
+ * Heuristic rest safety. Outdoor maps / world-map context are riskier.
+ * Scripts/tests can override via `setRestDangerOverride`.
+ */
+export function getRestDanger(): RestDanger {
+    if (restDangerOverride) return restDangerOverride
+    if (Config.engine?.doEncounters === false) return 'safe'
+    const map = globalState.gMap as any
+    if (map?.isOutdoor === true || map?.restDanger === 'high') return 'high'
+    if (map?.restDanger === 'medium' || map?.isOutdoor === 'partial') return 'medium'
+    if (map?.restDanger === 'safe' || map?.isIndoor === true) return 'safe'
+    // Travelling / recently on world map → elevated risk
+    if (globalState.worldPosition) return 'medium'
+    return 'low'
+}
+
+/**
+ * Roll whether rest is interrupted for the coming hour.
+ * Exported for tests; uses Math.random unless a custom rng is passed.
+ */
+export function rollRestInterrupt(danger: RestDanger = getRestDanger(), rng: () => number = Math.random): boolean {
+    const chance = REST_INTERRUPT_CHANCE[danger] ?? 0
+    if (chance <= 0) return false
+    return Math.floor(rng() * 100) < chance
+}
+
+/** Rest for a number of game hours (Pip-Boy alarm clock), hour-by-hour with interrupt checks. */
 export function restForHours(hours: number): TimeAdvanceResult {
     if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0) {
         return { ticksAdvanced: 0, eventsFired: 0, hpHealed: 0, refusedReason: 'invalid' }
     }
-    return advanceGameTime(hours * TICKS_PER_HOUR, {
-        heal: true,
-        tickEffects: true,
-        requireOutOfCombat: true,
-    })
+    if (!canRest()) {
+        return {
+            ticksAdvanced: 0,
+            eventsFired: 0,
+            hpHealed: 0,
+            refusedReason: globalState.inCombat ? 'combat' : 'no_player',
+        }
+    }
+
+    const wholeHours = Math.floor(hours)
+    const frac = hours - wholeHours
+    let ticksAdvanced = 0
+    let eventsFired = 0
+    let hpHealed = 0
+    let hoursCompleted = 0
+    let interrupted = false
+
+    for (let h = 0; h < wholeHours; h++) {
+        if (rollRestInterrupt()) {
+            interrupted = true
+            EventBus.emit('rest:interrupted', {
+                hoursCompleted,
+                hoursRequested: hours,
+                danger: getRestDanger(),
+            })
+            break
+        }
+        const chunk = advanceGameTime(TICKS_PER_HOUR, {
+            heal: true,
+            tickEffects: true,
+            requireOutOfCombat: true,
+        })
+        if (chunk.refusedReason) {
+            return { ...chunk, hoursCompleted, interrupted }
+        }
+        ticksAdvanced += chunk.ticksAdvanced
+        eventsFired += chunk.eventsFired
+        hpHealed += chunk.hpHealed
+        hoursCompleted++
+    }
+
+    if (!interrupted && frac > 0.001) {
+        if (rollRestInterrupt()) {
+            interrupted = true
+            EventBus.emit('rest:interrupted', {
+                hoursCompleted,
+                hoursRequested: hours,
+                danger: getRestDanger(),
+            })
+        } else {
+            const chunk = advanceGameTime(Math.floor(frac * TICKS_PER_HOUR), {
+                heal: true,
+                tickEffects: true,
+                requireOutOfCombat: true,
+            })
+            ticksAdvanced += chunk.ticksAdvanced
+            eventsFired += chunk.eventsFired
+            hpHealed += chunk.hpHealed
+        }
+    }
+
+    return { ticksAdvanced, eventsFired, hpHealed, interrupted, hoursCompleted }
 }
 
 /** Rest for a number of game minutes. */
@@ -184,11 +291,15 @@ export function restForMinutes(minutes: number): TimeAdvanceResult {
     if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0) {
         return { ticksAdvanced: 0, eventsFired: 0, hpHealed: 0, refusedReason: 'invalid' }
     }
-    return advanceGameTime(minutes * 60 * TICKS_PER_SECOND, {
-        heal: true,
-        tickEffects: true,
-        requireOutOfCombat: true,
-    })
+    // Short rests (< 60 min) skip interrupt rolls; longer ones go through hours.
+    if (minutes < 60) {
+        return advanceGameTime(minutes * 60 * TICKS_PER_SECOND, {
+            heal: true,
+            tickEffects: true,
+            requireOutOfCombat: true,
+        })
+    }
+    return restForHours(minutes / 60)
 }
 
 export function hoursToTicks(hours: number): number {

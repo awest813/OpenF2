@@ -22,6 +22,7 @@ import { Scripting } from './scripting.js'
 import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
 import { serializeTimedEffects, hydrateTimedEffects } from './character/timedEffects.js'
 import { serializeAutomap, hydrateAutomap } from './character/automap.js'
+import { setHasCar } from './car.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
@@ -171,6 +172,8 @@ function applyExtraSaveState(save: SaveGame): void {
     hydrateTimedEffects(save.timedEffects)
     // Slice G / P1-11: restore local automap fog.
     hydrateAutomap(save.automap)
+    // P1-6: Highwayman ownership (fuel alone is not enough after empty tank).
+    setHasCar(save.hasCar === true)
 }
 
 // Saving and loading support
@@ -455,6 +458,8 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     save.timedEffects = serializeTimedEffects()
     // Slice G / P1-11: local automap fog.
     save.automap = serializeAutomap()
+    // P1-6: Highwayman ownership.
+    save.hasCar = globalState.hasCar === true
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     // BLK-080: Guard against null gMap in the log message — save() can be called

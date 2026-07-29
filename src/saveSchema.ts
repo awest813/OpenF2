@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 23
+export const SAVE_VERSION = 24
 
 export interface SaveGame {
     id?: number
@@ -346,6 +346,12 @@ export interface SaveGame {
      */
     automap?: Record<string, number[]>
 
+    /**
+     * True when the player owns the Highwayman (v24+ / P1-6 stub).
+     * Empty tank still counts as owned once acquired.
+     */
+    hasCar?: boolean
+
     player: {
         position: Point
         orientation: number
@@ -542,6 +548,13 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.automap === undefined) {save.automap = {}}
             save.version = 23
             // falls through
+        case 23:
+            // v23 → v24: Highwayman ownership flag (P1-6).
+            if (save.hasCar === undefined) {
+                save.hasCar = typeof save.carFuel === 'number' && save.carFuel > 0
+            }
+            save.version = 24
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -657,6 +670,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
         }
         save.automap = cleaned
     }
+    save.hasCar = save.hasCar === true
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {

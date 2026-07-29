@@ -103,6 +103,9 @@ export interface EngineEvents {
     'game:characterCreated': { name: string; mapName: string }
     'game:enterWorld': { mapName: string }
 
+    /** Pip-Boy / rest clock interrupted by a potential encounter. */
+    'rest:interrupted': { hoursCompleted: number; hoursRequested: number; danger: string }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

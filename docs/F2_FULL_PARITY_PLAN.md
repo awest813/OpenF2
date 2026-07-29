@@ -225,11 +225,9 @@ Small PRs preferred; each slice should leave tests green.
 | D | Skilldex 6 missing skills | P0-3 | Done (core dispatch) |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | Done (tile FID + opt-in lane) |
 | F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | Done (core tables + runtime; save/load of timed effects still open) |
-| G | Rest / holodisks / party / automap | P1-11, P1-3, P1-1 partial | Done (core); rest interrupts / full AI.TXT still open |
+| G | Rest / holodisks / party / automap | P1-11, P1-3, P1-1 partial | Done (core + rest interrupts); full AI.TXT still open |
 | F+ | Timed chem save/load | P1-5 | Done (schema v22 `timedEffects`) |
-| H | Rep + AI + car | P1-7, P1-1, P1-6 | Party disposition→targeting started; car/rep still open |
-| G | Rest / holodisks / party | P1-11, P1-3 | |
-| H | Rep + AI + car | P1-7, P1-1, P1-6 | |
+| H | Rep + AI + car | P1-7, P1-1, P1-6 | Car ownership/fuel/speed stub (v24); disposition→targeting started; rep still open |
 | I | Movies/speech + endgame | P1-9, P1-8 | |
 | J | UI consolidation + region re-cert wave 1–N | P1-10, P0-5 | |
 

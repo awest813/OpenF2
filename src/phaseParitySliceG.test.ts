@@ -13,6 +13,7 @@ import {
     HEAL_INTERVAL_TICKS,
     TICKS_PER_HOUR,
     bindTimedEventList,
+    setRestDangerOverride,
 } from './character/rest.js'
 import {
     addHolodisk,
@@ -34,6 +35,7 @@ describe('Parity Slice G — rest / time advance', () => {
         savedCombat = globalState.inCombat
         Scripting.timeEventList.length = 0
         bindTimedEventList(Scripting.timeEventList)
+        setRestDangerOverride('safe')
         globalState.player = new Player()
         globalState.gameTickTime = 10_000
         globalState.inCombat = false
@@ -44,6 +46,7 @@ describe('Parity Slice G — rest / time advance', () => {
         globalState.gameTickTime = savedTick
         globalState.inCombat = savedCombat
         Scripting.timeEventList.length = 0
+        setRestDangerOverride(null)
     })
 
     it('canRest is false during combat', () => {

@@ -53,6 +53,7 @@ import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
+import { setCarFuel } from './car.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -5886,7 +5887,7 @@ export namespace Scripting {
         // Set the current fuel level of the player's car.
         // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
         set_car_fuel_amount_sfall(amount: number): void {
-            globalState.carFuel = Math.max(0, Math.min(80000, amount))
+            setCarFuel(amount)
         }
 
         // sfall 0x822B — get_critter_ai_packet_sfall(obj):
