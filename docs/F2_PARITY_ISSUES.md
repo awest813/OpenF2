@@ -157,16 +157,17 @@ regions to `NOT_STARTED` and re-earn them. Until then the gate status must read
 
 **Status.** Partial. AI.TXT now also drives `attack_who` (party control or packet),
 `run_away_mode` HP thresholds (via `fleeHpThreshold`), `min_to_hit` (hold fire / creep),
-and `called_freq` (aimed eyes shots). Party `disposition` still biases `Combat.findTarget`.
-Still open: `best_weapon`, `distance`, `area_attack_mode`, `chem_use` / stimpaks,
-`hurt_too_much`.
+`called_freq` (aimed eyes shots), `chem_use` (stimpak when hurt), and `best_weapon`
+(suppress burst for melee/unarmed prefs). Party `disposition` still biases
+`Combat.findTarget`. Still open: weapon swapping for `best_weapon`, `distance`,
+`area_attack_mode`, `hurt_too_much`.
 
 **Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts`); helpers in
 `src/combatAi.ts`.
 
-**Gap.** Unused: `best_weapon`, `distance`, `area_attack_mode`,
-`hurt_too_much`, `chem_use`/`chem_primary_desire`, `secondary_freq`. Weapon selection,
-cover, stimpak use, and burst positioning remain incomplete.
+**Gap.** Unused: full `best_weapon` swap, `distance`, `area_attack_mode`,
+`hurt_too_much`, `chem_primary_desire`, `secondary_freq`. Cover and burst positioning
+remain incomplete.
 
 **Acceptance.** AI turn resolution consumes the full packet. Regression tests per
 disposition/`attack_who`/`run_away_mode` combination using real AI.TXT rows.
@@ -269,13 +270,15 @@ reaction checks and barter pricing.
 
 ### P1-8 — No endgame: no ending selection, no ending slides
 
-**Evidence.** `grep -rniE "endgame|ENDGAME"` → 0 hits. `src/cinematic.ts` (198 lines) is a
-generic slide player: `{ imagePath, caption, duration }`, no Fallout content.
+**Status.** Partial (Slice I stub). `src/endgame.ts` parses ENDGAME.TXT (or a built-in
+table keyed by `GVAR_ENDGAME_MOVIE_*` 408+), selects matching slides, builds a
+`CinematicSequence` with a credits beat, and is triggered by `metarule(1)` /
+`signalEndGame`. Emits `endgame:start` / `endgame:credits` / `endgame:returnToMenu`.
+Still open: real ending art + narrator VO, death-vs-victory art paths, main-menu
+UI handoff wiring.
 
-**Gap.** No `ENDGAME.TXT` parsing, no per-town ending-slide selection driven by quest
-globals and reputation, no narrator VO, no credits, no "game over / you died" path.
-`docs/F2_RELEASE_GATE.md` requires "Ending slides/cinematic handoff completes" — there is
-nothing to hand off to.
+**Gap.** Asset-backed slides/narration ACM, full Oil Rig victory script integration
+smoke, and return-to-menu UI panel.
 
 **Acceptance.** Reaching the Oil Rig ending trigger selects the correct slide set from
 quest/reputation state, plays them with narration, and rolls credits back to the main
@@ -285,18 +288,17 @@ menu.
 
 ### P1-9 — No movie playback and no speech audio; audio pipeline is Windows-only and partial
 
-**Evidence**
-- `play_gmovie` / `metarule(5/MOVIE)` exist as log-only no-ops (`scripting.ts`); there is no FMV decoder or browser video player wired to them.
-- `setup.py` converts DAT extraction, images, PROs, and maps (`export_images`,
-  `export_pros`, `export_maps`) — no audio, no movies, no `.int` scripts, no `.msg` text.
-- `ASSETS.md:55` — "**Audio** is NOT automated. Run separately: `python convertAudio.py
-  INSTALL_DIR` (requires `acm2wav.exe`)."
-- `convertAudio.py:23-27` — hard-requires `acm2wav.exe` and an `SFX/` directory; covers
-  SFX and music only.
+**Status.** Partial (Slice I stub). `src/movies.ts` maps FO2 movie IDs, and
+`play_gmovie` / `metarule(5/MOVIE)` emit `movie:play` / `movie:end` (optional
+placeholder cinematic). Still open: FMV decode/transcode, speech ACM, cross-platform
+audio converter.
 
-**Gap.** No intro movie, no Vault City/Enclave cutscene movies, no ending movie, no
-character speech (`.ACM` dialogue VO). The audio converter cannot run on Linux/macOS
-without Wine.
+**Evidence (historical)**
+- `play_gmovie` / `metarule(5/MOVIE)` were log-only no-ops.
+- Audio converter requires Windows `acm2wav.exe`.
+
+**Gap.** No intro/cutscene video assets in-browser, no speech `.ACM` pipeline, converter
+still Windows-centric.
 
 **Acceptance.** Movies transcoded to a browser-playable container and played at their F2
 trigger points; speech `.ACM` converted and played during dialogue; a cross-platform

@@ -63,6 +63,8 @@ import {
     townRepTier,
     reactionBiasForTier,
 } from './quest/townReputation.js'
+import { signalEndGame } from './endgame.js'
+import { playMovie } from './movies.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -1101,10 +1103,12 @@ export namespace Scripting {
                 // Additional metarule IDs — de-stubbed with safe defaults
                 // -----------------------------------------------------------------------
                 case 1:
-                    // METARULE_SIGNAL_END_GAME: trigger end-game sequence for given reason.
-                    // Browser build has no end-game cinematic pipeline; treat as no-op.
-                    log('metarule', arguments)
-                    return 0
+                    // METARULE_SIGNAL_END_GAME: trigger end-game slideshow (P1-8).
+                    {
+                        const reason = typeof target === 'number' && Number.isFinite(target) ? target : 0
+                        signalEndGame(reason, globalVars, { play: true })
+                        return 0
+                    }
                 case 2:
                     // METARULE_TIMER_FIRED: 1 if the timed event for `target` has elapsed.
                     // Without a running timer-fired table, default to 0 (not fired).
@@ -1118,10 +1122,12 @@ export namespace Scripting {
                     // No radiation display panel in browser build; return 0.
                     return 0
                 case 5:
-                    // METARULE_MOVIE: play a game movie by ID.
-                    // Browser build has no FMV pipeline; treat as no-op and return 0.
-                    log('metarule(5/MOVIE)', arguments)
-                    return 0
+                    // METARULE_MOVIE: play a game movie by ID (P1-9 stub).
+                    {
+                        const movieID = typeof target === 'number' && Number.isFinite(target) ? target : 0
+                        playMovie(movieID)
+                        return 0
+                    }
                 case 6:
                     // METARULE_ARMOR_WORN: 1 if `target` is a critter wearing armor.
                     if (isGameObject(target) && (target as any).equippedArmor) {return 1}
@@ -4473,9 +4479,8 @@ export namespace Scripting {
             else {globalState.gMap.loadMapByID(map)}
         }
         play_gmovie(movieID: number) {
-            // Play a full-motion video clip by ID.  The browser build does not
-            // currently have an FMV pipeline, so we skip playback silently rather
-            // than emitting a stub warning on every intro/cut-scene trigger.
+            // P1-9: resolve FO2 movie ID, emit movie:play / optional cinematic placeholder.
+            playMovie(typeof movieID === 'number' ? movieID : 0)
             log('play_gmovie', arguments)
         }
         mark_area_known(areaType: number, area: number, markState: number) {

@@ -106,6 +106,15 @@ export interface EngineEvents {
     /** Pip-Boy / rest clock interrupted by a potential encounter. */
     'rest:interrupted': { hoursCompleted: number; hoursRequested: number; danger: string }
 
+    /** Ending slideshow (P1-8). */
+    'endgame:start': { reason: number; slideCount: number; narrIds: string[] }
+    'endgame:credits': { slideCount: number }
+    'endgame:returnToMenu': Record<string, never>
+
+    /** Game movie playback (P1-9 stub). */
+    'movie:play': { movieID: number; movieId: string; title: string }
+    'movie:end': { movieID: number; movieId: string }
+
     // Scripting
     'script:error': { scriptName: string; opcode: number; message: string }
     'script:stub': { scriptName: string; procName: string }

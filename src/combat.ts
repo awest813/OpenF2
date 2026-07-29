@@ -30,8 +30,11 @@ import {
     normalizeAttackWho,
     parseAiInt,
     shouldAttemptCalledShot,
+    chemUseHpRatioThreshold,
+    bestWeaponSuppressesBurst,
     type AiAttackWho,
 } from './combatAi.js'
+import { applyDrugToCritter } from './character/timedEffects.js'
 
 // Turn-based combat system
 
@@ -1001,11 +1004,34 @@ export class Combat {
             // out of AP
             {return this.nextTurn()}
 
+        // P1-1: chem_use — spend a stimpak when hurt enough (party control or AI.TXT).
+        const partyCtrlEarly = globalState.gParty?.getControl?.(obj)
+        const chemUse = partyCtrlEarly?.chemUse ?? obj.ai.info.chem_use
+        const chemThreshold = chemUseHpRatioThreshold(chemUse)
+        if (chemThreshold !== null) {
+            const maxHpChem = obj.getStat('Max HP') || 0
+            const hpChem = obj.getStat('HP') || 0
+            const ratio = maxHpChem > 0 ? hpChem / maxHpChem : 1
+            if (ratio <= chemThreshold && Array.isArray(obj.inventory)) {
+                const stimIdx = obj.inventory.findIndex((it: any) => {
+                    const n = String(it?.name ?? it?.pro?.name ?? '').toLowerCase()
+                    return n.includes('stimpak') || n.includes('stim pack') || it?.pid === 40
+                })
+                if (stimIdx >= 0 && AP.getAvailableCombatAP() >= 1) {
+                    const stim = obj.inventory[stimIdx]
+                    applyDrugToCritter(obj, stim, { skipHeal: false })
+                    obj.inventory.splice(stimIdx, 1)
+                    AP.subtractCombatAP(1)
+                    this.log('[AI USED STIMPAK]')
+                }
+            }
+        }
+
         // behaviors
 
         // Party coward disposition flees earlier than AI.TXT min_hp alone.
         // P1-1: also honour run_away_mode HP%-of-max thresholds.
-        const partyCtrl = globalState.gParty?.getControl?.(obj)
+        const partyCtrl = partyCtrlEarly ?? globalState.gParty?.getControl?.(obj)
         const partyDisposition = partyCtrl?.disposition
         const maxHp = obj.getStat('Max HP') || 0
         const runAwayMode = partyCtrl?.runAwayMode ?? obj.ai.info.run_away_mode
@@ -1154,6 +1180,9 @@ export class Combat {
                 && this.getBurstAPCost(obj) <= AP.getAvailableCombatAP()
             // If scripts forced a non-ranged mode, suppress burst.
             if (modeOverride !== undefined && modeOverride < 2) {canBurst = false}
+            // P1-1: best_weapon melee/unarmed prefs suppress burst.
+            const bestWeapon = partyCtrl?.bestWeapon ?? obj.ai.info.best_weapon
+            if (bestWeaponSuppressesBurst(bestWeapon)) {canBurst = false}
             const attackCost = canBurst ? this.getBurstAPCost(obj) : this.getAttackAPCost(obj)
 
             if (AP.getAvailableCombatAP() >= attackCost) {

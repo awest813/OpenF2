@@ -112,3 +112,71 @@ export function shouldAttemptCalledShot(calledFreq: unknown, rng: () => number =
     const chance = Math.min(50, Math.max(0, freq))
     return Math.floor(rng() * 100) < chance
 }
+
+export type AiChemUse =
+    | 'clean'
+    | 'stims_when_hurt_little'
+    | 'stims_when_hurt_lots'
+    | 'sometimes'
+    | 'anytime'
+    | 'always'
+
+export type AiBestWeapon =
+    | 'no_pref'
+    | 'melee'
+    | 'melee_over_ranged'
+    | 'ranged_over_melee'
+    | 'ranged'
+    | 'unarmed'
+
+export function normalizeChemUse(raw: unknown, fallback: AiChemUse = 'clean'): AiChemUse {
+    if (raw === undefined || raw === null) return fallback
+    const key = String(raw).trim().toLowerCase()
+    const allowed: AiChemUse[] = [
+        'clean',
+        'stims_when_hurt_little',
+        'stims_when_hurt_lots',
+        'sometimes',
+        'anytime',
+        'always',
+    ]
+    return (allowed as string[]).includes(key) ? (key as AiChemUse) : fallback
+}
+
+export function normalizeBestWeapon(raw: unknown, fallback: AiBestWeapon = 'no_pref'): AiBestWeapon {
+    if (raw === undefined || raw === null) return fallback
+    const key = String(raw).trim().toLowerCase()
+    const allowed: AiBestWeapon[] = [
+        'no_pref',
+        'melee',
+        'melee_over_ranged',
+        'ranged_over_melee',
+        'ranged',
+        'unarmed',
+    ]
+    return (allowed as string[]).includes(key) ? (key as AiBestWeapon) : fallback
+}
+
+/** HP ratio threshold below which chem_use should trigger a stim. */
+export function chemUseHpRatioThreshold(chemUse: unknown): number | null {
+    const mode = normalizeChemUse(chemUse)
+    switch (mode) {
+        case 'clean':
+            return null
+        case 'stims_when_hurt_lots':
+            return 0.35
+        case 'stims_when_hurt_little':
+            return 0.65
+        case 'sometimes':
+            return 0.5
+        case 'anytime':
+        case 'always':
+            return 0.9
+    }
+}
+
+/** True when best_weapon preference should suppress burst fire. */
+export function bestWeaponSuppressesBurst(bestWeapon: unknown): boolean {
+    const pref = normalizeBestWeapon(bestWeapon)
+    return pref === 'melee' || pref === 'melee_over_ranged' || pref === 'unarmed'
+}
