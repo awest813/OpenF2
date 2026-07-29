@@ -235,7 +235,6 @@ export function restForHours(hours: number): TimeAdvanceResult {
     const frac = hours - wholeHours
     let ticksAdvanced = 0
     let eventsFired = 0
-    let hpHealed = 0
     let hoursCompleted = 0
     let interrupted = false
 
@@ -249,8 +248,9 @@ export function restForHours(hours: number): TimeAdvanceResult {
             })
             break
         }
+        // Heal once for the total rested span (FO2: every 3 hours) — not per hour chunk.
         const chunk = advanceGameTime(TICKS_PER_HOUR, {
-            heal: true,
+            heal: false,
             tickEffects: true,
             requireOutOfCombat: true,
         })
@@ -259,7 +259,6 @@ export function restForHours(hours: number): TimeAdvanceResult {
         }
         ticksAdvanced += chunk.ticksAdvanced
         eventsFired += chunk.eventsFired
-        hpHealed += chunk.hpHealed
         hoursCompleted++
     }
 
@@ -273,13 +272,20 @@ export function restForHours(hours: number): TimeAdvanceResult {
             })
         } else {
             const chunk = advanceGameTime(Math.floor(frac * TICKS_PER_HOUR), {
-                heal: true,
+                heal: false,
                 tickEffects: true,
                 requireOutOfCombat: true,
             })
             ticksAdvanced += chunk.ticksAdvanced
             eventsFired += chunk.eventsFired
-            hpHealed += chunk.hpHealed
+        }
+    }
+
+    let hpHealed = 0
+    if (ticksAdvanced > 0) {
+        hpHealed = applyRestHealing(ticksAdvanced)
+        if (globalState.player) {
+            syncPlayerEntityFromCritter()
         }
     }
 
