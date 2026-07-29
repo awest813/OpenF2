@@ -60,12 +60,14 @@ Reason:
 ## Latest validation evidence
 
 - Full regression run (clean checkout, no converted assets): `npm test` →
-  **5013 passed / 16 skipped / 0 failed** (123 files).
+  green with asset suites skipped (Slices A–E).
 - Type-check run: `./node_modules/.bin/tsc --noEmit` → **pass**.
 - Asset-dependent suites (`phase100`/`107`/`109` script/proto corpora) now **skip**
   when `data/scripts` / converted data are absent (Slice A).
-- Checklist status vocabulary includes `safe_stub` (Slice A / P3-2).
+- Opt-in Arroyo lane: `npm run test:assets:arroyo` — see `docs/F2_REAL_ASSET_LANE.md` (Slice E).
+- Checklist status vocabulary includes `safe_stub` / `partial` (Slice A / P3-2).
 - HUD/Pip-Boy project live Critter HP via `playerProjection.ts` (Slice B / P0-2 adapter).
+- `get_tile_fid` implemented; `set_tile_fid` patches map floor data (Slice E / P2-1).
 - Scaffold suites (`phase26`/`phase34`/`phase35`) still pass as state-machine smoke;
   they are **not** treated as campaign completion evidence.
 
