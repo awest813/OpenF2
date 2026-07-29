@@ -839,18 +839,42 @@ export class Combat {
         // BLK-059: Guard null positions in the sort comparator to avoid crashes when
         // combatants lack a position (e.g. freshly added or off-map).
         if (!obj.position) {return targets[0] ?? null}
+
+        // Slice G / P1-1: party combat-control disposition biases target choice.
+        const disposition = globalState.gParty?.getControl?.(obj)?.disposition
+        const playerPos = globalState.player?.position
+
         targets.sort((a, b) => {
             let da = a.position ? hexDistance(obj.position!, a.position) : Infinity
             let db = b.position ? hexDistance(obj.position!, b.position) : Infinity
             
             // AI Heuristic: 'finish off weak targets' by discounting effective distance
+            let aRatio = 1
+            let bRatio = 1
             if (a.getStat('Max HP') > 0) {
-                const aRatio = Math.max(0, a.getStat('HP') / a.getStat('Max HP'))
+                aRatio = Math.max(0, a.getStat('HP') / a.getStat('Max HP'))
                 if (aRatio < 0.3) da -= 3
             }
             if (b.getStat('Max HP') > 0) {
-                const bRatio = Math.max(0, b.getStat('HP') / b.getStat('Max HP'))
+                bRatio = Math.max(0, b.getStat('HP') / b.getStat('Max HP'))
                 if (bRatio < 0.3) db -= 3
+            }
+
+            if (disposition === 'aggressive' || disposition === 'berserk') {
+                if (aRatio < 0.5) da -= 2
+                if (bRatio < 0.5) db -= 2
+                if (disposition === 'berserk') {
+                    da -= 1
+                    db -= 1
+                }
+            } else if (disposition === 'defensive' && playerPos) {
+                // Prefer threats near the player
+                if (a.position) da += hexDistance(playerPos, a.position) * 0.5
+                if (b.position) db += hexDistance(playerPos, b.position) * 0.5
+            } else if (disposition === 'coward') {
+                // Prefer weaker / less threatening targets
+                if (aRatio > 0.6) da += 2
+                if (bRatio > 0.6) db += 2
             }
 
             return da - db
@@ -939,7 +963,15 @@ export class Combat {
 
         // behaviors
 
-        if (obj.getStat('HP') <= obj.ai.info.min_hp) {
+        // Party coward disposition flees earlier than AI.TXT min_hp alone.
+        const partyDisposition = globalState.gParty?.getControl?.(obj)?.disposition
+        let fleeHp = obj.ai.info.min_hp
+        if (partyDisposition === 'coward') {
+            const maxHp = obj.getStat('Max HP') || 0
+            fleeHp = Math.max(fleeHp, Math.floor(maxHp * 0.5))
+        }
+
+        if (obj.getStat('HP') <= fleeHp) {
             // hp <= min fleeing hp, so flee
             this.log('[AI FLEES]')
 

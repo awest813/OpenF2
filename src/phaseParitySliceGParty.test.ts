@@ -143,7 +143,7 @@ describe('Parity Slice G — save schema v21 partyControls', () => {
             partyMembersHp: {},
         })
         expect(migrated.version).toBe(SAVE_VERSION)
-        expect(SAVE_VERSION).toBe(22)
+        expect(SAVE_VERSION).toBe(23)
         expect(migrated.partyControls).toEqual({})
     })
 })

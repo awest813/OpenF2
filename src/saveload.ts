@@ -21,6 +21,7 @@ import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
 import { Scripting } from './scripting.js'
 import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
 import { serializeTimedEffects, hydrateTimedEffects } from './character/timedEffects.js'
+import { serializeAutomap, hydrateAutomap } from './character/automap.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
 
@@ -168,6 +169,8 @@ function applyExtraSaveState(save: SaveGame): void {
     }
     // Slice F: restore timed chem / addiction clocks onto live Critters.
     hydrateTimedEffects(save.timedEffects)
+    // Slice G / P1-11: restore local automap fog.
+    hydrateAutomap(save.automap)
 }
 
 // Saving and loading support
@@ -450,6 +453,8 @@ export function save(name: string, slot = -1, callback?: () => void): void {
 
     // Slice F: timed chem / addiction clocks.
     save.timedEffects = serializeTimedEffects()
+    // Slice G / P1-11: local automap fog.
+    save.automap = serializeAutomap()
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     // BLK-080: Guard against null gMap in the log message — save() can be called

@@ -33,7 +33,7 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 | Rendering | Working (WebGL) | `src/renderer.ts`, `src/webglrenderer.ts` |
 | UI panels | Dual stacks | `src/ui2/*` + legacy `src/ui.ts` (P1-10) |
 | Audio | Partial | SFX/music path exists; speech/movies missing (P1-9) |
-| Save/load | Working (hardened) | `src/saveload.ts`, schema v22 |
+| Save/load | Working (hardened) | `src/saveload.ts`, schema v23 |
 | Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
 | Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
 | New game / chargen | In progress (Slice C) | Main menu + chargen UI; `?map` still skips for dev (P0-1) |

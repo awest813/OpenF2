@@ -26,6 +26,7 @@ import { centerCamera } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { fromTileNum, hexToTile, toTileNum } from './tile.js'
 import { arrayRemove, arrayWithout, getFileJSON } from './util.js'
+import { markPlayerExplored } from './character/automap.js'
 
 declare let PF: any
 
@@ -245,6 +246,9 @@ export class GameMap {
         centerCamera(globalState.player.position)
 
         Events.emit('elevationChanged', { elevation: level, oldElevation, isMapLoading })
+
+        // Seed automap fog at the player's landing tile.
+        markPlayerExplored(2)
     }
 
     placeParty() {

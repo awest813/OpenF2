@@ -155,16 +155,17 @@ regions to `NOT_STARTED` and re-earn them. Until then the gate status must read
 
 ### P1-1 — Combat AI uses 2 of ~20 AI.txt fields
 
-**Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts:98-123`), but
-`grep -oE "info\.[a-z_]+" src/combat.ts` returns exactly two fields: `info.chance` and
-`info.min_hp` (`src/combat.ts:942`).
+**Status.** Partial. AI.TXT still drives mainly `chance` / `min_hp`; party `disposition`
+now biases `Combat.findTarget` (aggressive / berserk / defensive / coward) and cowards
+flee earlier. Still open: full packet fields (`attack_who`, `run_away_mode`, `called_freq`, …).
 
-**Gap.** Unused: `attack_who`, `best_weapon`, `distance`, `disposition`, `run_away_mode`,
+**Evidence.** `AI.init()` parses AI.TXT into `AI.aiTxt` (`src/combat.ts`); historically
+only `info.chance` and `info.min_hp` were consumed in turn logic.
+
+**Gap.** Unused: `attack_who`, `best_weapon`, `distance`, `run_away_mode`,
 `area_attack_mode`, `hurt_too_much`, `chem_use`/`chem_primary_desire`, `secondary_freq`,
-`called_freq`, `min_to_hit`. The current AI is: pick nearest living enemy, flee under
-`min_hp`, creep, attack. No weapon selection, no cover, no stimpak use, no burst
-positioning, no aimed shots, no coward/berserk/defensive disposition, no ranged-vs-melee
-preference.
+`called_freq`, `min_to_hit`. Weapon selection, cover, stimpak use, burst positioning, and
+aimed shots remain incomplete.
 
 **Acceptance.** AI turn resolution consumes the full packet. Regression tests per
 disposition/`attack_who`/`run_away_mode` combination using real AI.TXT rows.
@@ -318,8 +319,9 @@ Bug fixes land in one and not the other, and which one runs depends on a config 
 **Status.** Partial (Slice G). `src/character/rest.ts` advances `gameTickTime` with
 timed-event firing, Healing Rate over rest, and chem/rad/poison simulation; Pip-Boy has
 REST + DATA (archives) tabs; `src/character/holodisks.ts` is an in-memory archive with
-serialize helpers. Still open: FO2 automap per visited level, encounter interrupts while
-resting, richer Archives/Status layout, holodisk items from real protos.
+serialize helpers; **local automap** (`src/character/automap.ts`, save v23) records visited
+hexes and drives the Pip-Boy MAP tab. Still open: FO2 automap FRMs / MAP.MSG names,
+encounter interrupts while resting, richer Archives layout.
 
 **Acceptance.** Holodisks collectible and readable, archives populated by quest/rumor
 state, automap rendered per visited level, and an alarm-clock rest UI that advances

@@ -30,6 +30,7 @@ import { deepClone, getMessage } from './util.js'
 import { Config } from './config.js'
 import { SkillSet, StatSet } from './char.js'
 import { ActionPoints, AI } from './combat.js'
+import { markPlayerExplored } from './character/automap.js'
 
 // Collection of functions for working with game objects
 
@@ -1374,6 +1375,11 @@ export class Critter extends Obj {
     move(position: Point, curIdx?: number, signalEvents = true): boolean {
         if (!super.move(position, curIdx, signalEvents)) {
             return false
+        }
+
+        // Slice G / P1-11: record local automap exploration for the player.
+        if (this.isPlayer) {
+            markPlayerExplored(1)
         }
 
         if (Config.engine.doSpatials !== false) {

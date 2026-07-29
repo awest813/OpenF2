@@ -100,7 +100,7 @@ describe('Phase 50-B — active_hand() opcode is implemented (BLK-034)', () => {
 
 describe('Phase 50-C — save schema v13: playerActiveHand migration', () => {
     it('SAVE_VERSION was 18 (now superseded to 20)', () => {
-        expect(SAVE_VERSION).toBe(22)
+        expect(SAVE_VERSION).toBe(23)
     })
 
     it('v12 → v13 (towards current SAVE_VERSION) migration adds playerActiveHand defaulting to 0', () => {

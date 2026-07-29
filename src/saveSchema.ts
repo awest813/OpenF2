@@ -12,7 +12,7 @@ import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 22
+export const SAVE_VERSION = 23
 
 export interface SaveGame {
     id?: number
@@ -341,6 +341,11 @@ export interface SaveGame {
         }>
     }
 
+    /**
+     * Local automap fog-of-war: mapName|elevation → visited tile numbers (v23).
+     */
+    automap?: Record<string, number[]>
+
     player: {
         position: Point
         orientation: number
@@ -532,6 +537,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.timedEffects === undefined) {save.timedEffects = {}}
             save.version = 22
             // falls through
+        case 22:
+            // v22 → v23: local automap visited tiles (P1-11).
+            if (save.automap === undefined) {save.automap = {}}
+            save.version = 23
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -635,6 +645,17 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     }
     if (!save.timedEffects || typeof save.timedEffects !== 'object' || Array.isArray(save.timedEffects)) {
         save.timedEffects = {}
+    }
+    if (!save.automap || typeof save.automap !== 'object' || Array.isArray(save.automap)) {
+        save.automap = {}
+    } else {
+        const cleaned: Record<string, number[]> = {}
+        for (const [k, v] of Object.entries(save.automap)) {
+            if (Array.isArray(v)) {
+                cleaned[k] = v.filter((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0).map((n) => n | 0)
+            }
+        }
+        save.automap = cleaned
     }
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).

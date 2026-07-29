@@ -28,6 +28,7 @@ import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest
 import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import { openCompanionTrade } from '../partyTrade.js'
 import { Critter } from '../object.js'
+import { buildPipBoyMapData, markPlayerExplored } from '../character/automap.js'
 import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
@@ -286,6 +287,11 @@ export class PipBoyPanel extends UIPanel {
     // ── Map tab ────────────────────────────────────────────────────────────
 
     private _renderMap(ctx: OffscreenCanvasRenderingContext2D): void {
+        // Refresh from live automap each paint so exploration stays current.
+        markPlayerExplored(1)
+        const live = buildPipBoyMapData(40)
+        if (live) this.mapData = live
+
         if (!this.mapData) {
             drawText(ctx, 'No map data loaded.', 10, 24, FALLOUT_DARK_GRAY)
             drawText(ctx, 'Explore to reveal the map.', 10, 42, FALLOUT_DARK_GRAY)

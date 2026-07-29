@@ -157,7 +157,7 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
 
 describe('Phase 54-B — BLK-042: Save schema v15 — player weapon slot persistence', () => {
     it('SAVE_VERSION was 18 (now superseded to 20)', () => {
-        expect(SAVE_VERSION).toBe(22)
+        expect(SAVE_VERSION).toBe(23)
     })
 
     it('v14 save migrates toward v15 with undefined playerLeftHandPID/playerRightHandPID', () => {

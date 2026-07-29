@@ -120,6 +120,7 @@ export function snapshotSaveData(name: string, timestamp: number, version: numbe
             ? state.gParty.serializeControls()
             : {},
         timedEffects: {},
+        automap: {},
         savedMaps: { [curMap.name]: curMap, ...state.dirtyMapCache },
         questLog: state.questLog.serialize(),
         reputation: state.reputation.serialize(),
