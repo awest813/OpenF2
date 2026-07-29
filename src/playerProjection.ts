@@ -20,7 +20,6 @@ const SPECIAL_TO_ECS: Array<[string, keyof StatsComponent]> = [
     ['PER', 'perception'],
     ['END', 'endurance'],
     ['CHA', 'charisma'],
-    ['CHR', 'charisma'],
     ['INT', 'intelligence'],
     ['AGI', 'agility'],
     ['LUK', 'luck'],
@@ -111,14 +110,9 @@ export function syncPlayerEntityFromCritter(): void {
                 ;(stats as any)[ecsKey] = value
             }
         }
-        // Derived / resistance fields when present on StatSet
         const armorClass = readStat(player, 'AC', NaN)
         if (Number.isFinite(armorClass)) {
             stats.armorClass = armorClass
-        }
-        const carry = readStat(player, 'Carry Weight', NaN)
-        if (Number.isFinite(carry)) {
-            stats.carryWeight = carry
         }
     }
 
