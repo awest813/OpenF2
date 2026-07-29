@@ -53,7 +53,16 @@ import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
-import { setCarFuel } from './car.js'
+import { setCarFuel, setHasCar } from './car.js'
+import {
+    syncReputationFromGvar,
+    pullReputationFromGvars,
+    GVAR_PLAYER_GOT_CAR,
+    resolveTownIdFromMapName,
+    getTownRepValue,
+    townRepTier,
+    reactionBiasForTier,
+} from './quest/townReputation.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -197,6 +206,7 @@ export namespace Scripting {
     const globalVars: any = {
         0: 0, // GVAR_PLAYER_REPUTATION (karma) — start at neutral to match Reputation
         //10: 1, // GVAR_START_ARROYO_TRIAL (1 = TRIAL_FIGHT)
+        47: 50, // GVAR_TOWN_REP_ARROYO — FO2 default Idolized
         531: 1, // GVAR_TALKED_TO_ELDER
         452: 2, // GVAR_DEN_VIC_KNOWN
         88: 0, // GVAR_VAULT_RAIDERS
@@ -524,6 +534,14 @@ export namespace Scripting {
             if (gvar === 0 && globalState.reputation) {
                 globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
             }
+            syncReputationFromGvar(globalState.reputation, gvar, value)
+            if (gvar === GVAR_PLAYER_GOT_CAR) {
+                setHasCar(typeof value === 'number' ? value !== 0 : !!value)
+            }
+        }
+        // Ensure Reputation town/flag mirrors match the full GVAR table after bulk load.
+        if (globalState.reputation) {
+            pullReputationFromGvars(globalState.reputation, globalVars)
         }
     }
 
@@ -852,6 +870,11 @@ export namespace Scripting {
             // Sync the reputation system so getKarma() and the UI stay consistent.
             if (gvar === 0 && globalState.reputation) {
                 globalState.reputation.setKarma(typeof value === 'number' ? value : 0)
+            }
+            syncReputationFromGvar(globalState.reputation, gvar, value)
+            // GVAR_PLAYER_GOT_CAR (18) — Highwayman ownership flag.
+            if (gvar === GVAR_PLAYER_GOT_CAR) {
+                setHasCar(typeof value === 'number' ? value !== 0 : !!value)
             }
             info('set_global_var: ' + gvar + ' = ' + value, 'gvars')
             log('set_global_var', arguments, 'gvars')
@@ -7761,7 +7784,16 @@ export namespace Scripting {
                 warn('get_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
                 return 50
             }
-            return (npc as any)._reactionValue ?? 50
+            const base = (npc as any)._reactionValue ?? 50
+            // P1-7: bias reaction by current map's town reputation tier.
+            let bias = 0
+            const mapName = (globalState.gMap as any)?.name as string | undefined
+            const townId = resolveTownIdFromMapName(mapName)
+            if (townId && globalState.reputation) {
+                const tier = townRepTier(getTownRepValue(globalState.reputation, townId))
+                bias = reactionBiasForTier(tier)
+            }
+            return Math.max(0, Math.min(100, base + bias))
         }
 
         // sfall 0x82D1 — set_critter_reaction_sfall(npc, pc, val):
@@ -9264,3 +9296,11 @@ export namespace Scripting {
 
 // Slice G: rest/time-advance module shares the same timed-event queue.
 bindTimedEventList(Scripting.timeEventList)
+
+// P1-7: seed Reputation town/flag mirrors from default GVARs once the module
+// graph finishes (globalState can be undefined mid-circular import).
+Promise.resolve().then(() => {
+    if (globalState?.reputation) {
+        pullReputationFromGvars(globalState.reputation, Scripting.getGlobalVars())
+    }
+})

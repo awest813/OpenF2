@@ -228,18 +228,15 @@ withdrawal onset/penalties, and save/load persistence of active effects and addi
 
 ---
 
+### P1-6 — No Highwayman car
+
 **Status.** Partial (Slice H stub). `src/car.ts` tracks ownership (`hasCar`, save v24),
 fuel burn on world-map travel ticks, and a 2× travel speed when fueled. sfall
 `set_car_fuel_amount` implies ownership. Still open: Den acquisition quest, trunk
 inventory, per-town parking/placement, car-stolen plot.
 
-**Evidence.** `grep -rniE "highwayman|\bcar\b"` finds only `globalState.carFuel` /
-`save.carFuel` (`saveload.ts:396`) and the sfall fuel opcodes. Nothing consumes fuel,
-nothing drives.
-
-**Gap.** No car acquisition, no world-map travel speed bonus, no fuel consumption or
-refuelling, no trunk inventory, no car placement/parking per town map, no car-stolen
-plot event.
+**Gap.** Den acquisition, trunk inventory, per-town parking/placement, car-stolen plot,
+and FO2-accurate fuel economics remain.
 
 **Acceptance.** Car acquirable in the Den, drivable on the world map with correct
 speed/fuel model, trunk usable as persistent storage, parked instance appears on town
@@ -249,13 +246,18 @@ maps, all persisted.
 
 ### P1-7 — No town reputation, karma titles, or reputation flags
 
-**Evidence.** `grep -rniE "town_rep|TOWN_REP"` → 0 hits. `src/quest/reputation.ts` is 98
-lines of generic reputation.
+**Status.** Partial (Slice H). `src/quest/townReputation.ts` derives FO2 town-rep
+tiers and karma titles; town/flag GVARs sync into `Reputation`; Pip-Boy STATUS shows
+karma title, current-map standing, and active flags; `get_critter_reaction_sfall` and
+barter ask prices apply tier biases. Still open: full dialogue gate coverage, Made Man /
+Grave Digger / Chosen One flag set paths, FO2-accurate barter formula.
 
-**Gap.** No per-town reputation values or thresholds (Idolized/Liked/Neutral/Antipathy/
-Hated), no karma titles, no special reputation flags (Childkiller, Berserker, Slaver,
-Grave Digger, Chosen One, Betrayer), and no reaction-modifier wiring from reputation into
-dialogue gates or merchant prices.
+**Evidence (historical).** `src/quest/reputation.ts` was a generic karma + string map
+without tier/title helpers or GVAR town indices.
+
+**Gap.** Dialogue option gates and merchant scripts that hard-code thresholds still need
+campaign verification; some special titles are display-only until their GVARs are set by
+quest scripts.
 
 **Acceptance.** Per-town rep and global karma tracked, titles derived, flags set by the
 correct actions, all surfaced in the Pip-Boy status screen and consumed by dialogue

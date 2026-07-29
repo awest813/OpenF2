@@ -19,6 +19,13 @@
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, cssColor, fillRect, strokeRect } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
+import globalState from '../globalState.js'
+import {
+    resolveTownIdFromMapName,
+    getTownRepValue,
+    townRepTier,
+    barterPriceMultiplierForTier,
+} from '../quest/townReputation.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -130,7 +137,7 @@ export class BarterPanel extends UIPanel {
 
         // Value totals
         const playerVal   = totalValue(this.playerTable)
-        const merchantVal = totalValue(this.merchantTable)
+        const merchantVal = merchantAskValue(this.merchantTable)
         const btnY = height - 40
 
         ctx.font = '10px monospace'
@@ -344,7 +351,7 @@ export class BarterPanel extends UIPanel {
 
     private _tryOffer(): void {
         const playerVal   = totalValue(this.playerTable)
-        const merchantVal = totalValue(this.merchantTable)
+        const merchantVal = merchantAskValue(this.merchantTable)
         if (playerVal >= merchantVal) {
             this._offerRefused = false
             // Commit the exchange in-panel so repeated barter rounds keep
@@ -381,6 +388,17 @@ export class BarterPanel extends UIPanel {
 
 function totalValue(items: BarterItem[]): number {
     return items.reduce((sum, i) => sum + i.value * i.amount, 0)
+}
+
+/** Merchant ask total adjusted by current town reputation (P1-7). */
+function merchantAskValue(items: BarterItem[]): number {
+    const base = totalValue(items)
+    const rep = globalState.reputation
+    const mapName = (globalState.gMap as any)?.name as string | undefined
+    const townId = resolveTownIdFromMapName(mapName)
+    if (!rep || !townId) return base
+    const mult = barterPriceMultiplierForTier(townRepTier(getTownRepValue(rep, townId)))
+    return Math.round(base * mult)
 }
 
 function drawHeader(

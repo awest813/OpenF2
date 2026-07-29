@@ -29,6 +29,11 @@ import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import { openCompanionTrade } from '../partyTrade.js'
 import { Critter } from '../object.js'
 import { buildPipBoyMapData, markPlayerExplored } from '../character/automap.js'
+import {
+    karmaTitle,
+    currentTownStanding,
+    listActiveReputationFlags,
+} from '../quest/townReputation.js'
 import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
@@ -224,6 +229,33 @@ export class PipBoyPanel extends UIPanel {
                     drawStat(ctx, 'Addiction', labels.join(', '), 16, y, FALLOUT_AMBER)
                     y += 16
                 }
+            }
+        }
+
+        y += 8
+
+        // ── Reputation (P1-7) ─────────────────────────
+        const rep = globalState.reputation
+        if (rep) {
+            drawLabel(ctx, 'REPUTATION', 10, y); y += 18
+            const title = karmaTitle(rep.getKarma())
+            drawStat(ctx, 'Karma', `${rep.getKarma()} (${title})`, 16, y, FALLOUT_GREEN); y += 16
+            const standing = currentTownStanding(rep, (globalState.gMap as any)?.name)
+            if (standing) {
+                drawStat(
+                    ctx,
+                    standing.displayName,
+                    `${standing.tier} (${standing.value})`,
+                    16,
+                    y,
+                    standing.value < 0 ? FALLOUT_AMBER : FALLOUT_GREEN
+                )
+                y += 16
+            }
+            const flags = listActiveReputationFlags(rep)
+            if (flags.length > 0) {
+                drawStat(ctx, 'Flags', flags.join(', '), 16, y, FALLOUT_AMBER)
+                y += 16
             }
         }
 
