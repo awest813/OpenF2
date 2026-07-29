@@ -22,6 +22,8 @@ import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
 import { initGame, enterWorldMap } from './init.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
+import { tickTimedEffects } from './character/timedEffects.js'
+import { tickRadiationAndPoison } from './character/radiationPoison.js'
 import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -808,6 +810,12 @@ heart.update = function () {
         }
 
         globalState.audioEngine.tick()
+
+        // Slice F / P1-4 / P1-5: drug expiry + rad/poison DoT on the player.
+        if (globalState.player && (globalState.player as Critter).stats) {
+            tickTimedEffects(globalState.player as Critter)
+            tickRadiationAndPoison(globalState.gameTickTime)
+        }
     }
 
     for (const obj of globalState.gMap.getObjects()) {

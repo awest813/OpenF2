@@ -224,7 +224,7 @@ Small PRs preferred; each slice should leave tests green.
 | C | Main menu + chargen + New Game handoff | P0-1 | Done (core flow) |
 | D | Skilldex 6 missing skills | P0-3 | Done (core dispatch) |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke | P2-1, P0-4 | Done (tile FID + opt-in lane) |
-| F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | |
+| F | Perks/traits + drugs + rad/poison | P1-2, P1-4, P1-5 | Done (core tables + runtime; save/load of timed effects still open) |
 | G | Rest / holodisks / party | P1-11, P1-3 | |
 | H | Rep + AI + car | P1-7, P1-1, P1-6 | |
 | I | Movies/speech + endgame | P1-9, P1-8 | |
@@ -252,5 +252,7 @@ Small PRs preferred; each slice should leave tests green.
 4. ~~Slice C: main menu + chargen + Temple handoff.~~
 5. ~~**Slice D:** Skilldex remaining skills.~~
 6. ~~Slice E: `get_tile_fid` + Arroyo real-script smoke / opt-in asset lane.~~
-7. Continue P0-2: perk grant / XP award through Critter model.
-8. Slice F: perks/traits + drugs + rad/poison (Tier 1).
+7. ~~Continue P0-2: perk grant / XP award through Critter model.~~
+8. ~~Slice F: perks/traits + drugs + rad/poison (Tier 1 core).~~
+9. Slice G: rest / holodisks / party (Tier 1).
+10. Persist timed drug effects + addictions across save/load.

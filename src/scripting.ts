@@ -49,8 +49,10 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
-import { PERK_MAP } from './character/perks.js'
+import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
+import { applyDrugToCritter } from './character/timedEffects.js'
+import { applyRadiationGain } from './character/radiationPoison.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -1425,9 +1427,9 @@ export namespace Scripting {
                 player.level++
                 // BLK-043: Award skill points on level-up (10 + INT/2, minimum 1).
                 // Fallout 2 formula: base 10 + floor(INT / 2) skill points per level.
-                // The Educated perk (perk ID 47) adds +2 per level; check perkRanks.
+                // Educated perk: UI id 11; FO2/script aliases 18 and 47.
                 const intScore = player.getStat('INT') ?? 5
-                const educatedBonus = (player.perkRanks?.[47] ?? 0) * 2
+                const educatedBonus = educatedPerkRanks(player.perkRanks) * 2
                 const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
                 // BLK-174: Guard against null player.skills — the Elder's dialogue
                 // calls give_exp_points(2500) when temple completion is confirmed.
@@ -2366,7 +2368,8 @@ export namespace Scripting {
                 warn('radiation_add: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
-            (obj as Critter).stats.modifyBase('Radiation Level', amount)
+            // Apply through resistance (Rad-X timed bonus + DR Radiation).
+            applyRadiationGain(obj as Critter, amount)
         }
 
         // combat
@@ -8769,9 +8772,11 @@ export namespace Scripting {
 
         // If the item being used is a drug, mark the source critter as
         // "on drugs" so that metarule(18) checks return the correct result
-        // for the duration of the drug effect.
+        // for the duration of the drug effect, and apply timed SPECIAL/addiction.
         if (isDrugItem(obj) && source && (source as any).type === 'critter') {
             markOnDrugs(source)
+            // skipHeal: use_p_proc typically applies stimpak healing.
+            applyDrugToCritter(source as Critter, obj, { skipHeal: true })
         }
 
         obj._script.source_obj = source
@@ -8939,9 +8944,11 @@ export namespace Scripting {
 
         // If the item being used on this target is a drug, mark the target
         // critter as "on drugs" so that metarule(44)/WHO_ON_DRUGS queries return
-        // the correct result (e.g. NPC healer scripts using stimpaks on companions).
+        // the correct result (e.g. NPC healer scripts using stimpaks on companions),
+        // and apply timed SPECIAL/addiction effects.
         if (isDrugItem(item) && (obj as any).type === 'critter') {
             markOnDrugs(obj)
+            applyDrugToCritter(obj as Critter, item, { skipHeal: true })
         }
 
         obj._script.source_obj = item as Obj

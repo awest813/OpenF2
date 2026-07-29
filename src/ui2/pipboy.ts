@@ -18,6 +18,13 @@ import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { QuestLog, QuestState } from '../quest/questLog.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
+import {
+    readPlayerRadiationLevel,
+    readPlayerPoisonLevel,
+    radiationBand,
+} from '../character/radiationPoison.js'
+import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
+import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,6 +169,36 @@ export class PipBoyPanel extends UIPanel {
         drawStat(ctx, 'Damage',    `${stats.damageResistance}%`,    16, y, FALLOUT_GREEN); y += 16
         drawStat(ctx, 'Radiation', `${stats.radiationResistance}%`, 16, y, FALLOUT_GREEN); y += 16
         drawStat(ctx, 'Poison',    `${stats.poisonResistance}%`,    16, y, FALLOUT_GREEN); y += 16
+
+        y += 8
+
+        // ── Exposure (Critter levels — P1-4) ──────────
+        const radLevel = readPlayerRadiationLevel()
+        const poisonLevel = readPlayerPoisonLevel()
+        drawLabel(ctx, 'EXPOSURE', 10, y); y += 18
+        const radColor = radLevel >= 300 ? FALLOUT_RED : radLevel >= 150 ? FALLOUT_AMBER : FALLOUT_GREEN
+        drawStat(ctx, 'Rad Level', `${radLevel} (${radiationBand(radLevel)})`, 16, y, radColor); y += 16
+        const poiColor = poisonLevel > 0 ? FALLOUT_AMBER : FALLOUT_GREEN
+        drawStat(ctx, 'Poison Level', String(poisonLevel), 16, y, poiColor); y += 16
+
+        const player = globalState.player as object | null
+        if (player) {
+            const effects = getActiveEffects(player)
+            const addicts = getAddictions(player)
+            if (effects.length > 0 || addicts.length > 0) {
+                y += 8
+                drawLabel(ctx, 'CHEMS', 10, y); y += 18
+                if (effects.length > 0) {
+                    drawStat(ctx, 'Active', effects.map((e) => e.drugId).join(', '), 16, y, FALLOUT_GREEN)
+                    y += 16
+                }
+                if (addicts.length > 0) {
+                    const labels = addicts.map((a) => a.withdrawing ? `${a.drugId} (wd)` : a.drugId)
+                    drawStat(ctx, 'Addiction', labels.join(', '), 16, y, FALLOUT_AMBER)
+                    y += 16
+                }
+            }
+        }
 
         y += 8
 

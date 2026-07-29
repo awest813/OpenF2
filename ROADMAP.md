@@ -117,7 +117,8 @@ Prefer small PRs; leave the suite green on a clean (asset-less) checkout.
 | C | Main menu + chargen + New Game → `artemple` |
 | D | Remaining Skilldex skills |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) | Done — see `docs/F2_REAL_ASSET_LANE.md` |
-| F+ | Tier 1 systems per full parity plan |
+| F | Perks/traits + drugs + rad/poison (core) | Done — timed save/load still open |
+| G+ | Rest / party / rep / AI / car per full parity plan |
 
 ### Longer horizon
 

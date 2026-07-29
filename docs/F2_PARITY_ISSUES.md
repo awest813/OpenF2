@@ -173,15 +173,11 @@ disposition/`attack_who`/`run_away_mode` combination using real AI.TXT rows.
 
 ### P1-2 — Perks and traits are largely absent
 
-**Evidence.** `src/character/perks.ts` defines 17 perks (`grep -c "id:"`);
-`src/character/traits.ts` defines 4. Fallout 2 has ~119 perks and 16 traits.
-
-**Gap.** Missing perks include campaign-relevant ones (Bonus Rate of Fire, Better
-Criticals, Sniper, Slayer, Living Anatomy, Educated, Tag!, Awareness, all the Bonus Move
-line, Lifegiver, Action Boy). Missing traits include Gifted, Small Frame, One Hander,
-Finesse, Bloody Mess (which also gates death-animation variants), Chem Reliant, Jinxed.
-Perk selection is also on the disconnected ECS path (see **P0-2**) — `scripting.ts` tracks
-`playerPerksOwed` but the picker writes to ECS.
+**Status.** Partial (Slice F). `src/character/traits.ts` has all **16** FO2 traits.
+`src/character/perks.ts` expanded to ~46 campaign-relevant perks (Educated id 11;
+FO2 script alias 18 / legacy 47 via `educatedPerkRanks`). Full FO2 catalog (~119) and
+every combat/world-map effect hook still incomplete. Perk picker projects through Critter
+(`recordCritterPerkGrant`) after P0-2 deepen.
 
 **Acceptance.** Full perk and trait tables with correct prerequisites and effects applied
 to the live character model, level-up perk picker reachable from gameplay, and
@@ -208,14 +204,11 @@ inventory and level intact.
 
 ### P1-4 — Radiation and poison are recorded but inert
 
-**Evidence.** `src/skills.ts:125-126` declares `'Poison Level'` and `'Radiation Level'`
-stats. Every other reference is a scripting getter/setter
-(`scripting.ts:2147-2159, 2306-2343, 6009-6056, 6779-6789`). No code reads either stat to
-apply an effect.
-
-**Gap.** No radiation thresholds (150/300/600/1000 → SPECIAL penalties, HP loss, death),
-no radiation gauge in the Pip-Boy, no poison damage-over-time, no Rad-X/RadAway/Antidote
-behavior, no healing rate applied over game time.
+**Status.** Partial (Slice F). `src/character/radiationPoison.ts` applies threshold HP
+loss and poison DoT on the 10 Hz game tick; Pip-Boy Status shows rad/poison **levels**;
+`radiation_add` respects Rad-X resistance; RadAway/Antidote adjust levels via the drug
+table. Still open: full SPECIAL penalties at rad bands, healing-rate over time, save/load
+of exposure clocks.
 
 **Acceptance.** Radiation and poison tick against `globalState.gameTickTime` with F2
 thresholds and effects, are visible in the Pip-Boy status tab, respond to the correct
@@ -225,13 +218,10 @@ items, and persist across save/load.
 
 ### P1-5 — No drug, addiction, or timed-effect system
 
-**Evidence.** `scripting.ts:196-226` implements only a "critter is on drugs" marker
-(`DRUG_EFFECT_TICKS = 600`) used by `metarule` 18/44. `grep -rniE "withdrawal|addict"`
-outside the checklist → effectively nothing.
-
-**Gap.** No temporary SPECIAL/skill modifiers with expiry, no per-drug effect tables
-(Jet, Buffout, Mentats, Psycho, Nuka-Cola, Rad-X, alcohol), no addiction chance, no
-withdrawal penalties, no Jet-addiction quest hook (a main-plot beat in New Reno).
+**Status.** Partial (Slice F). `src/character/timedEffects.ts` tables Buffout, Mentats,
+Psycho, Jet, Rad-X, RadAway, Antidote, Nuka-Cola, stimpaks; `use` / `useObjOn` call
+`applyDrugToCritter`; expiry + withdrawal tick from `main.ts`. Still open: alcohol set,
+Chem Reliant/Resistant multipliers, Jet quest hook, save/load of active effects.
 
 **Acceptance.** A timed-modifier subsystem with per-drug tables, addiction rolls,
 withdrawal onset/penalties, and save/load persistence of active effects and addictions.
