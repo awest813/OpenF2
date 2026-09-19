@@ -135,6 +135,19 @@ describe('Parity Slice B — HUD follows live Critter HP', () => {
         expect(stats!.maxHp).toBeGreaterThanOrEqual(22)
     })
 
+    it('syncPlayerEntityFromCritter copies live Critter AP into ECS combat', () => {
+        const player = globalState.player as any
+        player.AP = {
+            getAvailableCombatAP: () => 4,
+            getMaxAP: () => ({ combat: 8, move: 8 }),
+        }
+        player.stats.baseStats['AP'] = 8
+        syncPlayerEntityFromCritter()
+        const combat = EntityManager.get<'combat'>(entityId, 'combat')
+        expect(combat?.combatAP).toBe(4)
+        expect(EntityManager.get<'stats'>(entityId, 'stats')?.maxAP).toBeGreaterThanOrEqual(8)
+    })
+
     it('ECS HUD path stays aligned after further HP changes', () => {
         ;(globalState.player as any).stats.baseStats['HP'] = 90
         syncPlayerEntityFromCritter()

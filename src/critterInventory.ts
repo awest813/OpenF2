@@ -45,14 +45,17 @@ export function getCritterInventoryWeightLbs(critter: Critter): number {
     return total
 }
 
-/** FO2 carry limit: Carry / Carry Weight stat, else 25 + STR×25. */
+/** FO2 carry limit: Carry Weight / explicit Carry base, else 25 + STR×25. */
 export function getCritterCarryLimitLbs(critter: Critter): number {
     if (critter && typeof critter.getStat === 'function') {
-        for (const statName of ['Carry Weight', 'Carry']) {
-            const cw = critter.getStat(statName)
-            if (typeof cw === 'number' && Number.isFinite(cw) && cw > 0) {
-                return cw
-            }
+        const carryWeight = critter.getStat('Carry Weight')
+        if (typeof carryWeight === 'number' && Number.isFinite(carryWeight) && carryWeight > 0) {
+            return carryWeight
+        }
+        const stats = (critter as any).stats
+        const carryOverride = stats?.baseStats?.['Carry']
+        if (typeof carryOverride === 'number' && Number.isFinite(carryOverride) && carryOverride > 0) {
+            return carryOverride
         }
         const str = critter.getStat('STR') ?? 5
         return 25 + str * 25

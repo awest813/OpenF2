@@ -876,6 +876,10 @@ export class Obj {
             console.warn("dropObject: item not found in source inventory — ignoring drop")
             return
         }
+        const srcCritter = source.type === 'critter' ? (source as unknown as Critter) : null
+        if (srcCritter?.isPlayer && globalState.player === srcCritter) {
+            syncPlayerEntityFromCritter()
+        }
 
         // BLK-114: Guard against null position on the source critter — objects in
         // inventory or mid-transition have no tile assignment; skip the move rather
