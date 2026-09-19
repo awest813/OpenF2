@@ -50,11 +50,10 @@ Reason:
 - Region checklist reset to `NOT_STARTED` after audit showed prior `CERTIFIED` /
   `READY` claims were backed by synthetic scaffolds (`phase35`, `campaignSmoke`),
   not real map/script execution.
-- Measured suite @ `cbcb8d1`: **5103 passed / 61 failed** (117/122 files). Failures
-  are concentrated in asset-absent script corpora (`phase100`, `phase107`) plus
-  `get_tile_fid` regressions.
-- Tier 0 parity gaps remain open: no new-game/chargen flow, dual character model,
-  Skilldex 2/8, no real-asset certification evidence. See `docs/F2_PARITY_ISSUES.md`
+- Measured suite on clean checkout: **5136 passed / 17 skipped / 0 failed** (137 files).
+  Skips are asset-gated script/proto corpora (`phase100`, `phase107`, `phase109`).
+- Tier 0 parity gaps remain open: chargen polish, character-model unification,
+  Skilldex fidelity, no real region certification evidence. See `docs/F2_PARITY_ISSUES.md`
   and `docs/F2_FULL_PARITY_PLAN.md`.
 
 ## Latest validation evidence

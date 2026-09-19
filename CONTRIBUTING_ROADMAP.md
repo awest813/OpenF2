@@ -10,7 +10,7 @@
 2. [Core File Formats](#2-core-file-formats)
 3. [Architecture Tour](#3-architecture-tour)
 4. [Phase 1 — Core RPG Loop (Complete)](#4-phase-1--core-rpg-loop)
-5. [Phase 2 — Full Fallout 2 Completion (Complete)](#5-phase-2--full-fallout-2-completion)
+5. [Phase 2 — Full Fallout 2 Completion (In Progress)](#5-phase-2--full-fallout-2-completion)
 6. [Debugging Guide](#6-debugging-guide)
 7. [Engine Extension Points (sfall Ecosystem)](#7-engine-extension-points-sfall-ecosystem)
 8. [Community Reference Engines](#8-community-reference-engines)
@@ -278,9 +278,10 @@ Fallout 2 triangular formula: Level N requires `N×(N-1)/2 × 1000` XP.
 
 ## 5. Phase 2 — Full Fallout 2 Completion
 
-**Status: ✅ Complete**
+**Status: 🚧 In Progress**
 
-Phase 2 makes the full Fallout 2 experience completable end-to-end.
+Phase 2 targets a full Fallout 2 playthrough end-to-end. The release gate remains
+`NOT_READY` — see `docs/F2_FULL_PARITY_PLAN.md` and `docs/F2_PARITY_ISSUES.md`.
 
 ### Systems and Known Issues
 
