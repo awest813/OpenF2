@@ -14,7 +14,11 @@
 import globalState from './globalState.js'
 import { EntityManager } from './ecs/entityManager.js'
 import type { SkillsComponent, StatsComponent } from './ecs/components.js'
-import { xpForLevel } from './ecs/derivedStats.js'
+import { xpForLevel, recomputeDerivedStats } from './ecs/derivedStats.js'
+import {
+    getCritterCarryLimitLbs,
+    getCritterInventoryWeightLbs,
+} from './critterInventory.js'
 
 const SPECIAL_TO_ECS: Array<[string, keyof StatsComponent]> = [
     ['STR', 'strength'],
@@ -150,6 +154,13 @@ export function syncPlayerEntityFromCritter(): void {
         if (typeof player.level === 'number') {
             stats.xpToNextLevel = xpForLevel(player.level + 1)
         }
+        recomputeDerivedStats(stats)
+        stats.carryWeight = getCritterCarryLimitLbs(player)
+    }
+
+    const inv = EntityManager.get<'inventory'>(entityId, 'inventory')
+    if (inv && player.type === 'critter') {
+        inv.currentWeight = getCritterInventoryWeightLbs(player)
     }
 
     const combat = EntityManager.get<'combat'>(entityId, 'combat')

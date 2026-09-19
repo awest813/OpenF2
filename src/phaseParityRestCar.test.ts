@@ -32,6 +32,35 @@ import {
     tickRadiationAndPoison,
     readPlayerPoisonLevel,
 } from './character/radiationPoison.js'
+import {
+    resolveRestEncounterTable,
+    triggerRestEncounter,
+} from './restEncounter.js'
+import { Worldmap } from './worldmap.js'
+
+describe('Parity — rest encounter spawn', () => {
+    it('resolveRestEncounterTable maps danger to outdoor tables', () => {
+        expect(resolveRestEncounterTable('low', null)).toBe('wasteland')
+        expect(resolveRestEncounterTable('high', null)).toBe('desert')
+        expect(resolveRestEncounterTable('medium', { encounterType: 'forest' })).toBe('forest')
+    })
+
+    it('triggerRestEncounter calls forceEncounter on local maps', () => {
+        const prevMap = globalState.gMap
+        const prevPlayer = globalState.player
+        const prevWorldPos = globalState.worldPosition
+        globalState.player = new Player()
+        globalState.gMap = { encounterType: 'wasteland' } as any
+        globalState.worldPosition = null
+        const spy = vi.spyOn(Worldmap, 'forceEncounter').mockReturnValue(true)
+        expect(triggerRestEncounter('medium')).toBe(true)
+        expect(spy).toHaveBeenCalledWith('wasteland')
+        spy.mockRestore()
+        globalState.gMap = prevMap
+        globalState.player = prevPlayer
+        globalState.worldPosition = prevWorldPos
+    })
+})
 
 describe('Parity — rest encounter interrupts', () => {
     let savedPlayer: typeof globalState.player

@@ -31,6 +31,9 @@ import { Config } from './config.js'
 import { SkillSet, StatSet } from './char.js'
 import { ActionPoints, AI } from './combat.js'
 import { markPlayerExplored } from './character/automap.js'
+import { canCritterCarryMore } from './critterInventory.js'
+import { syncPlayerEntityFromCritter } from './playerProjection.js'
+import { uiLog } from './ui.js'
 
 // Collection of functions for working with game objects
 
@@ -636,9 +639,20 @@ export class Obj {
     }
 
     addInventoryItem(item: Obj, count = 1): void {
+        const asCritter = this.type === 'critter' ? (this as unknown as Critter) : null
+        if (asCritter && !canCritterCarryMore(asCritter, item, count)) {
+            if (asCritter.isPlayer) {
+                uiLog('You cannot carry that much.')
+            }
+            return
+        }
+
         for (let i = 0; i < this.inventory.length; i++) {
             if (this.inventory[i].approxEq(item)) {
                 this.inventory[i].amount += count
+                if (asCritter?.isPlayer && globalState.player === asCritter) {
+                    syncPlayerEntityFromCritter()
+                }
                 return
             }
         }
@@ -647,6 +661,9 @@ export class Obj {
         // setAmount/approxEq from the prototype, so no per-instance binding)
         const clone = item.clone()
         this.inventory.push(clone.setAmount(count))
+        if (asCritter?.isPlayer && globalState.player === asCritter) {
+            syncPlayerEntityFromCritter()
+        }
     }
 
     getMessageCategory(): string {

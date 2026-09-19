@@ -68,8 +68,9 @@ This is the single largest architectural blocker in the codebase.
   through `character/leveling.js` (`spendSkillPoint`) and `character/perks.js`
   (`grantPerk`). None of that reaches `globalState.player`.
 - `src/inventory.ts:47-48, 74-79` — weight limits are enforced against ECS components;
-  the gameplay inventory (`Obj.addInventoryItem`, `src/object.ts:637`) has **no weight
-  check at all**.
+  gameplay `Obj.addInventoryItem` now enforces Critter carry weight (`src/critterInventory.ts`)
+  and projects weight to ECS via `playerProjection.ts`. Scripting pickup paths still need
+  audit for consistent messaging.
 - `awardXP()` (`src/character/leveling.ts:21`) is referenced **only** from tests —
   gameplay XP goes through `scripting.ts:1397` instead.
 
@@ -330,7 +331,8 @@ simulation, and hour-by-hour encounter interrupt rolls (`rest:interrupted`); Pip
 REST + DATA (archives) tabs; `src/character/holodisks.ts` is an in-memory archive with
 serialize helpers; **local automap** (`src/character/automap.ts`, save v23) records visited
 hexes and drives the Pip-Boy MAP tab. Still open: FO2 automap FRMs / MAP.MSG names,
-richer Archives layout, map-linked encounter spawn on interrupt.
+richer Archives layout, full encounter-map fidelity on interrupt (basic spawn wired via
+`src/restEncounter.ts` + `Worldmap.forceEncounter`).
 
 **Acceptance.** Holodisks collectible and readable, archives populated by quest/rumor
 state, automap rendered per visited level, and an alarm-clock rest UI that advances
