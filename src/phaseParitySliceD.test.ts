@@ -16,6 +16,8 @@ import {
 } from './skilldex.js'
 import { Player } from './player.js'
 import globalState from './globalState.js'
+
+const TICKS_PER_GAME_DAY = 10 * 86400
 import { UIManagerImpl } from './ui2/uiPanel.js'
 import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { QuestLog } from './quest/questLog.js'
@@ -105,6 +107,27 @@ describe('Parity Slice D — First Aid fallback heal', () => {
         const ok = applyHealingSkillFallback(Skills.FirstAid, player)
         expect(ok).toBe(true)
         expect(player.stats.baseStats['HP']).toBeGreaterThan(10)
+    })
+
+    it('resets First Aid uses after one in-game day (10 Hz tick clock)', () => {
+        const player = globalState.player as Player
+        globalState.gameTickTime = 0
+        resetSkilldexHealUses()
+        const rollSpy = vi.spyOn(skillCheck, 'rollSkillCheck').mockReturnValue({
+            success: false,
+            roll: 99,
+            threshold: 1,
+        })
+        for (let i = 0; i < 3; i++) {
+            expect(applyHealingSkillFallback(Skills.FirstAid, player)).toBe(true)
+        }
+        expect(rollSpy).toHaveBeenCalledTimes(3)
+        applyHealingSkillFallback(Skills.FirstAid, player)
+        expect(rollSpy).toHaveBeenCalledTimes(3)
+
+        globalState.gameTickTime = TICKS_PER_GAME_DAY
+        applyHealingSkillFallback(Skills.FirstAid, player)
+        expect(rollSpy).toHaveBeenCalledTimes(4)
     })
 })
 

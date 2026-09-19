@@ -11,6 +11,7 @@ import {
     setRestDangerOverride,
     getRestDanger,
     bindTimedEventList,
+    advanceGameTime,
     TICKS_PER_HOUR,
 } from './character/rest.js'
 import { Scripting } from './scripting.js'
@@ -26,6 +27,40 @@ import {
     CAR_SPEED_MULT,
 } from './car.js'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
+import {
+    resetRadiationPoisonClocks,
+    tickRadiationAndPoison,
+    readPlayerPoisonLevel,
+} from './character/radiationPoison.js'
+import {
+    resolveRestEncounterTable,
+    triggerRestEncounter,
+} from './restEncounter.js'
+import { Worldmap } from './worldmap.js'
+
+describe('Parity — rest encounter spawn', () => {
+    it('resolveRestEncounterTable maps danger to outdoor tables', () => {
+        expect(resolveRestEncounterTable('low', null)).toBe('wasteland')
+        expect(resolveRestEncounterTable('high', null)).toBe('desert')
+        expect(resolveRestEncounterTable('medium', { encounterType: 'forest' })).toBe('forest')
+    })
+
+    it('triggerRestEncounter calls forceEncounter on local maps', () => {
+        const prevMap = globalState.gMap
+        const prevPlayer = globalState.player
+        const prevWorldPos = globalState.worldPosition
+        globalState.player = new Player()
+        globalState.gMap = { encounterType: 'wasteland' } as any
+        globalState.worldPosition = null
+        const spy = vi.spyOn(Worldmap, 'forceEncounter').mockReturnValue(true)
+        expect(triggerRestEncounter('medium')).toBe(true)
+        expect(spy).toHaveBeenCalledWith('wasteland')
+        spy.mockRestore()
+        globalState.gMap = prevMap
+        globalState.player = prevPlayer
+        globalState.worldPosition = prevWorldPos
+    })
+})
 
 describe('Parity — rest encounter interrupts', () => {
     let savedPlayer: typeof globalState.player
@@ -97,6 +132,24 @@ describe('Parity — rest encounter interrupts', () => {
         expect(getRestDanger()).toBe('medium')
         setRestDangerOverride('safe')
         expect(getRestDanger()).toBe('safe')
+    })
+
+    it('advanceGameTime does not double-apply poison DoT on the next live tick', () => {
+        const player = globalState.player as Player
+        player.stats.setBase('Poison Level', 200)
+        player.stats.setBase('Max HP', 100)
+        player.stats.setBase('HP', 100)
+        resetRadiationPoisonClocks()
+        globalState.gameTickTime = 0
+
+        const beforeHp = player.stats.get('HP') ?? 100
+        advanceGameTime(TICKS_PER_HOUR, { heal: false, tickEffects: true })
+        const afterRestHp = player.stats.get('HP') ?? 100
+        expect(afterRestHp).toBeLessThan(beforeHp)
+
+        tickRadiationAndPoison(globalState.gameTickTime)
+        expect(player.stats.get('HP')).toBe(afterRestHp)
+        expect(readPlayerPoisonLevel()).toBeLessThan(200)
     })
 })
 

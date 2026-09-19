@@ -9,7 +9,11 @@
 import globalState from '../globalState.js'
 import { Critter } from '../object.js'
 import { tickTimedEffects } from './timedEffects.js'
-import { tickPoison, tickRadiation } from './radiationPoison.js'
+import {
+    tickPoison,
+    tickRadiation,
+    syncRadiationPoisonClocksAfterAdvance,
+} from './radiationPoison.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 import { EventBus } from '../eventBus.js'
 import { Config } from '../config.js'
@@ -144,6 +148,7 @@ function simulateEffectsAcrossAdvance(ticks: number): void {
     const radRounds = Math.floor(ticks / 1800)
     for (let i = 0; i < poisonRounds; i++) tickPoison(player)
     for (let i = 0; i < radRounds; i++) tickRadiation(player)
+    syncRadiationPoisonClocksAfterAdvance(ticks)
 }
 
 /**

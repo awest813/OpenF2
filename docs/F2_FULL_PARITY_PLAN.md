@@ -16,8 +16,8 @@ yet have campaign parity.
 
 The release gate marked `READY` and all 13 regions marked `CERTIFIED` are backed by
 synthetic harnesses (`phase35`, `campaignSmoke`) that set globals by assignment and
-never load real maps or scripts. Measured suite: **5103 pass / 61 fail** across 122
-files; failures are almost entirely asset-absent script corpora plus `get_tile_fid`.
+never load real maps or scripts. Measured suite: **5136 pass / 17 skip / 0 fail**
+across 137 files on a clean checkout.
 
 **Honest gate status: `NOT_READY`.** Full parity requires closing Tier 0 first, then
 Tier 1 systems, then region re-certification against real assets.
@@ -52,16 +52,16 @@ Out of scope until after campaign certification (matches existing freeze):
 |---|---|---|
 | Region certification | All 13 `CERTIFIED` | Scaffold-only; reset to `NOT_STARTED` |
 | Release gate | `READY` | `NOT_READY` |
-| Script checklist | Partial gaps in README | 807/807 marked `implemented` (many safe no-ops) |
+| Script checklist | Partial gaps in README | 801 `implemented`, 4 `partial`, 2 `safe_stub` |
 | Blocker matrix | No open HIGH/CRITICAL | True, but issues were crash/hardening focused |
-| Tests | 5089 / “all green” | 5103/5164; 61 failures |
+| Tests | 5089 / “all green” | 5136/5153; 0 failures; 17 asset skips |
 | Assets in repo | Implied playable | Only `nullmap`; no `data/scripts` |
 | New game / chargen | — | Slice C: menu + chargen + Temple handoff (remaining polish) |
 | Character model | Working | Critter source of truth + ECS projection (HUD/sheet); deeper writes remain |
 | Skilldex | Working | 8/8 Skilldex selectable; Steal/Traps fidelity polish remains |
-| Ending | Certified via scaffold | No `ENDGAME.TXT` / slide selection |
-| Combat AI | Partial | Uses 2 of ~20 AI.TXT fields |
-| Perks / traits | Partial | ~17 perks / 4 traits vs ~119 / 16 |
+| Ending | Certified via scaffold | ENDGAME.TXT slide selection stub (`src/endgame.ts`) |
+| Combat AI | Partial | AI.TXT attack_who/run_away/chem/best_weapon wired; more fields remain |
+| Perks / traits | Partial | Expanded FO2-aligned set; full ~119 / 16 parity remains |
 
 ---
 

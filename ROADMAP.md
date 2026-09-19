@@ -19,8 +19,8 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 - **Campaign completion is NOT READY.** Prior region `CERTIFIED` / gate `READY` claims were
   scaffold-based and have been reset. See `docs/F2_FULL_PARITY_PLAN.md` and
   `docs/F2_PARITY_ISSUES.md`.
-- Measured suite @ latest audit: **5103 passed / 61 failed** (asset-absent script corpora +
-  `get_tile_fid`); `tsc --noEmit` clean.
+- Measured suite @ latest audit: **5136 passed / 17 skipped / 0 failed** (137 test files);
+  `tsc --noEmit` clean.
 
 ### System Status Dashboard
 
@@ -33,13 +33,13 @@ OpenF2 is an open-source engine reimplementation focused on fully playable Fallo
 | Rendering | Working (WebGL) | `src/renderer.ts`, `src/webglrenderer.ts` |
 | UI panels | Dual stacks | `src/ui2/*` + legacy `src/ui.ts` (P1-10) |
 | Audio | Partial | SFX/music path exists; speech/movies missing (P1-9) |
-| Save/load | Working (hardened) | `src/saveload.ts`, schema v23 |
-| Combat | Working, AI shallow | Uses 2 of ~20 AI.TXT fields (P1-1) |
+| Save/load | Working (hardened) | `src/saveload.ts`, schema v26 |
+| Combat | Working, AI partial | AI.TXT attack_who/run_away/chem/best_weapon wired (P1-1) |
 | Scripting VM/bridge | Broad surface, fidelity uneven | Safe stubs often marked implemented (P3-2) |
 | New game / chargen | In progress (Slice C) | Main menu + chargen UI; `?map` still skips for dev (P0-1) |
 | Skilldex | In progress (Slice D) | All 8 Skilldex skills selectable; Steal inventory UI / trap damage polish remain (P0-3) |
 | Dialogue/barter | Working core | Edge fidelity + reaction model remain |
-| Ending / endgame slides | Missing | No ENDGAME.TXT selection (P1-8) |
+| Ending / endgame slides | Partial | ENDGAME.TXT selection stub in `src/endgame.ts` (P1-8) |
 | Multiplayer | Missing (experimental) | Not part of core path |
 
 ---
@@ -54,7 +54,7 @@ Highest-leverage remaining work (Tier 0 first):
    certification uses real maps/scripts only.
 2. **Unify character model** — one source of truth for HUD, combat, scripts, perks, weight (P0-2).
 3. **New game + character creation** — main menu → SPECIAL/tags/traits → Temple (P0-1).
-4. **Complete Skilldex** — Sneak, Steal, Traps, First Aid, Doctor, Science (P0-3).
+4. **Skilldex fidelity** — all 8 selectable; Steal/Traps/Doctor edge cases remain (P0-3).
 5. **Real-asset campaign validation** — Arroyo→Oil Rig against converted install (P0-4/P0-5).
 6. **Tier 1 systems** — perks/traits, drugs/rad/poison, party, rest/holodisks, rep, AI, car, endings.
 
@@ -117,7 +117,7 @@ Prefer small PRs; leave the suite green on a clean (asset-less) checkout.
 | C | Main menu + chargen + New Game → `artemple` |
 | D | Remaining Skilldex skills |
 | E | Fix `get_tile_fid`; Arroyo real-script smoke (opt-in assets) | Done — see `docs/F2_REAL_ASSET_LANE.md` |
-| F | Perks/traits + drugs + rad/poison (core) | Done — timed save/load still open |
+| F | Perks/traits + drugs + rad/poison (core) | Done (schema v22 timed chem persistence) |
 | G | Rest + holodisk archives + party control (P1-11 / P1-3 core) | Done — trade UI / automap / combat AI hooks still open |
 | H+ | Rep / AI / car per full parity plan |
 

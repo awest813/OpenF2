@@ -19,7 +19,8 @@ import globalState from './globalState.js'
 import { hexDirectionTo } from './geometry.js'
 import { Critter, WeaponObj } from './object.js'
 import { Scripting } from './scripting.js'
-import { educatedPerkRanks } from './character/perks.js'
+import { awardCritterXp } from './character/xp.js'
+import { syncPlayerEntityFromCritter } from './playerProjection.js'
 
 const weaponAnims: { [weapon: string]: { [anim: string]: string } } = {
     punch: { idle: 'aa', attack: 'aq' },
@@ -365,30 +366,8 @@ export function critterKill(
             const xpValue: number = (obj as any).pro?.extra?.XPValue ?? 0
             if (xpValue > 0) {
                 const player = source as any
-                player.xp = (player.xp ?? 0) + xpValue
-                // Level-up check: level N is reached at N*(N+1)/2 * 1000 total XP.
-                const oldLevel: number = player.level ?? 1
-                while (player.xp >= ((player.level ?? 1) * ((player.level ?? 1) + 1) / 2) * 1000) {
-                    player.level = (player.level ?? 1) + 1
-                    // BLK-049: Award skill points on level-up using the full Fallout 2
-                    // formula: base 10 + floor(INT/2) + 2 per rank of Educated perk.
-                    // This mirrors the formula in give_exp_points().
-                    const intScore: number = typeof player.getStat === 'function'
-                        ? (player.getStat('INT') ?? 5) : 5
-                    // Educated: UI id 11; FO2/script aliases 18 and 47.
-                    const educatedBonus = educatedPerkRanks(player.perkRanks as Record<number, number>) * 2
-                    const points = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
-                    if (player.skills && typeof player.skills.skillPoints === 'number') {
-                        player.skills.skillPoints += points
-                    }
-                    // BLK-049: Award a perk credit every 3 levels (levels 3, 6, 9, …),
-                    // matching Fallout 2 behaviour.  Uses globalState so that the
-                    // counter is shared with give_exp_points() and is persisted.
-                    if (player.level % 3 === 0) {
-                        globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
-                    }
-                }
-                if ((player.level ?? 1) > oldLevel) {
+                const levelsGained = awardCritterXp(player, xpValue)
+                if (levelsGained > 0) {
                     console.log('[XP] You reached level ' + player.level + '!')
                 }
             }
@@ -422,6 +401,9 @@ export function critterDamage(
     callback?: () => void
 ) {
     obj.stats.modifyBase('HP', -damage)
+    if (obj.isPlayer) {
+        syncPlayerEntityFromCritter()
+    }
     if (obj.getStat('HP') <= 0) {return critterKill(obj, source, useScript)}
 
     if (useScript) {

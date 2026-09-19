@@ -14,7 +14,11 @@
 import globalState from './globalState.js'
 import { EntityManager } from './ecs/entityManager.js'
 import type { SkillsComponent, StatsComponent } from './ecs/components.js'
-import { xpForLevel } from './ecs/derivedStats.js'
+import { xpForLevel, recomputeDerivedStats } from './ecs/derivedStats.js'
+import {
+    getCritterCarryLimitLbs,
+    getCritterInventoryWeightLbs,
+} from './critterInventory.js'
 
 const SPECIAL_TO_ECS: Array<[string, keyof StatsComponent]> = [
     ['STR', 'strength'],
@@ -124,13 +128,8 @@ export function syncPlayerEntityFromCritter(): void {
     }
 
     const stats = EntityManager.get<'stats'>(entityId, 'stats')
+    const hudSnap = readPlayerHudSnapshot()
     if (stats) {
-        const snap = readPlayerHudSnapshot()
-        if (snap) {
-            stats.currentHp = snap.currentHp
-            stats.maxHp = snap.maxHp
-            stats.maxAP = snap.maxAP
-        }
         for (const [statName, ecsKey] of SPECIAL_TO_ECS) {
             const value = readStat(player, statName, NaN)
             if (Number.isFinite(value)) {
@@ -150,14 +149,24 @@ export function syncPlayerEntityFromCritter(): void {
         if (typeof player.level === 'number') {
             stats.xpToNextLevel = xpForLevel(player.level + 1)
         }
+        recomputeDerivedStats(stats)
+        stats.carryWeight = getCritterCarryLimitLbs(player)
+        // Critter HP/AP are authoritative for live combat — re-apply after derived recompute.
+        if (hudSnap) {
+            stats.currentHp = hudSnap.currentHp
+            stats.maxHp = Math.max(hudSnap.maxHp, hudSnap.currentHp)
+            stats.maxAP = Math.max(stats.maxAP, hudSnap.maxAP)
+        }
+    }
+
+    const inv = EntityManager.get<'inventory'>(entityId, 'inventory')
+    if (inv && player.type === 'critter') {
+        inv.currentWeight = getCritterInventoryWeightLbs(player)
     }
 
     const combat = EntityManager.get<'combat'>(entityId, 'combat')
-    if (combat) {
-        const snap = readPlayerHudSnapshot()
-        if (snap) {
-            combat.combatAP = snap.currentAP
-        }
+    if (combat && hudSnap) {
+        combat.combatAP = hudSnap.currentAP
     }
 
     const skills = EntityManager.get<'skills'>(entityId, 'skills')

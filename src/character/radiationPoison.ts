@@ -158,6 +158,19 @@ export function tickRadiationAndPoison(now = globalState.gameTickTime): void {
     syncPlayerEntityFromCritter()
 }
 
+/**
+ * Align interval guards after bulk time simulation (rest / game_time_advance).
+ * Prevents an immediate duplicate DoT tick on the next live 10 Hz update.
+ */
+export function syncRadiationPoisonClocksAfterAdvance(ticksAdvanced: number): void {
+    const now = globalState.gameTickTime
+    if (typeof ticksAdvanced !== 'number' || !Number.isFinite(ticksAdvanced) || ticksAdvanced <= 0) {
+        return
+    }
+    lastPoisonTickAt = now - (ticksAdvanced % POISON_TICK_INTERVAL)
+    lastRadTickAt = now - (ticksAdvanced % RAD_TICK_INTERVAL)
+}
+
 /** Test helper. */
 export function resetRadiationPoisonClocks(): void {
     lastPoisonTickAt = -1

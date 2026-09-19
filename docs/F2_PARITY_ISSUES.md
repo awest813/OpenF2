@@ -17,9 +17,9 @@ definition of done, and certification rules that replace the scaffold gate.
 | Check | Result |
 |---|---|
 | `npx tsc --noEmit` | clean |
-| `npm test` | **5103 passed / 61 failed** (117 files passed / 5 failed) |
+| `npm test` | **5136 passed / 17 skipped / 0 failed** (137 files) |
 | Converted game assets present in repo | none (`maps/` holds only `nullmap.json` + images sidecar; no `data/`, `art/`, `proto/`) |
-| Checklist statuses | 807/807 marked `implemented` (0 stub/partial) — see **P3-2** |
+| Checklist statuses | 801 `implemented`, 4 `partial`, 2 `safe_stub` — see **P3-2** |
 | Open HIGH/CRITICAL blockers in matrix | 0 (all CLOSED) — but certification is scaffold-based; see **P0-5** |
 | `src/` size | ~99.5k lines TypeScript |
 
@@ -68,8 +68,9 @@ This is the single largest architectural blocker in the codebase.
   through `character/leveling.js` (`spendSkillPoint`) and `character/perks.js`
   (`grantPerk`). None of that reaches `globalState.player`.
 - `src/inventory.ts:47-48, 74-79` — weight limits are enforced against ECS components;
-  the gameplay inventory (`Obj.addInventoryItem`, `src/object.ts:637`) has **no weight
-  check at all**.
+  gameplay `Obj.addInventoryItem` now enforces Critter carry weight (`src/critterInventory.ts`)
+  and projects weight to ECS via `playerProjection.ts`. Scripting pickup paths still need
+  audit for consistent messaging.
 - `awardXP()` (`src/character/leveling.ts:21`) is referenced **only** from tests —
   gameplay XP goes through `scripting.ts:1397` instead.
 
@@ -104,20 +105,17 @@ day, Steal detection roll → reaction/combat, Traps disarm → damage on failur
 
 ### P0-4 — The real campaign scripts have never been executed; asset-dependent tests hard-fail
 
-**Evidence**
-- `npm test` → 59 of the 61 failures are `src/phase100.test.ts` (43) and
+**Status:** Partially addressed (Slice A/E). Asset-dependent suites now **skip** cleanly
+via `src/testScriptAssets.ts`; opt-in Arroyo lane documented in `docs/F2_REAL_ASSET_LANE.md`.
+
+**Evidence (historical @ `cbcb8d1`)**
+- `npm test` → 59 of the 61 failures were `src/phase100.test.ts` (43) and
   `src/phase107.test.ts` (16).
-- Both call `loadIntFile(name)` which returns `null` when
-  `path.resolve(__dirname, '..', 'data', 'scripts', name + '.int')` is absent
-  (`src/phase100.test.ts:87-90`), and then assert `expect(result).not.toBeNull()`
-  (`src/phase107.test.ts:117-124`).
 - `data/` does not exist in the repo, and `setup.py` (the converter) requires a licensed
   Fallout 2 install.
 
-**Gap.** Two problems in one. (a) Tests that require unavailable assets **fail** instead of
-skipping, so the suite is permanently red and real regressions hide in the noise.
-(b) More importantly, there is **no evidence anywhere in CI that a single real Fallout 2
-`.int` script has ever been parsed and run** by this engine.
+**Gap.** Clean checkout is green, but there is still **no CI evidence that a full real
+Fallout 2 `.int` campaign corpus has been parsed and run** on every PR.
 
 **Acceptance.** Asset-dependent suites `skip` with a clear reason when assets are absent,
 so a clean checkout is green. Separately, an opt-in CI lane (or documented local
@@ -333,7 +331,8 @@ simulation, and hour-by-hour encounter interrupt rolls (`rest:interrupted`); Pip
 REST + DATA (archives) tabs; `src/character/holodisks.ts` is an in-memory archive with
 serialize helpers; **local automap** (`src/character/automap.ts`, save v23) records visited
 hexes and drives the Pip-Boy MAP tab. Still open: FO2 automap FRMs / MAP.MSG names,
-richer Archives layout, map-linked encounter spawn on interrupt.
+richer Archives layout, full encounter-map fidelity on interrupt (basic spawn wired via
+`src/restEncounter.ts` + `Worldmap.forceEncounter`).
 
 **Acceptance.** Holodisks collectible and readable, archives populated by quest/rumor
 state, automap rendered per visited level, and an alarm-clock rest UI that advances
@@ -444,8 +443,8 @@ map with `worldmap.txt` parsing, and functioning save/load with map-state cachin
 (`globalState.dirtyMapCache`, `map.ts:321-360`) and script local-variable persistence
 (`scripting.ts:_serialize` → `{ name, lvars }`). That is substantial and non-trivial work.
 
-What is missing is not polish. There is no way to create a character, no way to use six of
-the eight Skilldex skills, no ending, and no evidence that any real Fallout 2 script has
-ever run. The current documentation states the opposite of all four. Closing Tier 0 alone
-is a large body of work; Tier 0 + Tier 1 is what "playable start to finish" actually
-requires.
+What is missing is not polish alone. Chargen, Skilldex dispatch, and an endgame slide stub
+exist, but campaign certification against real maps/scripts has not been completed, and
+Tier 1 systems (party fidelity, rest encounters, full perk/trait coverage, etc.) remain
+partial. Closing remaining Tier 0 gaps plus Tier 1 is what "playable start to finish"
+actually requires.

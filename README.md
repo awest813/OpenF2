@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
 [![TypeScript](https://img.shields.io/badge/engine-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-5013%20passing%20(16%20skipped)-green.svg)](#project-metrics)
+[![Tests](https://img.shields.io/badge/tests-5136%20passing%20(17%20skipped)-green.svg)](#project-metrics)
 [![Platform](https://img.shields.io/badge/platform-browser%20first-orange.svg)](#mission)
 
 **OpenF2** is an open-source reimplementation of the Fallout 2 engine written in TypeScript and WebGL.
@@ -37,11 +37,11 @@ This summary is based on current code in `src/` and live test execution (validat
 
 ### Test Metrics (Verified)
 
-- **Test Files:** 123 passing / 123 total (asset corpora skipped when absent)
-- **Individual Tests:** 5,013 passing / 16 skipped / 0 failing
+- **Test Files:** 137 passing / 137 total (asset corpora skipped when absent)
+- **Individual Tests:** 5,136 passing / 17 skipped / 0 failing
 - **Typecheck:** `tsc --noEmit` clean
 - **Campaign gate:** `NOT_READY` — see `docs/F2_RELEASE_GATE.md`
-- **Code Size:** ~99.5k lines of TypeScript in `src/`
+- **Code Size:** ~107k lines of TypeScript in `src/`
 
 ### Engine Status Dashboard
 
@@ -56,12 +56,12 @@ This summary is based on current code in `src/` and live test execution (validat
 | Audio | **Working** | `src/audio.ts` HTML5 backend |
 | Save/Load | **Working (hardened)** | `src/saveload.ts`, versioned migrations in `src/saveSchema.ts` |
 | Combat loop | **Working (playable)** | `src/combat.ts` with 66+ integration tests; AI fidelity partial |
-| Script runtime / VM | **Broad surface; fidelity uneven** | 807 checklist entries marked implemented (incl. safe no-ops); see parity plan |
+| Script runtime / VM | **Broad surface; fidelity uneven** | 801 implemented, 4 partial, 2 safe_stub in checklist; see parity plan |
 | Dialogue/Barter | **Working (parity ongoing)** | UI functional; reaction/edge cases remain |
 | World map + encounters | **Working** | `src/worldmap.ts`; specials / placement simplified |
 | Quest scripting | **Partial** | Infrastructure exists; real `.int` corpus not in repo |
-| New game / chargen | **Missing** | Boot jumps to map; hardcoded player (P0-1) |
-| Ending / endgame | **Missing** | No ENDGAME.TXT slide selection (P1-8) |
+| New game / chargen | **Partial** | Main menu + chargen → Temple (`src/ui2/mainMenuPanel.ts`, `src/character/chargen.ts`); polish remains (P0-1) |
+| Ending / endgame | **Partial** | ENDGAME.TXT slide selection stub (`src/endgame.ts`); real art/VO and full GVAR coverage remain (P1-8) |
 | Weather/cinematics | **Partial** | Generic slide player; movies log-only |
 | Multiplayer / netplay | **Missing** | No production multiplayer subsystem in `src/` |
 
@@ -79,13 +79,12 @@ Most critical partials include `proto_data`, animation queue callbacks (`reg_ani
 
 ## Known Test Gaps & Limitations
 
-The 74 failing tests are concentrated in Phase 100-101, which validates specific NPC and location scripts:
+On a clean checkout (no converted game assets), **17 tests skip** instead of failing:
 
-- **Phase 100:** Arroyo, Klamath, and Modoc location scripts (missing proto data or script context issues)
-- **Phase 101:** Den and Vault City NPC/location scripts (same underlying cause)
-- **Phase 107:** New Reno NPC scripts (script bytecode parsing or procedure availability)
+- **Phase 100 / 101 / 107 / 109:** Real `.int` script and proto corpora (`data/scripts`, `proto/pro.json`)
+- **Phase parity Slice E:** Arroyo real-asset smoke lane
 
-These failures indicate **incomplete script data availability at test time**, not engine crashes. In a full Fallout 2 installation, these scripts would load correctly.
+Run `npm run test:assets:arroyo` after `setup.py` against a legal Fallout 2 install to exercise real script content. See `docs/F2_REAL_ASSET_LANE.md`.
 
 ---
 
@@ -98,13 +97,13 @@ Release gate status: **`NOT_READY`** (prior `CERTIFIED`/`READY` claims were scaf
 
 Highest-leverage blockers:
 
-1. **Unify the character model** — HUD/ECS vs `globalState.player` Critter divergence (P0-2)
-2. **New game + character creation** — no main menu / SPECIAL / tags / traits flow (P0-1)
-3. **Complete Skilldex** — only Lockpick + Repair are usable (P0-3)
-4. **Real-asset script validation** — clean checkout has no `.int` corpus; phase100/107 fail instead of skip (P0-4)
-5. **Re-certify regions against real maps/scripts** — then Tier 1 systems (party, drugs, rep, car, endings)
+1. **Finish unifying the character model** — Critter→ECS projection exists; carry weight and XP routing remain split (P0-2)
+2. **Polish new game + character creation** — main menu/chargen flow exists; intro/credits/autosave remain (P0-1)
+3. **Skilldex fidelity** — all 8 skills dispatch; Steal/Traps/Doctor edge cases remain (P0-3)
+4. **Real-asset campaign validation** — opt-in Arroyo lane exists; full region re-cert pending (P0-4/P0-5)
+5. **Re-certify regions against real maps/scripts** — Tier 1 systems (party, drugs, rep, car, endings) are partial
 
-Foundation already in place: map loader, ScriptVM, combat loop, world map, save/load (schema v20), UI2 panels, extensive crash-hardening.
+Foundation already in place: map loader, ScriptVM, combat loop, world map, save/load (schema v26), UI2 panels, extensive crash-hardening.
 
 ---
 
@@ -198,7 +197,7 @@ The OpenF2 codebase is organized into focused modules:
 
 ### Testing
 
-- **phase*.test.ts** — 108 phase-based test files covering specific gameplay features
+- **phase*.test.ts** — 137 test files covering specific gameplay features and parity slices
 - **combat.integration.test.ts** — End-to-end combat scenarios
 - **ui2/ui2.test.ts** — UI panel testing
 - **vm.test.ts** — VM instruction and opcode testing
@@ -315,7 +314,7 @@ pipenv run python setup.py /path/to/Fallout2
 # Compile TypeScript
 npx tsc
 
-# Run full test suite (5100+ tests, ~98.5% pass rate)
+# Run full test suite (5136+ tests; asset suites skip when data/ is absent)
 npm test
 
 # Run browser build
@@ -325,11 +324,11 @@ python -m http.server
 
 **Test Output Example:**
 ```
-Test Files  118 passed | 3 failed (121)
-Tests       5026 passed | 74 failed (5100)
+Test Files  137 passed (137)
+Tests       5136 passed | 17 skipped (5153)
 ```
 
-Most failures are in Phase 100-101 script loading (known gap with proto data availability during tests).
+Asset-dependent suites skip cleanly when converted game data is not present.
 
 ### Where to help first
 

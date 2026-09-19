@@ -49,7 +49,9 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
-import { PERK_MAP, educatedPerkRanks } from './character/perks.js'
+import { PERK_MAP } from './character/perks.js'
+import { awardCritterXp } from './character/xp.js'
+import { getCritterCarryLimitLbs } from './critterInventory.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
@@ -1458,41 +1460,10 @@ export namespace Scripting {
                 warn('give_exp_points: non-finite XP (' + xp + ') — no-op', undefined, this)
                 return
             }
-            player.xp += xp
-            uiLog('You gain ' + xp + ' experience points.')
-            // Check for level-up: level N is reached at N*(N+1)/2 * 1000 total XP.
-            while (player.xp >= (player.level * (player.level + 1) / 2) * 1000) {
-                player.level++
-                // BLK-043: Award skill points on level-up (10 + INT/2, minimum 1).
-                // Fallout 2 formula: base 10 + floor(INT / 2) skill points per level.
-                // Educated perk: UI id 11; FO2/script aliases 18 and 47.
-                const intScore = player.getStat('INT') ?? 5
-                const educatedBonus = educatedPerkRanks(player.perkRanks) * 2
-                const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
-                // BLK-174: Guard against null player.skills — the Elder's dialogue
-                // calls give_exp_points(2500) when temple completion is confirmed.
-                // When the player object is partially initialised (skills component not
-                // yet attached, e.g. during early Arroyo character-creation flow),
-                // accessing skills.skillPoints throws TypeError and crashes the
-                // level-up loop.  Skip the skill-point award when skills is absent.
-                if (player.skills) {
-                    player.skills.skillPoints += pointsGained
-                }
-                uiLog('You have reached experience level ' + player.level + '.')
-                // BLK-047: Award a perk credit every 3 levels (levels 3, 6, 9, …).
-                // The player earns one perk selection every 3 levels in Fallout 2.
-                // Scripts and sfall mods can read this via get_perk_owed() (0x81AE)
-                // and update it via set_perk_owed() (0x81AF).
-                if (player.level % 3 === 0) {
-                    globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
-                }
-                // Slice G / P1-3: companion party.txt level tiers track the player.
-                if (globalState.gParty && typeof globalState.gParty.applyLevelTiersForPlayerLevel === 'function') {
-                    globalState.gParty.applyLevelTiersForPlayerLevel(player.level)
-                }
-            }
-            // Keep ECS HUD / character sheet aligned with Critter XP (P0-2).
-            syncPlayerEntityFromCritter()
+            awardCritterXp(player, xp, {
+                onGain: (amount) => uiLog('You gain ' + amount + ' experience points.'),
+                onLevelUp: (level) => uiLog('You have reached experience level ' + level + '.'),
+            })
         }
 
         // critters
@@ -7458,13 +7429,7 @@ export namespace Scripting {
         // Used by New Reno shop scripts to check whether the player can carry loot.
         get_critter_carry_limit_sfall(obj: Obj): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const critter = obj as any
-            if (typeof critter.getStat === 'function') {
-                const cw = critter.getStat('Carry Weight')
-                if (typeof cw === 'number' && isFinite(cw) && cw > 0) {return cw}
-            }
-            const str = typeof critter.getStat === 'function' ? (critter.getStat('STR') ?? 5) : 5
-            return 25 + str * 25
+            return getCritterCarryLimitLbs(obj as Critter)
         }
 
         // sfall 0x82B4 — get_obj_script_name_sfall(obj):
