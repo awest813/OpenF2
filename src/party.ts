@@ -118,11 +118,14 @@ export class Party {
             console.warn('setDistance: %s not allowed for pid %s', distance, obj.pid)
             return
         }
+        const wasStay = ctrl.distance === 'stay'
         ctrl.distance = distance
         // Stay implies wait-in-place for follow queries
-        if (distance === 'stay') ctrl.waiting = true
-        if (distance !== 'stay' && distance !== undefined) {
-            // leaving stay resumes follow unless explicitly waiting
+        if (distance === 'stay') {
+            ctrl.waiting = true
+        } else if (wasStay) {
+            // Leaving stay resumes follow unless the player explicitly set wait.
+            ctrl.waiting = false
         }
     }
 

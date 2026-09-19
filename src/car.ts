@@ -35,7 +35,11 @@ export function hasCar(): boolean {
 
 export function setHasCar(owned: boolean): void {
     globalState.hasCar = !!owned
-    if (!owned) carPark = null
+    if (!owned) {
+        carPark = null
+        clearCarTrunk()
+        globalState.carFuel = 0
+    }
 }
 
 export function getCarFuel(): number {

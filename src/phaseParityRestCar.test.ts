@@ -11,6 +11,7 @@ import {
     setRestDangerOverride,
     getRestDanger,
     bindTimedEventList,
+    advanceGameTime,
     TICKS_PER_HOUR,
 } from './character/rest.js'
 import { Scripting } from './scripting.js'
@@ -26,6 +27,11 @@ import {
     CAR_SPEED_MULT,
 } from './car.js'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
+import {
+    resetRadiationPoisonClocks,
+    tickRadiationAndPoison,
+    readPlayerPoisonLevel,
+} from './character/radiationPoison.js'
 
 describe('Parity — rest encounter interrupts', () => {
     let savedPlayer: typeof globalState.player
@@ -97,6 +103,24 @@ describe('Parity — rest encounter interrupts', () => {
         expect(getRestDanger()).toBe('medium')
         setRestDangerOverride('safe')
         expect(getRestDanger()).toBe('safe')
+    })
+
+    it('advanceGameTime does not double-apply poison DoT on the next live tick', () => {
+        const player = globalState.player as Player
+        player.stats.setBase('Poison Level', 200)
+        player.stats.setBase('Max HP', 100)
+        player.stats.setBase('HP', 100)
+        resetRadiationPoisonClocks()
+        globalState.gameTickTime = 0
+
+        const beforeHp = player.stats.get('HP') ?? 100
+        advanceGameTime(TICKS_PER_HOUR, { heal: false, tickEffects: true })
+        const afterRestHp = player.stats.get('HP') ?? 100
+        expect(afterRestHp).toBeLessThan(beforeHp)
+
+        tickRadiationAndPoison(globalState.gameTickTime)
+        expect(player.stats.get('HP')).toBe(afterRestHp)
+        expect(readPlayerPoisonLevel()).toBeLessThan(200)
     })
 })
 

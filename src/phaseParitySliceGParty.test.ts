@@ -97,6 +97,15 @@ describe('Parity Slice G — party control runtime', () => {
         expect(ctrl.appliedLevelPid).toBe(16777527)
     })
 
+    it('setDistance leaving stay resumes follow', () => {
+        const vic = makeMember(16777345, 'Vic')
+        globalState.gParty.addPartyMember(vic)
+        globalState.gParty.setDistance(vic, 'stay')
+        expect(globalState.gParty.isFollowing(vic)).toBe(false)
+        globalState.gParty.setDistance(vic, 'stay_close')
+        expect(globalState.gParty.isFollowing(vic)).toBe(true)
+    })
+
     it('serializeControls / deserializeControls round-trip waiting', () => {
         const marcus = makeMember(16777377, 'Marcus')
         globalState.gParty.addPartyMember(marcus)

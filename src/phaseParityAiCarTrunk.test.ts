@@ -16,6 +16,9 @@ import {
 } from './combatAi.js'
 import {
     setHasCar,
+    hasCar,
+    setCarFuel,
+    getCarFuel,
     clearCarTrunk,
     addToCarTrunk,
     getCarTrunk,
@@ -175,6 +178,21 @@ describe('Parity P1-6 — car trunk (save v25)', () => {
         expect(getCarTrunk()).toHaveLength(0)
         // Keep serialized shape stable for save schema
         expect(Array.isArray(snap)).toBe(true)
+    })
+
+    it('setHasCar(false) clears trunk and fuel', () => {
+        setHasCar(true)
+        setCarFuel(500)
+        addToCarTrunk({
+            serialize: () => ({ type: 'item', pid: 41, amount: 1 } as any),
+        } as any)
+        expect(getCarTrunk()).toHaveLength(1)
+        expect(getCarFuel()).toBe(500)
+
+        setHasCar(false)
+        expect(getCarTrunk()).toHaveLength(0)
+        expect(getCarFuel()).toBe(0)
+        expect(hasCar()).toBe(false)
     })
 
     it('canOpenCarTrunk requires ownership and out-of-combat', () => {

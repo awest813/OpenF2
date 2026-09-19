@@ -72,8 +72,8 @@ interface HealUseTracker {
 let healUses: HealUseTracker = { dayKey: 0, firstAid: 0, doctor: 0 }
 
 function currentDayKey(): number {
-    // Approximate in-game day from engine tick; fine for uses/day gating.
-    return Math.floor((globalState.gameTickTime ?? 0) / (1000 * 60 * 60 * 24))
+    // gameTickTime runs at 10 ticks/second (see vm_bridge get_month).
+    return Math.floor((globalState.gameTickTime ?? 0) / (10 * 86400))
 }
 
 function refreshHealDay(): void {
