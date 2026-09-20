@@ -221,6 +221,27 @@ describe('UIManagerImpl.isAnyPanelOpen', () => {
         mgr.register(panel)  // not shown
         expect(mgr.isAnyPanelOpen()).toBe(false)
     })
+
+    it('absorbs clicks and keys outside an overlay so they do not reach the HUD', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        class ClickHud extends TestPanel {
+            clicks = 0
+            override onMouseDown(): boolean {
+                this.clicks++
+                return true
+            }
+        }
+        const hud = new ClickHud('hud', { x: 0, y: 500, width: 800, height: 100 }, 0)
+        hud.show()
+        const modal = new TestPanel('modal', { x: 200, y: 100, width: 400, height: 300 }, 10)
+        modal.show()
+        mgr.register(hud)
+        mgr.register(modal)
+
+        expect(mgr.handleMouseDown(10, 550, 'l')).toBe(true)
+        expect(hud.clicks).toBe(0)
+        expect(mgr.handleKeyDown('w')).toBe(true)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -2371,7 +2392,7 @@ describe('GamePanel: combat log overlay', () => {
     it('captures combat:turnStart for player with "You" label', () => {
         EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
         const log = panel.getCombatLog()
-        expect(log[0]).toContain("You's turn")
+        expect(log[0]).toContain('Your turn')
     })
 
     it('captures combat:turnStart for non-player with entity id', () => {
@@ -2399,7 +2420,7 @@ describe('GamePanel: combat log overlay', () => {
 
     it('captures combat:turnEnd', () => {
         EventBus.emit('combat:turnEnd', { entityId: playerEntityId })
-        expect(panel.getCombatLog()[0]).toContain('You ends turn')
+        expect(panel.getCombatLog()[0]).toContain('You end turn')
     })
 
     it('marks inCombat true after combat:start, false after combat:end', () => {

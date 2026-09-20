@@ -76,7 +76,7 @@ export interface EngineEvents {
     'player:reputationChange': { name: string; oldValue: number; newValue: number }
 
     // UI panels
-    'ui:openPanel': { panelName: string; returnTo?: string }
+    'ui:openPanel': { panelName: string; returnTo?: string; openAs?: string }
     'ui:closePanel': { panelName: string }
     'settings:changed': { settings: GameSettings }
     'barter:talkRequested': Record<string, never>
@@ -100,6 +100,7 @@ export interface EngineEvents {
     'game:loadFromSlot': { slot: number }
     /** Fired after a save completes successfully. */
     'game:saveComplete': { slot: number; name: string }
+    'game:loadComplete': { slot: number; name: string }
 
     // New game / character creation (Slice C / P0-1)
     'game:newGameRequested': Record<string, never>

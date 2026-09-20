@@ -75,7 +75,11 @@ export class MainMenuPanel extends UIPanel {
         }
         this.hide()
         const panelName = id === 'load' ? 'saveLoad' : id
-        EventBus.emit('ui:openPanel', { panelName, returnTo: 'mainMenu' })
+        EventBus.emit('ui:openPanel', {
+            panelName,
+            returnTo: 'mainMenu',
+            openAs: id === 'load' ? 'load' : undefined,
+        })
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {

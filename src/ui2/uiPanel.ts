@@ -345,7 +345,7 @@ export class UIManagerImpl {
     private panels: UIPanel[] = []
     private offscreen: OffscreenCanvas
     private ctx: OffscreenCanvasRenderingContext2D
-    private _busOpenHandler: ((e: { panelName: string; returnTo?: string }) => void) | null = null
+    private _busOpenHandler: ((e: { panelName: string; returnTo?: string; openAs?: string }) => void) | null = null
     private _busCloseHandler: ((e: { panelName: string }) => void) | null = null
     private lastHoveredPanel: UIPanel | null = null
     /** Optional bitmap font renderer for pixel-accurate Fallout fonts. */
@@ -398,23 +398,28 @@ export class UIManagerImpl {
     }
 
     handleMouseDown(x: number, y: number, button: 'l' | 'r'): boolean {
+        const overlayOpen = this.isAnyPanelOpen()
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
             if (!panel.visible) {continue}
+            // Modal overlays (z > 0) own input; don't leak clicks to the HUD.
+            if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.containsPoint(x, y)) {
                 if (panel.onMouseDown(x - panel.bounds.x, y - panel.bounds.y, button)) {
                     return true
                 }
             }
         }
-        return false
+        return overlayOpen
     }
 
     handleMouseMove(x: number, y: number): void {
+        const overlayOpen = this.isAnyPanelOpen()
         let foundPanel: UIPanel | null = null
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
             if (!panel.visible) {continue}
+            if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.containsPoint(x, y)) {
                 foundPanel = panel
                 break
@@ -432,12 +437,14 @@ export class UIManagerImpl {
     }
 
     handleKeyDown(key: string): boolean {
+        const overlayOpen = this.isAnyPanelOpen()
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
             if (!panel.visible) {continue}
+            if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.onKeyDown(key)) {return true}
         }
-        return false
+        return overlayOpen
     }
 
     /**
@@ -453,11 +460,16 @@ export class UIManagerImpl {
             EventBus.off('ui:openPanel', this._busOpenHandler)
             EventBus.off('ui:closePanel', this._busCloseHandler!)
         }
-        this._busOpenHandler = ({ panelName, returnTo }) => {
+        this._busOpenHandler = ({ panelName, returnTo, openAs }) => {
             const panel = this.panels.find((p) => p.name === panelName)
             if (!panel) {return}
             panel.returnPanel = returnTo ?? null
-            panel.show()
+            const opener = (panel as UIPanel & { openAs?: (mode: string) => void }).openAs
+            if (openAs && typeof opener === 'function') {
+                opener.call(panel, openAs)
+            } else {
+                panel.show()
+            }
         }
         this._busCloseHandler = ({ panelName }) => {
             const panel = this.panels.find((p) => p.name === panelName)

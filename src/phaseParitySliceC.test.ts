@@ -30,6 +30,7 @@ import { MainMenuPanel } from './ui2/mainMenuPanel.js'
 import { CharacterCreationPanel } from './ui2/characterCreationPanel.js'
 import { CreditsPanel } from './ui2/creditsPanel.js'
 import { OptionsPanel } from './ui2/optionsPanel.js'
+import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 
 function destroyAllEntities(): void {
     for (const id of EntityManager.allIds()) {
@@ -191,6 +192,25 @@ describe('Parity Slice C — main menu / chargen panels', () => {
         options.onKeyDown('Escape')
         expect(options.visible).toBe(false)
         expect(menu.visible).toBe(true)
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('LOAD GAME opens the save/load panel in load mode', () => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        mgr.connectEventBus()
+        const menu = mgr.get<MainMenuPanel>('mainMenu')
+        const sl = mgr.get<SaveLoadPanel>('saveLoad')
+        menu.show()
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('Enter')
+        expect(menu.visible).toBe(false)
+        expect(sl.visible).toBe(true)
+        expect(sl.isSave).toBe(false)
+        expect(sl.returnPanel).toBe('mainMenu')
         EventBus.clear('ui:openPanel')
         EventBus.clear('ui:closePanel')
     })

@@ -101,13 +101,18 @@ export class GamePanel extends UIPanel {
         })
         EventBus.on('combat:turnStart', (payload) => {
             this._isPlayerTurn = payload.isPlayer
-            const who = payload.isPlayer ? 'You' : `Entity#${payload.entityId}`
-            this._combatLog.push(`> ${who}'s turn`)
+            if (payload.isPlayer) {
+                this._combatLog.push('> Your turn')
+            } else {
+                this._combatLog.push(`> Entity#${payload.entityId}'s turn`)
+            }
             this._truncateLog()
         })
         EventBus.on('combat:turnEnd', (payload) => {
-            const who = payload.entityId === this.playerEntityId ? 'You' : `Entity#${payload.entityId}`
-            this._combatLog.push(`  ${who} ends turn`)
+            const line = payload.entityId === this.playerEntityId
+                ? '  You end turn'
+                : `  Entity#${payload.entityId} ends turn`
+            this._combatLog.push(line)
             this._truncateLog()
         })
         EventBus.on('combat:hit', (payload) => {
