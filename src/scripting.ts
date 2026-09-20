@@ -68,6 +68,7 @@ import {
 import { signalEndGame } from './endgame.js'
 import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
+import { iniOverride, violenceToIni, patchSettings } from './settings.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -1058,8 +1059,8 @@ export namespace Scripting {
                     return wLoaded > 0 ? 1 : 0
                 }
                 case 35:
-                    // METARULE_COMBAT_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
-                    return 1
+                    // METARULE_COMBAT_DIFFICULTY: 0=easy, 1=normal, 2=hard.
+                    return globalState.combatDifficulty
                 case 44: {
                     // METARULE_WHO_ON_DRUGS: 1 if the target critter is currently under drug influence.
                     // Uses the drug-tracking map populated when drug items are used via use/useObjOn.
@@ -1077,7 +1078,7 @@ export namespace Scripting {
                     }
                     return 0
                 case 48:
-                    return 2 // METARULE_VIOLENCE_FILTER (2 = VLNCLVL_NORMAL)
+                    return violenceToIni(globalState.violenceLevel) // METARULE_VIOLENCE_FILTER
                 case 49: { // METARULE_W_DAMAGE_TYPE
                     // Map the damage-type string to the Fallout 2 DMG_* constants:
                     //   0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP, 6=Explosion
@@ -1098,8 +1099,8 @@ export namespace Scripting {
                     return 0 // fall back to Normal
                 }
                 case 55:
-                    // METARULE_GAME_DIFFICULTY: 0=easy, 1=normal, 2=hard. Return normal.
-                    return 1
+                    // METARULE_GAME_DIFFICULTY: 0=easy, 1=normal, 2=hard.
+                    return globalState.gameDifficulty
                 case 56:
                     return SFALL_VER // METARULE_SFALL_VER — sfall compatibility version
                 // -----------------------------------------------------------------------
@@ -4561,6 +4562,8 @@ export namespace Scripting {
         get_ini_setting(key: string): number {
             log('get_ini_setting', arguments)
             const normalized = key.toLowerCase()
+            const live = iniOverride(normalized)
+            if (live !== undefined) {return live}
             if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, normalized)) {
                 return INI_SETTING_DEFAULTS[normalized]
             }
@@ -6247,9 +6250,8 @@ export namespace Scripting {
 
         // sfall 0x8247 — get_violence_level_sfall():
         // Return the current violence level setting (0=minimal, 1=normal, 2=maximum blood).
-        // Browser build: always returns 2 (maximum) — no violence-level control implemented.
         get_violence_level_sfall(): number {
-            return 2
+            return globalState.violenceLevel
         }
 
         // ---------------------------------------------------------------------------
@@ -7787,7 +7789,7 @@ export namespace Scripting {
         // does not yet cascade the value through encounter/XP formula branches.
         set_game_difficulty_sfall(level: number): void {
             if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            globalState.gameDifficulty = level
+            patchSettings({ gameDifficulty: level as 0 | 1 | 2 }, false)
         }
 
         // sfall 0x82D4 — get_combat_difficulty_sfall():
@@ -7799,7 +7801,7 @@ export namespace Scripting {
         // through the damage formula is not yet wired.
         set_combat_difficulty_sfall(level: number): void {
             if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            globalState.combatDifficulty = level
+            patchSettings({ combatDifficulty: level as 0 | 1 | 2 }, false)
         }
 
         // sfall 0x82D6 — get_critter_team_sfall(obj):

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import globalState from './globalState.js'
+import { EventBus } from './eventBus.js'
 import { deserializeObj } from './object.js'
 import { SAVE_VERSION, SaveGame, migrateSave } from './saveSchema.js'
 import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
@@ -515,6 +516,7 @@ export function load(id: number): void {
                 console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                 hydrateStateFromSave(save, globalState, deserializeObj)
                 applyExtraSaveState(save)
+                EventBus.emit('game:loadComplete', { slot: id, name: save.name })
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                     error,
@@ -545,6 +547,7 @@ export function load(id: number): void {
                     console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
                     hydrateStateFromSave(save, globalState, deserializeObj)
                     applyExtraSaveState(save)
+                    EventBus.emit('game:loadComplete', { slot: id, name: save.name })
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
                         error,

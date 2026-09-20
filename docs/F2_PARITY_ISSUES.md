@@ -38,8 +38,8 @@ These are hard blockers. Nothing downstream matters until they are closed.
 **Status:** Partially addressed on the full-parity branch (Slice C). Cold boot without a
 `?map` query opens `MainMenuPanel` → `CharacterCreationPanel` → `enterWorldMap('artemple')`
 with SPECIAL/tags/traits applied to `globalState.player` and the debug 1337-caps loadout
-cleared. Remaining: Credits/Quit, derived-stat preview polish, intro cinematic, post-chargen
-autosave.
+cleared. Remaining: derived-stat preview polish, intro cinematic, post-chargen
+autosave. Credits and Quit are on the main menu.
 
 **Evidence (historical @ `cbcb8d1`)**
 - `src/init.ts` — previously boot went straight to `gMap.loadMap(...)`.

@@ -221,6 +221,27 @@ describe('UIManagerImpl.isAnyPanelOpen', () => {
         mgr.register(panel)  // not shown
         expect(mgr.isAnyPanelOpen()).toBe(false)
     })
+
+    it('absorbs clicks and keys outside an overlay so they do not reach the HUD', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        class ClickHud extends TestPanel {
+            clicks = 0
+            override onMouseDown(): boolean {
+                this.clicks++
+                return true
+            }
+        }
+        const hud = new ClickHud('hud', { x: 0, y: 500, width: 800, height: 100 }, 0)
+        hud.show()
+        const modal = new TestPanel('modal', { x: 200, y: 100, width: 400, height: 300 }, 10)
+        modal.show()
+        mgr.register(hud)
+        mgr.register(modal)
+
+        expect(mgr.handleMouseDown(10, 550, 'l')).toBe(true)
+        expect(hud.clicks).toBe(0)
+        expect(mgr.handleKeyDown('w')).toBe(true)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -647,9 +668,19 @@ describe('UIManager integration: all standard panels', () => {
 // ---------------------------------------------------------------------------
 
 import { OptionsPanel } from './optionsPanel.js'
+import { CreditsPanel } from './creditsPanel.js'
 import { Config } from '../config.js'
+import { getSettings, resetSettings } from '../settings.js'
 
 describe('OptionsPanel', () => {
+    beforeEach(() => {
+        resetSettings()
+    })
+
+    afterEach(() => {
+        resetSettings()
+    })
+
     it('has panel name "options"', () => {
         const panel = new OptionsPanel(800, 600)
         expect(panel.name).toBe('options')
@@ -706,6 +737,72 @@ describe('OptionsPanel', () => {
 
         EventBus.clear('ui:openPanel')
         EventBus.clear('ui:closePanel')
+    })
+
+    it('cycles game difficulty with arrow keys', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        expect(getSettings().gameDifficulty).toBe(1)
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+        expect(getSettings().gameDifficulty).toBe(2)
+        expect(Config.engine.encounterDifficulty).toBe('hard')
+        expect(panel.onKeyDown('ArrowLeft')).toBe(true)
+        expect(getSettings().gameDifficulty).toBe(1)
+    })
+
+    it('Tab / Q switch GAME DISPLAY SOUND tabs', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        expect(panel.activeTab).toBe('game')
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('display')
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('sound')
+        panel.onKeyDown('q')
+        expect(panel.activeTab).toBe('display')
+    })
+
+    it('toggles display flags through the settings store', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('display')
+        expect(getSettings().showHexOverlay).toBe(false)
+        panel.onKeyDown('Enter')
+        expect(getSettings().showHexOverlay).toBe(true)
+        expect(Config.ui.showHexOverlay).toBe(true)
+    })
+
+    it('DONE click closes the panel', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        const doneY = panel.bounds.height - 40 + 8
+        const doneX = panel.bounds.width / 2
+        expect(panel.onMouseDown(doneX, doneY, 'l')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+})
+
+describe('CreditsPanel', () => {
+    it('has panel name "credits" and zOrder 45', () => {
+        const panel = new CreditsPanel(800, 600)
+        expect(panel.name).toBe('credits')
+        expect(panel.zOrder).toBe(45)
+    })
+
+    it('Escape hides credits', () => {
+        const panel = new CreditsPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+        expect(panel.quitMode).toBe(false)
+    })
+
+    it('openAs(quit) sets quitMode', () => {
+        const panel = new CreditsPanel(800, 600)
+        panel.openAs('quit')
+        expect(panel.visible).toBe(true)
+        expect(panel.quitMode).toBe(true)
     })
 })
 
@@ -2295,7 +2392,7 @@ describe('GamePanel: combat log overlay', () => {
     it('captures combat:turnStart for player with "You" label', () => {
         EventBus.emit('combat:turnStart', { entityId: playerEntityId, isPlayer: true })
         const log = panel.getCombatLog()
-        expect(log[0]).toContain("You's turn")
+        expect(log[0]).toContain('Your turn')
     })
 
     it('captures combat:turnStart for non-player with entity id', () => {
@@ -2323,7 +2420,7 @@ describe('GamePanel: combat log overlay', () => {
 
     it('captures combat:turnEnd', () => {
         EventBus.emit('combat:turnEnd', { entityId: playerEntityId })
-        expect(panel.getCombatLog()[0]).toContain('You ends turn')
+        expect(panel.getCombatLog()[0]).toContain('You end turn')
     })
 
     it('marks inCombat true after combat:start, false after combat:end', () => {

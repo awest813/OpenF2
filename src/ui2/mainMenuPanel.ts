@@ -1,5 +1,5 @@
 /**
- * MainMenuPanel — New Game / Load / Options entry point (Slice C / P0-1).
+ * MainMenuPanel — New Game / Load / Options / Credits / Quit (Slice C / P0-1).
  *
  * Shown on cold boot when no `?mapName` query is present. Dev shortcuts that
  * pass a map in the URL still skip straight into gameplay.
@@ -18,15 +18,19 @@ import {
 import { EventBus } from '../eventBus.js'
 
 const PANEL_W = 360
-const PANEL_H = 280
+const PANEL_H = 380
 const BTN_W = 220
 const BTN_H = 32
-const BTN_GAP = 14
+const BTN_GAP = 12
 
-const MENU_ITEMS: Array<{ id: 'new' | 'load' | 'options'; label: string }> = [
+type MenuId = 'new' | 'load' | 'options' | 'credits' | 'quit'
+
+const MENU_ITEMS: Array<{ id: MenuId; label: string }> = [
     { id: 'new', label: 'NEW GAME' },
     { id: 'load', label: 'LOAD GAME' },
     { id: 'options', label: 'OPTIONS' },
+    { id: 'credits', label: 'CREDITS' },
+    { id: 'quit', label: 'QUIT' },
 ]
 
 export class MainMenuPanel extends UIPanel {
@@ -50,7 +54,7 @@ export class MainMenuPanel extends UIPanel {
 
     private _buttonRect(i: number): { x: number; y: number; w: number; h: number } {
         const { width } = this.bounds
-        const startY = 100
+        const startY = 88
         return {
             x: Math.floor((width - BTN_W) / 2),
             y: startY + i * (BTN_H + BTN_GAP),
@@ -59,17 +63,23 @@ export class MainMenuPanel extends UIPanel {
         }
     }
 
-    private _activate(id: 'new' | 'load' | 'options'): void {
+    private _activate(id: MenuId): void {
         if (id === 'new') {
             this.hide()
             EventBus.emit('game:newGameRequested', {})
             return
         }
-        if (id === 'load') {
-            EventBus.emit('ui:openPanel', { panelName: 'saveLoad' })
+        if (id === 'quit') {
+            EventBus.emit('game:quitRequested', {})
             return
         }
-        EventBus.emit('ui:openPanel', { panelName: 'options' })
+        this.hide()
+        const panelName = id === 'load' ? 'saveLoad' : id
+        EventBus.emit('ui:openPanel', {
+            panelName,
+            returnTo: 'mainMenu',
+            openAs: id === 'load' ? 'load' : undefined,
+        })
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -80,11 +90,11 @@ export class MainMenuPanel extends UIPanel {
         ctx.textAlign = 'center'
         ctx.font = 'bold 22px monospace'
         ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('OPENF2', width / 2, 42)
+        ctx.fillText('OPENF2', width / 2, 38)
 
         ctx.font = '12px monospace'
         ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText('Fallout 2 engine reimplementation', width / 2, 68)
+        ctx.fillText('Fallout 2 engine reimplementation', width / 2, 62)
 
         for (let i = 0; i < MENU_ITEMS.length; i++) {
             const item = MENU_ITEMS[i]
@@ -99,7 +109,7 @@ export class MainMenuPanel extends UIPanel {
 
         ctx.font = '10px monospace'
         ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('↑↓ / Enter  ·  click to select', width / 2, height - 18)
+        ctx.fillText('↑↓ / Enter  ·  click to select', width / 2, height - 16)
         ctx.textAlign = 'left'
     }
 

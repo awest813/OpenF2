@@ -28,6 +28,9 @@ import { QuestLog } from './quest/questLog.js'
 import { EventBus } from './eventBus.js'
 import { MainMenuPanel } from './ui2/mainMenuPanel.js'
 import { CharacterCreationPanel } from './ui2/characterCreationPanel.js'
+import { CreditsPanel } from './ui2/creditsPanel.js'
+import { OptionsPanel } from './ui2/optionsPanel.js'
+import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 
 function destroyAllEntities(): void {
     for (const id of EntityManager.allIds()) {
@@ -162,5 +165,90 @@ describe('Parity Slice C — main menu / chargen panels', () => {
 
     it('lists all chargen skills', () => {
         expect(CHARGEN_SKILLS.length).toBe(18)
+    })
+
+    it('registers credits and options panels', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        expect(mgr.get('credits')).toBeInstanceOf(CreditsPanel)
+        expect(mgr.get('options')).toBeInstanceOf(OptionsPanel)
+    })
+
+    it('OPTIONS hides the menu and restores it on close', () => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        mgr.connectEventBus()
+        const menu = mgr.get<MainMenuPanel>('mainMenu')
+        const options = mgr.get<OptionsPanel>('options')
+        menu.show()
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('Enter')
+        expect(menu.visible).toBe(false)
+        expect(options.visible).toBe(true)
+        expect(options.returnPanel).toBe('mainMenu')
+        options.onKeyDown('Escape')
+        expect(options.visible).toBe(false)
+        expect(menu.visible).toBe(true)
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('LOAD GAME opens the save/load panel in load mode', () => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        mgr.connectEventBus()
+        const menu = mgr.get<MainMenuPanel>('mainMenu')
+        const sl = mgr.get<SaveLoadPanel>('saveLoad')
+        menu.show()
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('Enter')
+        expect(menu.visible).toBe(false)
+        expect(sl.visible).toBe(true)
+        expect(sl.isSave).toBe(false)
+        expect(sl.returnPanel).toBe('mainMenu')
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('CREDITS opens the credits panel', () => {
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        mgr.connectEventBus()
+        const menu = mgr.get<MainMenuPanel>('mainMenu')
+        const credits = mgr.get<CreditsPanel>('credits')
+        menu.show()
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('ArrowDown')
+        menu.onKeyDown('Enter')
+        expect(menu.visible).toBe(false)
+        expect(credits.visible).toBe(true)
+        expect(credits.quitMode).toBe(false)
+        EventBus.clear('ui:openPanel')
+        EventBus.clear('ui:closePanel')
+    })
+
+    it('QUIT emits game:quitRequested', () => {
+        const mgr = new UIManagerImpl(800, 600)
+        registerDefaultPanels(mgr, 800, 600, 1, new QuestLog())
+        const menu = mgr.get<MainMenuPanel>('mainMenu')
+        menu.show()
+        let got = false
+        const handler = () => { got = true }
+        EventBus.on('game:quitRequested', handler)
+        try {
+            menu.onKeyDown('ArrowUp') // wrap to QUIT (last item)
+            menu.onKeyDown('Enter')
+            expect(got).toBe(true)
+        } finally {
+            EventBus.off('game:quitRequested', handler)
+        }
     })
 })

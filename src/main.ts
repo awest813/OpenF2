@@ -56,6 +56,9 @@ import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { save, load } from './saveload.js'
 import { triggerRestEncounter } from './restEncounter.js'
 import type { RestDanger } from './character/rest.js'
+import { applySettings, getSettings, loadAndApplySettings, patchSettings } from './settings.js'
+import { CreditsPanel } from './ui2/creditsPanel.js'
+import { Engine } from './engine.js'
 
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
@@ -353,9 +356,16 @@ function initUIManager(): void {
         load(slot)
     })
 
+    EventBus.on('game:loadComplete', () => {
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
+    })
+
     // Slice C / P0-1: New Game → chargen → enter world
     EventBus.on('game:newGameRequested', () => {
         EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
         EventBus.emit('ui:openPanel', { panelName: 'characterCreation' })
     })
 
@@ -389,6 +399,31 @@ function initUIManager(): void {
         EventBus.emit('ui:closePanel', { panelName: 'pipboy' })
         EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
         EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
+    })
+
+    EventBus.on('game:quitRequested', () => {
+        try {
+            Engine.shutdown()
+        } catch {
+            // engine may not have been started in tests
+        }
+        EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        const credits = mgr.get<CreditsPanel>('credits')
+        credits.returnPanel = null
+        credits.openAs('quit')
+        try {
+            if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close()
+            }
+        } catch {
+            // browsers ignore window.close() unless the script opened the window
+        }
+    })
+
+    EventBus.on('settings:changed', () => {
+        applyUIScale()
     })
 
     mgr.connectEventBus()
@@ -443,12 +478,17 @@ window.onload = async function () {
     // initialize ui2 panel manager (unified WebGL/OffscreenCanvas UI path)
     initUIManager()
 
+    // Load persisted preferences before constructing the audio backend so
+    // `Config.engine.doAudio` reflects the player's last choice.
+    loadAndApplySettings()
+
     // initialize audio engine
     if (Config.engine.doAudio) {
         globalState.audioEngine = new HTMLAudioEngine()
     } else {
         globalState.audioEngine = new NullAudioEngine()
     }
+    applySettings()
 
     // initialize cached data
 
@@ -481,6 +521,7 @@ window.onload = async function () {
 
                 // Campaign boot: show main menu when no ?map query is present.
                 if (!skipMenu) {
+                    EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
                     EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
                 } else {
                     EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
@@ -526,6 +567,19 @@ heart.keydown = (k: string) => {
         return
     }
 
+    const overlayOpen = globalState.uiManager?.isAnyPanelOpen() === true
+    // HUD binds L to the combat log, which would steal Config.controls.loadKey
+    // out of combat. Prefer Load when no overlay is open and we're not fighting.
+    if (!overlayOpen && !globalState.inCombat && k === Config.controls.loadKey) {
+        const slPanel = globalState.uiManager?.get<SaveLoadPanel>('saveLoad')
+        if (slPanel) {
+            slPanel.openAs('load')
+        } else {
+            uiSaveLoad(false)
+        }
+        return
+    }
+
     // Route to ui2 UIManager first; if a panel consumes the key, skip game handling.
     if (globalState.uiManager?.handleKeyDown(k)) {
         return
@@ -559,16 +613,16 @@ heart.keydown = (k: string) => {
         }
     }
     if (k === Config.controls.showRoof) {
-        Config.ui.showRoof = !Config.ui.showRoof
+        patchSettings({ showRoof: !getSettings().showRoof })
     }
     if (k === Config.controls.showFloor) {
-        Config.ui.showFloor = !Config.ui.showFloor
+        patchSettings({ showFloor: !getSettings().showFloor })
     }
     if (k === Config.controls.showObjects) {
-        Config.ui.showObjects = !Config.ui.showObjects
+        patchSettings({ showObjects: !getSettings().showObjects })
     }
     if (k === Config.controls.showWalls) {
-        Config.ui.showWalls = !Config.ui.showWalls
+        patchSettings({ showWalls: !getSettings().showWalls })
     }
     if (k === Config.controls.talkTo) {
         const critter = globalState.gMap.critterAtPosition(mouseHex)
