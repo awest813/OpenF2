@@ -1,3 +1,5 @@
+import type { GameSettings } from './settings.js'
+
 /**
  * Typed event bus — the single communication channel between engine modules.
  *
@@ -74,8 +76,9 @@ export interface EngineEvents {
     'player:reputationChange': { name: string; oldValue: number; newValue: number }
 
     // UI panels
-    'ui:openPanel': { panelName: string }
+    'ui:openPanel': { panelName: string; returnTo?: string }
     'ui:closePanel': { panelName: string }
+    'settings:changed': { settings: GameSettings }
     'barter:talkRequested': Record<string, never>
     'barter:offerAccepted': {
         playerTable: { name: string; amount: number; value: number }[]
@@ -102,6 +105,7 @@ export interface EngineEvents {
     'game:newGameRequested': Record<string, never>
     'game:characterCreated': { name: string; mapName: string }
     'game:enterWorld': { mapName: string }
+    'game:quitRequested': Record<string, never>
 
     /** Pip-Boy / rest clock interrupted by a potential encounter. */
     'rest:interrupted': { hoursCompleted: number; hoursRequested: number; danger: string }

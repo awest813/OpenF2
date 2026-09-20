@@ -56,6 +56,9 @@ import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { save, load } from './saveload.js'
 import { triggerRestEncounter } from './restEncounter.js'
 import type { RestDanger } from './character/rest.js'
+import { applySettings, loadAndApplySettings } from './settings.js'
+import { CreditsPanel } from './ui2/creditsPanel.js'
+import { Engine } from './engine.js'
 
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
@@ -391,6 +394,31 @@ function initUIManager(): void {
         EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
     })
 
+    EventBus.on('game:quitRequested', () => {
+        try {
+            Engine.shutdown()
+        } catch {
+            // engine may not have been started in tests
+        }
+        EventBus.emit('ui:closePanel', { panelName: 'gamePanel' })
+        EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
+        EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
+        const credits = mgr.get<CreditsPanel>('credits')
+        credits.returnPanel = null
+        credits.openAs('quit')
+        try {
+            if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close()
+            }
+        } catch {
+            // browsers ignore window.close() unless the script opened the window
+        }
+    })
+
+    EventBus.on('settings:changed', () => {
+        applyUIScale()
+    })
+
     mgr.connectEventBus()
 
     globalState.uiManager = mgr
@@ -443,12 +471,17 @@ window.onload = async function () {
     // initialize ui2 panel manager (unified WebGL/OffscreenCanvas UI path)
     initUIManager()
 
+    // Load persisted preferences before constructing the audio backend so
+    // `Config.engine.doAudio` reflects the player's last choice.
+    loadAndApplySettings()
+
     // initialize audio engine
     if (Config.engine.doAudio) {
         globalState.audioEngine = new HTMLAudioEngine()
     } else {
         globalState.audioEngine = new NullAudioEngine()
     }
+    applySettings()
 
     // initialize cached data
 

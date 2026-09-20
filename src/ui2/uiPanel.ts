@@ -273,6 +273,11 @@ export abstract class UIPanel {
     visible = false
     /** Z-order: higher values render on top. */
     zOrder = 0
+    /**
+     * When this panel hides, re-open the named panel (used by main-menu
+     * Options / Load / Credits so the menu returns after the modal closes).
+     */
+    returnPanel: string | null = null
 
     constructor(name: string, bounds: Rect) {
         this.name = name
@@ -286,7 +291,12 @@ export abstract class UIPanel {
 
     hide(): void {
         this.visible = false
+        const ret = this.returnPanel
+        this.returnPanel = null
         this.onHide()
+        if (ret) {
+            EventBus.emit('ui:openPanel', { panelName: ret })
+        }
     }
 
     toggle(): void {
@@ -335,7 +345,7 @@ export class UIManagerImpl {
     private panels: UIPanel[] = []
     private offscreen: OffscreenCanvas
     private ctx: OffscreenCanvasRenderingContext2D
-    private _busOpenHandler: ((e: { panelName: string }) => void) | null = null
+    private _busOpenHandler: ((e: { panelName: string; returnTo?: string }) => void) | null = null
     private _busCloseHandler: ((e: { panelName: string }) => void) | null = null
     private lastHoveredPanel: UIPanel | null = null
     /** Optional bitmap font renderer for pixel-accurate Fallout fonts. */
@@ -443,9 +453,11 @@ export class UIManagerImpl {
             EventBus.off('ui:openPanel', this._busOpenHandler)
             EventBus.off('ui:closePanel', this._busCloseHandler!)
         }
-        this._busOpenHandler = ({ panelName }) => {
+        this._busOpenHandler = ({ panelName, returnTo }) => {
             const panel = this.panels.find((p) => p.name === panelName)
-            panel?.show()
+            if (!panel) {return}
+            panel.returnPanel = returnTo ?? null
+            panel.show()
         }
         this._busCloseHandler = ({ panelName }) => {
             const panel = this.panels.find((p) => p.name === panelName)

@@ -595,8 +595,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'metarule',
         description:
             'METARULE_COMBAT_DIFFICULTY(35): returns combat difficulty (0=easy, 1=normal, 2=hard). ' +
-            'Returns 1 (normal). The browser build has no difficulty setting; normal is the ' +
-            'correct default for standard gameplay balance.',
+            'Reads globalState.combatDifficulty (default 1). Set from the Options panel or ' +
+            'set_combat_difficulty_sfall.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',
@@ -625,8 +625,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'metarule',
         description:
             'METARULE_GAME_DIFFICULTY(55): returns game difficulty (0=easy, 1=normal, 2=hard). ' +
-            'Returns 1 (normal). The browser build has no difficulty setting; normal is the ' +
-            'correct default for standard gameplay balance.',
+            'Reads globalState.gameDifficulty (default 1). Set from the Options panel or ' +
+            'set_game_difficulty_sfall; also drives world-map encounterDifficulty.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',
@@ -1573,8 +1573,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8198: get_ini_setting(key) → integer INI value.  ' +
-            'BLK-064 (Phase 62): now returns sensible defaults for ~20 known FO2 ' +
-            'config keys (case-insensitive). Unknown keys return 0.',
+            'BLK-064 (Phase 62): returns sensible defaults for ~20 known FO2 ' +
+            'config keys (case-insensitive). Preference keys overlay live engine ' +
+            'settings (difficulty, running, volumes). Unknown keys return 0.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -4280,9 +4281,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'BLK-064: get_ini_setting(key) now returns sensible FO2 engine defaults for ' +
             '~20 well-known config keys (SpeedInterfaceCounterAnims=1, FPS=60, sound=1, ' +
-            'etc.).  Unknown keys still return 0.  Full INI file access is unavailable ' +
-            'in the browser build but engine-appropriate defaults prevent scripts from ' +
-            'treating absent settings as explicitly disabled.',
+            'etc.).  Live Options-panel settings overlay preference/volume keys.  Unknown ' +
+            'keys still return 0.  Full INI file access is unavailable in the browser build.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -5111,8 +5111,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x8247: get_violence_level_sfall() — return the current violence level ' +
-            'setting (0=minimal, 1=normal, 2=maximum blood).  Browser build: returns ' +
-            '2 (maximum); violence-level gore filtering is not implemented.',
+            'setting (0=minimal, 1=normal, 2=maximum blood).  Reads globalState.violenceLevel ' +
+            '(default 2). Set from the Options panel.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -7846,9 +7846,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x82D3: set_game_difficulty_sfall(level) → sets game difficulty. ' +
-            'Partial: stores the value; the engine does not yet cascade it through ' +
-            'encounter-rate or XP formula branches.  Level must be 0–2; out-of-range ' +
-            'values are silently ignored.',
+            'Stores the value, updates encounterDifficulty, and keeps the Options panel ' +
+            'in sync. Level must be 0–2; out-of-range values are silently ignored.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -7872,8 +7871,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x82D5: set_combat_difficulty_sfall(level) → sets combat difficulty. ' +
-            'Partial: stores the value; full cascade through the damage formula pipeline ' +
-            'is not yet wired.  Level must be 0–2; out-of-range values are silently ignored.',
+            'Stores the value (0=wimpy, 1=normal, 2=rough) used by the hit/damage formulas ' +
+            'and the Options panel. Out-of-range values are silently ignored.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',

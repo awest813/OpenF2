@@ -3,6 +3,7 @@ import { GamePanel } from './gamePanel.js'
 import { PipBoyPanel } from './pipboy.js'
 import { CharacterScreen } from './characterScreen.js'
 import { OptionsPanel } from './optionsPanel.js'
+import { CreditsPanel } from './creditsPanel.js'
 import { SaveLoadPanel } from './saveLoadPanel.js'
 import { DialoguePanel } from './dialoguePanel.js'
 import { BarterPanel } from './barterPanel.js'
@@ -41,6 +42,7 @@ export function registerDefaultPanels(
     manager.register(new PipBoyPanel(screenWidth, screenHeight, playerEntityId, questLog))
     manager.register(new CharacterScreen(screenWidth, screenHeight, playerEntityId))
     manager.register(new OptionsPanel(screenWidth, screenHeight))
+    manager.register(new CreditsPanel(screenWidth, screenHeight))
     manager.register(new SaveLoadPanel(screenWidth, screenHeight))
     manager.register(new MainMenuPanel(screenWidth, screenHeight))
     manager.register(new CharacterCreationPanel(screenWidth, screenHeight))

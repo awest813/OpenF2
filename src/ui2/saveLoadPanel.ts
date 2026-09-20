@@ -613,6 +613,7 @@ export class SaveLoadPanel extends UIPanel {
             }
         } else {
             EventBus.emit('audio:playSound', { soundId: 'ui_click' })
+            this.returnPanel = null
             this.hide()
             EventBus.emit('game:loadFromSlot', { slot: this.selectedSlot })
         }

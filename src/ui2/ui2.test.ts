@@ -647,9 +647,19 @@ describe('UIManager integration: all standard panels', () => {
 // ---------------------------------------------------------------------------
 
 import { OptionsPanel } from './optionsPanel.js'
+import { CreditsPanel } from './creditsPanel.js'
 import { Config } from '../config.js'
+import { getSettings, resetSettings } from '../settings.js'
 
 describe('OptionsPanel', () => {
+    beforeEach(() => {
+        resetSettings()
+    })
+
+    afterEach(() => {
+        resetSettings()
+    })
+
     it('has panel name "options"', () => {
         const panel = new OptionsPanel(800, 600)
         expect(panel.name).toBe('options')
@@ -706,6 +716,72 @@ describe('OptionsPanel', () => {
 
         EventBus.clear('ui:openPanel')
         EventBus.clear('ui:closePanel')
+    })
+
+    it('cycles game difficulty with arrow keys', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        expect(getSettings().gameDifficulty).toBe(1)
+        expect(panel.onKeyDown('ArrowRight')).toBe(true)
+        expect(getSettings().gameDifficulty).toBe(2)
+        expect(Config.engine.encounterDifficulty).toBe('hard')
+        expect(panel.onKeyDown('ArrowLeft')).toBe(true)
+        expect(getSettings().gameDifficulty).toBe(1)
+    })
+
+    it('Tab / Q switch GAME DISPLAY SOUND tabs', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        expect(panel.activeTab).toBe('game')
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('display')
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('sound')
+        panel.onKeyDown('q')
+        expect(panel.activeTab).toBe('display')
+    })
+
+    it('toggles display flags through the settings store', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        panel.onKeyDown('Tab')
+        expect(panel.activeTab).toBe('display')
+        expect(getSettings().showHexOverlay).toBe(false)
+        panel.onKeyDown('Enter')
+        expect(getSettings().showHexOverlay).toBe(true)
+        expect(Config.ui.showHexOverlay).toBe(true)
+    })
+
+    it('DONE click closes the panel', () => {
+        const panel = new OptionsPanel(800, 600)
+        panel.show()
+        const doneY = panel.bounds.height - 40 + 8
+        const doneX = panel.bounds.width / 2
+        expect(panel.onMouseDown(doneX, doneY, 'l')).toBe(true)
+        expect(panel.visible).toBe(false)
+    })
+})
+
+describe('CreditsPanel', () => {
+    it('has panel name "credits" and zOrder 45', () => {
+        const panel = new CreditsPanel(800, 600)
+        expect(panel.name).toBe('credits')
+        expect(panel.zOrder).toBe(45)
+    })
+
+    it('Escape hides credits', () => {
+        const panel = new CreditsPanel(800, 600)
+        panel.show()
+        expect(panel.onKeyDown('Escape')).toBe(true)
+        expect(panel.visible).toBe(false)
+        expect(panel.quitMode).toBe(false)
+    })
+
+    it('openAs(quit) sets quitMode', () => {
+        const panel = new CreditsPanel(800, 600)
+        panel.openAs('quit')
+        expect(panel.visible).toBe(true)
+        expect(panel.quitMode).toBe(true)
     })
 })
 
