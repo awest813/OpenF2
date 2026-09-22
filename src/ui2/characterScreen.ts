@@ -5,7 +5,7 @@
  * EntityManager; all writes go through the leveling module.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, UIColor, cssColor, wrapText } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, FALLOUT_BLACK, UIColor, cssColor, wrapText, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { getSkillPointCost } from '../character/leveling.js'
@@ -72,6 +72,10 @@ export class CharacterScreen extends UIPanel {
 
     protected override onShow(): void {
         syncPlayerEntityFromCritter()
+        // Reset interaction state (keep the remembered tab).
+        this.hoveredSkill = null
+        this.selectedPerkId = null
+        this.perkScrollOffset = 0
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -88,10 +92,7 @@ export class CharacterScreen extends UIPanel {
         ctx.strokeRect(1, 1, width - 2, height - 2)
 
         // Title
-        ctx.font = 'bold 14px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CHARACTER', width / 2, 22)
+        drawUIFontText(ctx, 'CHARACTER', width / 2, 22, FALLOUT_GREEN, 14, { bold: true, align: 'center' })
 
         // Tabs
         const tabs: TabName[] = ['stats', 'skills', 'perks']
@@ -104,12 +105,8 @@ export class CharacterScreen extends UIPanel {
             ctx.strokeStyle = cssColor(FALLOUT_GREEN)
             ctx.lineWidth = 1
             ctx.strokeRect(tx, 32, 116, 22)
-            ctx.font = '11px monospace'
-            ctx.fillStyle = active ? '#000' : cssColor(FALLOUT_GREEN)
-            ctx.textAlign = 'center'
-            ctx.fillText(tab.toUpperCase(), tx + 58, 47)
+            drawUIFontText(ctx, tab.toUpperCase(), tx + 58, 47, active ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { align: 'center' })
         }
-        ctx.textAlign = 'left'
 
         // Content area
         ctx.save()
@@ -120,23 +117,17 @@ export class CharacterScreen extends UIPanel {
         ctx.restore()
 
         // Close button
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
         ctx.fillStyle = '#222'
         ctx.fillRect(width / 2 - 30, height - 34, 60, 22)
         ctx.strokeStyle = cssColor(FALLOUT_GREEN)
         ctx.strokeRect(width / 2 - 30, height - 34, 60, 22)
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('CLOSE', width / 2, height - 18)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CLOSE', width / 2, height - 18, FALLOUT_GREEN, 11, { align: 'center' })
     }
 
     private renderStats(ctx: OffscreenCanvasRenderingContext2D): void {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         if (!stats) {return}
 
-        ctx.font = '12px monospace'
         let y = 20
         for (const { key, label } of SPECIAL_NAMES) {
             const base = stats[key] as number
@@ -144,20 +135,16 @@ export class CharacterScreen extends UIPanel {
             const mod = (stats[modKey] as number) ?? 0
             const effective = base + mod
 
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(label.padEnd(15), 14, y)
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText(String(effective).padStart(3), 160, y)
+            drawUIFontText(ctx, label.padEnd(15), 14, y, FALLOUT_DARK_GRAY, 12)
+            drawUIFontText(ctx, String(effective).padStart(3), 160, y, FALLOUT_GREEN, 12)
             if (mod !== 0) {
-                ctx.fillStyle = mod > 0 ? cssColor(FALLOUT_AMBER) : cssColor(FALLOUT_RED)
-                ctx.fillText(`(${mod > 0 ? '+' : ''}${mod})`, 180, y)
+                drawUIFontText(ctx, `(${mod > 0 ? '+' : ''}${mod})`, 180, y, mod > 0 ? FALLOUT_AMBER : FALLOUT_RED, 12)
             }
             y += 20
         }
 
         y += 10
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('DERIVED STATS', 14, y); y += 20
+        drawUIFontText(ctx, 'DERIVED STATS', 14, y, FALLOUT_DARK_GRAY, 12); y += 20
         const derived: Array<[string, number | string]> = [
             ['Level',   stats.level],
             ['XP',      `${stats.xp}/${stats.xpToNextLevel}`],
@@ -170,10 +157,8 @@ export class CharacterScreen extends UIPanel {
             ['Crit%',   stats.criticalChance],
         ]
         for (const [label, val] of derived) {
-            ctx.fillStyle = '#888'
-            ctx.fillText(label.padEnd(10), 14, y)
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText(String(val), 120, y)
+            drawUIFontText(ctx, label.padEnd(10), 14, y, { r: 136, g: 136, b: 136, a: 255 }, 12)
+            drawUIFontText(ctx, String(val), 120, y, FALLOUT_GREEN, 12)
             y += 18
         }
     }
@@ -183,9 +168,7 @@ export class CharacterScreen extends UIPanel {
         const skills = EntityManager.get<'skills'>(this.playerEntityId, 'skills')
         if (!skills || !stats) {return}
 
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText(`Skill Points: ${skills.availablePoints}`, 14, 16)
+        drawUIFontText(ctx, `Skill Points: ${skills.availablePoints}`, 14, 16, FALLOUT_AMBER, 11)
 
         let y = 36
         for (const { key, label } of SKILL_NAMES) {
@@ -201,14 +184,11 @@ export class CharacterScreen extends UIPanel {
                 ctx.fillRect(10, y - 13, 270, 16)
             }
 
-            ctx.fillStyle = isTagged ? cssColor(FALLOUT_AMBER) : cssColor(FALLOUT_GREEN)
-            ctx.fillText((isTagged ? '* ' : '  ') + label.padEnd(16), 14, y)
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText(String(value).padStart(4) + '%', 200, y)
+            drawUIFontText(ctx, (isTagged ? '* ' : '  ') + label.padEnd(16), 14, y, isTagged ? FALLOUT_AMBER : FALLOUT_GREEN, 11)
+            drawUIFontText(ctx, String(value).padStart(4) + '%', 200, y, FALLOUT_GREEN, 11)
 
             if (canSpend && skills.availablePoints > 0) {
-                ctx.fillStyle = cssColor(FALLOUT_AMBER)
-                ctx.fillText('[+]', 248, y)
+                drawUIFontText(ctx, '[+]', 248, y, FALLOUT_AMBER, 11)
             }
 
             y += 18
@@ -221,9 +201,7 @@ export class CharacterScreen extends UIPanel {
         const player = EntityManager.get<'player'>(this.playerEntityId, 'player')
 
         if (!stats || !skills || !player) {
-            ctx.fillStyle = cssColor(FALLOUT_RED)
-            ctx.font = '12px monospace'
-            ctx.fillText('Player components missing.', 14, 40)
+            drawUIFontText(ctx, 'Player components missing.', 14, 40, FALLOUT_RED, 12)
             return
         }
 
@@ -293,9 +271,7 @@ export class CharacterScreen extends UIPanel {
             const itemY = 10 + (i - this.perkScrollOffset) * 26 + 3
 
             if (item.type === 'header') {
-                ctx.font = 'bold 11px monospace'
-                ctx.fillStyle = cssColor(FALLOUT_AMBER)
-                ctx.fillText(item.label, 20, itemY + 15)
+                drawUIFontText(ctx, item.label, 20, itemY + 15, FALLOUT_AMBER, 11, { bold: true })
             } else {
                 const isSelected = this.selectedPerkId === item.perk.id
                 if (isSelected) {
@@ -303,28 +279,21 @@ export class CharacterScreen extends UIPanel {
                     ctx.fillRect(12, itemY, 356, 24)
                 }
 
-                ctx.font = '12px monospace'
-                ctx.fillStyle = isSelected ? cssColor(FALLOUT_AMBER) : cssColor(FALLOUT_GREEN)
-
                 let displayName = item.perk.name
                 if (item.perk.ranks > 1) {
                     displayName += ` (${item.rank}/${item.perk.ranks})`
                 }
-                ctx.fillText(displayName, 20, itemY + 16)
+                drawUIFontText(ctx, displayName, 20, itemY + 16, isSelected ? FALLOUT_AMBER : FALLOUT_GREEN, 12)
 
                 if (item.type === 'available') {
-                    ctx.fillStyle = cssColor(FALLOUT_AMBER)
-                    ctx.font = 'bold 11px monospace'
-                    ctx.fillText('[CHOOSE]', 290, itemY + 16)
+                    drawUIFontText(ctx, '[CHOOSE]', 290, itemY + 16, FALLOUT_AMBER, 11, { bold: true })
                 }
             }
         }
 
         // Scroll indicator
         if (maxScroll > 0) {
-            ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(`↑↓ scroll (${this.perkScrollOffset + 1}/${maxScroll + 1})`, 250, 8)
+            drawUIFontText(ctx, `↑↓ scroll (${this.perkScrollOffset + 1}/${maxScroll + 1})`, 250, 8, FALLOUT_DARK_GRAY, 10)
         }
 
         // Description Box
@@ -335,9 +304,7 @@ export class CharacterScreen extends UIPanel {
 
         const selectedPerk = this.selectedPerkId !== null ? PERK_MAP.get(this.selectedPerkId) : null
         if (selectedPerk) {
-            ctx.font = 'bold 12px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_AMBER)
-            ctx.fillText(selectedPerk.name.toUpperCase(), 20, 230)
+            drawUIFontText(ctx, selectedPerk.name.toUpperCase(), 20, 230, FALLOUT_AMBER, 12, { bold: true })
 
             // Prerequisites
             let prereqStr = `Req: Level ${selectedPerk.prerequisites.minLevel ?? 1}`
@@ -351,21 +318,18 @@ export class CharacterScreen extends UIPanel {
             if (selectedPerk.prerequisites.minSkill) {
                 prereqStr += `, ${selectedPerk.prerequisites.minSkill.skill} ${selectedPerk.prerequisites.minSkill.value}%`
             }
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(prereqStr, 20, 246)
+            drawUIFontText(ctx, prereqStr, 20, 246, FALLOUT_DARK_GRAY, 11)
 
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
+            // Font stays set for wrapText's ctx.measureText below.
+            ctx.font = '11px monospace'
             const wrapped = wrapText(ctx, selectedPerk.description, 340)
             let descY = 264
             for (const line of wrapped) {
-                ctx.fillText(line, 20, descY)
+                drawUIFontText(ctx, line, 20, descY, FALLOUT_GREEN, 11)
                 descY += 15
             }
         } else {
-            ctx.font = 'italic 11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText('Select a perk to view details.', 20, 240)
+            drawUIFontText(ctx, 'Select a perk to view details.', 20, 240, FALLOUT_DARK_GRAY, 11)
         }
     }
 
@@ -395,9 +359,16 @@ export class CharacterScreen extends UIPanel {
                 let sy = 60 + 36  // offset by header and tab area
                 for (const { key } of SKILL_NAMES) {
                     if (y >= sy - 13 && y < sy + 3 && x >= 248 && x < 270) {
-                        const display = ECS_SKILL_TO_DISPLAY[key]
-                        if (display) {
-                            spendCritterSkillPoint(display)
+                        // Mirror the draw condition: [+] is only rendered when
+                        // the player can afford the next rank.
+                        const value = (skills as any)[key] as number
+                        const isTagged = skills.tagged.has(key)
+                        const canSpend = skills.availablePoints >= getSkillPointCost(value, isTagged)
+                        if (canSpend && skills.availablePoints > 0) {
+                            const display = ECS_SKILL_TO_DISPLAY[key]
+                            if (display) {
+                                spendCritterSkillPoint(display)
+                            }
                         }
                         return true
                     }
@@ -463,8 +434,9 @@ export class CharacterScreen extends UIPanel {
                             if (item.type === 'available' || item.type === 'acquired') {
                                 this.selectedPerkId = item.perk.id
 
-                                // Check if click is on [CHOOSE] button region
-                                if (item.type === 'available' && x >= 280 && x < 360) {
+                                // Check if click is on the [CHOOSE] affordance
+                                // (drawn at x=290; bold 11px mono ≈ 53px wide).
+                                if (item.type === 'available' && x >= 288 && x < 348) {
                                     const success = grantPerk(item.perk.id, stats, skills, currentPerks)
                                     if (success) {
                                         player.acquiredPerks.push(item.perk.id)
@@ -503,9 +475,12 @@ export class CharacterScreen extends UIPanel {
     }
 
     override onMouseMove(x: number, y: number): void {
-        if (this.activeTab !== 'skills') {return}
-        let sy = 96
+        // Always clear first so hover state cannot survive a tab switch.
         this.hoveredSkill = null
+        if (this.activeTab !== 'skills') {return}
+        // x bound matches the drawn highlight rect (10..280).
+        if (x < 10 || x >= 280) {return}
+        let sy = 96
         for (const { key } of SKILL_NAMES) {
             if (y >= sy - 13 && y < sy + 3) {
                 this.hoveredSkill = key

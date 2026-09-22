@@ -20,7 +20,7 @@ import {
     UIPanel,
     FALLOUT_GREEN, FALLOUT_DARK_GREEN, FALLOUT_AMBER,
     FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_RED,
-    UIColor, cssColor, fillRect, strokeRect, clampListOffset,
+    UIColor, fillRect, strokeRect, clampListOffset, drawUIFontText,
 } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 import { saveList, formatSaveDate, SaveGame } from '../saveload.js'
@@ -168,24 +168,16 @@ export class SaveLoadPanel extends UIPanel {
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
         // — Title —
-        ctx.font = 'bold 14px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('GAME MENU', width / 2, 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'GAME MENU', width / 2, 22, FALLOUT_GREEN, 14, { bold: true, align: 'center' })
 
         // — Tabs —
         this._renderTabs(ctx)
 
         // — Slot list or loading indicator —
         if (!this._savesLoaded) {
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.textAlign = 'center'
             // Center vertically in the slot list area
             const slotListMidY = SLOT_START_Y + (VISIBLE_ROWS * SLOT_H) / 2
-            ctx.fillText('Loading…', width / 2, slotListMidY)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, 'Loading…', width / 2, slotListMidY, FALLOUT_DARK_GRAY, 11, { align: 'center' })
         } else {
             this._renderSlots(ctx)
         }
@@ -204,10 +196,7 @@ export class SaveLoadPanel extends UIPanel {
         this._renderButtons(ctx)
 
         // — Keyboard hint footer —
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.textAlign = 'left'
-        ctx.fillText('↑↓ navigate  1–0 jump  Esc close', SLOT_PAD_X, height - 6)
+        drawUIFontText(ctx, '↑↓ navigate  1–0 jump  Esc close', SLOT_PAD_X, height - 6, FALLOUT_DARK_GRAY, 9)
     }
 
     private _renderTabs(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -222,11 +211,7 @@ export class SaveLoadPanel extends UIPanel {
             const bg = active ? FALLOUT_GREEN : hovered ? FALLOUT_DARK_GRAY : FALLOUT_BLACK
             fillRect(ctx, tx, TAB_Y, TAB_W, TAB_H, bg)
             strokeRect(ctx, tx, TAB_Y, TAB_W, TAB_H, FALLOUT_GREEN, 1)
-            ctx.font = 'bold 11px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.textAlign = 'center'
-            ctx.fillText(label, tx + TAB_W / 2, TAB_Y + 16)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, label, tx + TAB_W / 2, TAB_Y + 16, active ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { bold: true, align: 'center' })
             tx += TAB_W + 4
         }
     }
@@ -254,9 +239,7 @@ export class SaveLoadPanel extends UIPanel {
 
             // Slot number badge
             const numLabel = String(slotIdx === 9 ? 0 : slotIdx + 1).padStart(2, ' ')
-            ctx.font = 'bold 12px monospace'
-            ctx.fillStyle = cssColor(isSelected ? FALLOUT_BLACK : FALLOUT_DARK_GRAY)
-            ctx.fillText(numLabel, SLOT_PAD_X + 4, y + 20)
+            drawUIFontText(ctx, numLabel, SLOT_PAD_X + 4, y + 20, isSelected ? FALLOUT_BLACK : FALLOUT_DARK_GRAY, 12, { bold: true })
 
             if (slotSave) {
                 // Name (primary)
@@ -264,29 +247,19 @@ export class SaveLoadPanel extends UIPanel {
                 const displayName  = slotSave.name.length > maxNameChars
                     ? slotSave.name.slice(0, maxNameChars - 1) + '…'
                     : slotSave.name
-                ctx.font = 'bold 12px monospace'
-                ctx.fillStyle = cssColor(textColor)
-                ctx.fillText(displayName, SLOT_PAD_X + 28, y + 13)
+                drawUIFontText(ctx, displayName, SLOT_PAD_X + 28, y + 13, textColor, 12, { bold: true })
 
                 // Map + level (secondary)
                 const mapName  = slotSave.currentMap ?? '?'
                 const mapShort = mapName.length > 14 ? mapName.slice(0, 14) + '…' : mapName
                 const levelStr = `Lv.${slotSave.player?.level ?? '?'}`
-                ctx.font = '9px monospace'
-                ctx.fillStyle = cssColor(dimColor)
-                ctx.fillText(`${mapShort}  ${levelStr}`, SLOT_PAD_X + 28, y + 24)
+                drawUIFontText(ctx, `${mapShort}  ${levelStr}`, SLOT_PAD_X + 28, y + 24, dimColor, 9)
 
                 // Timestamp (right-aligned)
                 const dateStr = formatSaveDate(slotSave)
-                ctx.font = '9px monospace'
-                ctx.fillStyle = cssColor(dimColor)
-                ctx.textAlign = 'right'
-                ctx.fillText(dateStr, SLOT_PAD_X + slotW - 4, y + 24)
-                ctx.textAlign = 'left'
+                drawUIFontText(ctx, dateStr, SLOT_PAD_X + slotW - 4, y + 24, dimColor, 9, { align: 'right' })
             } else {
-                ctx.font = '11px monospace'
-                ctx.fillStyle = cssColor(dimColor)
-                ctx.fillText('(Empty)', SLOT_PAD_X + 28, y + 19)
+                drawUIFontText(ctx, '(Empty)', SLOT_PAD_X + 28, y + 19, dimColor, 11)
             }
         }
 
@@ -294,20 +267,16 @@ export class SaveLoadPanel extends UIPanel {
         if (SLOT_COUNT > VISIBLE_ROWS) {
             const from = this._scrollOffset + 1
             const to   = Math.min(this._scrollOffset + VISIBLE_ROWS, SLOT_COUNT)
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.textAlign = 'right'
-            ctx.fillText(`${from}–${to} / ${SLOT_COUNT}`, this.bounds.width - SLOT_PAD_X, SLOT_START_Y - 4)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, `${from}–${to} / ${SLOT_COUNT}`, this.bounds.width - SLOT_PAD_X, SLOT_START_Y - 4, FALLOUT_DARK_GRAY, 9, { align: 'right' })
 
             // Up / Down chevrons
             const chevX = this.bounds.width - SLOT_PAD_X - 14
             if (this._scrollOffset > 0) {
-                ctx.fillText('▲', chevX, SLOT_START_Y - 4)
+                drawUIFontText(ctx, '▲', chevX, SLOT_START_Y - 4, FALLOUT_DARK_GRAY, 9)
             }
             const canScrollDown = this._scrollOffset + VISIBLE_ROWS < SLOT_COUNT
             if (canScrollDown) {
-                ctx.fillText('▼', chevX, SLOT_START_Y + VISIBLE_ROWS * SLOT_H + 4)
+                drawUIFontText(ctx, '▼', chevX, SLOT_START_Y + VISIBLE_ROWS * SLOT_H + 4, FALLOUT_DARK_GRAY, 9)
             }
         }
     }
@@ -319,9 +288,7 @@ export class SaveLoadPanel extends UIPanel {
         const labelY = INPUT_AREA_Y - 8
 
         // Label
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('SAVE NAME:', inputX, labelY)
+        drawUIFontText(ctx, 'SAVE NAME:', inputX, labelY, FALLOUT_DARK_GRAY, 9)
 
         // Input box
         const boxBg: UIColor = this._inputActive ? { r: 0, g: 40, b: 0, a: 255 } : FALLOUT_BLACK
@@ -330,17 +297,11 @@ export class SaveLoadPanel extends UIPanel {
 
         // Text + blinking cursor
         const cursorStr = this._inputActive && Math.floor(Date.now() / 500) % 2 === 0 ? '|' : ''
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText(this._nameBuffer + cursorStr, inputX + 6, INPUT_AREA_Y + 15)
+        drawUIFontText(ctx, this._nameBuffer + cursorStr, inputX + 6, INPUT_AREA_Y + 15, FALLOUT_GREEN, 12)
 
         // Hint (only when not active, so it doesn't crowd the cursor)
         if (!this._inputActive) {
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.textAlign = 'right'
-            ctx.fillText('Click to type', inputX + inputW - 2, labelY)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, 'Click to type', inputX + inputW - 2, labelY, FALLOUT_DARK_GRAY, 9, { align: 'right' })
         }
     }
 
@@ -352,27 +313,18 @@ export class SaveLoadPanel extends UIPanel {
         fillRect(ctx, SLOT_PAD_X, barY, width - SLOT_PAD_X * 2, barH, { r: 30, g: 0, b: 0, a: 255 })
         strokeRect(ctx, SLOT_PAD_X, barY, width - SLOT_PAD_X * 2, barH, FALLOUT_RED, 1)
 
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.textAlign = 'center'
         const nameShort = this._pendingName.length > 20 ? this._pendingName.slice(0, 20) + '…' : this._pendingName
-        ctx.fillText(`Overwrite "${nameShort}"?`, width / 2, barY + 14)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, `Overwrite "${nameShort}"?`, width / 2, barY + 14, FALLOUT_AMBER, 11, { align: 'center' })
 
         // YES button
         fillRect(ctx, width / 2 - 70, barY + 20, 54, 16, FALLOUT_RED)
         strokeRect(ctx, width / 2 - 70, barY + 20, 54, 16, FALLOUT_RED, 1)
-        ctx.font = 'bold 10px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_BLACK)
-        ctx.textAlign = 'center'
-        ctx.fillText('YES', width / 2 - 70 + 27, barY + 31)
+        drawUIFontText(ctx, 'YES', width / 2 - 70 + 27, barY + 31, FALLOUT_BLACK, 10, { bold: true, align: 'center' })
 
         // NO button
         fillRect(ctx, width / 2 + 16, barY + 20, 54, 16, FALLOUT_DARK_GRAY)
         strokeRect(ctx, width / 2 + 16, barY + 20, 54, 16, FALLOUT_GREEN, 1)
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('NO', width / 2 + 16 + 27, barY + 31)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'NO', width / 2 + 16 + 27, barY + 31, FALLOUT_GREEN, 10, { bold: true, align: 'center' })
     }
 
     private _renderButtons(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -381,25 +333,27 @@ export class SaveLoadPanel extends UIPanel {
         // Action button (SAVE / LOAD)
         const actionLabel  = this.isSave ? 'SAVE' : 'LOAD'
         const actionBtnX   = width / 2 - ACTION_BTN_W - 4
-        const canAct       = this.selectedSlot >= 0 && this._confirmState === 'none'
+        const canAct       = this._canAct()
         const actionBg     = canAct
-            ? (this._hoveredAction ? FALLOUT_DARK_GREEN : FALLOUT_GREEN)
+            ? (this._hoveredAction ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             : FALLOUT_DARK_GRAY
         fillRect(ctx, actionBtnX, BTN_ROW_Y, ACTION_BTN_W, ACTION_BTN_H, actionBg)
         strokeRect(ctx, actionBtnX, BTN_ROW_Y, ACTION_BTN_W, ACTION_BTN_H, FALLOUT_GREEN, 1)
-        ctx.font = 'bold 12px monospace'
-        ctx.fillStyle = canAct ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_DARK_GRAY)
-        ctx.textAlign = 'center'
-        ctx.fillText(actionLabel, actionBtnX + ACTION_BTN_W / 2, BTN_ROW_Y + 16)
+        drawUIFontText(
+            ctx,
+            actionLabel,
+            actionBtnX + ACTION_BTN_W / 2, BTN_ROW_Y + 16,
+            canAct && this._hoveredAction ? FALLOUT_BLACK : (canAct ? FALLOUT_GREEN : FALLOUT_DARK_GRAY),
+            12,
+            { bold: true, align: 'center' },
+        )
 
         // Close button
         const closeBtnX    = width / 2 + 4
         const closeBg      = this._hoveredClose ? FALLOUT_DARK_GRAY : FALLOUT_BLACK
         fillRect(ctx, closeBtnX, BTN_ROW_Y, CLOSE_BTN_W, CLOSE_BTN_H, closeBg)
         strokeRect(ctx, closeBtnX, BTN_ROW_Y, CLOSE_BTN_W, CLOSE_BTN_H, FALLOUT_GREEN, 1)
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('CLOSE', closeBtnX + CLOSE_BTN_W / 2, BTN_ROW_Y + 16)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CLOSE', closeBtnX + CLOSE_BTN_W / 2, BTN_ROW_Y + 16, FALLOUT_GREEN, 12, { bold: true, align: 'center' })
     }
 
     // -----------------------------------------------------------------------
@@ -451,7 +405,7 @@ export class SaveLoadPanel extends UIPanel {
 
         // Action button
         const actionBtnX = width / 2 - ACTION_BTN_W - 4
-        if (this.selectedSlot >= 0 &&
+        if (this._canAct() &&
             x >= actionBtnX && x < actionBtnX + ACTION_BTN_W &&
             y >= BTN_ROW_Y   && y < BTN_ROW_Y + ACTION_BTN_H) {
             this._confirmAction()
@@ -528,6 +482,13 @@ export class SaveLoadPanel extends UIPanel {
             return true  // swallow everything while confirming
         }
 
+        // Name input capture (save mode + slot selected + input active) —
+        // must run before Tab/Escape so a "confirm field" Tab reflex or an
+        // Escape while typing doesn't wipe the buffer or close the panel.
+        if (this.isSave && this.selectedSlot >= 0 && this._inputActive) {
+            return this._handleNameKey(key)
+        }
+
         if (key === 'Escape') {
             this.hide()
             return true
@@ -537,11 +498,6 @@ export class SaveLoadPanel extends UIPanel {
         if (key === 'Tab') {
             this._switchMode(this.isSave ? 'load' : 'save')
             return true
-        }
-
-        // Name input capture (save mode + slot selected + input active)
-        if (this.isSave && this.selectedSlot >= 0 && this._inputActive) {
-            return this._handleNameKey(key)
         }
 
         // Numeric jump: keys 1–9 and 0 select slots 0–9
@@ -597,8 +553,16 @@ export class SaveLoadPanel extends UIPanel {
         this._loadSaveList()
     }
 
+    /** True when the primary action is meaningful right now (slot selected,
+     *  no confirm pending, and — in load mode — the slot actually holds a save). */
+    private _canAct(): boolean {
+        if (this.selectedSlot < 0 || this._confirmState !== 'none') {return false}
+        if (!this.isSave && !this._saves.has(this.selectedSlot)) {return false}
+        return true
+    }
+
     private _confirmAction(): void {
-        if (this.selectedSlot < 0) {return}
+        if (!this._canAct()) {return}
 
         if (this.isSave) {
             const name   = this._nameBuffer.trim() || `Save Slot ${this.selectedSlot + 1}`
@@ -624,6 +588,9 @@ export class SaveLoadPanel extends UIPanel {
         const name = this._pendingName || this._nameBuffer.trim() || `Save Slot ${slot + 1}`
         this._confirmState = 'none'
         EventBus.emit('audio:playSound', { soundId: 'ui_click' })
+        // Symmetric with the load path: completing the action should not
+        // bounce the player back to a return panel (e.g. the main menu).
+        this.returnPanel = null
         this.hide()
         EventBus.emit('game:saveToSlot', { slot, name })
     }
@@ -662,8 +629,9 @@ export class SaveLoadPanel extends UIPanel {
             this._inputActive = false
             return true
         }
-        // Only append printable single characters
-        if (key.length === 1 && this._nameBuffer.length < MAX_NAME_LEN) {
+        // Only append printable single characters (filter out stray control
+        // characters that may reach us from the key pipeline)
+        if (/^[\x20-\x7E]$/.test(key) && this._nameBuffer.length < MAX_NAME_LEN) {
             this._nameBuffer += key
             return true
         }

@@ -11,7 +11,7 @@
  *  - Optional scrollable combat message log overlay (toggle with L)
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_RED, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, fillRect, strokeRect } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_RED, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { EventBus } from '../eventBus.js'
@@ -131,8 +131,13 @@ export class GamePanel extends UIPanel {
 
     private _truncateLog(): void {
         if (this._combatLog.length > MAX_LOG_LINES) {
+            const dropped = this._combatLog.length - MAX_LOG_LINES
             this._combatLog = this._combatLog.slice(-MAX_LOG_LINES)
-            // Keep the scroll offset valid after truncation.
+            // Keep the viewed window stable: shift the scroll offset up by
+            // the number of lines dropped out from under it.
+            if (this._logScrollOffset > 0) {
+                this._logScrollOffset = Math.max(0, this._logScrollOffset - dropped)
+            }
             const maxOffset = Math.max(0, this._combatLog.length - LOG_VISIBLE_ROWS)
             if (this._logScrollOffset > maxOffset) {this._logScrollOffset = maxOffset}
         }
@@ -160,7 +165,11 @@ export class GamePanel extends UIPanel {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const inv = EntityManager.get<'inventory'>(this.playerEntityId, 'inventory')
         const live = readPlayerHudSnapshot()
-        if (!stats && !live) {return}
+        if (!stats && !live) {
+            // No data this frame — make sure no stale hit rect lingers.
+            this._endTurnButtonRect = null
+            return
+        }
 
         const currentHp = live?.currentHp ?? stats!.currentHp
         const maxHp = live?.maxHp ?? stats!.maxHp
@@ -242,20 +251,18 @@ export class GamePanel extends UIPanel {
                     : msg.startsWith('>')
                         ? FALLOUT_GREEN
                         : FALLOUT_DARK_GRAY
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(color)
-            ctx.fillText(msg, 12, startY + i * rowH)
+            drawUIFontText(ctx, msg, 12, startY + i * rowH, color, 11)
         }
 
         // Scroll indicator
         if (this._combatLog.length > LOG_VISIBLE_ROWS) {
             const from = this._logScrollOffset + 1
             const to   = Math.min(this._logScrollOffset + LOG_VISIBLE_ROWS, this._combatLog.length)
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(
+            drawUIFontText(
+                ctx,
                 `${from}-${to} / ${this._combatLog.length}`,
                 width - 80, height - 6,
+                FALLOUT_DARK_GRAY, 9,
             )
         }
 
@@ -415,9 +422,7 @@ function drawLabel(
     text: string, x: number, y: number,
     color: UIColor,
 ): void {
-    ctx.font = '9px monospace'
-    ctx.fillStyle = cssColor(color)
-    ctx.fillText(text, x, y)
+    drawUIFontText(ctx, text, x, y, color, 9)
 }
 
 function drawValue(
@@ -425,9 +430,7 @@ function drawValue(
     text: string, x: number, y: number,
     color: UIColor,
 ): void {
-    ctx.font = 'bold 13px monospace'
-    ctx.fillStyle = cssColor(color)
-    ctx.fillText(text, x, y)
+    drawUIFontText(ctx, text, x, y, color, 13, { bold: true })
 }
 
 function drawAPBar(
@@ -437,7 +440,10 @@ function drawAPBar(
 ): void {
     const squareSize = 7
     const gap = 2
-    for (let i = 0; i < max; i++) {
+    // Cap drawn squares so high-AP characters don't run under the WEAPON
+    // block (x=260); the numeric readout still shows the exact count.
+    const maxSquares = Math.min(max, 13)
+    for (let i = 0; i < maxSquares; i++) {
         const sx = x + i * (squareSize + gap)
         const filled = i < current
         fillRect(ctx, sx, y, squareSize, squareSize, filled ? FALLOUT_AMBER : FALLOUT_DARK_GRAY)
@@ -453,16 +459,11 @@ function drawButton(
 ): void {
     fillRect(ctx, x, y, w, h, bg)
     strokeRect(ctx, x, y, w, h, border)
-    ctx.font = '10px monospace'
-    ctx.fillStyle = cssColor(border)
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, x + w / 2, y + h / 2)
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'alphabetic'
+    drawUIFontText(ctx, label, x + w / 2, y + h / 2 + 4, border, 10, { align: 'center' })
 }
 
 function hpColorFor(stats: StatsComponent): UIColor {
+    if (stats.maxHp <= 0) {return FALLOUT_GREEN}
     const ratio = stats.currentHp / stats.maxHp
     if (ratio > 0.66) {return FALLOUT_GREEN}
     if (ratio > 0.33) {return FALLOUT_AMBER}

@@ -11,10 +11,10 @@ import {
     FALLOUT_AMBER,
     FALLOUT_DARK_GRAY,
     FALLOUT_BLACK,
-    cssColor,
     fillRect,
     strokeRect,
     wrapText,
+    drawUIFontText,
 } from './uiPanel.js'
 
 const PANEL_W = 480
@@ -43,6 +43,7 @@ export class CreditsPanel extends UIPanel {
     /** When true, show the quit thank-you footer instead of a credits-only close. */
     quitMode = false
     private _openedViaOpenAs = false
+    private _hoveredClose = false
 
     constructor(screenWidth: number, screenHeight: number) {
         super('credits', {
@@ -83,33 +84,25 @@ export class CreditsPanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
-        ctx.textAlign = 'center'
-        ctx.font = 'bold 16px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText(this.quitMode ? 'QUIT' : 'CREDITS', width / 2, 28)
+        drawUIFontText(ctx, this.quitMode ? 'QUIT' : 'CREDITS', width / 2, 28, FALLOUT_GREEN, 16, { bold: true, align: 'center' })
 
+        // Font stays set for wrapText's ctx.measureText below.
         ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
         const lines = wrapText(ctx, CREDITS_BODY, width - 40)
         let y = 56
         for (const line of lines) {
-            ctx.fillText(line, width / 2, y)
+            drawUIFontText(ctx, line, width / 2, y, FALLOUT_AMBER, 11, { align: 'center' })
             y += 16
         }
 
         if (this.quitMode) {
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.font = '11px monospace'
-            ctx.fillText(QUIT_FOOTER, width / 2, height - 58)
+            drawUIFontText(ctx, QUIT_FOOTER, width / 2, height - 58, FALLOUT_GREEN, 11, { align: 'center' })
         }
 
         const close = this._closeRect()
-        fillRect(ctx, close.x, close.y, close.w, close.h, FALLOUT_DARK_GRAY)
+        fillRect(ctx, close.x, close.y, close.w, close.h, this._hoveredClose ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
         strokeRect(ctx, close.x, close.y, close.w, close.h, FALLOUT_GREEN, 1)
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText(this.quitMode ? 'OK' : 'CLOSE', width / 2, close.y + 16)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, this.quitMode ? 'OK' : 'CLOSE', width / 2, close.y + 16, this._hoveredClose ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { align: 'center' })
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
@@ -119,6 +112,14 @@ export class CreditsPanel extends UIPanel {
             return true
         }
         return true
+    }
+
+    override onMouseMove(x: number, y: number): void {
+        const close = this._closeRect()
+        this._hoveredClose = (
+            x >= close.x && x < close.x + close.w &&
+            y >= close.y && y < close.y + close.h
+        )
     }
 
     override onKeyDown(key: string): boolean {

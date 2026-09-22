@@ -6,7 +6,7 @@
  *
  * Displays the player's inventory as a scrollable list and shows the two
  * hand slots at the top.  Clicking an item opens a small context row with
- * USE / DROP / CANCEL actions.  Items in hand slots can also be dropped.
+ * USE / DROP / CANCEL actions.
  *
  * EventBus events emitted:
  *   'inventory:useItem'  — { index } — player clicked USE on inventory item
@@ -15,7 +15,7 @@
  * Panel name: 'inventory'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_HOVER, UIColor, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,9 @@ export interface InventoryItem {
     name: string
     amount: number
     canUse: boolean
+    /** Prototype PID of the source item (used by engine consumers of
+     *  'inventory:useItem' to resolve the live inventory entry). */
+    pid?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -86,20 +89,14 @@ export class InventoryPanel extends UIPanel {
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
         // Title
-        ctx.font = 'bold 12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('INVENTORY', width / 2, 18)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'INVENTORY', width / 2, 18, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
         // Hand slots
         drawSlot(ctx, 'LEFT HAND',  16,          30, SLOT_W, SLOT_H, this.leftHand)
         drawSlot(ctx, 'RIGHT HAND', 16 + SLOT_W + 8, 30, SLOT_W, SLOT_H, this.rightHand)
 
         // Item list header
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('ITEMS', LIST_X, LIST_Y - 4)
+        drawUIFontText(ctx, 'ITEMS', LIST_X, LIST_Y - 4, FALLOUT_DARK_GRAY, 9)
 
         strokeRect(ctx, LIST_X, LIST_Y, LIST_W, MAX_ROWS * ITEM_ROW_H, FALLOUT_DARK_GRAY, 1)
 
@@ -114,12 +111,13 @@ export class InventoryPanel extends UIPanel {
             if (isSelected) {
                 fillRect(ctx, LIST_X + 2, iy + 2, LIST_W - 4, ITEM_ROW_H - 2, FALLOUT_DARK_GRAY)
             } else if (isHovered) {
-                fillRect(ctx, LIST_X + 2, iy + 2, LIST_W - 4, ITEM_ROW_H - 2, { r: 20, g: 20, b: 20, a: 255 })
+                fillRect(ctx, LIST_X + 2, iy + 2, LIST_W - 4, ITEM_ROW_H - 2, FALLOUT_HOVER)
             }
-            ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(isSelected ? FALLOUT_AMBER : isHovered ? FALLOUT_AMBER : FALLOUT_GREEN)
-            const label = item.name.length > MAX_ITEM_NAME_LEN ? item.name.slice(0, MAX_ITEM_NAME_LEN) : item.name
-            ctx.fillText(`${label}  x${item.amount}`, LIST_X + 6, iy + 14)
+            const textColor: UIColor = isSelected ? FALLOUT_AMBER : FALLOUT_GREEN
+            const label = item.name.length > MAX_ITEM_NAME_LEN
+                ? item.name.slice(0, MAX_ITEM_NAME_LEN - 1) + '…'
+                : item.name
+            drawUIFontText(ctx, `${label}  x${item.amount}`, LIST_X + 6, iy + 14, textColor, 10)
         }
 
         // Context buttons when item is selected
@@ -128,9 +126,7 @@ export class InventoryPanel extends UIPanel {
             const ctxX = LIST_X + LIST_W + 8
             const ctxY = LIST_Y
 
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText('ACTION', ctxX, ctxY - 4)
+            drawUIFontText(ctx, 'ACTION', ctxX, ctxY - 4, FALLOUT_DARK_GRAY, 9)
 
             if (item.canUse) {
                 drawCtxBtn(ctx, 'USE',  ctxX, ctxY,      BTN_W, BTN_H)
@@ -141,10 +137,8 @@ export class InventoryPanel extends UIPanel {
 
         // Scroll hint
         if (this.items.length > MAX_ROWS) {
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(`↑↓ scroll (${this._scrollOffset + 1}-${Math.min(this._scrollOffset + MAX_ROWS, this.items.length)}/${this.items.length})`,
-                LIST_X, LIST_Y + MAX_ROWS * ITEM_ROW_H + 12)
+            drawUIFontText(ctx, `↑↓ scroll (${this._scrollOffset + 1}-${Math.min(this._scrollOffset + MAX_ROWS, this.items.length)}/${this.items.length})`,
+                LIST_X, LIST_Y + MAX_ROWS * ITEM_ROW_H + 12, FALLOUT_DARK_GRAY, 9)
         }
 
         // Close button
@@ -152,11 +146,7 @@ export class InventoryPanel extends UIPanel {
         const closeBtnY = height - 34
         fillRect(ctx, closeBtnX, closeBtnY, CLOSE_BTN_W, CLOSE_BTN_H, FALLOUT_DARK_GRAY)
         strokeRect(ctx, closeBtnX, closeBtnY, CLOSE_BTN_W, CLOSE_BTN_H, FALLOUT_GREEN, 1)
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CLOSE', width / 2, closeBtnY + 15)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CLOSE', width / 2, closeBtnY + 15, FALLOUT_GREEN, 11, { align: 'center' })
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
@@ -178,20 +168,22 @@ export class InventoryPanel extends UIPanel {
             if (x >= ctxX && x < ctxX + BTN_W) {
                 if (item.canUse && y >= ctxY && y < ctxY + BTN_H) {
                     EventBus.emit('inventory:useItem', { index: this._selectedIndex })
-                    this._selectedIndex = -1
+                    this._afterListMutation()
                     return true
                 }
                 if (y >= ctxY + 28 && y < ctxY + 28 + BTN_H) {
                     EventBus.emit('inventory:dropItem', { index: this._selectedIndex })
                     this.items.splice(this._selectedIndex, 1)
                     this._selectedIndex = -1
-                    this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, this.items.length - MAX_ROWS))
+                    this._afterListMutation()
                     return true
                 }
-                if (y >= ctxY + 56 && y < ctxY + 56 + BTN_H) {
-                    this._selectedIndex = -1
-                    return true
-                }
+            }
+            // The X (cancel) button is square (BTN_H wide) — hit-test only
+            // what is actually drawn.
+            if (x >= ctxX && x < ctxX + BTN_H && y >= ctxY + 56 && y < ctxY + 56 + BTN_H) {
+                this._selectedIndex = -1
+                return true
             }
         }
 
@@ -240,8 +232,11 @@ export class InventoryPanel extends UIPanel {
         }
         if (key === 'ArrowUp') {
             if (this.items.length === 0) {return true}
-            if (this._selectedIndex < 0) {return true}
-            const next = Math.max(this._selectedIndex - 1, 0)
+            // Move selection up; initialise to last item when nothing is
+            // selected (symmetric with ArrowDown initialising to first).
+            const next = this._selectedIndex < 0
+                ? this.items.length - 1
+                : Math.max(this._selectedIndex - 1, 0)
             this._selectedIndex = next
             // Auto-scroll so the selected item stays visible.
             if (this._selectedIndex < this._scrollOffset) {
@@ -256,9 +251,7 @@ export class InventoryPanel extends UIPanel {
                 if (item.canUse) {
                     EventBus.emit('inventory:useItem', { index: this._selectedIndex })
                     // Keep selection clamped to the list so multiple uses in sequence work without re-selecting.
-                    this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
-                    // Re-clamp scroll offset in case USE caused the item list to shrink.
-                    this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, Math.max(0, this.items.length - MAX_ROWS)))
+                    this._afterListMutation()
                 }
             }
             return true
@@ -271,11 +264,17 @@ export class InventoryPanel extends UIPanel {
                 EventBus.emit('inventory:dropItem', { index: this._selectedIndex })
                 this.items.splice(this._selectedIndex, 1)
                 this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
-                this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, Math.max(0, this.items.length - MAX_ROWS)))
+                this._afterListMutation()
             }
             return true
         }
         return false
+    }
+
+    /** Re-clamp selection/scroll after the item list may have changed. */
+    private _afterListMutation(): void {
+        this._selectedIndex = Math.min(this._selectedIndex, this.items.length - 1)
+        this._scrollOffset = Math.max(0, Math.min(this._scrollOffset, Math.max(0, this.items.length - MAX_ROWS)))
     }
 }
 
@@ -292,18 +291,12 @@ function drawSlot(
     item: InventoryItem | null,
 ): void {
     strokeRect(ctx, x, y, w, h, FALLOUT_DARK_GRAY, 1)
-    ctx.font = '8px monospace'
-    ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-    ctx.fillText(label, x + 4, y + 10)
+    drawUIFontText(ctx, label, x + 4, y + 10, FALLOUT_DARK_GRAY, 8)
     if (item) {
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        const name = item.name.length > 12 ? item.name.slice(0, 12) : item.name
-        ctx.fillText(name, x + 4, y + 26)
+        const name = item.name.length > 12 ? item.name.slice(0, 11) + '…' : item.name
+        drawUIFontText(ctx, name, x + 4, y + 26, FALLOUT_GREEN, 9)
     } else {
-        ctx.font = '8px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('[empty]', x + 4, y + 26)
+        drawUIFontText(ctx, '[empty]', x + 4, y + 26, FALLOUT_DARK_GRAY, 8)
     }
 }
 
@@ -314,9 +307,5 @@ function drawCtxBtn(
 ): void {
     fillRect(ctx, x, y, w, h, FALLOUT_DARK_GRAY)
     strokeRect(ctx, x, y, w, h, FALLOUT_GREEN, 1)
-    ctx.font = '10px monospace'
-    ctx.fillStyle = cssColor(FALLOUT_GREEN)
-    ctx.textAlign = 'center'
-    ctx.fillText(label, x + w / 2, y + 13)
-    ctx.textAlign = 'left'
+    drawUIFontText(ctx, label, x + w / 2, y + 13, FALLOUT_GREEN, 10, { align: 'center' })
 }

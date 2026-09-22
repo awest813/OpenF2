@@ -28,12 +28,20 @@ import { SKILLDEX_ENTRIES, useSkilldexSkill } from './skilldex.js'
 import { fromTileNum } from './tile.js'
 import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl, ElementOptions } from './dom.js'
 import { CSSBoundingBox, Widget, WindowFrame, SmallButton, Label, List, ListItem } from './widgets.js'
-import { pad } from './util.js'
+import { pad, getProtoMsg } from './util.js'
 import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
 import { Point } from './geometry.js'
 import { lazyLoadImage } from './images.js'
 import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
+import type { DialoguePanel } from './ui2/dialoguePanel.js'
+import type { InventoryPanel } from './ui2/inventoryPanel.js'
+import type { LootPanel } from './ui2/lootPanel.js'
+import type { ElevatorPanel } from './ui2/elevatorPanel.js'
+import type { BarterPanel } from './ui2/barterPanel.js'
+import { weaponAmmoPid, reloadWeapon } from './combat/ammo.js'
+import { BODY_REGIONS } from './ui2/calledShotPanel.js'
+import type { CalledShotPanel, BodyRegion } from './ui2/calledShotPanel.js'
 import { xpForLevel } from './ecs/derivedStats.js'
 import { UIMode } from './uiMode.js'
 import { EventBus } from './eventBus.js'
@@ -42,6 +50,85 @@ import { parkCarAtPlayer } from './car.js'
 // UI system
 
 let playerUseHandler: (obj?: Obj) => void = () => {}
+
+/** Pending region callback for the ui2 called-shot panel (see uiCalledShot). */
+let uiCalledShotCallback: ((region: string) => void) | null = null
+
+/**
+ * Mirror the player's live Critter inventory into the ui2 inventory panel.
+ * Items usable with the current loadout (ammo matching the equipped weapon)
+ * get canUse so USE offers the reload action.
+ */
+function refreshInventoryPanel(): void {
+    const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
+    const player = globalState.player
+    if (!panel || !player) {return}
+
+    const weapon = player.equippedWeapon
+    const ammoPid = weapon ? weaponAmmoPid(weapon) : -1
+
+    panel.items = (player.inventory ?? []).map((o) => {
+        const pid = typeof (o as any).pid === 'number' ? (o as any).pid as number : undefined
+        return {
+            name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
+            amount: (o as any).amount ?? 1,
+            canUse: pid !== undefined && pid === ammoPid,
+            pid,
+        }
+    })
+    panel.leftHand = invSlotItem(playerGetSlot('leftHand'))
+    panel.rightHand = invSlotItem(playerGetSlot('rightHand'))
+}
+
+function invSlotItem(obj: Obj | null | undefined): { name: string; amount: number; canUse: boolean; pid?: number } | null {
+    if (!obj) {return null}
+    const pid = typeof (obj as any).pid === 'number' ? (obj as any).pid as number : undefined
+    return {
+        name: obj.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
+        amount: (obj as any).amount ?? 1,
+        canUse: false,
+        pid,
+    }
+}
+
+/**
+ * Handle USE on a panel item: when it is ammo for the equipped weapon,
+ * reload and report. Returns false when the item is not weapon ammo so the
+ * caller can fall back to generic item use.
+ */
+function reloadPlayerWeapon(item: { pid?: number; name: string }): boolean {
+    const player = globalState.player
+    const weapon = player?.equippedWeapon
+    if (!player || !weapon) {
+        uiLog('You have no weapon to reload.')
+        return true
+    }
+    const ammoPid = weaponAmmoPid(weapon)
+    if (item.pid !== undefined && item.pid !== ammoPid) {return false}
+
+    const result = reloadWeapon(player, weapon)
+    switch (result.reason) {
+        case 'full':
+            uiLog('Your weapon is already fully loaded.')
+            return true
+        case 'no-ammo':
+            if (item.pid !== undefined && item.pid === ammoPid) {
+                // Matched the ammo type but the stack search failed — treat
+                // as reload attempt with nothing to load.
+                uiLog('Nothing to load.')
+                return true
+            }
+            uiLog('That is not the right ammunition.')
+            return true
+        case 'no-ap':
+            uiLog(getProtoMsg(700)!)
+            return true
+        default:
+            uiLog(`You reload your weapon (${result.loaded} round${result.loaded === 1 ? '' : 's'}).`)
+            EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })
+            return true
+    }
+}
 
 export function setPlayerUseHandler(handler: (obj?: Obj) => void): void {
     playerUseHandler = handler
@@ -59,6 +146,12 @@ function uiInit() {
     // initCharacterScreen();
 
     document.getElementById('chrButton')!.onclick = () => {
+        // Prefer the ui2 character screen when the panel manager exists;
+        // the legacy widget tree is only a fallback.
+        if (globalState.uiManager) {
+            EventBus.emit('ui:openPanel', { panelName: 'characterScreen' })
+            return
+        }
         characterWindow && characterWindow.close()
         initCharacterScreen()
     }
@@ -337,6 +430,72 @@ function drawInventory($el: HTMLElement, objects: Obj[], prefix: string, options
 export function initUI() {
     uiInit()
 
+    // -------------------------------------------------------------------
+    // EventBus consumers completing the ui2 panel round-trips. The legacy
+    // entry points (uiStartDialogue / uiLoot / uiElevator) delegate to the
+    // ui2 panels when a UIManager exists; these handlers perform the
+    // engine-side effects the panels cannot do themselves.
+    // -------------------------------------------------------------------
+    EventBus.on('dialogue:optionSelected', ({ optionID }) => {
+        Scripting.dialogueReply(optionID)
+    })
+    EventBus.on('dialogue:closed', () => {
+        // Player dismissed the dialogue panel (Escape) — run the same
+        // script-side exit as a normal end of conversation.
+        Scripting.dialogueEnd()
+    })
+    EventBus.on('barter:talkRequested', () => {
+        // TALK / Escape on the barter panel returns to the conversation,
+        // exactly like the legacy barter screen's TALK button.
+        uiStartDialogue(true)
+    })
+    EventBus.on('inventory:useItem', ({ index }) => {
+        // USE on an ammo item reloads the equipped weapon (FO2 behavior);
+        // anything else falls through to the generic item-use handler.
+        const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
+        const item = panel?.items[index]
+        if (item && reloadPlayerWeapon(item)) {return}
+        playerUseHandler()
+    })
+    // Keep the ui2 inventory panel populated from the live inventory every
+    // time it opens (hand slots, ammo flags for USE-as-reload).
+    EventBus.on('ui:openPanel', ({ panelName }) => {
+        if (panelName === 'inventory') {refreshInventoryPanel()}
+    })
+    EventBus.on('loot:closed', () => {
+        // Live inventories were mutated in place by the panel (openWithLive);
+        // only the mode and legacy DOM cleanup remain.
+        uiEndLoot()
+    })
+    EventBus.on('elevator:buttonPressed', ({ mapID, level, tileNum }) => {
+        const position = fromTileNum(tileNum)
+        if (mapID !== globalState.gMap.mapID) {
+            // different map
+            console.log('elevator -> map ' + mapID + ', level ' + level + ' @ ' + position.x + ', ' + position.y)
+            globalState.gMap.loadMapByID(mapID, position, level)
+        } else if (level !== globalState.currentElevation) {
+            // same map, different elevation
+            console.log('elevator -> level ' + level + ' @ ' + position.x + ', ' + position.y)
+            globalState.player.move(position)
+            globalState.gMap.changeElevation(level, true)
+        }
+        // else, same elevation, do nothing
+        uiElevatorDone()
+    })
+    EventBus.on('elevator:closed', () => {
+        uiElevatorDone()
+    })
+    EventBus.on('calledShot:regionSelected', ({ region }) => {
+        const cb = uiCalledShotCallback
+        uiCalledShotCallback = null
+        cb?.(region)
+        uiCloseCalledShot()
+    })
+    EventBus.on('calledShot:cancelled', () => {
+        uiCalledShotCallback = null
+        uiCloseCalledShot()
+    })
+
     makeDropTarget($id('inventoryBoxList'), (data: string) => {
         uiMoveSlot(data, 'inventory')
     })
@@ -375,6 +534,11 @@ export function initUI() {
     */
 
     $id('inventoryButton').onclick = () => {
+        // Prefer the ui2 inventory panel when the panel manager exists.
+        if (globalState.uiManager) {
+            EventBus.emit('ui:openPanel', { panelName: 'inventory' })
+            return
+        }
         uiInventoryScreen()
     }
     $id('inventoryDoneButton').onclick = () => {
@@ -475,9 +639,16 @@ export function initUI() {
     uiDrawWeapon()
 }
 
+/** Active outside-click dismissal listener for the item context menu. */
+let contextMenuOutsideHandler: ((e: MouseEvent) => void) | null = null
+
 function uiHideContextMenu() {
     globalState.uiMode = UIMode.none
     $id('itemContextMenu').style.visibility = 'hidden'
+    if (contextMenuOutsideHandler) {
+        document.removeEventListener('mousedown', contextMenuOutsideHandler)
+        contextMenuOutsideHandler = null
+    }
 }
 
 export function uiContextMenu(obj: Obj, evt: any) {
@@ -530,6 +701,16 @@ export function uiContextMenu(obj: Obj, evt: any) {
         $menu.appendChild(useBtn)
     }
     $menu.appendChild(pickupBtn)
+
+    // Dismiss when clicking anywhere outside the menu (without this, one
+    // stray right-click left a floating menu over gameplay until a button
+    // was pressed).
+    contextMenuOutsideHandler = (e: MouseEvent) => {
+        if (!$menu.contains(e.target as Node)) {
+            uiHideContextMenu()
+        }
+    }
+    document.addEventListener('mousedown', contextMenuOutsideHandler)
 }
 
 export function uiStartCombat() {
@@ -578,10 +759,12 @@ export function uiUpdateCombatHUD() {
             $apDigit2.style.backgroundPosition = 0 - CHAR_W * currentAP + 'px'
         }
 
-        // also show max AP alongside if we have an element for it
+        // also show armor class alongside if we have an element for it
+        // (FO2's combat bar displays AC here — this used to draw max AP,
+        // permanently overwriting the armor-class readout)
         const $acNumber = $id('acNumber')
-        if ($acNumber) {
-            drawDigits('#acDigit', maxAP, 4, false)
+        if ($acNumber && globalState.player) {
+            drawDigits('#acDigit', globalState.player.getStat('AC'), 4, false)
         }
     }
 }
@@ -687,7 +870,14 @@ function uiMoveSlot(data: string, target: string) {
 
         const idx = parseInt(data.slice(1))
         console.log('idx: ' + idx)
+        // Guard against a stale drag payload (out-of-bounds index would push
+        // undefined into the inventory and crash the next redraw).
         obj = globalState.player.inventory[idx]
+        if (obj === undefined) {
+            console.warn('uiMoveSlot: no inventory item at index ' + idx)
+            uiInventoryScreen()
+            return
+        }
         globalState.player.inventory.splice(idx, 1)
     } else {
         obj = playerGetSlot(data)
@@ -951,6 +1141,10 @@ function drawDigits(idPrefix: string, amount: number, maxDigits: number, hasSign
 }
 
 // Smoothly transition an element's top property from an origin to a target position over a duration
+/** Pending transitionend listener per element, so a new animation can
+ *  cancel the previous one (stale callbacks used to hide just-reopened boxes). */
+const pendingBoxListeners = new WeakMap<HTMLElement, () => void>()
+
 function uiAnimateBox($el: HTMLElement, origin: number | null, target: number, callback?: () => void): void {
     const style = $el.style
 
@@ -962,14 +1156,21 @@ function uiAnimateBox($el: HTMLElement, origin: number | null, target: number, c
 
     // We need to wait for the browser to process the updated CSS position, so we need to wait here
     setTimeout(() => {
-        // Set up our transition finished callback if necessary
+        // Set up our transition finished callback if necessary. Remove any
+        // listener left over from an interrupted previous animation first —
+        // otherwise both fire when the new transition completes.
+        const previous = pendingBoxListeners.get($el)
+        if (previous) {
+            $el.removeEventListener('transitionend', previous)
+            pendingBoxListeners.delete($el)
+        }
         if (callback) {
-            let listener = () => {
+            const listener = () => {
                 callback()
                 $el.removeEventListener('transitionend', listener)
-                ;(listener as any) = null // Allow listener to be GC'd
+                pendingBoxListeners.delete($el)
             }
-
+            pendingBoxListeners.set($el, listener)
             $el.addEventListener('transitionend', listener)
         }
 
@@ -980,15 +1181,23 @@ function uiAnimateBox($el: HTMLElement, origin: number | null, target: number, c
 }
 
 export function uiStartDialogue(force: boolean, target?: Critter) {
-    assertNoLegacyGameplayPanelFallback('dialogue', 'uiStartDialogue')
     if (globalState.uiMode === UIMode.barter && force !== true) {
         return
     }
 
     globalState.uiMode = UIMode.dialogue
-    $id('dialogueContainer').style.visibility = 'visible'
-    $id('dialogueBox').style.visibility = 'visible'
-    uiAnimateBox($id('dialogueBox'), 480, 290)
+
+    // Prefer the ui2 DialoguePanel when the panel manager exists; the DOM
+    // dialogue box is only a fallback.
+    const dialoguePanel = globalState.uiManager?.get<DialoguePanel>('dialogue')
+    if (dialoguePanel) {
+        dialoguePanel.show()
+    } else {
+        assertNoLegacyGameplayPanelFallback('dialogue', 'uiStartDialogue')
+        $id('dialogueContainer').style.visibility = 'visible'
+        $id('dialogueBox').style.visibility = 'visible'
+        uiAnimateBox($id('dialogueBox'), 480, 290)
+    }
 
     // center around the dialogue target
     if (!target) {
@@ -1008,6 +1217,10 @@ export function uiStartDialogue(force: boolean, target?: Critter) {
 export function uiEndDialogue() {
     globalState.uiMode = UIMode.none
 
+    // Close the ui2 panel if it was the live surface (a no-op when already
+    // hidden, e.g. after the player pressed Escape on the panel itself).
+    globalState.uiManager?.get<DialoguePanel>('dialogue')?.hide()
+
     const $dialogueBox = $id('dialogueBox')
     uiAnimateBox($dialogueBox, null, 480, () => {
         $id('dialogueContainer').style.visibility = 'hidden'
@@ -1017,6 +1230,14 @@ export function uiEndDialogue() {
 }
 
 export function uiSetDialogueReply(reply: string) {
+    const dialoguePanel = globalState.uiManager?.get<DialoguePanel>('dialogue')
+    if (dialoguePanel) {
+        // setReply also clears any pending options, matching the DOM path
+        // below (innerHTML = '').
+        dialoguePanel.setReply(reply)
+        return
+    }
+
     const $dialogueBoxReply = $id('dialogueBoxReply')
     $dialogueBoxReply.innerHTML = reply
     $dialogueBoxReply.scrollTop = 0
@@ -1025,10 +1246,27 @@ export function uiSetDialogueReply(reply: string) {
 }
 
 export function uiAddDialogueOption(msg: string, optionID: number) {
-    $id('dialogueBoxTextArea').insertAdjacentHTML(
-        'beforeend',
-        `<li><a href="javascript:dialogueReply(${optionID})">${msg}</a></li>`
-    )
+    // Prefer the ui2 panel: options chosen there arrive back as
+    // 'dialogue:optionSelected' events (see the consumer in initUI).
+    const dialoguePanel = globalState.uiManager?.get<DialoguePanel>('dialogue')
+    if (dialoguePanel) {
+        dialoguePanel.addOption(msg, optionID)
+        return
+    }
+
+    // Legacy DOM path: real click handler instead of a `javascript:` href —
+    // `dialogueReply` lives in the Scripting module namespace and is not a
+    // global, so the href form threw ReferenceError on every option click.
+    const link = document.createElement('a')
+    link.href = '#'
+    link.textContent = msg
+    link.onclick = (e) => {
+        e.preventDefault()
+        Scripting.dialogueReply(optionID)
+    }
+    const li = document.createElement('li')
+    li.appendChild(link)
+    $id('dialogueBoxTextArea').appendChild(li)
 }
 
 function uiGetAmount(item: Obj) {
@@ -1150,8 +1388,19 @@ function uiEndBarterMode() {
 }
 
 export function uiBarterMode(merchant: Critter) {
-    assertNoLegacyGameplayPanelFallback('barter', 'uiBarterMode')
     globalState.uiMode = UIMode.barter
+
+    // Prefer the ui2 BarterPanel: openWithLive mutates the real inventories
+    // in lockstep, accepted offers are committed by the panel itself, and
+    // TALK / Escape route back here as 'barter:talkRequested' (consumer in
+    // initUI resumes the dialogue).
+    const barterPanel = globalState.uiManager?.get<BarterPanel>('barter')
+    if (barterPanel) {
+        barterPanel.openWithLive(globalState.player.inventory, merchant.inventory)
+        return
+    }
+
+    assertNoLegacyGameplayPanelFallback('barter', 'uiBarterMode')
 
     // Hide dialogue screen for now (animate down)
     const $dialogueBox = $id('dialogueBox')
@@ -1294,8 +1543,18 @@ function uiEndLoot() {
 }
 
 export function uiLoot(object: Obj) {
-    assertNoLegacyGameplayPanelFallback('loot', 'uiLoot')
     globalState.uiMode = UIMode.loot
+
+    // Prefer the ui2 LootPanel: openWithLive mutates the real inventories in
+    // lockstep (same semantics as the DOM path below), and its CLOSE /
+    // Escape routes back through the 'loot:closed' consumer (uiEndLoot).
+    const lootPanel = globalState.uiManager?.get<LootPanel>('loot')
+    if (lootPanel) {
+        lootPanel.openWithLive(globalState.player.inventory, object.inventory)
+        return
+    }
+
+    assertNoLegacyGameplayPanelFallback('loot', 'uiLoot')
 
     function uiLootMove(data: string /* "l"|"r" */, where: 'left' | 'right') {
         console.log('loot: move ' + data + ' to ' + where)
@@ -1463,8 +1722,23 @@ function uiElevatorDone() {
 }
 
 export function uiElevator(elevator: Elevator) {
-    assertNoLegacyGameplayPanelFallback('elevator', 'uiElevator')
     globalState.uiMode = UIMode.elevator
+
+    // Prefer the ui2 ElevatorPanel: a floor selection arrives back as an
+    // 'elevator:buttonPressed' event (consumer in initUI performs the map
+    // load / elevation change), CANCEL or Escape as 'elevator:closed'.
+    const elevatorPanel = globalState.uiManager?.get<ElevatorPanel>('elevator')
+    if (elevatorPanel) {
+        elevatorPanel.openWith(elevator.buttons.map((b) => ({
+            label: `Level ${b.level}`,
+            mapID: b.mapID,
+            level: b.level,
+            tileNum: b.tileNum,
+        })))
+        return
+    }
+
+    assertNoLegacyGameplayPanelFallback('elevator', 'uiElevator')
     const art = lookupInterfaceArt(elevator.type)
     console.log('elevator art: ' + art)
     console.log('buttons: ' + elevator.buttonCount)
@@ -1517,12 +1791,34 @@ export function uiCloseCalledShot() {
 }
 
 export function uiCalledShot(art: string, target: Critter, callback?: (regionHit: string) => void) {
-    assertNoLegacyGameplayPanelFallback('calledShot', 'uiCalledShot')
     globalState.uiMode = UIMode.calledShot
+
+    // getHitChance is an instance method (it consults this.combatants for
+    // partial cover). Prefer the live combat; outside combat use a bare
+    // prototype instance with no combatants — calling it via Combat.prototype
+    // used to throw on the undefined `this`.
+    const combat: Combat = globalState.combat
+        ?? Object.assign(Object.create(Combat.prototype), { combatants: [] as Critter[] })
+
+    // Prefer the ui2 CalledShotPanel: the region choice arrives back as a
+    // 'calledShot:regionSelected' event (consumer in initUI invokes the
+    // attack callback), CANCEL / Escape as 'calledShot:cancelled'.
+    const calledShotPanel = globalState.uiManager?.get<CalledShotPanel>('calledShot')
+    if (calledShotPanel) {
+        const chances: Partial<Record<BodyRegion, number>> = {}
+        for (const region of BODY_REGIONS) {
+            chances[region] = combat.getHitChance(globalState.player, target, region).hit
+        }
+        uiCalledShotCallback = callback ?? null
+        calledShotPanel.openWith(chances)
+        return
+    }
+
+    assertNoLegacyGameplayPanelFallback('calledShot', 'uiCalledShot')
     show($id('calledShotBox'))
 
     function drawChance(region: string) {
-        let chance: any = Combat.prototype.getHitChance(globalState.player, target, region).hit
+        let chance: any = combat.getHitChance(globalState.player, target, region).hit
         console.log('id: %s | chance: %d', '#calledShot-' + region + '-chance #digit', chance)
         if (chance <= 0) {
             chance = '--'
@@ -1619,6 +1915,9 @@ export function uiSaveLoad(isSave: boolean): void {
 
         if (isSave) {
             const name = prompt('Save Name?')
+            if (name === null) {
+                return  // cancelled — don't save under a "null" title
+            }
 
             if (saveID !== -1) {
                 if (!confirm('Are you sure you want to overwrite that save slot?')) {

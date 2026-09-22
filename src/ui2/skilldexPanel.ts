@@ -5,12 +5,11 @@
 import {
     UIPanel,
     FALLOUT_GREEN,
-    FALLOUT_AMBER,
     FALLOUT_DARK_GRAY,
     FALLOUT_BLACK,
-    cssColor,
     fillRect,
     strokeRect,
+    drawUIFontText,
 } from './uiPanel.js'
 import { SKILLDEX_ENTRIES } from '../skilldex.js'
 import { Skills, skillRequiresTarget } from '../skills.js'
@@ -36,6 +35,11 @@ export class SkilldexPanel extends UIPanel {
         this.zOrder = 25
     }
 
+    protected override onShow(): void {
+        // Hover state must not survive a hide/show cycle.
+        this._hovered = -1
+    }
+
     private _activate(skill: Skills): void {
         this.hide()
         if (!skillRequiresTarget(skill)) {
@@ -51,11 +55,7 @@ export class SkilldexPanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
-        ctx.font = 'bold 13px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('SKILLDEX', width / 2, 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'SKILLDEX', width / 2, 22, FALLOUT_GREEN, 12, { bold: true, align: 'center' })
 
         for (let i = 0; i < SKILLDEX_ENTRIES.length; i++) {
             const entry = SKILLDEX_ENTRIES[i]
@@ -63,16 +63,10 @@ export class SkilldexPanel extends UIPanel {
             const active = i === this._hovered
             fillRect(ctx, 12, y, width - 24, ROW_H - 4, active ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, 12, y, width - 24, ROW_H - 4, FALLOUT_GREEN, 1)
-            ctx.font = '12px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_AMBER)
-            ctx.fillText(entry.label.toUpperCase(), 24, y + 18)
+            drawUIFontText(ctx, `${i + 1}. ${entry.label.toUpperCase()}`, 24, y + 18, active ? FALLOUT_BLACK : FALLOUT_GREEN, 12)
         }
 
-        ctx.font = '10px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.textAlign = 'center'
-        ctx.fillText('Esc to close', width / 2, height - 12)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, '1–8 or click  ·  Esc to close', width / 2, height - 12, FALLOUT_DARK_GRAY, 10, { align: 'center' })
     }
 
     override onMouseMove(x: number, y: number): void {
@@ -100,6 +94,12 @@ export class SkilldexPanel extends UIPanel {
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
             this.hide()
+            return true
+        }
+        // Number keys 1–8 activate skills directly (matching the drawn hints).
+        const digit = parseInt(key)
+        if (!isNaN(digit) && digit >= 1 && digit <= SKILLDEX_ENTRIES.length) {
+            this._activate(SKILLDEX_ENTRIES[digit - 1].skill)
             return true
         }
         return true

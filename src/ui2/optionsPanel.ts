@@ -11,10 +11,11 @@ import {
     FALLOUT_GREEN,
     FALLOUT_AMBER,
     FALLOUT_DARK_GRAY,
+    FALLOUT_DARK_GREEN,
     FALLOUT_BLACK,
-    cssColor,
     fillRect,
     strokeRect,
+    drawUIFontText,
 } from './uiPanel.js'
 import {
     COMBAT_DIFFICULTY_LABELS,
@@ -80,7 +81,7 @@ function cycleLevel(current: number, max: number, dir: 1 | -1): number {
 }
 
 function volumeLabel(vol: number): string {
-    return String(Math.round(Math.max(0, Math.min(1, vol)) * VOLUME_STEPS))
+    return `${Math.round(Math.max(0, Math.min(1, vol)) * VOLUME_STEPS)}/${VOLUME_STEPS}`
 }
 
 const GAME_ROWS: PrefRow[] = [
@@ -234,23 +235,21 @@ export class OptionsPanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
-        ctx.font = 'bold 14px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('OPTIONS', width / 2, 22)
+        drawUIFontText(ctx, 'OPTIONS', width / 2, 22, FALLOUT_GREEN, 14, { bold: true, align: 'center' })
 
         for (let i = 0; i < TABS.length; i++) {
             const tab = TABS[i]
             const r = this._tabRect(i)
-            const active = tab === this._tab || tab === this._hoveredTab
-            fillRect(ctx, r.x, r.y, r.w, r.h, active ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
+            const isActive = tab === this._tab
+            const isHovered = tab === this._hoveredTab
+            // Active tab: solid green. Hover on an inactive tab: dim green —
+            // visually distinct from the selected tab.
+            const bg = isActive ? FALLOUT_GREEN : isHovered ? FALLOUT_DARK_GREEN : FALLOUT_DARK_GRAY
+            fillRect(ctx, r.x, r.y, r.w, r.h, bg)
             strokeRect(ctx, r.x, r.y, r.w, r.h, FALLOUT_GREEN, 1)
-            ctx.font = 'bold 11px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.fillText(tab.toUpperCase(), r.x + r.w / 2, r.y + 16)
+            drawUIFontText(ctx, tab.toUpperCase(), r.x + r.w / 2, r.y + 16, isActive ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { bold: true, align: 'center' })
         }
 
-        ctx.textAlign = 'left'
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i]
             const y = START_Y + i * ROW_H
@@ -261,37 +260,25 @@ export class OptionsPanel extends UIPanel {
                 fillRect(ctx, 8, y, width - 16, ROW_H, FALLOUT_DARK_GRAY)
             }
 
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(isFocused ? FALLOUT_AMBER : FALLOUT_GREEN)
-            ctx.fillText(row.label, 16, y + 18)
+            drawUIFontText(ctx, row.label, 16, y + 18, isFocused ? FALLOUT_AMBER : FALLOUT_GREEN, 11)
 
             fillRect(ctx, vr.x, vr.y, vr.w, vr.h, FALLOUT_DARK_GRAY)
             strokeRect(ctx, vr.x, vr.y, vr.w, vr.h, FALLOUT_GREEN, 1)
-            ctx.textAlign = 'center'
-            ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
             if (row.kind === 'toggle') {
-                ctx.fillText(row.get(settings) ? 'ON' : 'OFF', vr.x + vr.w / 2, vr.y + 14)
+                drawUIFontText(ctx, row.get(settings) ? 'ON' : 'OFF', vr.x + vr.w / 2, vr.y + 14, FALLOUT_GREEN, 10, { align: 'center' })
             } else if (row.kind === 'cycle') {
-                ctx.fillText(row.getLabel(settings), vr.x + vr.w / 2, vr.y + 14)
+                drawUIFontText(ctx, row.getLabel(settings), vr.x + vr.w / 2, vr.y + 14, FALLOUT_GREEN, 10, { align: 'center' })
             } else {
-                ctx.fillText(volumeLabel(row.get(settings)), vr.x + vr.w / 2, vr.y + 14)
+                drawUIFontText(ctx, volumeLabel(row.get(settings)), vr.x + vr.w / 2, vr.y + 14, FALLOUT_GREEN, 10, { align: 'center' })
             }
-            ctx.textAlign = 'left'
         }
 
         const done = this._doneRect()
         fillRect(ctx, done.x, done.y, done.w, done.h, this._hoveredDone ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
         strokeRect(ctx, done.x, done.y, done.w, done.h, FALLOUT_GREEN, 1)
-        ctx.font = '11px monospace'
-        ctx.fillStyle = this._hoveredDone ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('DONE', width / 2, done.y + 16)
+        drawUIFontText(ctx, 'DONE', width / 2, done.y + 16, this._hoveredDone ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { align: 'center' })
 
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('Tab  Q/E  ·  ↑↓ select  ·  ←→ change  ·  Esc close', width / 2, height - 8)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'Tab/Q/E tabs  ·  ↑↓/WS select  ·  ←→ change  ·  Esc close', width / 2, height - 8, FALLOUT_DARK_GRAY, 9, { align: 'center' })
     }
 
     override onMouseMove(x: number, y: number): void {
@@ -373,11 +360,11 @@ export class OptionsPanel extends UIPanel {
             return true
         }
         const rows = rowsFor(this._tab)
-        if (k === 'ArrowDown') {
+        if (k === 'ArrowDown' || k === 's') {
             this._focusedIndex = Math.min(this._focusedIndex + 1, rows.length - 1)
             return true
         }
-        if (k === 'ArrowUp') {
+        if (k === 'ArrowUp' || k === 'w') {
             this._focusedIndex = Math.max(this._focusedIndex - 1, 0)
             return true
         }

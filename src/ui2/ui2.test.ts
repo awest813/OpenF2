@@ -22,6 +22,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import globalState from '../globalState.js'
 import {
     UIPanel,
     UIManagerImpl,
@@ -29,6 +30,9 @@ import {
     FALLOUT_GREEN,
     FALLOUT_RED,
     FALLOUT_AMBER,
+    UIFontSet,
+    setActiveUIFont,
+    drawUIFontText,
 } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
@@ -704,10 +708,13 @@ describe('OptionsPanel', () => {
         expect(panel.visible).toBe(false)
     })
 
-    it('non-Escape keys are not consumed', () => {
+    it('"w" is consumed as a row-navigation alias', () => {
         const panel = new OptionsPanel(800, 600)
         panel.show()
-        expect(panel.onKeyDown('w')).toBe(false)
+        // w/s now alias ArrowUp/ArrowDown for row navigation (mirrors the
+        // main menu's w/s convention). The global showWalls hotkey is
+        // unreachable while a modal panel is open anyway.
+        expect(panel.onKeyDown('w')).toBe(true)
     })
 
     it('is centered on screen', () => {
@@ -1089,6 +1096,69 @@ describe('BitmapFontRenderer', () => {
     })
 })
 
+describe('UIFontSet', () => {
+    function mkFont(height: number): any {
+        return {
+            filepath: `font-${height}.fon`,
+            height,
+            spacing: 1,
+            symbols: [{ width: 5, offset: 0 }],
+            textureData: new Uint8Array(5 * height),
+        }
+    }
+
+    it('forSize picks the font with the nearest glyph height', () => {
+        const set = new UIFontSet([mkFont(9), mkFont(13)])
+        expect(set.forSize(9)?.height).toBe(9)
+        expect(set.forSize(10)?.height).toBe(9)   // equidistant → smaller
+        expect(set.forSize(12)?.height).toBe(13)
+        expect(set.forSize(13)?.height).toBe(13)
+    })
+
+    it('forSize breaks distance ties toward the smaller font', () => {
+        const set = new UIFontSet([mkFont(9), mkFont(13)])
+        expect(set.forSize(11)?.height).toBe(9)
+    })
+
+    it('forSize returns null for an empty set', () => {
+        const set = new UIFontSet([])
+        expect(set.isEmpty).toBe(true)
+        expect(set.forSize(10)).toBeNull()
+    })
+
+    it('drawUIFontText falls back to the system font when no set is active', () => {
+        setActiveUIFont(null)
+        const calls: Array<{ font: string; text: string; align: string }> = []
+        const stubCtx: any = {
+            set font(v: string) { this._font = v },
+            get font() { return this._font ?? '' },
+            _font: '',
+            fillStyle: '',
+            textAlign: 'left',
+            fillText(text: string) { calls.push({ font: this._font, text, align: this.textAlign }) },
+        }
+        drawUIFontText(stubCtx, 'HP', 10, 20, FALLOUT_GREEN, 9)
+        expect(calls).toHaveLength(1)
+        expect(calls[0].font).toBe('9px monospace')
+        expect(calls[0].text).toBe('HP')
+    })
+
+    it('drawUIFontText uses the bold system font when bold is requested in fallback', () => {
+        setActiveUIFont(null)
+        const seen: string[] = []
+        const stubCtx: any = {
+            set font(v: string) { this._font = v },
+            get font() { return this._font ?? '' },
+            _font: '',
+            fillStyle: '',
+            textAlign: 'left',
+            fillText() { seen.push(this._font) },
+        }
+        drawUIFontText(stubCtx, '30/30', 10, 20, FALLOUT_GREEN, 13, { bold: true })
+        expect(seen).toEqual(['bold 13px monospace'])
+    })
+})
+
 // ---------------------------------------------------------------------------
 // UIManagerImpl fontRenderer property
 // ---------------------------------------------------------------------------
@@ -1255,23 +1325,16 @@ describe('DebugOverlayPanel', () => {
         expect(() => mgr.render()).not.toThrow()
     })
 
-    it('backtick key toggles the panel', () => {
+    it('does not self-toggle from its own key handler (F3 is global in main.ts)', () => {
+        // The UIManager only dispatches keys to visible panels, so a panel
+        // can never open itself via its own onKeyDown. Toggling lives in the
+        // global F3 handler in main.ts; the panel just renders.
         const pid = EntityManager.create()
         const panel = new DebugOverlayPanel(800, 600, pid)
         expect(panel.visible).toBe(false)
-        const consumed = panel.onKeyDown('`')
-        expect(consumed).toBe(true)
-        expect(panel.visible).toBe(true)
-        panel.onKeyDown('`')
+        expect(panel.onKeyDown('`')).toBe(false)
+        expect(panel.onKeyDown('F3')).toBe(false)
         expect(panel.visible).toBe(false)
-    })
-
-    it('F3 key toggles the panel', () => {
-        const pid = EntityManager.create()
-        const panel = new DebugOverlayPanel(800, 600, pid)
-        const consumed = panel.onKeyDown('F3')
-        expect(consumed).toBe(true)
-        expect(panel.visible).toBe(true)
     })
 
     it('other keys are not consumed', () => {
@@ -1605,6 +1668,77 @@ describe('BarterPanel', () => {
         expect(spy).toHaveBeenCalled()
         EventBus.clear('barter:offerRefused')
     })
+
+    it('openWithLive moves real Objs and commits an accepted offer across sides', () => {
+        // Real inventory Objs (structural subset, matching live usage).
+        const playerInv = [
+            { name: 'Stimpak', amount: 2, pid: 40, pro: { extra: { cost: 25 } } },
+        ]
+        const merchantInv = [
+            { name: 'Knife', amount: 1, pid: 10, pro: { extra: { cost: 40 } } },
+        ]
+        const panel = new BarterPanel(800, 600)
+        panel.openWithLive(playerInv as any, merchantInv as any)
+        expect(panel.visible).toBe(true)
+        // Display snapshots reflect the real arrays (values from pro.extra.cost).
+        expect(panel.playerInventory).toEqual([{ name: 'Stimpak', amount: 2, value: 25 }])
+        expect(panel.merchantInventory).toEqual([{ name: 'Knife', amount: 1, value: 40 }])
+
+        // Player: select leftInv row 0, click leftTbl to move it onto the table.
+        panel.onMouseDown(20, 48, 'l')    // LEFT_INV_X=10, COL_Y=38
+        panel.onMouseDown(154, 48, 'l')   // LEFT_TBL_X=144
+        expect(panel.playerInventory).toHaveLength(0)
+        expect(panel.playerTable).toHaveLength(1)
+        // The real player inventory array was mutated too.
+        expect(playerInv).toHaveLength(0)
+
+        // Merchant: select rightInv row 0, click rightTbl to move it.
+        panel.onMouseDown(440, 48, 'l')   // RIGHT_INV_X=430
+        panel.onMouseDown(302, 48, 'l')   // RIGHT_TBL_X=292
+        expect(panel.merchantInventory).toHaveLength(0)
+        expect(panel.merchantTable).toHaveLength(1)
+        expect(merchantInv).toHaveLength(0)
+
+        // Offer: player value 2×25=50 >= merchant 1×40=40 → accepted.
+        const spy = vi.fn()
+        EventBus.on('barter:offerAccepted', spy)
+        const { width, height } = panel.bounds
+        panel.onMouseDown(width / 2 - 70 - 6 + 10, height - 40 + 5, 'l')
+        expect(spy).toHaveBeenCalled()
+        EventBus.clear('barter:offerAccepted')
+
+        // Real inventories received the traded items; tables are cleared and
+        // the displays re-snapshotted for continued bartering.
+        expect(playerInv).toHaveLength(1)
+        expect(playerInv[0].name).toBe('Knife')
+        expect(merchantInv).toHaveLength(1)
+        expect(merchantInv[0].name).toBe('Stimpak')
+        expect(merchantInv[0].amount).toBe(2)
+        expect(panel.playerTable).toHaveLength(0)
+        expect(panel.merchantTable).toHaveLength(0)
+        expect(panel.playerInventory).toEqual([{ name: 'Knife', amount: 1, value: 40 }])
+        expect(panel.visible).toBe(true)  // stays open for further bartering
+    })
+
+    it('openWithLive splits stacks when moving part of a stack to the table', () => {
+        const playerInv = [
+            { name: 'Caps', amount: 10, pid: 41, pro: { extra: { cost: 1 } } },
+        ]
+        const merchantInv: any[] = []
+        const panel = new BarterPanel(800, 600)
+        panel.openWithLive(playerInv as any, merchantInv as any)
+
+        // Move one row's worth (the snapshot row holds all 10) onto the table.
+        panel.onMouseDown(20, 48, 'l')
+        panel.onMouseDown(154, 48, 'l')
+        // The whole snapshot row moved, so the live array does too.
+        expect(playerInv).toHaveLength(0)
+        expect(panel.playerTable).toEqual([{ name: 'Caps', amount: 10, value: 1 }])
+
+        // Hide resets live refs (no dangling mutation after close).
+        panel.onKeyDown('Escape')
+        expect(panel.visible).toBe(false)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1879,6 +2013,51 @@ describe('WorldMapPanel', () => {
     it('has panel name "worldMap"', () => {
         const panel = new WorldMapPanel(800, 600)
         expect(panel.name).toBe('worldMap')
+    })
+
+    it('populates discovered areas from the real loadAreas() Area shape', () => {
+        // Fabricate globalState.mapAreas with the exact shape loadAreas()
+        // produces (parseAreas of city.txt): AreaMap keyed by area id, each
+        // Area carrying name/id/state/entrances with mapLookupName.
+        const real: any = {
+            0: {
+                name: 'Arroyo', id: 0, size: 'small', state: true,
+                worldPosition: { x: 30, y: 60 },
+                entrances: [{
+                    startState: 'On', x: 30, y: 60, mapLookupName: 'Arroyo Bridge',
+                    mapName: 'arroyobrn', elevation: 1, tileNum: 22508, orientation: 3,
+                }],
+            },
+            1: {
+                name: 'Klamath', id: 1, size: 'small', state: false,  // not discovered
+                worldPosition: { x: 60, y: 120 },
+                entrances: [{
+                    startState: 'On', x: 60, y: 120, mapLookupName: 'Klamath Downtown',
+                    mapName: 'kladwtwn', elevation: 1, tileNum: 20108, orientation: 3,
+                }],
+            },
+        }
+        const saved = globalState.mapAreas
+        globalState.mapAreas = real
+        try {
+            const panel = new WorldMapPanel(800, 600)
+            panel.show()
+            // Only the discovered (state === true) area is offered.
+            expect(panel.areas).toHaveLength(1)
+            expect(panel.areas[0].name).toBe('Arroyo')
+
+            // Entering the area exposes the real entrance; travelling emits
+            // its mapLookupName.
+            panel.onMouseDown(20, 48 + 4 + 5, 'l')  // first list row
+            expect(panel.currentView).toBe('area')
+            const spy = vi.fn()
+            EventBus.on('worldMap:travelTo', spy)
+            panel.onMouseDown(20, 48 + 5, 'l')      // first entrance row
+            expect(spy).toHaveBeenCalledWith({ mapLookupName: 'Arroyo Bridge' })
+            EventBus.clear('worldMap:travelTo')
+        } finally {
+            globalState.mapAreas = saved
+        }
     })
 
     it('starts hidden', () => {
@@ -2314,6 +2493,9 @@ describe('SaveLoadPanel Integration', () => {
 
     it('confirming load slot selection emits game:loadFromSlot', () => {
         panel.openAs('load')
+        // Seed the slot list so slot 1 actually holds a save (loading an
+        // empty slot must be refused — see test below).
+        ;(panel as any)._saves.set(1, { id: 1, version: 1, name: 'Existing', timestamp: 0, currentMap: 'klamath', currentElevation: 0 })
         panel.onMouseDown(50, 72 + 32 + 5, 'l')  // select slot 1
 
         const loadSpy = vi.fn()
@@ -2323,6 +2505,20 @@ describe('SaveLoadPanel Integration', () => {
 
         expect(loadSpy).toHaveBeenCalledWith({ slot: 1 })
         expect(panel.visible).toBe(false)
+        EventBus.clear('game:loadFromSlot')
+    })
+
+    it('confirming load on an empty slot is refused and keeps the panel open', () => {
+        panel.openAs('load')
+        panel.onMouseDown(50, 72 + 32 + 5, 'l')  // select slot 1 (no save present)
+
+        const loadSpy = vi.fn()
+        EventBus.on('game:loadFromSlot', loadSpy)
+
+        panel.onKeyDown('Enter')
+
+        expect(loadSpy).not.toHaveBeenCalled()
+        expect(panel.visible).toBe(true)
         EventBus.clear('game:loadFromSlot')
     })
 })

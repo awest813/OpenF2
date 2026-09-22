@@ -47,6 +47,8 @@ export class BitmapFontRenderer {
      * Pre-computed in the constructor for O(1) per-character lookup.
      */
     private glyphOffsets: number[] = []
+    /** Atlas copies recolored per rgba key (see tintedAtlas). */
+    private readonly tintedAtlases = new Map<string, OffscreenCanvas>()
 
     constructor(font: Font | null = null) {
         this.font = font
@@ -60,6 +62,11 @@ export class BitmapFontRenderer {
             this.atlasWidth = offset
             this.glyphCanvas = this._buildAtlasCanvas(font)
         }
+    }
+
+    /** Pixel height of the wrapped font (0 when falling back). */
+    get fontHeight(): number {
+        return this.font?.height ?? 0
     }
 
     /** Width in pixels of a single character, or 0 if the char is unknown. */
@@ -98,6 +105,10 @@ export class BitmapFontRenderer {
         }
 
         const font = this.font
+        // Tint the atlas up-front and blit plain glyphs: tinting against the
+        // destination with 'source-atop' would paint solid rectangles over
+        // any opaque panel background.
+        const atlas = this.tintedAtlas(color)
         let cx = x
         for (const ch of text) {
             const code = ch.charCodeAt(0)
@@ -110,27 +121,43 @@ export class BitmapFontRenderer {
             // Source X in the atlas is pre-computed in glyphOffsets for O(1) lookup
             const srcX = this.glyphOffsets[code] ?? 0
 
-            // Tint the glyph with `color` via compositing
-            ctx.save()
-            ctx.globalCompositeOperation = 'source-over'
-
-            // Draw the glyph bitmap (white mask).
             // Cast needed because our custom OffscreenCanvas declaration
             // does not extend the DOM's CanvasImageSource union type.
             ctx.drawImage(
-                this.glyphCanvas as unknown as CanvasImageSource,
+                atlas as unknown as CanvasImageSource,
                 srcX, 0, sym.width, font.height,
                 cx, y, sym.width, font.height,
             )
-
-            // Multiply: replace white pixels with the requested color
-            ctx.globalCompositeOperation = 'source-atop'
-            ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`
-            ctx.fillRect(cx, y, sym.width, font.height)
-
-            ctx.restore()
             cx += sym.width + (font.spacing ?? 1)
         }
+    }
+
+    /**
+     * The glyph atlas recolored to `color`. The white mask lives on a
+     * transparent canvas, so 'source-atop' here keeps only the glyph pixels
+     * (unlike tinting against an opaque panel background). Cached per color
+     * — panels reuse a handful of palette colors every frame.
+     */
+    private tintedAtlas(color: UIColor): OffscreenCanvas {
+        const key = `${color.r},${color.g},${color.b},${color.a}`
+        const cached = this.tintedAtlases.get(key)
+        if (cached) {return cached}
+
+        const canvas = new OffscreenCanvas(this.atlasWidth, this.font!.height)
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(this.glyphCanvas as unknown as CanvasImageSource, 0, 0)
+        ctx.globalCompositeOperation = 'source-atop'
+        ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${color.a / 255})`
+        ctx.fillRect(0, 0, this.atlasWidth, this.font!.height)
+        ctx.globalCompositeOperation = 'source-over'
+
+        // Bound the cache; recoloring on the fly is cheap beyond this point.
+        if (this.tintedAtlases.size >= 32) {
+            const first = this.tintedAtlases.keys().next().value
+            this.tintedAtlases.delete(first!)
+        }
+        this.tintedAtlases.set(key, canvas)
+        return canvas
     }
 
     private fallbackSize(): number {
@@ -166,6 +193,129 @@ export class BitmapFontRenderer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UIFontSet — multi-size bitmap-font picker
+// ---------------------------------------------------------------------------
+
+/**
+ * Picks the loaded bitmap font whose glyph height best matches a requested
+ * pixel size, so panels can keep talking in "9px label / 12px title" terms
+ * while the actual glyphs come from the fixed-size Fallout .FON fonts.
+ *
+ * The engine loads fonts 0, 1, 2, 3 and 5, each at a fixed pixel height.
+ * Panels request a size; `forSize` returns the renderer of the nearest
+ * font (ties resolve downward). Bold is approximated by double-striking
+ * in `drawUIFontText` — the original fonts have no bold variant.
+ */
+export class UIFontSet {
+    private readonly fonts: Font[]
+    private readonly renderers = new Map<Font, BitmapFontRenderer>()
+
+    constructor(fonts: Font[]) {
+        this.fonts = (fonts ?? []).filter((f) => f && f.height > 0)
+    }
+
+    get isEmpty(): boolean {
+        return this.fonts.length === 0
+    }
+
+    /**
+     * The loaded font whose glyph height is closest to the requested size,
+     * or null when no fonts are loaded. Ties resolve to the smaller font
+     * (tighter pixel look). Selection only — building the glyph atlas is
+     * deferred to rendererFor().
+     */
+    forSize(px: number): Font | null {
+        if (this.fonts.length === 0) {return null}
+        let best = this.fonts[0]
+        for (const font of this.fonts) {
+            const dBest = Math.abs(best.height - px)
+            const dFont = Math.abs(font.height - px)
+            if (dFont < dBest || (dFont === dBest && font.height < best.height)) {
+                best = font
+            }
+        }
+        return best
+    }
+
+    /** Glyph renderer for a font from this set, built on first use. */
+    rendererFor(font: Font): BitmapFontRenderer {
+        let renderer = this.renderers.get(font)
+        if (!renderer) {
+            renderer = new BitmapFontRenderer(font)
+            this.renderers.set(font, renderer)
+        }
+        return renderer
+    }
+}
+
+/**
+ * The font set panels draw with. Set once by main.ts after the .FON files
+ * load; null (e.g. in unit tests) makes every helper fall back to the
+ * system monospace path.
+ */
+let activeUIFont: UIFontSet | null = null
+
+export function setActiveUIFont(set: UIFontSet | null): void {
+    activeUIFont = set
+}
+
+export function getActiveUIFont(): UIFontSet | null {
+    return activeUIFont
+}
+
+export interface UIFontTextOptions {
+    /** Horizontal alignment relative to x (default left). */
+    align?: 'left' | 'center' | 'right'
+    /** Faux-bold via a 1px double strike (bitmap fonts have no bold face). */
+    bold?: boolean
+}
+
+/**
+ * Draw `text` with the bitmap font nearest to `px`, falling back to the
+ * system monospace font when no font set is active.
+ *
+ * `y` is the BASELINE-style anchor panels already use with ctx.fillText;
+ * bitmap glyphs are drawn top-anchored, so the glyph top is derived from
+ * the font height to land the text on roughly the same baseline.
+ */
+export function drawUIFontText(
+    ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    color: UIColor,
+    px: number,
+    opts: UIFontTextOptions = {},
+): void {
+    const font = activeUIFont?.forSize(px) ?? null
+    const align = opts.align ?? 'left'
+
+    if (!activeUIFont || !font) {
+        ctx.font = `${opts.bold ? 'bold ' : ''}${px}px monospace`
+        ctx.fillStyle = cssColor(color)
+        ctx.textAlign = align
+        ctx.fillText(text, x, y)
+        ctx.textAlign = 'left'
+        return
+    }
+
+    // The Fallout bitmap fonts have no U+2026 glyph; render '…' as '..' so
+    // truncated labels don't silently lose their indicator.
+    const bitmapText = text.replace(/\u2026/g, '..')
+    const renderer = activeUIFont.rendererFor(font)
+    const width = renderer.measureText(bitmapText)
+    let dx = x
+    if (align === 'center') {dx = x - width / 2}
+    else if (align === 'right') {dx = x - width}
+
+    const top = y - renderer.fontHeight + Math.max(1, Math.round(renderer.fontHeight * 0.15))
+    renderer.drawText(ctx, bitmapText, dx, top, color)
+    if (opts.bold) {
+        renderer.drawText(ctx, bitmapText, dx + 1, top, color)
+    }
+}
+
 export interface Rect {
     x: number
     y: number
@@ -186,6 +336,33 @@ export const FALLOUT_AMBER: UIColor      = { r: 255, g: 165, b: 0,   a: 255 }
 export const FALLOUT_RED: UIColor        = { r: 195, g: 0,   b: 0,   a: 255 }
 export const FALLOUT_BLACK: UIColor      = { r: 0,   g: 0,   b: 0,   a: 255 }
 export const FALLOUT_DARK_GRAY: UIColor  = { r: 40,  g: 40,  b: 40,  a: 255 }
+/** Dim fill for hovered (but not selected) list rows. */
+export const FALLOUT_HOVER: UIColor      = { r: 20,  g: 20,  b: 20,  a: 255 }
+
+// ---------------------------------------------------------------------------
+// Key-name normalization
+// ---------------------------------------------------------------------------
+
+/**
+ * Map engine key names (produced by heart._getKeyChar) to the DOM-style
+ * names that panels compare against in onKeyDown. The engine's own hotkeys
+ * (Config.controls) keep the heart names, so the translation happens once
+ * here at the UIManager dispatch boundary.
+ */
+const KEY_NAME_MAP: Record<string, string> = {
+    escape: 'Escape',
+    return: 'Enter',
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+    '\t': 'Tab',
+    '\b': 'Backspace',
+}
+
+export function normalizeKey(key: string): string {
+    return KEY_NAME_MAP[key] ?? key
+}
 
 // ---------------------------------------------------------------------------
 // Shared drawing helpers
@@ -253,6 +430,24 @@ export function wrapText(
 }
 
 /**
+ * Truncate `text` with an ellipsis so it fits within `maxWidth` pixels,
+ * measured with the context's current font. Single-line labels only.
+ */
+export function fitText(
+    ctx: OffscreenCanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+): string {
+    if (ctx.measureText(text).width <= maxWidth) {return text}
+    const ellipsis = '…'
+    let truncated = text
+    while (truncated.length > 1 && ctx.measureText(truncated + ellipsis).width > maxWidth) {
+        truncated = truncated.slice(0, -1)
+    }
+    return truncated + ellipsis
+}
+
+/**
  * Clamp a list scroll offset so the focused row stays visible. Used by
  * panels with keyboard-navigated scrollable lists (world map, inventory,
  * loot, save/load).
@@ -273,6 +468,12 @@ export abstract class UIPanel {
     visible = false
     /** Z-order: higher values render on top. */
     zOrder = 0
+    /**
+     * Passive overlays (debug inspectors) set this so the UIManager skips
+     * them for input dispatch and modal-blocking checks — they observe the
+     * game without stealing clicks or keys from it.
+     */
+    inputTransparent = false
     /**
      * When this panel hides, re-open the named panel (used by main-menu
      * Options / Load / Credits so the menu returns after the modal closes).
@@ -305,9 +506,13 @@ export abstract class UIPanel {
     }
 
     /** Override to react when panel becomes visible. */
-    protected onShow(): void {}
+    protected onShow(): void {
+        // no-op by default
+    }
     /** Override to react when panel becomes hidden. */
-    protected onHide(): void {}
+    protected onHide(): void {
+        // no-op by default
+    }
 
     /**
      * Called each render frame when visible.
@@ -320,7 +525,9 @@ export abstract class UIPanel {
         return false  // return true to consume the event
     }
 
-    onMouseMove(_x: number, _y: number): void {}
+    onMouseMove(_x: number, _y: number): void {
+        // no-op by default
+    }
 
     onKeyDown(_key: string): boolean {
         return false
@@ -369,9 +576,15 @@ export class UIManagerImpl {
         return p as T
     }
 
-    /** Are any panels currently visible (blocking game input)? */
+    /** Like get() but returns null for an unregistered name. */
+    tryGet<T extends UIPanel>(name: string): T | null {
+        const p = this.panels.find((p) => p.name === name)
+        return (p as T) ?? null
+    }
+
+    /** Are any input-blocking panels currently visible? */
     isAnyPanelOpen(): boolean {
-        return this.panels.some((p) => p.visible && p.zOrder > 0)
+        return this.panels.some((p) => p.visible && p.zOrder > 0 && !p.inputTransparent)
     }
 
     /** Render all visible panels onto the offscreen canvas. */
@@ -401,7 +614,7 @@ export class UIManagerImpl {
         const overlayOpen = this.isAnyPanelOpen()
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) {continue}
+            if (!panel.visible || panel.inputTransparent) {continue}
             // Modal overlays (z > 0) own input; don't leak clicks to the HUD.
             if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.containsPoint(x, y)) {
@@ -418,7 +631,7 @@ export class UIManagerImpl {
         let foundPanel: UIPanel | null = null
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) {continue}
+            if (!panel.visible || panel.inputTransparent) {continue}
             if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.containsPoint(x, y)) {
                 foundPanel = panel
@@ -437,10 +650,13 @@ export class UIManagerImpl {
     }
 
     handleKeyDown(key: string): boolean {
+        // Translate engine key names ('up', 'escape', …) to the DOM-style
+        // names ('ArrowUp', 'Escape', …) that panels compare against.
+        key = normalizeKey(key)
         const overlayOpen = this.isAnyPanelOpen()
         for (let i = this.panels.length - 1; i >= 0; i--) {
             const panel = this.panels[i]
-            if (!panel.visible) {continue}
+            if (!panel.visible || panel.inputTransparent) {continue}
             if (overlayOpen && panel.zOrder <= 0) {continue}
             if (panel.onKeyDown(key)) {return true}
         }

@@ -1,19 +1,20 @@
 /**
  * PipBoyPanel — the in-game Pip-Boy 2000 interface.
  *
- * Provides four tabs matching the original Fallout UI:
+ * Provides tabs matching the original Fallout UI:
  *   STATUS  — current HP, radiation, poison, combat stats
  *   ITEMS   — inventory list with equipped markers
  *   MAP     — simple local-area tile grid (Pip-Boy map)
  *   QUESTS  — active / completed quest log
+ *   REST    — alarm clock / timed rest
+ *   DATA    — holodisk archives, companion trade, car trunk
  *
- * All rendering uses the 2D offscreen canvas API so that the UIManager can
- * composite it onto the WebGL scene texture.  When bitmap fonts are available
- * (via BitmapFontRenderer) they will be used automatically; otherwise the
- * panel falls back to system monospace.
+ * All rendering uses the 2D offscreen canvas API with drawUIFontText (bitmap
+ * fonts when loaded, system monospace fallback) so the UIManager can composite
+ * it onto the WebGL scene texture.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, fillRect, strokeRect } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_RED, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { StatsComponent } from '../ecs/components.js'
 import { QuestLog, QuestState } from '../quest/questLog.js'
@@ -80,6 +81,14 @@ const PANEL_WIDTH  = 400
 const PANEL_HEIGHT = 500
 /** Right-side x offset for the scroll-position hint text. */
 const SCROLL_HINT_X_OFFSET = 110
+/** List geometry shared by the ITEMS / QUESTS scrollers (content-local). */
+const LIST_ROW_H = 16
+const LIST_BOTTOM_MARGIN = 70
+
+/** Number of list rows actually drawable between startY and the bottom margin. */
+function listVisibleRows(panelHeight: number, startY: number): number {
+    return Math.floor((panelHeight - LIST_BOTTOM_MARGIN - startY) / LIST_ROW_H) + 1
+}
 
 export class PipBoyPanel extends UIPanel {
     private playerEntityId: number
@@ -90,6 +99,10 @@ export class PipBoyPanel extends UIPanel {
     private _itemScrollOffset = 0
     /** Scroll offset (in rows) for the QUESTS tab. */
     private _questScrollOffset = 0
+    /** Scroll offset (in rows) for the STATUS tab (sections can overflow). */
+    private _statusScrollOffset = 0
+    /** Bottom edge of the STATUS content measured during the last render. */
+    private _statusContentHeight = 0
     /** Last rest outcome message for the REST tab. */
     private _restMessage = ''
     /** Selected holodisk id on the DATA tab. */
@@ -134,7 +147,7 @@ export class PipBoyPanel extends UIPanel {
 
         // Title bar
         fillRect(ctx, 0, 0, width, 28, { r: 0, g: 60, b: 0, a: 255 })
-        drawCenteredText(ctx, 'PIP-BOY 2000', width / 2, 19, FALLOUT_GREEN, 'bold 14px monospace')
+        drawCenteredText(ctx, 'PIP-BOY 2000', width / 2, 19, FALLOUT_GREEN, 14, true)
 
         // Tabs
         const tabs = PIPBOY_TABS
@@ -145,12 +158,8 @@ export class PipBoyPanel extends UIPanel {
             const active = tab === this.activeTab
             fillRect(ctx, tx, 30, tabW, 22, active ? FALLOUT_GREEN : { r: 0, g: 40, b: 0, a: 255 })
             strokeRect(ctx, tx, 30, tabW, 22, FALLOUT_GREEN, 1)
-            ctx.font = '9px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.textAlign = 'center'
-            ctx.fillText(PIPBOY_TAB_LABEL[tab], tx + tabW / 2, 45)
+            drawUIFontText(ctx, PIPBOY_TAB_LABEL[tab], tx + tabW / 2, 45, active ? FALLOUT_BLACK : FALLOUT_GREEN, 9, { align: 'center' })
         }
-        ctx.textAlign = 'left'
 
         // Content
         ctx.save()
@@ -169,11 +178,7 @@ export class PipBoyPanel extends UIPanel {
         ctx.restore()
 
         // Close hint
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.textAlign = 'right'
-        ctx.fillText('[P] close', width - 6, height - 6)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, '[P] close', width - 6, height - 6, FALLOUT_DARK_GRAY, 9, { align: 'right' })
     }
 
     // ── Status tab ─────────────────────────────────────────────────────────
@@ -184,8 +189,14 @@ export class PipBoyPanel extends UIPanel {
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         if (!stats) {
             drawText(ctx, 'No stats available.', 10, 20, FALLOUT_DARK_GRAY)
+            this._statusContentHeight = 0
             return
         }
+
+        // With chems / reputation sections present the content can exceed the
+        // tab viewport — scroll it with the arrow keys like ITEMS / QUESTS.
+        ctx.save()
+        ctx.translate(0, -this._statusScrollOffset * LIST_ROW_H)
 
         let y = 18
         const col2 = 200
@@ -275,6 +286,14 @@ export class PipBoyPanel extends UIPanel {
             drawStat(ctx, abbr, String(val), 16, y, FALLOUT_GREEN)
             y += 14
         }
+
+        ctx.restore()
+        this._statusContentHeight = y
+        const maxScroll = Math.max(0, Math.ceil((y - (this.bounds.height - 60)) / LIST_ROW_H))
+        this._statusScrollOffset = Math.min(this._statusScrollOffset, maxScroll)
+        if (maxScroll > 0) {
+            this._renderScrollHint(ctx, this._statusScrollOffset, maxScroll)
+        }
     }
 
     // ── Items tab ──────────────────────────────────────────────────────────
@@ -286,13 +305,16 @@ export class PipBoyPanel extends UIPanel {
             return
         }
 
-        const visibleRows = Math.floor((this.bounds.height - 76) / 16)
+        const startY = 36
+        // Must match the drawn row count exactly or the last item becomes
+        // unreachable and "... (more)" can never clear.
+        const visibleRows = listVisibleRows(this.bounds.height, startY)
         const maxScroll = Math.max(0, inv.items.length - visibleRows)
         this._itemScrollOffset = Math.min(this._itemScrollOffset, maxScroll)
 
         drawLabel(ctx, 'ITEMS', 10, 16)
 
-        let y = 36
+        let y = startY
         for (let i = this._itemScrollOffset; i < inv.items.length; i++) {
             const item = inv.items[i]
             const isEquipped =
@@ -304,8 +326,8 @@ export class PipBoyPanel extends UIPanel {
             const label = `PID:${item.pid}` + (item.count > 1 ? ` x${item.count}` : '')
             const color = isEquipped ? FALLOUT_AMBER : FALLOUT_GREEN
             drawText(ctx, prefix + label, 14, y, color)
-            y += 16
-            if (y > this.bounds.height - 70) {
+            y += LIST_ROW_H
+            if (y > this.bounds.height - LIST_BOTTOM_MARGIN) {
                 if (i < inv.items.length - 1) {
                     drawText(ctx, '... (more)', 14, y, FALLOUT_DARK_GRAY)
                 }
@@ -325,7 +347,7 @@ export class PipBoyPanel extends UIPanel {
         // Refresh from live automap each paint so exploration stays current.
         markPlayerExplored(1)
         const live = buildPipBoyMapData(40)
-        if (live) this.mapData = live
+        if (live) {this.mapData = live}
 
         if (!this.mapData) {
             drawText(ctx, 'No map data loaded.', 10, 24, FALLOUT_DARK_GRAY)
@@ -402,12 +424,12 @@ export class PipBoyPanel extends UIPanel {
             }
         }
 
-        const rowH = 16
-        const visibleRows = Math.floor((this.bounds.height - 76) / rowH)
+        const startY = 16
+        const visibleRows = listVisibleRows(this.bounds.height, startY)
         const maxScroll = Math.max(0, rows.length - visibleRows)
         this._questScrollOffset = Math.min(this._questScrollOffset, maxScroll)
 
-        let y = 16
+        let y = startY
         for (let i = this._questScrollOffset; i < rows.length; i++) {
             const row = rows[i]
             if (row.kind === 'header') {
@@ -415,8 +437,8 @@ export class PipBoyPanel extends UIPanel {
             } else {
                 drawText(ctx, row.text, 14, y, row.color)
             }
-            y += rowH
-            if (y > this.bounds.height - 70) {
+            y += LIST_ROW_H
+            if (y > this.bounds.height - LIST_BOTTOM_MARGIN) {
                 if (i < rows.length - 1) {
                     drawText(ctx, '  ... (more)', 14, y, FALLOUT_DARK_GRAY)
                 }
@@ -451,7 +473,7 @@ export class PipBoyPanel extends UIPanel {
             this._restButtons.push({ x, y, w: btnW, h: btnH, hours })
             fillRect(ctx, x, y, btnW, btnH, { r: 0, g: 50, b: 0, a: 255 })
             strokeRect(ctx, x, y, btnW, btnH, FALLOUT_GREEN, 1)
-            drawCenteredText(ctx, `${hours}h`, x + btnW / 2, y + 15, FALLOUT_GREEN, '11px monospace')
+            drawCenteredText(ctx, `${hours}h`, x + btnW / 2, y + 15, FALLOUT_GREEN, 11)
             x += btnW + 8
         }
         y += btnH + 16
@@ -476,7 +498,7 @@ export class PipBoyPanel extends UIPanel {
             drawText(ctx, 'No companions.', 16, y, FALLOUT_DARK_GRAY); y += 16
         } else {
             for (const member of members) {
-                if ((member as Critter).dead) continue
+                if ((member as Critter).dead) {continue}
                 const rowH = 16
                 this._partyTradeRows.push({ y, h: rowH, member: member as Critter })
                 const waiting = globalState.gParty.getControl?.(member as Critter)?.waiting
@@ -523,9 +545,9 @@ export class PipBoyPanel extends UIPanel {
             drawLabel(ctx, selected.title.toUpperCase(), 10, y); y += 18
             const lines = selected.body.split('\n')
             for (const line of lines) {
-                drawText(ctx, line, 16, y, FALLOUT_GREEN, '10px monospace')
+                drawText(ctx, line, 16, y, FALLOUT_GREEN, 10)
                 y += 14
-                if (y > this.bounds.height - 80) break
+                if (y > this.bounds.height - 80) {break}
             }
         }
     }
@@ -617,11 +639,13 @@ export class PipBoyPanel extends UIPanel {
         if (key === 'ArrowDown') {
             if (this.activeTab === 'items') {this._itemScrollOffset++}
             else if (this.activeTab === 'quests') {this._questScrollOffset++}
+            else if (this.activeTab === 'status') {this._statusScrollOffset++}
             return true
         }
         if (key === 'ArrowUp') {
             if (this.activeTab === 'items') {this._itemScrollOffset = Math.max(0, this._itemScrollOffset - 1)}
             else if (this.activeTab === 'quests') {this._questScrollOffset = Math.max(0, this._questScrollOffset - 1)}
+            else if (this.activeTab === 'status') {this._statusScrollOffset = Math.max(0, this._statusScrollOffset - 1)}
             return true
         }
         // Rest shortcuts 1/3/6
@@ -638,6 +662,7 @@ export class PipBoyPanel extends UIPanel {
         // Reset scroll when switching tabs for a clean view
         this._itemScrollOffset = 0
         this._questScrollOffset = 0
+        this._statusScrollOffset = 0
     }
 
     private _renderScrollHint(
@@ -651,7 +676,7 @@ export class PipBoyPanel extends UIPanel {
             this.bounds.width - SCROLL_HINT_X_OFFSET,
             16,
             FALLOUT_DARK_GRAY,
-            '9px monospace',
+            9,
         )
     }
 }
@@ -660,39 +685,32 @@ export class PipBoyPanel extends UIPanel {
 // Drawing helpers
 // ---------------------------------------------------------------------------
 
-// (cssColor / fillRect / strokeRect now live in uiPanel.ts)
+// (fillRect / strokeRect now live in uiPanel.ts)
 
 function drawText(
     ctx: OffscreenCanvasRenderingContext2D,
     text: string, x: number, y: number,
     color: UIColor,
-    font = '11px monospace',
+    px = 11,
 ): void {
-    ctx.font = font
-    ctx.fillStyle = cssColor(color)
-    ctx.fillText(text, x, y)
+    drawUIFontText(ctx, text, x, y, color, px)
 }
 
 function drawCenteredText(
     ctx: OffscreenCanvasRenderingContext2D,
     text: string, x: number, y: number,
     color: UIColor,
-    font = '11px monospace',
+    px = 11,
+    bold = false,
 ): void {
-    ctx.font = font
-    ctx.fillStyle = cssColor(color)
-    ctx.textAlign = 'center'
-    ctx.fillText(text, x, y)
-    ctx.textAlign = 'left'
+    drawUIFontText(ctx, text, x, y, color, px, { align: 'center', bold })
 }
 
 function drawLabel(
     ctx: OffscreenCanvasRenderingContext2D,
     text: string, x: number, y: number,
 ): void {
-    ctx.font = 'bold 11px monospace'
-    ctx.fillStyle = cssColor({ r: 0, g: 140, b: 0, a: 255 })
-    ctx.fillText(text, x, y)
+    drawUIFontText(ctx, text, x, y, { r: 0, g: 140, b: 0, a: 255 }, 11, { bold: true })
 }
 
 function drawStat(
@@ -701,11 +719,8 @@ function drawStat(
     x: number, y: number,
     valueColor: UIColor,
 ): void {
-    ctx.font = '11px monospace'
-    ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-    ctx.fillText(label.padEnd(14), x, y)
-    ctx.fillStyle = cssColor(valueColor)
-    ctx.fillText(value, x + 130, y)
+    drawUIFontText(ctx, label.padEnd(14), x, y, FALLOUT_DARK_GRAY, 11)
+    drawUIFontText(ctx, value, x + 130, y, valueColor, 11)
 }
 
 function hpColor(stats: StatsComponent): UIColor {

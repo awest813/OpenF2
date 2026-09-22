@@ -5,8 +5,8 @@
  * of the nearest visible objects on the current map. Useful when authoring
  * map scripts or placing objects without leaving the browser.
  *
- * Toggle with F5.  Panel name: 'mapViewer'.
- * Z-order 51 so it renders on top of the debug overlay.
+ * Toggled globally with F5 (main.ts).  Panel name: 'mapViewer'.
+ * Input-transparent observer: never blocks game input.
  *
  * Usage:
  *   const panel = new MapViewerPanel(screenWidth, screenHeight)
@@ -14,7 +14,7 @@
  *   panel.show()
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, drawUIFontText } from './uiPanel.js'
 import { modRegistry } from '../mods.js'
 
 const PANEL_WIDTH  = 220
@@ -54,6 +54,8 @@ export class MapViewerPanel extends UIPanel {
             height: PANEL_HEIGHT,
         })
         this.zOrder = 51
+        // Observer overlay: must never block game input or open a modal state.
+        this.inputTransparent = true
     }
 
     override render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -67,8 +69,6 @@ export class MapViewerPanel extends UIPanel {
         ctx.strokeStyle = cssColor(FALLOUT_DARK_GRAY)
         ctx.lineWidth = 1
         ctx.strokeRect(0.5, 0.5, width - 1, height - 1)
-
-        ctx.font = '9px monospace'
 
         const lines: Array<[string, UIColor]> = [
             ['MAP VIEWER', FALLOUT_GREEN],
@@ -109,19 +109,13 @@ export class MapViewerPanel extends UIPanel {
             }
         }
 
-        for (let i = 0; i < lines.length; i++) {
+        // Cap the line count so the content cannot spill below the panel
+        // (UIManager.render does not clip panels).
+        const maxLines = Math.floor((height - 2 * PAD) / LINE_H)
+        for (let i = 0; i < Math.min(lines.length, maxLines); i++) {
             const [text, color] = lines[i]
-            ctx.fillStyle = cssColor(color)
-            ctx.fillText(text, PAD, PAD + (i + 1) * LINE_H)
+            drawUIFontText(ctx, truncate(text, 26), PAD, PAD + (i + 1) * LINE_H, color, 9)
         }
-    }
-
-    override onKeyDown(key: string): boolean {
-        if (key === 'F5') {
-            this.toggle()
-            return true
-        }
-        return false
     }
 }
 
@@ -134,4 +128,9 @@ export class MapViewerPanel extends UIPanel {
 function basename(path: string): string {
     const idx = path.lastIndexOf('/')
     return idx === -1 ? path : path.slice(idx + 1)
+}
+
+function truncate(text: string, maxLen: number): string {
+    if (text.length <= maxLen) {return text}
+    return `${text.slice(0, Math.max(0, maxLen - 3))}...`
 }

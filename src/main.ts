@@ -14,10 +14,12 @@
 
 import { HTMLAudioEngine, NullAudioEngine } from './audio.js'
 import { Combat } from './combat.js'
+import { weaponNeedsReload } from './combat/ammo.js'
 import { critterKill } from './critter.js'
 import { getElevator, lookupMapNameFromLookup } from './data.js'
 import { heart } from './heart.js'
 import { hexDistance, hexesInRadius, hexFromScreen, hexNeighbors } from './geometry.js'
+import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
 import { initGame, enterWorldMap } from './init.js'
@@ -46,9 +48,10 @@ import { getFileJSON, getProtoMsg } from './util.js'
 import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
-import { UIManagerImpl, BitmapFontRenderer } from './ui2/uiPanel.js'
+import { UIManagerImpl, BitmapFontRenderer, UIFontSet, setActiveUIFont } from './ui2/uiPanel.js'
 import { ScriptDebuggerPanel } from './ui2/scriptDebuggerPanel.js'
 import { DebugOverlayPanel } from './ui2/debugOverlay.js'
+import { MapViewerPanel } from './ui2/mapViewerPanel.js'
 import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { createPlayerEntity } from './ecs/entityFactory.js'
 import { EventBus } from './eventBus.js'
@@ -158,6 +161,11 @@ export function playerUse(obj?: Obj) {
             }
 
             const doAttack = (region: string) => {
+                // Dry click: refuse before spending AP when the weapon is empty.
+                if (weaponNeedsReload(weapon)) {
+                    uiLog('Click! Your weapon is out of ammo.')
+                    return
+                }
                 if (!globalState.player.AP!.subtractCombatAP(attackCost)) {
                     uiLog(getProtoMsg(700)!)
                     return
@@ -312,11 +320,13 @@ function initUIManager(): void {
 
     const mgr = new UIManagerImpl(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-    // Wire the first loaded font (font0.fon — the main UI font) into the
-    // BitmapFontRenderer so ui2 panels can draw pixel-accurate Fallout glyphs.
+    // Wire the loaded .FON fonts (0, 1, 2, 3, 5) into the ui2 font system:
+    // fontRenderer drives the font-atlas debug view, and the UIFontSet lets
+    // migrated panels draw pixel-accurate glyphs at their requested sizes.
     const fonts = globalState.renderer?.fonts
     if (fonts && fonts.length > 0) {
         mgr.fontRenderer = new BitmapFontRenderer(fonts[0])
+        setActiveUIFont(new UIFontSet(fonts))
     }
 
     registerDefaultPanels(mgr, SCREEN_WIDTH, SCREEN_HEIGHT, playerEntityId, globalState.questLog)
@@ -329,6 +339,9 @@ function initUIManager(): void {
     EventBus.on('map:loaded', ({ mapName }) => {
         debugOverlayPanel.mapName = mapName
     })
+    if (Config.ui.showDebugOverlay) {
+        debugOverlayPanel.show()
+    }
 
     EventBus.on('worldMap:travelTo', ({ mapLookupName }) => {
         const mapName = lookupMapNameFromLookup(mapLookupName)
@@ -545,6 +558,12 @@ heart.mousepressed = (x: number, y: number, btn: string) => {
         globalState.uiManager.handleMouseDown(x, y, btn)) {
         return
     }
+    // A legacy DOM screen (dialogue, loot, inventory, elevator, …) is open:
+    // clicks must not leak through to the game underneath. Skill targeting
+    // (useSkill) is the exception — it needs canvas clicks on a target.
+    if (globalState.uiMode !== UIMode.none && globalState.uiMode !== UIMode.useSkill) {
+        return
+    }
     if (btn === 'l') {
         playerUse()
     } else if (btn === 'r') {
@@ -566,11 +585,22 @@ heart.keydown = (k: string) => {
         globalState.uiManager?.get<ScriptDebuggerPanel>('scriptDebugger').toggle()
         return
     }
+    // Global debug-overlay toggles (F3 engine HUD, F5 map inspector). These
+    // must live here: the UIManager only dispatches keys to visible panels,
+    // so a panel can never open itself from its own onKeyDown.
+    if (k === 'F3') {
+        globalState.uiManager?.get<DebugOverlayPanel>('debug').toggle()
+        return
+    }
+    if (k === 'F5') {
+        globalState.uiManager?.get<MapViewerPanel>('mapViewer').toggle()
+        return
+    }
 
     const overlayOpen = globalState.uiManager?.isAnyPanelOpen() === true
     // HUD binds L to the combat log, which would steal Config.controls.loadKey
     // out of combat. Prefer Load when no overlay is open and we're not fighting.
-    if (!overlayOpen && !globalState.inCombat && k === Config.controls.loadKey) {
+    if (!overlayOpen && !globalState.inCombat && globalState.uiMode === UIMode.none && k === Config.controls.loadKey) {
         const slPanel = globalState.uiManager?.get<SaveLoadPanel>('saveLoad')
         if (slPanel) {
             slPanel.openAs('load')
@@ -582,6 +612,11 @@ heart.keydown = (k: string) => {
 
     // Route to ui2 UIManager first; if a panel consumes the key, skip game handling.
     if (globalState.uiManager?.handleKeyDown(k)) {
+        return
+    }
+    // A legacy DOM screen (dialogue, loot, elevator, …) is open: game hotkeys
+    // (camera, save/load/worldmap, kill, use …) must not fire underneath it.
+    if (globalState.uiMode !== UIMode.none) {
         return
     }
     const mousePos = heart.mouse.getPosition()
@@ -689,6 +724,10 @@ heart.keydown = (k: string) => {
                 combatant.position.y === mouseHex.y &&
                 !combatant.dead
             ) {
+                if (weaponNeedsReload(globalState.player.equippedWeapon)) {
+                    uiLog('Click! Your weapon is out of ammo.')
+                    break
+                }
                 globalState.player.AP.subtractCombatAP(kbAttackCost)
                 console.log('Attacking...')
                 globalState.combat.attack(globalState.player, combatant)
@@ -827,6 +866,24 @@ heart.update = function () {
         const mousePos = heart.mouse.getPosition()
         // Route mouse move to ui2 panels for hover effects.
         globalState.uiManager?.handleMouseMove(mousePos[0], mousePos[1])
+        // Feed the map-viewer debug panel (input-transparent observer).
+        const mapViewerPanel = globalState.uiManager?.tryGet<MapViewerPanel>('mapViewer')
+        if (mapViewerPanel?.visible) {
+            const worldX = mousePos[0] + globalState.cameraPosition.x
+            const worldY = mousePos[1] + globalState.cameraPosition.y
+            const hex = hexFromScreen(worldX, worldY)
+            const tile = hexToTile(hex)
+            mapViewerPanel.cursorInfo = {
+                hexX: hex.x,
+                hexY: hex.y,
+                tileX: tile.x,
+                tileY: tile.y,
+                elevation: globalState.currentElevation,
+                nearbyObjects: globalState.gMap.objectsAtPosition(hex)
+                    .slice(0, 8)
+                    .map((o) => o.name ?? (o.pid !== undefined ? `pid:${o.pid}` : 'obj')),
+            }
+        }
         if (mousePos[0] <= Config.ui.scrollPadding) {
             globalState.cameraPosition.x -= 15
         }

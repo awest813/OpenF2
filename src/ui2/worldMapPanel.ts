@@ -15,7 +15,7 @@
  * Panel name: 'worldMap'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect, clampListOffset } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, fillRect, strokeRect, clampListOffset, fitText, drawUIFontText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 import globalState from '../globalState.js'
 import { loadAreas } from '../data.js'
@@ -127,6 +127,17 @@ export class WorldMapPanel extends UIPanel {
         this._keyboardSelectedEntranceIndex = -1
     }
 
+    /** Leave the area view, keeping the world-list selection and its scroll position visible. */
+    private _backToWorld(): void {
+        this.currentView   = 'world'
+        this._currentArea  = null
+        this._keyboardSelectedEntranceIndex = -1
+        this._scrollOffset = 0
+        if (this._keyboardSelectedIndex >= 0) {
+            this._scrollOffset = clampListOffset(this._keyboardSelectedIndex, 0, WORLD_VISIBLE_ROWS)
+        }
+    }
+
 
     setTransitionLocked(locked: boolean): void {
         this._isTransitionLocked = locked
@@ -150,11 +161,7 @@ export class WorldMapPanel extends UIPanel {
         const closeBtnY = height - 34
         fillRect(ctx, closeBtnX, closeBtnY, BTN_W, BTN_H, FALLOUT_DARK_GRAY)
         strokeRect(ctx, closeBtnX, closeBtnY, BTN_W, BTN_H, FALLOUT_GREEN, 1)
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CLOSE', width / 2, closeBtnY + 15)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CLOSE', width / 2, closeBtnY + 15, FALLOUT_GREEN, 11, { align: 'center' })
     }
 
     private _renderWorldView(
@@ -162,15 +169,9 @@ export class WorldMapPanel extends UIPanel {
         width: number,
         _height: number,
     ): void {
-        ctx.font = 'bold 13px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('WORLD MAP', width / 2, 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'WORLD MAP', width / 2, 22, FALLOUT_GREEN, 13, { align: 'center', bold: true })
 
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('Select a destination:', LIST_X, LIST_Y - 6)
+        drawUIFontText(ctx, 'Select a destination:', LIST_X, LIST_Y - 6, FALLOUT_DARK_GRAY, 9)
 
         const worldRows = Math.min(this.areas.length, WORLD_VISIBLE_ROWS)
         strokeRect(ctx, LIST_X, LIST_Y, LIST_W, worldRows * AREA_ROW_H + 8, FALLOUT_DARK_GRAY, 1)
@@ -185,9 +186,10 @@ export class WorldMapPanel extends UIPanel {
             if (isKeySelected) {
                 fillRect(ctx, LIST_X + 2, ry - 2, LIST_W - 4, AREA_ROW_H, FALLOUT_DARK_GRAY)
             }
+            // System font stays set for fitText's ctx.measureText width pass.
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(isKeySelected ? FALLOUT_GREEN : FALLOUT_AMBER)
-            ctx.fillText('▶ ' + area.name, LIST_X + 8, ry + 15)
+            const label = fitText(ctx, '▶ ' + area.name, LIST_W - 16)
+            drawUIFontText(ctx, label, LIST_X + 8, ry + 15, isKeySelected ? FALLOUT_GREEN : FALLOUT_AMBER, 11)
         }
 
         drawScrollIndicator(ctx, this._scrollOffset, this.areas.length, WORLD_VISIBLE_ROWS)
@@ -199,24 +201,16 @@ export class WorldMapPanel extends UIPanel {
         _height: number,
     ): void {
         const area = this._currentArea
-        ctx.font = 'bold 13px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText(area ? area.name.toUpperCase() : 'AREA MAP', width / 2, 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, area ? area.name.toUpperCase() : 'AREA MAP', width / 2, 22, FALLOUT_GREEN, 13, { align: 'center', bold: true })
 
         if (!area) {return}
 
         // Back button
         fillRect(ctx, LIST_X, LIST_Y - 26, 50, 18, FALLOUT_DARK_GRAY)
         strokeRect(ctx, LIST_X, LIST_Y - 26, 50, 18, FALLOUT_GREEN, 1)
-        ctx.font = '10px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('← BACK', LIST_X + 4, LIST_Y - 12)
+        drawUIFontText(ctx, '← BACK', LIST_X + 4, LIST_Y - 12, FALLOUT_GREEN, 10)
 
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('Entrances:', LIST_X, LIST_Y - 4)
+        drawUIFontText(ctx, 'Entrances:', LIST_X, LIST_Y - 4, FALLOUT_DARK_GRAY, 9)
 
         const entranceRows = Math.min(area.entrances.length, ENTRANCE_VISIBLE_ROWS)
         strokeRect(ctx, LIST_X, LIST_Y, LIST_W, entranceRows * ENTRANCE_ROW_H + 8, FALLOUT_DARK_GRAY, 1)
@@ -230,15 +224,14 @@ export class WorldMapPanel extends UIPanel {
             if (isSelected) {
                 fillRect(ctx, LIST_X + 2, ey + 2, LIST_W - 4, ENTRANCE_ROW_H - 2, FALLOUT_DARK_GRAY)
             }
+            // System font stays set for fitText's ctx.measureText width pass.
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(isSelected ? FALLOUT_AMBER : FALLOUT_GREEN)
-            ctx.fillText(`▶ ${entrance.mapLookupName}`, LIST_X + 8, ey + 15)
+            const entranceLabel = fitText(ctx, `▶ ${entrance.mapLookupName}`, LIST_W - 16)
+            drawUIFontText(ctx, entranceLabel, LIST_X + 8, ey + 15, isSelected ? FALLOUT_AMBER : FALLOUT_GREEN, 11)
         }
 
         if (area.entrances.length === 0) {
-            ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText('[No entrances]', LIST_X, LIST_Y + 20)
+            drawUIFontText(ctx, '[No entrances]', LIST_X, LIST_Y + 20, FALLOUT_DARK_GRAY, 10)
         }
 
         drawScrollIndicator(ctx, this._scrollOffset, area.entrances.length, ENTRANCE_VISIBLE_ROWS)
@@ -258,8 +251,9 @@ export class WorldMapPanel extends UIPanel {
         }
 
         if (this.currentView === 'world') {
-            // Area list clicks
-            if (x >= LIST_X && x < LIST_X + LIST_W && y >= LIST_Y && y < LIST_Y + WORLD_VISIBLE_ROWS * AREA_ROW_H) {
+            // Area list clicks — the +4 matches the drawn row inset so the
+            // last visible row's full band is clickable.
+            if (x >= LIST_X && x < LIST_X + LIST_W && y >= LIST_Y && y < LIST_Y + 4 + WORLD_VISIBLE_ROWS * AREA_ROW_H) {
                 const idx = Math.floor((y - LIST_Y - 4) / AREA_ROW_H)
                 const absIdx = idx + this._scrollOffset
                 if (idx >= 0 && absIdx < this.areas.length) {
@@ -271,13 +265,10 @@ export class WorldMapPanel extends UIPanel {
             const area = this._currentArea
             if (!area) {return true}
 
-            // Back button
+            // Back button — keep the world-view selection so returning
+            // restores the player's place in the list.
             if (x >= LIST_X && x < LIST_X + 50 && y >= LIST_Y - 26 && y < LIST_Y - 8) {
-                this.currentView   = 'world'
-                this._currentArea  = null
-                this._keyboardSelectedIndex = -1
-                this._keyboardSelectedEntranceIndex = -1
-                this._scrollOffset = 0
+                this._backToWorld()
                 return true
             }
 
@@ -301,11 +292,7 @@ export class WorldMapPanel extends UIPanel {
         if (this._isTransitionLocked) {return true}
         if (key === 'Escape') {
             if (this.currentView === 'area') {
-                this.currentView  = 'world'
-                this._currentArea = null
-                this._keyboardSelectedIndex = -1
-                this._keyboardSelectedEntranceIndex = -1
-                this._scrollOffset = 0
+                this._backToWorld()
             } else {
                 EventBus.emit('worldMap:closed', {})
                 this.hide()
@@ -390,11 +377,11 @@ function drawScrollIndicator(
     visibleRows: number,
 ): void {
     if (totalRows <= visibleRows || visibleRows <= 0) {return}
-    ctx.font = '9px monospace'
-    ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-    ctx.fillText(
+    drawUIFontText(
+        ctx,
         `↑↓ ${scrollOffset + 1}-${Math.min(scrollOffset + visibleRows, totalRows)}/${totalRows}`,
         LIST_X,
         LIST_Y + visibleRows * AREA_ROW_H + 12,
+        FALLOUT_DARK_GRAY, 9,
     )
 }

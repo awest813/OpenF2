@@ -239,7 +239,9 @@ describe('UI2-only gameplay mode fallback guard', () => {
 
     it('logs clearly and throws when legacy gameplay panel paths are used', () => {
         Config.ui.forceUI2OnlyGameplayPanels = true
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {
+            // silence expected console.error output in this test
+        })
 
         expect(() => assertNoLegacyGameplayPanelFallback('loot', 'panel-smoke')).toThrowError(
             /UI2_ONLY_GAMEPLAY_PANELS/,

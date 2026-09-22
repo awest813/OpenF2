@@ -52,6 +52,9 @@ export interface EngineEvents {
     'dialogue:end': { npcId: number }
     'dialogue:nodeChange': { nodeId: string }
     'dialogue:optionSelected': { optionID: number }
+    /** Fired when the player dismisses the dialogue panel (Escape). Lets the
+     *  scripting layer end the session instead of silently desyncing. */
+    'dialogue:closed': Record<string, never>
 
     // Inventory
     'inventory:itemAdd': { entityId: number; itemPid: number; count: number }
@@ -92,7 +95,11 @@ export interface EngineEvents {
     'worldMap:closed': Record<string, never>
     'worldMap:travelTo': { mapLookupName: string }
     'elevator:buttonPressed': { mapID: number; level: number; tileNum: number }
+    /** Fired when the elevator panel is dismissed without choosing a floor. */
+    'elevator:closed': Record<string, never>
     'calledShot:regionSelected': { region: string }
+    /** Fired when the called-shot panel is dismissed without choosing a region. */
+    'calledShot:cancelled': Record<string, never>
 
     // Save / Load
     /** name is the save title chosen by the player in the UI; omit to use a default. */

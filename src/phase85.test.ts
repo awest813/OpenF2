@@ -460,7 +460,7 @@ describe('Phase 85-G — WorldMapPanel keyboard navigation', () => {
         expect(panel.currentView).toBe('world')
     })
 
-    it('keyboard selection is reset when Escape returns from area view', () => {
+    it('keyboard selection is preserved when Escape returns from area view', () => {
         const panel = new WorldMapPanel(800, 600)
         panel.areas = makeAreas(3)
         panel.show()
@@ -469,8 +469,10 @@ describe('Phase 85-G — WorldMapPanel keyboard navigation', () => {
         expect(panel.currentView).toBe('area')
         panel.onKeyDown('Escape')     // back to world
         expect(panel.currentView).toBe('world')
-        // After returning, keyboard selection should be reset; Enter should not trigger.
-        expect(panel.onKeyDown('Enter')).toBe(false)  // no selection
+        // Returning keeps the player's place in the list, so Enter re-enters
+        // the selected area (and the scroll offset stays valid).
+        expect(panel.onKeyDown('Enter')).toBe(true)
+        expect(panel.currentView).toBe('area')
     })
 
     it('render() does not throw with keyboard selection active', () => {

@@ -48,6 +48,10 @@ export class WindowFrame {
             return this
         }
         this.showing = true
+        // Attach to the game container — the canvas renderer only paints the
+        // window background image; the interactive child widgets live in the
+        // DOM and are invisible unless the element is in the document.
+        document.getElementById('game-container')?.appendChild(this.elem)
         return this
     }
 
@@ -56,6 +60,7 @@ export class WindowFrame {
             return
         }
         this.showing = false
+        this.elem.remove()
     }
 
     toggle(): this {
@@ -245,6 +250,10 @@ export class List extends Widget {
 
     clear(): void {
         this.items.length = 0
+        // Drop the stale selection, otherwise addItem() never re-selects and
+        // getSelection() keeps returning a row that is no longer in the list.
+        this.currentlySelected = null
+        this.currentlySelectedElem = null
 
         const node = this.elem
         while (node.firstChild) {

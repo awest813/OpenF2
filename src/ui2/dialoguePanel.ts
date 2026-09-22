@@ -12,7 +12,7 @@
  * Panel name: 'dialogue'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect, wrapText } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, cssColor, fillRect, strokeRect, wrapText, fitText, drawUIFontText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,9 @@ const REPLY_LINE_H = 14
 const REPLY_CONTENT_TOP = 42     // y of the first reply text line
 const REPLY_VISIBLE_LINES = Math.floor((REPLY_HEIGHT - (REPLY_CONTENT_TOP - 26)) / REPLY_LINE_H)  // = 7
 const OPTION_ROW_H = 26
+const OPTIONS_TOP  = 26 + REPLY_HEIGHT + 14
+/** Rows that fit between the options list top and the panel bottom margin. */
+const OPTION_VISIBLE_ROWS = Math.floor((PANEL_HEIGHT - OPTIONS_TOP - 8) / OPTION_ROW_H)  // = 5
 const PADDING      = 14
 
 // ---------------------------------------------------------------------------
@@ -53,6 +56,8 @@ export class DialoguePanel extends UIPanel {
     private _replyLines: string[] = []
     /** Index of the currently hovered option (-1 = none). */
     private _hoveredIndex = -1
+    /** First visible option row when the list overflows. */
+    private _optionScrollOffset = 0
 
     constructor(screenWidth: number, screenHeight: number) {
         super('dialogue', {
@@ -71,11 +76,17 @@ export class DialoguePanel extends UIPanel {
         this._replyScrollLine = 0
         this._replyLines = []
         this._hoveredIndex = -1
+        this._optionScrollOffset = 0
     }
 
     /** Append a player-response option. */
     addOption(text: string, optionID: number): void {
         this._options.push({ text, optionID })
+    }
+
+    protected override onHide(): void {
+        // Hover state must not survive a hide/show cycle.
+        this._hoveredIndex = -1
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -86,19 +97,16 @@ export class DialoguePanel extends UIPanel {
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
         // Title bar
-        ctx.font = 'bold 12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('DIALOGUE', width / 2, 18)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'DIALOGUE', width / 2, 18, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
         // Reply area
         strokeRect(ctx, PADDING, 26, width - PADDING * 2, REPLY_HEIGHT, FALLOUT_DARK_GRAY, 1)
+        // System font stays set for wrapText's ctx.measureText width pass.
         ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
 
         // Build wrapped lines using ctx.measureText for accurate wrapping.
-        const replyMaxW = width - PADDING * 2 - 12
+        // Keep 12px clear of the ▲/▼ scroll arrows in the top-right corner.
+        const replyMaxW = width - PADDING * 2 - 12 - 12
         this._replyLines = wrapText(ctx, this._reply, replyMaxW)
 
         // Clamp scroll offset in case text changed since last keypress.
@@ -112,19 +120,15 @@ export class DialoguePanel extends UIPanel {
             this._replyScrollLine + REPLY_VISIBLE_LINES,
         )
         for (let i = 0; i < visibleLines.length; i++) {
-            ctx.fillText(visibleLines[i], PADDING + 6, REPLY_CONTENT_TOP + i * REPLY_LINE_H)
+            drawUIFontText(ctx, visibleLines[i], PADDING + 6, REPLY_CONTENT_TOP + i * REPLY_LINE_H, FALLOUT_AMBER, 11)
         }
 
         // Scroll indicator arrows when reply text overflows the box.
         if (this._replyScrollLine > 0) {
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText('▲', width - PADDING - 10, REPLY_CONTENT_TOP)
+            drawUIFontText(ctx, '▲', width - PADDING - 10, REPLY_CONTENT_TOP, FALLOUT_GREEN, 9)
         }
         if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
-            ctx.font = '9px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText('▼', width - PADDING - 10, REPLY_CONTENT_TOP + (REPLY_VISIBLE_LINES - 1) * REPLY_LINE_H)
+            drawUIFontText(ctx, '▼', width - PADDING - 10, REPLY_CONTENT_TOP + (REPLY_VISIBLE_LINES - 1) * REPLY_LINE_H, FALLOUT_GREEN, 9)
         }
 
         // Divider — draw as a thin stroke rect (1px height)
@@ -132,33 +136,47 @@ export class DialoguePanel extends UIPanel {
         ctx.lineWidth = 1
         ctx.strokeRect(PADDING + 0.5, 26 + REPLY_HEIGHT + 6 + 0.5, this.bounds.width - PADDING * 2 - 1, 0)
 
-        // Options list
-        const optY0 = 26 + REPLY_HEIGHT + 14
-        for (let i = 0; i < this._options.length; i++) {
+        // Options list — only as many rows as fit inside the panel; the rest
+        // scroll into view via the arrow keys (or shrink as options resolve).
+        this._optionScrollOffset = Math.max(0, Math.min(
+            this._optionScrollOffset,
+            Math.max(0, this._options.length - OPTION_VISIBLE_ROWS),
+        ))
+        const visibleOptions = Math.min(this._options.length, OPTION_VISIBLE_ROWS)
+        for (let row = 0; row < visibleOptions; row++) {
+            const i = this._optionScrollOffset + row
             const opt = this._options[i]
-            const oy = optY0 + i * OPTION_ROW_H
+            const oy = OPTIONS_TOP + row * OPTION_ROW_H
             // Hover highlight
             if (i === this._hoveredIndex) {
                 fillRect(ctx, PADDING, oy, width - PADDING * 2, OPTION_ROW_H, FALLOUT_DARK_GRAY)
             }
             ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(i === this._hoveredIndex ? FALLOUT_AMBER : FALLOUT_GREEN)
-            ctx.fillText(`${i + 1}. ${opt.text}`, PADDING + 4, oy + 16)
+            const label = fitText(ctx, `${i + 1}. ${opt.text}`, width - PADDING * 2 - 8)
+            drawUIFontText(ctx, label, PADDING + 4, oy + 16,
+                i === this._hoveredIndex ? FALLOUT_AMBER : FALLOUT_GREEN, 11)
+        }
+
+        // Scroll indicator when more options exist below the fold.
+        if (this._options.length > OPTION_VISIBLE_ROWS) {
+            drawUIFontText(
+                ctx,
+                `${this._optionScrollOffset + 1}–${this._optionScrollOffset + visibleOptions} / ${this._options.length}`,
+                width - PADDING - 4, height - 8,
+                FALLOUT_AMBER, 9, { align: 'right' },
+            )
         }
 
         if (this._options.length === 0) {
-            ctx.font = '10px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.textAlign = 'center'
-            ctx.fillText('[No options]', width / 2, optY0 + 16)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, '[No options]', width / 2, OPTIONS_TOP + 16, FALLOUT_DARK_GRAY, 10, { align: 'center' })
         }
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
-        const optY0 = 26 + REPLY_HEIGHT + 14
-        for (let i = 0; i < this._options.length; i++) {
-            const oy = optY0 + i * OPTION_ROW_H
+        const visibleOptions = Math.min(this._options.length, OPTION_VISIBLE_ROWS)
+        for (let row = 0; row < visibleOptions; row++) {
+            const i = this._optionScrollOffset + row
+            const oy = OPTIONS_TOP + row * OPTION_ROW_H
             if (y >= oy && y < oy + OPTION_ROW_H && x >= PADDING && x < this.bounds.width - PADDING) {
                 EventBus.emit('dialogue:optionSelected', { optionID: this._options[i].optionID })
                 return true
@@ -168,9 +186,10 @@ export class DialoguePanel extends UIPanel {
     }
 
     override onMouseMove(x: number, y: number): void {
-        const optY0 = 26 + REPLY_HEIGHT + 14
-        for (let i = 0; i < this._options.length; i++) {
-            const oy = optY0 + i * OPTION_ROW_H
+        const visibleOptions = Math.min(this._options.length, OPTION_VISIBLE_ROWS)
+        for (let row = 0; row < visibleOptions; row++) {
+            const i = this._optionScrollOffset + row
+            const oy = OPTIONS_TOP + row * OPTION_ROW_H
             if (y >= oy && y < oy + OPTION_ROW_H && x >= PADDING && x < this.bounds.width - PADDING) {
                 this._hoveredIndex = i
                 return
@@ -186,18 +205,42 @@ export class DialoguePanel extends UIPanel {
             EventBus.emit('dialogue:optionSelected', { optionID: this._options[digit - 1].optionID })
             return true
         }
-        // Arrow keys scroll the reply text.
+        const optionsOverflow = this._options.length > OPTION_VISIBLE_ROWS
+        // Arrow keys scroll whichever area overflows: the option list when
+        // it is too long, otherwise the reply text.
         if (key === 'ArrowUp') {
-            if (this._replyScrollLine > 0) {this._replyScrollLine--}
+            if (optionsOverflow && this._optionScrollOffset > 0) {
+                this._optionScrollOffset--
+            } else if (this._replyScrollLine > 0) {
+                this._replyScrollLine--
+            }
             return true
         }
         if (key === 'ArrowDown') {
-            if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
+            if (optionsOverflow &&
+                this._optionScrollOffset + OPTION_VISIBLE_ROWS < this._options.length) {
+                this._optionScrollOffset++
+            } else if (this._replyScrollLine + REPLY_VISIBLE_LINES < this._replyLines.length) {
                 this._replyScrollLine++
             }
             return true
         }
+        // PageUp/PageDown always scroll the reply text.
+        if (key === 'PageUp') {
+            this._replyScrollLine = Math.max(0, this._replyScrollLine - REPLY_VISIBLE_LINES)
+            return true
+        }
+        if (key === 'PageDown') {
+            this._replyScrollLine = Math.min(
+                Math.max(0, this._replyLines.length - REPLY_VISIBLE_LINES),
+                this._replyScrollLine + REPLY_VISIBLE_LINES,
+            )
+            return true
+        }
         if (key === 'Escape') {
+            // Tell the scripting layer the player walked away so it can end
+            // the session instead of leaving the NPC stuck in dialogue state.
+            EventBus.emit('dialogue:closed', {})
             this.hide()
             return true
         }

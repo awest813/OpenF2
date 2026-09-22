@@ -1,10 +1,14 @@
 {
   "scripts": {
     "test": "vitest run",
+    "test:ui2": "vitest run src/ui2",
     "test:ui2:gameplay": "vitest run src/ui2/panelParity.test.ts",
-    "test:assets:arroyo": "vitest run src/phaseParitySliceE.test.ts src/phase100.test.ts"
+    "test:assets:arroyo": "vitest run src/phaseParitySliceE.test.ts src/phase100.test.ts",
+    "harness:build": "esbuild tools/ui2harness/ui2harness-node.ts --bundle --platform=node --format=cjs --external:@napi-rs/canvas --outfile=js/ui2harness-node.cjs --log-level=warning",
+    "harness:render": "npm run harness:build && node js/ui2harness-node.cjs"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "@typescript-eslint/eslint-plugin": "^5.25.0",
     "@typescript-eslint/parser": "^5.25.0",
     "eslint": "^7.32.0",

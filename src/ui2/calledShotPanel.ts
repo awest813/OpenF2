@@ -13,7 +13,7 @@
  * Panel name: 'calledShot'
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, cssColor, fillRect, strokeRect } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_RED, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,25 @@ export class CalledShotPanel extends UIPanel {
         // Focus the first hittable region so keyboard nav works immediately.
         this._focusedIndex = BODY_REGIONS.findIndex(r => this.hitChances[r] >= 0)
         this._hoveredIndex = -1
+        this._openedViaOpenWith = true
         this.show()
+    }
+
+    /** True when show() was triggered by openWith (skip the reset in onShow). */
+    private _openedViaOpenWith = false
+
+    protected override onShow(): void {
+        if (this._openedViaOpenWith) {
+            this._openedViaOpenWith = false
+            return
+        }
+        // A plain show() (EventBus ui:openPanel) must not display the
+        // previous target's hit chances.
+        for (const region of BODY_REGIONS) {
+            this.hitChances[region] = -1
+        }
+        this._focusedIndex = -1
+        this._hoveredIndex = -1
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -98,17 +116,11 @@ export class CalledShotPanel extends UIPanel {
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
         // Title
-        ctx.font = 'bold 12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CALLED SHOT', width / 2, 20)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CALLED SHOT', width / 2, 20, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
         // Sub-header
-        ctx.font = '9px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('TARGET REGION', REGIONS_X + 4, REGIONS_Y - 6)
-        ctx.fillText('HIT%', REGIONS_X + CHANCE_X_OFF, REGIONS_Y - 6)
+        drawUIFontText(ctx, 'TARGET REGION', REGIONS_X + 4, REGIONS_Y - 6, FALLOUT_DARK_GRAY, 9)
+        drawUIFontText(ctx, 'HIT%', REGIONS_X + CHANCE_X_OFF, REGIONS_Y - 6, FALLOUT_DARK_GRAY, 9)
 
         // Body region rows
         for (let i = 0; i < BODY_REGIONS.length; i++) {
@@ -126,16 +138,11 @@ export class CalledShotPanel extends UIPanel {
             }
             strokeRect(ctx, REGIONS_X, ry, REGION_W, ROW_H - 2, FALLOUT_DARK_GRAY, 1)
 
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(
-                isHighlighted && isHittable ? FALLOUT_AMBER :
-                    isHittable ? FALLOUT_GREEN : FALLOUT_DARK_GRAY,
-            )
             // Number hint (1-8) for keyboard selection
-            ctx.fillText(`${i + 1}. ${REGION_LABELS[region]}`, REGIONS_X + 6, ry + 17)
-
-            ctx.fillStyle = cssColor(chanceColor)
-            ctx.fillText(chanceText, REGIONS_X + CHANCE_X_OFF + 4, ry + 17)
+            drawUIFontText(ctx, `${i + 1}. ${REGION_LABELS[region]}`, REGIONS_X + 6, ry + 17,
+                isHighlighted && isHittable ? FALLOUT_AMBER :
+                    isHittable ? FALLOUT_GREEN : FALLOUT_DARK_GRAY, 11)
+            drawUIFontText(ctx, chanceText, REGIONS_X + CHANCE_X_OFF + 4, ry + 17, chanceColor, 11)
         }
 
         // Cancel button
@@ -143,11 +150,7 @@ export class CalledShotPanel extends UIPanel {
         const cancelY = height - 34
         fillRect(ctx, cancelX, cancelY, BTN_W, BTN_H, FALLOUT_DARK_GRAY)
         strokeRect(ctx, cancelX, cancelY, BTN_W, BTN_H, FALLOUT_GREEN, 1)
-        ctx.font = '11px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CANCEL', width / 2, cancelY + 15)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CANCEL', width / 2, cancelY + 15, FALLOUT_GREEN, 11, { align: 'center' })
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
@@ -157,7 +160,7 @@ export class CalledShotPanel extends UIPanel {
         const cancelX = width / 2 - BTN_W / 2
         const cancelY = height - 34
         if (x >= cancelX && x < cancelX + BTN_W && y >= cancelY && y < cancelY + BTN_H) {
-            this.hide()
+            this._cancel()
             return true
         }
 
@@ -189,7 +192,7 @@ export class CalledShotPanel extends UIPanel {
 
     override onKeyDown(key: string): boolean {
         if (key === 'Escape') {
-            this.hide()
+            this._cancel()
             return true
         }
         // Number keys 1–8 select a body region directly when targetable.
@@ -224,6 +227,12 @@ export class CalledShotPanel extends UIPanel {
             return true
         }
         return false
+    }
+
+    /** Close without a selection, notifying callers (unlike a silent hide). */
+    private _cancel(): void {
+        EventBus.emit('calledShot:cancelled', {})
+        this.hide()
     }
 }
 

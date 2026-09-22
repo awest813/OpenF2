@@ -10,3 +10,4 @@ xcuserdata
 contents.xcworkspacedata
 node_modules
 js/
+tools/ui2harness/out/

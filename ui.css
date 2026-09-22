@@ -224,8 +224,6 @@ body {
   height: 12px;
 }
 
-#attackButtonWeapon {}
-
 #attackButtonContainer:active #attackButtonWeapon {
   /* move weapon image up */
   transform: translateY(-2px);
@@ -708,19 +706,6 @@ body {
   background-image: url("art/intrface/wmapbox.png");
 }
 
-#worldmapViewButton {
-  position: absolute;
-  left: 519px;
-  top: 440px;
-  width: 15px;
-  height: 16px;
-  background-image: url("art/intrface/lilredup.png");
-}
-
-#worldmapViewButton:active {
-  background-image: url("art/intrface/lilreddn.png");
-}
-
 #worldMapWorld {
   position: absolute;
   left: 105px;
@@ -823,10 +808,6 @@ body {
   visibility: hidden;
 
   /* background-image varies per elevator type */
-}
-
-#elevatorPositioner {
-  /**/
 }
 
 .elevatorButton {

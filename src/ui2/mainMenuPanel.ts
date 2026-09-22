@@ -11,9 +11,9 @@ import {
     FALLOUT_AMBER,
     FALLOUT_DARK_GRAY,
     FALLOUT_BLACK,
-    cssColor,
     fillRect,
     strokeRect,
+    drawUIFontText,
 } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 
@@ -87,14 +87,9 @@ export class MainMenuPanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
-        ctx.textAlign = 'center'
-        ctx.font = 'bold 22px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('OPENF2', width / 2, 38)
+        drawUIFontText(ctx, 'OPENF2', width / 2, 38, FALLOUT_GREEN, 22, { bold: true, align: 'center' })
 
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText('Fallout 2 engine reimplementation', width / 2, 62)
+        drawUIFontText(ctx, 'Fallout 2 engine reimplementation', width / 2, 62, FALLOUT_AMBER, 12, { align: 'center' })
 
         for (let i = 0; i < MENU_ITEMS.length; i++) {
             const item = MENU_ITEMS[i]
@@ -102,15 +97,10 @@ export class MainMenuPanel extends UIPanel {
             const active = i === this._focused || i === this._hovered
             fillRect(ctx, r.x, r.y, r.w, r.h, active ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, r.x, r.y, r.w, r.h, FALLOUT_GREEN, 1)
-            ctx.font = 'bold 13px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.fillText(item.label, width / 2, r.y + 21)
+            drawUIFontText(ctx, item.label, width / 2, r.y + 21, active ? FALLOUT_BLACK : FALLOUT_GREEN, 13, { bold: true, align: 'center' })
         }
 
-        ctx.font = '10px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('↑↓ / Enter  ·  click to select', width / 2, height - 16)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, '↑↓ / Enter  ·  click to select', width / 2, height - 16, FALLOUT_DARK_GRAY, 10, { align: 'center' })
     }
 
     override onMouseMove(x: number, y: number): void {

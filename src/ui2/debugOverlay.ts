@@ -7,16 +7,17 @@
  *   - Rendering frame counter
  *   - Current map name (if provided)
  *
- * Toggled by Config.ui.showDebugOverlay. Panel name: 'debug'.
- * Z-order 50 so it renders on top of all other panels.
+ * Toggled globally with F3 (main.ts) or initially via Config.ui.showDebugOverlay.
+ * The overlay is input-transparent: it observes the game without stealing
+ * clicks or keys from it.  Panel name: 'debug'.
  *
  * Usage:
  *   const dbg = new DebugOverlayPanel(screenWidth, screenHeight)
  *   uiManager.register(dbg)
- *   dbg.show()  // or driven by Config.ui.showDebugOverlay
+ *   dbg.show()  // or driven by Config.ui.showDebugOverlay / F3
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_RED, UIColor, cssColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_RED, UIColor, cssColor, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 
 const PANEL_WIDTH  = 200
@@ -44,6 +45,8 @@ export class DebugOverlayPanel extends UIPanel {
         })
         this.playerEntityId = playerEntityId
         this.zOrder = 50
+        // Observer overlay: must never block game input or open a modal state.
+        this.inputTransparent = true
     }
 
     setScriptRuntimeProvider(provider: (() => { currentProcedure: string | null, recentLog: readonly string[] }) | null): void {
@@ -64,8 +67,6 @@ export class DebugOverlayPanel extends UIPanel {
         ctx.lineWidth = 1
         ctx.strokeRect(0.5, 0.5, width - 1, height - 1)
 
-        ctx.font = '9px monospace'
-
         const stats = EntityManager.get<'stats'>(this.playerEntityId, 'stats')
         const combat = EntityManager.get<'combat'>(this.playerEntityId, 'combat')
         let entityCount = 0
@@ -77,29 +78,20 @@ export class DebugOverlayPanel extends UIPanel {
             : undefined
 
         const lines: Array<[string, UIColor]> = [
-            ['DEBUG OVERLAY', FALLOUT_GREEN],
+            ['DEBUG OVERLAY (F3)', FALLOUT_GREEN],
             [`HP: ${stats ? `${stats.currentHp}/${stats.maxHp}` : 'n/a'}`, stats ? hpColor(stats.currentHp, stats.maxHp) : FALLOUT_DARK_GRAY],
             [`AP: ${combat ? `${combat.combatAP}/${stats?.maxAP ?? '?'}` : 'n/a'}`, FALLOUT_AMBER],
             [`Entities: ${entityCount}`, FALLOUT_GREEN],
             [`Frame: ${this._frameCount}`, FALLOUT_GREEN],
-            [`Map: ${this.mapName ?? 'none'}`, FALLOUT_GREEN],
-            [`Proc: ${runtime?.currentProcedure ?? 'none'}`, FALLOUT_AMBER],
-            [`ScriptLog: ${truncate(recentLog ?? '(no messages)', 26)}`, FALLOUT_DARK_GRAY],
+            [`Map: ${truncate(this.mapName ?? 'none', 22)}`, FALLOUT_GREEN],
+            [`Proc: ${truncate(runtime?.currentProcedure ?? 'none', 22)}`, FALLOUT_AMBER],
+            [`ScriptLog: ${truncate(recentLog ?? '(no messages)', 22)}`, FALLOUT_DARK_GRAY],
         ]
 
         for (let i = 0; i < lines.length; i++) {
             const [text, color] = lines[i]
-            ctx.fillStyle = cssColor(color)
-            ctx.fillText(text, PAD, PAD + (i + 1) * LINE_H)
+            drawUIFontText(ctx, text, PAD, PAD + (i + 1) * LINE_H, color, 9)
         }
-    }
-
-    override onKeyDown(key: string): boolean {
-        if (key === '`' || key === 'F3') {
-            this.toggle()
-            return true
-        }
-        return false
     }
 }
 

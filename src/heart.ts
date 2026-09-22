@@ -319,6 +319,25 @@ class Heart {
                 return 'escape'
             case 13:
                 return 'return'
+            /* paging keys — keyCode 33-36 would otherwise masquerade as
+             * '!' '"' '#' '$' (unreachable via shift+digit, which reports
+             * the digit key's code), so reclaim them here */
+            case 33:
+                return 'PageUp'
+            case 34:
+                return 'PageDown'
+            case 35:
+                return 'End'
+            case 36:
+                return 'Home'
+            /* function keys used by debug overlays — without these, F3/F5/F6
+             * collide with the letters r/t/u produced by their keyCodes */
+            case 114:
+                return 'F3'
+            case 116:
+                return 'F5'
+            case 117:
+                return 'F6'
         }
 
         return String.fromCharCode(c).toLowerCase()
@@ -332,6 +351,11 @@ class Heart {
 // we rely on the existing helper to keep the surface area small.
 window.onkeydown = function (e) {
     const c = heart._getKeyChar(e.keyCode)
+    // Suppress browser defaults for keys the game binds (F5 would reload
+    // the page and abort the session; F3/F6 open in-page debug panels).
+    if (e.keyCode === 114 || e.keyCode === 116 || e.keyCode === 117) {
+        e.preventDefault()
+    }
     heart._keysDown[c] = true
     if (heart.keydown !== undefined) {
         heart.keydown(c)

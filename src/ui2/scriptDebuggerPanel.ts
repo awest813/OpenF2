@@ -16,7 +16,7 @@
  *   panel.show()
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, cssColor, drawUIFontText } from './uiPanel.js'
 
 const PANEL_WIDTH  = 260
 const PANEL_HEIGHT = 190
@@ -95,8 +95,6 @@ export class ScriptDebuggerPanel extends UIPanel {
         ctx.lineWidth = 1
         ctx.strokeRect(0.5, 0.5, width - 1, height - 1)
 
-        ctx.font = '9px monospace'
-
         const header: Array<[string, UIColor]> = [
             ['SCRIPT DEBUGGER', FALLOUT_GREEN],
             [`Steps: ${this._stepCount}`, FALLOUT_AMBER],
@@ -106,18 +104,15 @@ export class ScriptDebuggerPanel extends UIPanel {
 
         for (let i = 0; i < header.length; i++) {
             const [text, color] = header[i]
-            ctx.fillStyle = cssColor(color)
-            ctx.fillText(text, PAD, PAD + (i + 1) * LINE_H)
+            drawUIFontText(ctx, text, PAD, PAD + (i + 1) * LINE_H, color, 9)
         }
 
         const logStart = PAD + (header.length + 1) * LINE_H
         if (this._log.length === 0) {
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText('(no messages)', PAD, logStart)
+            drawUIFontText(ctx, '(no messages)', PAD, logStart, FALLOUT_DARK_GRAY, 9)
         } else {
             for (let i = 0; i < this._log.length; i++) {
-                ctx.fillStyle = cssColor(FALLOUT_GREEN)
-                ctx.fillText(this._log[i], PAD, logStart + i * LINE_H)
+                drawUIFontText(ctx, this._log[i], PAD, logStart + i * LINE_H, FALLOUT_GREEN, 9)
             }
         }
     }

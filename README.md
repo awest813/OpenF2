@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
 [![TypeScript](https://img.shields.io/badge/engine-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-5136%20passing%20(17%20skipped)-green.svg)](#project-metrics)
+[![Tests](https://img.shields.io/badge/tests-5195%20passing%20(17%20skipped)-green.svg)](#project-metrics)
 [![Platform](https://img.shields.io/badge/platform-browser%20first-orange.svg)](#mission)
 
 **OpenF2** is an open-source reimplementation of the Fallout 2 engine written in TypeScript and WebGL.
@@ -37,8 +37,8 @@ This summary is based on current code in `src/` and live test execution (validat
 
 ### Test Metrics (Verified)
 
-- **Test Files:** 137 passing / 137 total (asset corpora skipped when absent)
-- **Individual Tests:** 5,136 passing / 17 skipped / 0 failing
+- **Test Files:** 142 passing / 142 total (asset corpora skipped when absent)
+- **Individual Tests:** 5,195 passing / 17 skipped / 0 failing
 - **Typecheck:** `tsc --noEmit` clean
 - **Campaign gate:** `NOT_READY` — see `docs/F2_RELEASE_GATE.md`
 - **Code Size:** ~107k lines of TypeScript in `src/`
@@ -197,7 +197,7 @@ The OpenF2 codebase is organized into focused modules:
 
 ### Testing
 
-- **phase*.test.ts** — 137 test files covering specific gameplay features and parity slices
+- **phase*.test.ts** — 142 test files covering specific gameplay features and parity slices
 - **combat.integration.test.ts** — End-to-end combat scenarios
 - **ui2/ui2.test.ts** — UI panel testing
 - **vm.test.ts** — VM instruction and opcode testing
@@ -314,7 +314,7 @@ pipenv run python setup.py /path/to/Fallout2
 # Compile TypeScript
 npx tsc
 
-# Run full test suite (5136+ tests; asset suites skip when data/ is absent)
+# Run full test suite (5195+ tests; asset suites skip when data/ is absent)
 npm test
 
 # Run browser build
@@ -324,7 +324,7 @@ python -m http.server
 
 **Test Output Example:**
 ```
-Test Files  137 passed (137)
+Test Files  142 passed (142)
 Tests       5136 passed | 17 skipped (5153)
 ```
 

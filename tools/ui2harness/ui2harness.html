@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>ui2 visual harness</title>
+	<meta charset="utf-8">
+	<style>
+		body { background: #222; margin: 0; padding: 16px; font-family: monospace; color: #9c9; }
+		#stage { image-rendering: pixelated; border: 1px solid #555; }
+		#states { margin-top: 12px; }
+		#states button { font-family: monospace; margin: 2px; }
+		#stateName { color: #ffa; }
+	</style>
+</head>
+<body>
+	<canvas id="stage" width="800" height="600"></canvas>
+	<div id="states"></div>
+	<div>current: <span id="stateName">(none)</span></div>
+	<script type="module" src="/js/ui2harness.js"></script>
+	<script>
+		window.addEventListener('load', () => {
+			const wait = setInterval(() => {
+				if (!window.__ready) {return}
+				clearInterval(wait)
+				const bar = document.getElementById('states')
+				for (const name of window.listStates()) {
+					const btn = document.createElement('button')
+					btn.textContent = name
+					btn.onclick = () => {
+						window.showState(name)
+						document.getElementById('stateName').textContent = name
+					}
+					bar.appendChild(btn)
+				}
+			}, 50)
+		})
+	</script>
+</body>
+</html>

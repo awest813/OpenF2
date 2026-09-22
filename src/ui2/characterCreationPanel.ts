@@ -9,9 +9,10 @@ import {
     FALLOUT_DARK_GRAY,
     FALLOUT_BLACK,
     FALLOUT_RED,
-    cssColor,
     fillRect,
     strokeRect,
+    wrapText,
+    drawUIFontText,
 } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
 import { TRAITS } from '../character/traits.js'
@@ -64,8 +65,8 @@ export class CharacterCreationPanel extends UIPanel {
     private _adjustSpecial(key: SpecialKey, delta: number): void {
         const cur = this._data.special[key]
         const next = cur + delta
-        if (next < CHARGEN_SPECIAL_MIN || next > CHARGEN_SPECIAL_MAX) return
-        if (delta > 0 && specialPointsRemaining(this._data.special) <= 0) return
+        if (next < CHARGEN_SPECIAL_MIN || next > CHARGEN_SPECIAL_MAX) {return}
+        if (delta > 0 && specialPointsRemaining(this._data.special) <= 0) {return}
         this._data.special[key] = next
         this._error = ''
     }
@@ -113,11 +114,7 @@ export class CharacterCreationPanel extends UIPanel {
         fillRect(ctx, 0, 0, width, height, FALLOUT_BLACK)
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
-        ctx.font = 'bold 14px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.textAlign = 'center'
-        ctx.fillText('CHARACTER CREATION', width / 2, 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CHARACTER CREATION', width / 2, 22, FALLOUT_GREEN, 14, { bold: true, align: 'center' })
 
         const tabs: Tab[] = ['special', 'skills', 'traits', 'identity']
         for (let i = 0; i < tabs.length; i++) {
@@ -126,19 +123,15 @@ export class CharacterCreationPanel extends UIPanel {
             const active = tab === this._tab
             fillRect(ctx, tx, 34, 118, 22, active ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, tx, 34, 118, 22, FALLOUT_GREEN, 1)
-            ctx.font = '11px monospace'
-            ctx.fillStyle = active ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.textAlign = 'center'
-            ctx.fillText(tab.toUpperCase(), tx + 59, 49)
+            drawUIFontText(ctx, tab.toUpperCase(), tx + 59, 49, active ? FALLOUT_BLACK : FALLOUT_GREEN, 11, { align: 'center' })
         }
-        ctx.textAlign = 'left'
 
         ctx.save()
         ctx.translate(0, 64)
-        if (this._tab === 'special') this._renderSpecial(ctx)
-        else if (this._tab === 'skills') this._renderSkills(ctx)
-        else if (this._tab === 'traits') this._renderTraits(ctx)
-        else this._renderIdentity(ctx)
+        if (this._tab === 'special') {this._renderSpecial(ctx)}
+        else if (this._tab === 'skills') {this._renderSkills(ctx)}
+        else if (this._tab === 'traits') {this._renderTraits(ctx)}
+        else {this._renderIdentity(ctx)}
         ctx.restore()
 
         // Footer buttons
@@ -146,60 +139,46 @@ export class CharacterCreationPanel extends UIPanel {
         strokeRect(ctx, 20, height - 40, 100, 26, FALLOUT_GREEN, 1)
         fillRect(ctx, width - 120, height - 40, 100, 26, FALLOUT_GREEN)
         strokeRect(ctx, width - 120, height - 40, 100, 26, FALLOUT_GREEN, 1)
-        ctx.font = '12px monospace'
-        ctx.textAlign = 'center'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText('CANCEL', 70, height - 22)
-        ctx.fillStyle = cssColor(FALLOUT_BLACK)
-        ctx.fillText('DONE', width - 70, height - 22)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'CANCEL', 70, height - 22, FALLOUT_GREEN, 12, { align: 'center' })
+        drawUIFontText(ctx, 'DONE', width - 70, height - 22, FALLOUT_BLACK, 12, { align: 'center' })
 
         if (this._error) {
-            ctx.font = '11px monospace'
-            ctx.fillStyle = cssColor(FALLOUT_RED)
-            ctx.fillText(this._error, 140, height - 22)
+            drawUIFontText(ctx, this._error, 140, height - 22, FALLOUT_RED, 11)
         }
     }
 
     private _renderSpecial(ctx: OffscreenCanvasRenderingContext2D): void {
         const remaining = specialPointsRemaining(this._data.special)
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText(`Points remaining: ${remaining}`, 16, 16)
+        drawUIFontText(ctx, `Points remaining: ${remaining}`, 16, 16, FALLOUT_AMBER, 12)
 
         let y = 40
         for (const key of SPECIAL_KEYS) {
             const val = this._data.special[key]
-            ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-            ctx.fillText(key.padEnd(4), 16, y)
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText(String(val).padStart(2), 70, y)
+            drawUIFontText(ctx, key.padEnd(4), 16, y, FALLOUT_DARK_GRAY, 12)
+            drawUIFontText(ctx, String(val).padStart(2), 70, y, FALLOUT_GREEN, 12)
 
             // - / + hit targets drawn as labels
             fillRect(ctx, 110, y - 12, 22, 18, FALLOUT_DARK_GRAY)
             strokeRect(ctx, 110, y - 12, 22, 18, FALLOUT_GREEN, 1)
             fillRect(ctx, 138, y - 12, 22, 18, FALLOUT_DARK_GRAY)
             strokeRect(ctx, 138, y - 12, 22, 18, FALLOUT_GREEN, 1)
-            ctx.textAlign = 'center'
-            ctx.fillStyle = cssColor(FALLOUT_GREEN)
-            ctx.fillText('-', 121, y)
-            ctx.fillText('+', 149, y)
-            ctx.textAlign = 'left'
+            drawUIFontText(ctx, '-', 121, y, FALLOUT_GREEN, 12, { align: 'center' })
+            drawUIFontText(ctx, '+', 149, y, FALLOUT_GREEN, 12, { align: 'center' })
             y += 28
         }
 
-        ctx.fillStyle = cssColor(FALLOUT_DARK_GRAY)
-        ctx.fillText('Distribute 40 SPECIAL points (1–10 each).', 200, 40)
-        ctx.fillText('Then tag 3 skills and optionally pick traits.', 200, 58)
+        drawUIFontText(ctx, 'Distribute 40 SPECIAL points (1–10 each).', 200, 40, FALLOUT_DARK_GRAY, 12)
+        drawUIFontText(ctx, 'Then tag 3 skills and optionally pick traits.', 200, 58, FALLOUT_DARK_GRAY, 12)
     }
 
     private _renderSkills(ctx: OffscreenCanvasRenderingContext2D): void {
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText(
+        drawUIFontText(
+            ctx,
             `Tagged ${this._data.taggedSkills.length}/${CHARGEN_REQUIRED_TAGS}`,
             16,
             16,
+            FALLOUT_AMBER,
+            12,
         )
 
         const visible = 12
@@ -212,16 +191,13 @@ export class CharacterCreationPanel extends UIPanel {
             const tagged = this._data.taggedSkills.includes(skill)
             fillRect(ctx, 12, y - 12, 300, 20, tagged ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, 12, y - 12, 300, 20, FALLOUT_GREEN, 1)
-            ctx.fillStyle = tagged ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.fillText((tagged ? '* ' : '  ') + skill, 20, y)
+            drawUIFontText(ctx, (tagged ? '* ' : '  ') + skill, 20, y, tagged ? FALLOUT_BLACK : FALLOUT_GREEN, 12)
             y += 24
         }
     }
 
     private _renderTraits(ctx: OffscreenCanvasRenderingContext2D): void {
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_AMBER)
-        ctx.fillText(`Traits ${this._data.traitIds.length}/${CHARGEN_MAX_TRAITS}`, 16, 16)
+        drawUIFontText(ctx, `Traits ${this._data.traitIds.length}/${CHARGEN_MAX_TRAITS}`, 16, 16, FALLOUT_AMBER, 12)
 
         const visible = 10
         const maxScroll = Math.max(0, TRAITS.length - visible)
@@ -233,49 +209,48 @@ export class CharacterCreationPanel extends UIPanel {
             const on = this._data.traitIds.includes(trait.id)
             fillRect(ctx, 12, y - 12, 480, 20, on ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
             strokeRect(ctx, 12, y - 12, 480, 20, FALLOUT_GREEN, 1)
-            ctx.fillStyle = on ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-            ctx.fillText((on ? '* ' : '  ') + trait.name, 20, y)
+            drawUIFontText(ctx, (on ? '* ' : '  ') + trait.name, 20, y, on ? FALLOUT_BLACK : FALLOUT_GREEN, 12)
             y += 24
         }
 
         const selected = TRAITS.find((t) => t.id === this._data.traitIds[this._data.traitIds.length - 1])
         if (selected) {
-            ctx.fillStyle = cssColor(FALLOUT_AMBER)
-            ctx.fillText(selected.description.slice(0, 70), 16, 320)
+            // Font stays set for wrapText's ctx.measureText below.
+            ctx.font = '12px monospace'
+            // Wrap to the panel width (a hard slice(0, 70) used to run into
+            // the right border for longer descriptions).
+            const lines = wrapText(ctx, selected.description, PANEL_W - 32)
+            let dy = 320
+            for (const line of lines) {
+                drawUIFontText(ctx, line, 16, dy, FALLOUT_AMBER, 12)
+                dy += 16
+                if (dy > PANEL_H - 56) {break}  // stay clear of the footer
+            }
         }
     }
 
     private _renderIdentity(ctx: OffscreenCanvasRenderingContext2D): void {
-        ctx.font = '12px monospace'
-        ctx.fillStyle = cssColor(FALLOUT_GREEN)
-        ctx.fillText(`Name: ${this._data.name}_`, 16, 30)
-        ctx.fillText('(type to edit name)', 16, 50)
+        drawUIFontText(ctx, `Name: ${this._data.name}_`, 16, 30, FALLOUT_GREEN, 12)
+        drawUIFontText(ctx, '(type to edit name)', 16, 50, FALLOUT_GREEN, 12)
 
-        ctx.fillText(`Age: ${this._data.age}`, 16, 90)
+        drawUIFontText(ctx, `Age: ${this._data.age}`, 16, 90, FALLOUT_GREEN, 12)
         fillRect(ctx, 100, 76, 22, 18, FALLOUT_DARK_GRAY)
         strokeRect(ctx, 100, 76, 22, 18, FALLOUT_GREEN, 1)
         fillRect(ctx, 128, 76, 22, 18, FALLOUT_DARK_GRAY)
         strokeRect(ctx, 128, 76, 22, 18, FALLOUT_GREEN, 1)
-        ctx.textAlign = 'center'
-        ctx.fillText('-', 111, 90)
-        ctx.fillText('+', 139, 90)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, '-', 111, 90, FALLOUT_GREEN, 12, { align: 'center' })
+        drawUIFontText(ctx, '+', 139, 90, FALLOUT_GREEN, 12, { align: 'center' })
 
-        ctx.fillText(`Gender: ${this._data.gender}`, 16, 130)
+        drawUIFontText(ctx, `Gender: ${this._data.gender}`, 16, 130, FALLOUT_GREEN, 12)
         fillRect(ctx, 120, 116, 70, 20, this._data.gender === 'male' ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
         strokeRect(ctx, 120, 116, 70, 20, FALLOUT_GREEN, 1)
         fillRect(ctx, 200, 116, 80, 20, this._data.gender === 'female' ? FALLOUT_GREEN : FALLOUT_DARK_GRAY)
         strokeRect(ctx, 200, 116, 80, 20, FALLOUT_GREEN, 1)
-        ctx.textAlign = 'center'
-        ctx.fillStyle = this._data.gender === 'male' ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-        ctx.fillText('MALE', 155, 130)
-        ctx.fillStyle = this._data.gender === 'female' ? cssColor(FALLOUT_BLACK) : cssColor(FALLOUT_GREEN)
-        ctx.fillText('FEMALE', 240, 130)
-        ctx.textAlign = 'left'
+        drawUIFontText(ctx, 'MALE', 155, 130, this._data.gender === 'male' ? FALLOUT_BLACK : FALLOUT_GREEN, 12, { align: 'center' })
+        drawUIFontText(ctx, 'FEMALE', 240, 130, this._data.gender === 'female' ? FALLOUT_BLACK : FALLOUT_GREEN, 12, { align: 'center' })
 
         const v = validateCharacterCreation(this._data)
-        ctx.fillStyle = cssColor(v.ok ? FALLOUT_AMBER : FALLOUT_RED)
-        ctx.fillText(v.ok ? 'Ready — press DONE to enter the Temple of Trials.' : v.errors[0], 16, 180)
+        drawUIFontText(ctx, v.ok ? 'Ready — press DONE to enter the Temple of Trials.' : v.errors[0], 16, 180, v.ok ? FALLOUT_AMBER : FALLOUT_RED, 12)
     }
 
     override onMouseDown(x: number, y: number, _btn: 'l' | 'r'): boolean {
@@ -309,8 +284,8 @@ export class CharacterCreationPanel extends UIPanel {
             for (const key of SPECIAL_KEYS) {
                 const rowY = 40 + row * 28
                 if (ly >= rowY - 12 && ly < rowY + 6) {
-                    if (x >= 110 && x < 132) this._adjustSpecial(key, -1)
-                    if (x >= 138 && x < 160) this._adjustSpecial(key, 1)
+                    if (x >= 110 && x < 132) {this._adjustSpecial(key, -1)}
+                    if (x >= 138 && x < 160) {this._adjustSpecial(key, 1)}
                     return true
                 }
                 row++
@@ -321,7 +296,7 @@ export class CharacterCreationPanel extends UIPanel {
             const visible = 12
             for (let i = 0; i < visible; i++) {
                 const idx = this._skillScroll + i
-                if (idx >= CHARGEN_SKILLS.length) break
+                if (idx >= CHARGEN_SKILLS.length) {break}
                 const rowY = 40 + i * 24
                 if (ly >= rowY - 12 && ly < rowY + 8 && x >= 12 && x < 312) {
                     this._toggleSkill(CHARGEN_SKILLS[idx])
@@ -334,7 +309,7 @@ export class CharacterCreationPanel extends UIPanel {
             const visible = 10
             for (let i = 0; i < visible; i++) {
                 const idx = this._traitScroll + i
-                if (idx >= TRAITS.length) break
+                if (idx >= TRAITS.length) {break}
                 const rowY = 40 + i * 24
                 if (ly >= rowY - 12 && ly < rowY + 8 && x >= 12 && x < 492) {
                     this._toggleTrait(TRAITS[idx].id)
@@ -345,13 +320,13 @@ export class CharacterCreationPanel extends UIPanel {
 
         if (this._tab === 'identity') {
             if (ly >= 76 && ly < 94) {
-                if (x >= 100 && x < 122) this._data.age = Math.max(16, this._data.age - 1)
-                if (x >= 128 && x < 150) this._data.age = Math.min(35, this._data.age + 1)
+                if (x >= 100 && x < 122) {this._data.age = Math.max(16, this._data.age - 1)}
+                if (x >= 128 && x < 150) {this._data.age = Math.min(35, this._data.age + 1)}
                 return true
             }
             if (ly >= 116 && ly < 136) {
-                if (x >= 120 && x < 190) this._data.gender = 'male'
-                if (x >= 200 && x < 280) this._data.gender = 'female'
+                if (x >= 120 && x < 190) {this._data.gender = 'male'}
+                if (x >= 200 && x < 280) {this._data.gender = 'female'}
                 return true
             }
         }

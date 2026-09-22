@@ -256,17 +256,20 @@ describe('MapViewerPanel — lifecycle', () => {
         expect(new MapViewerPanel(800, 600).zOrder).toBeGreaterThan(0)
     })
 
-    it('F5 toggles visibility on', () => {
+    it('F5 is handled globally (panel cannot self-toggle while hidden)', () => {
+        // The UIManager only dispatches keys to visible panels, so a hidden
+        // panel would never see F5. Toggling lives in main.ts's global handler.
         const p = new MapViewerPanel(800, 600)
-        expect(p.onKeyDown('F5')).toBe(true)
-        expect(p.visible).toBe(true)
+        expect(p.visible).toBe(false)
+        expect(p.onKeyDown('F5')).toBe(false)
+        expect(p.visible).toBe(false)
     })
 
-    it('F5 toggles visibility off', () => {
+    it('visible panel ignores F5 (toggle handled globally)', () => {
         const p = new MapViewerPanel(800, 600)
         p.show()
-        expect(p.onKeyDown('F5')).toBe(true)
-        expect(p.visible).toBe(false)
+        expect(p.onKeyDown('F5')).toBe(false)
+        expect(p.visible).toBe(true)
     })
 
     it('unrelated keys return false', () => {

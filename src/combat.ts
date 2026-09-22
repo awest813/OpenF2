@@ -16,8 +16,10 @@ limitations under the License.
 */
 
 import { Config } from './config.js'
+import { EventBus, DamageType } from './eventBus.js'
 import { CriticalEffects } from './criticalEffects.js'
 import { critterDamage, Weapon } from './critter.js'
+import { isRangedWeapon, consumeRounds, weaponNeedsReload } from './combat/ammo.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
 import globalState from './globalState.js'
 import { Critter, Obj, WeaponObj } from './object.js'
@@ -244,6 +246,15 @@ export class Combat {
     log(msg: any) {
         // Combat-related debug log
         console.log(msg)
+    }
+
+    /**
+     * Stable-per-combat identifier for a combatant, used as `entityId` in
+     * combat:* EventBus payloads (the HUD log only displays it). Critters
+     * have no global numeric id, so the combatant index is the contract.
+     */
+    private combatantId(c: Critter): number {
+        return Array.isArray(this.combatants) ? this.combatants.indexOf(c) : -1
     }
 
     private normalizeHitRegion(region: string): string {
@@ -605,6 +616,20 @@ export class Combat {
     }
 
     attack(obj: Critter, target: Critter, region = 'torso', callback?: () => void) {
+        // Empty ranged weapon: dry click, no attack roll, no ammo, no
+        // animation. The callback still fires so turn flow continues.
+        if (weaponNeedsReload(obj.equippedWeapon)) {
+            this.log(`${obj.isPlayer ? 'You' : obj.name} pull${obj.isPlayer ? '' : 's'} the trigger — click. Out of ammo.`)
+            if (obj.isPlayer) {uiLog('Click! Your weapon is out of ammo.')}
+            EventBus.emit('audio:playSound', { soundId: 'out_of_ammo' })
+            if (callback) {callback()}
+            return
+        }
+        // Ranged weapons consume one round per trigger pull (hit or miss).
+        if (isRangedWeapon(obj.equippedWeapon)) {
+            consumeRounds(obj.equippedWeapon!, 1)
+        }
+
         // turn to face the target
         // BLK-059: Guard against null positions before calling hexNearestNeighbor.
         if (obj.position && target.position) {
@@ -640,6 +665,13 @@ export class Combat {
             const extraMsg = hitRoll.crit === true ? this.getCombatMsg(hitRoll.msgID) || '' : ''
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage' + extraMsg)
 
+            EventBus.emit('combat:hit', {
+                attackerId: this.combatantId(obj),
+                targetId: this.combatantId(target),
+                damage,
+                damageType: normalizeDamageType(obj.equippedWeapon as unknown as { getDamageType?: () => string } | null),
+            })
+
             critterDamage(target, damage, obj)
 
             // FO2 sfall knockback: if the attacker's weapon has knockbackDist/knockbackChance,
@@ -664,6 +696,10 @@ export class Combat {
             }
         } else {
             this.log(who + ' missed ' + targetName + (hitRoll.crit === true ? ' critically' : ''))
+            EventBus.emit('combat:miss', {
+                attackerId: this.combatantId(obj),
+                targetId: this.combatantId(target),
+            })
             if (hitRoll.crit === true) {
                 const critFailMod = (obj.getStat('LUK') - 5) * -5
                 const critFailRoll = Math.floor(getRandomInt(1, 100) - critFailMod)
@@ -705,6 +741,14 @@ export class Combat {
      *  Center target takes ~half the rounds; adjacent hexes split the rest.
      *  Each round does an independent hit roll and damage roll. */
     burstAttack(obj: Critter, target: Critter, callback?: () => void) {
+        // Empty ranged weapon: dry click, nothing fired.
+        if (weaponNeedsReload(obj.equippedWeapon)) {
+            this.log(`${obj.isPlayer ? 'You' : obj.name} pull${obj.isPlayer ? '' : 's'} the trigger — click. Out of ammo.`)
+            if (obj.isPlayer) {uiLog('Click! Your weapon is out of ammo.')}
+            EventBus.emit('audio:playSound', { soundId: 'out_of_ammo' })
+            if (callback) {callback()}
+            return
+        }
         // turn to face target
         if (obj.position && target.position) {
             const hex = hexNearestNeighbor(obj.position, target.position)
@@ -721,12 +765,15 @@ export class Combat {
         const who = obj.isPlayer ? 'You' : obj.name
         const targetName = target.isPlayer ? 'you' : target.name
 
-        // Determine burst rounds: ammo loaded in weapon, or fallback default.
+        // Determine burst rounds: the weapon's proto burst size, capped by
+        // what is actually loaded (a burst fires its proto burst size — not
+        // the entire magazine — and cannot fire more rounds than remain).
         const weaponObj = obj.equippedWeapon
-        const rounds = (weaponObj?.extra?.ammoLoaded as number)
-            ?? (weaponObj?.weapon?.weapon?.pro?.extra?.maxAmmo as number)
+        const protoBurst = (weaponObj?.weapon?.weapon?.pro?.extra?.burstRounds as number)
+            ?? (weaponObj?.pro?.extra?.burstRounds as number)
             ?? 10
-        const effectiveRounds = Math.max(1, Math.min(rounds, 40))
+        const loaded = (weaponObj?.extra?.ammoLoaded as number) ?? protoBurst
+        const effectiveRounds = Math.max(1, Math.min(protoBurst, loaded, 40))
 
         // Consume ammo
         if (weaponObj?.extra && typeof weaponObj.extra.ammoLoaded === 'number') {
@@ -758,17 +805,38 @@ export class Combat {
         }
 
         let shouldAutoEnd = false
+        const burstDamageType = normalizeDamageType(weaponObj as unknown as { getDamageType?: () => string } | null)
 
         // Apply center-target rounds
+        let centerHits = 0
+        let centerDamage = 0
         for (let i = 0; i < centerRounds; i++) {
             const hitRoll = this.rollHit(obj, target, 'torso')
             if (hitRoll.hit === true) {
                 const critModifier = hitRoll.crit ? hitRoll.DM : 2
                 const damage = this.getDamageDone(obj, target, critModifier)
-                if (damage > 0) {critterDamage(target, damage, obj)}
+                if (damage > 0) {
+                    critterDamage(target, damage, obj)
+                    centerHits++
+                    centerDamage += damage
+                }
             }
         }
         this.log(`  → ${centerRounds} rounds at center target`)
+        // One aggregated event per target (a 30-round burst would spam the log).
+        if (centerHits > 0) {
+            EventBus.emit('combat:hit', {
+                attackerId: this.combatantId(obj),
+                targetId: this.combatantId(target),
+                damage: centerDamage,
+                damageType: burstDamageType,
+            })
+        } else {
+            EventBus.emit('combat:miss', {
+                attackerId: this.combatantId(obj),
+                targetId: this.combatantId(target),
+            })
+        }
 
         if (target.dead) {
             this.perish(target)
@@ -779,13 +847,27 @@ export class Combat {
         if (adjacentTargets.length > 0 && adjacentRounds > 0) {
             const perTarget = Math.max(1, Math.floor(adjacentRounds / adjacentTargets.length))
             for (const adj of adjacentTargets) {
+                let adjHits = 0
+                let adjDamage = 0
                 for (let i = 0; i < perTarget; i++) {
                     const hitRoll = this.rollHit(obj, adj, 'torso')
                     if (hitRoll.hit === true) {
                         const critModifier = hitRoll.crit ? hitRoll.DM : 2
                         const damage = this.getDamageDone(obj, adj, critModifier)
-                        if (damage > 0) {critterDamage(adj, damage, obj)}
+                        if (damage > 0) {
+                            critterDamage(adj, damage, obj)
+                            adjHits++
+                            adjDamage += damage
+                        }
                     }
+                }
+                if (adjHits > 0) {
+                    EventBus.emit('combat:hit', {
+                        attackerId: this.combatantId(obj),
+                        targetId: this.combatantId(adj),
+                        damage: adjDamage,
+                        damageType: burstDamageType,
+                    })
                 }
                 if (adj.dead) {this.perish(adj)}
             }
@@ -805,6 +887,11 @@ export class Combat {
 
     perish(obj: Critter) {
         this.log('...And killed them.')
+        const killer = (obj as any).lastCombatAttacker as Critter | undefined
+        EventBus.emit('combat:death', {
+            entityId: this.combatantId(obj),
+            killerId: killer ? this.combatantId(killer) : -1,
+        })
 
         // FO2: fire combat_p_proc(COMBAT_SUBTYPE_DEATH = 5) on the dying critter so
         // scripts can run death-quotes, quest triggers, or loot-dropping logic.
@@ -1282,6 +1369,7 @@ export class Combat {
         globalState.inCombat = true
         globalState.combat = new Combat(globalState.gMap.getObjects())
         uiLog("Combat started.")
+        EventBus.emit('combat:start', { combatants: globalState.combat.combatants.map((_, i) => i) })
 
         // FO2: fire combat_p_proc(COMBAT_SUBTYPE_INITIATE = 0) on all combatants
         // when combat starts. Scripts use this to set up flee states, switch AI
@@ -1325,6 +1413,7 @@ export class Combat {
         uiLog("Combat ended.")
         globalState.combat = null
         globalState.inCombat = false
+        EventBus.emit('combat:end')
 
         globalState.gMap.updateMap()
         uiEndCombat()
@@ -1359,6 +1448,10 @@ export class Combat {
             if (unusedAP > 0) {
                 prevTurnCritter.stats.acBonus = unusedAP
             }
+        }
+        // -1 on the very first turn (whoseTurn starts at -1).
+        if (this.whoseTurn >= 0 && prevTurnCritter) {
+            EventBus.emit('combat:turnEnd', { entityId: this.whoseTurn })
         }
 
         // BLK-051: Guard against a null player reference (can occur when combat was
@@ -1413,6 +1506,12 @@ export class Combat {
         } else if (isNewRound) {
             uiLog(`Combat Round ${this.round}`)
         }
+
+        const currentCombatant = this.combatants[this.whoseTurn]
+        EventBus.emit('combat:turnStart', {
+            entityId: this.whoseTurn,
+            isPlayer: currentCombatant?.isPlayer ?? false,
+        })
 
         if (this.combatants[this.whoseTurn].isPlayer) {
             // Player's turn starts — clear the player's end-of-turn AC bonus.
@@ -1489,5 +1588,23 @@ export class Combat {
 
             this.doAITurn(critter, this.whoseTurn, 1)
         }
+    }
+}
+
+/**
+ * Map a weapon's damage-type name (e.g. 'Normal', 'Electrical' — the proto
+ * spellings) to the DamageType union used by the combat:* EventBus events.
+ */
+function normalizeDamageType(weapon: { getDamageType?: () => string } | null | undefined): DamageType {
+    const raw = weapon?.getDamageType?.().toLowerCase() ?? 'normal'
+    switch (raw) {
+        case 'fire': return 'fire'
+        case 'plasma': return 'plasma'
+        case 'laser': return 'laser'
+        case 'explosion':
+        case 'explosive': return 'explosive'
+        case 'electrical': return 'electrical'
+        case 'emp': return 'emp'
+        default: return 'normal'
     }
 }
