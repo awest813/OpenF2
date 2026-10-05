@@ -4,6 +4,7 @@
  * (item.cc weaponGet* helpers).
  */
 
+import { sfallSettings } from '../sfallSettings.js'
 import { PerkId, perkRank } from '../character/perkIds.js'
 import { TraitId } from '../character/statModifiers.js'
 import { loadPRO } from '../pro.js'
@@ -110,8 +111,13 @@ export function getAttackWeaponInfo(critter: any, hitMode: HitMode = 1): AttackW
     if (attackType === 'throw') {
         // weaponGetRange: thrown range is capped at 3×STR (+2 STR per Heave Ho! rank, max 10).
         let str = critter.getStat?.('STR') ?? 5
-        if (critter.isPlayer) {str = Math.min(10, str + 2 * perkRank(critter, PerkId.HEAVE_HO))}
-        range = Math.min(range, 3 * str)
+        if (sfallSettings.heaveHoFix) {
+            // sfall apply_heaveho_fix: 3×STR up to the weapon's range, then +6 per Heave Ho! rank.
+            range = Math.min(range, 3 * str) + 6 * perkRank(critter, PerkId.HEAVE_HO)
+        } else {
+            if (critter.isPlayer) {str = Math.min(10, str + 2 * perkRank(critter, PerkId.HEAVE_HO))}
+            range = Math.min(range, 3 * str)
+        }
     }
 
     const apCost = (hitMode === 2 ? extra.APCost2 : extra.APCost1)

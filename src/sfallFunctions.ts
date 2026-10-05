@@ -44,7 +44,7 @@ import { loadMessage } from './data.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
 import { PERK_COUNT, PERK_DESCRIPTIONS, resetPerkDescriptions } from './character/perkTable.js'
-import { PERK_STAT_EFFECTS } from './character/perkIds.js'
+import { PERK_STAT_EFFECTS, PerkId } from './character/perkIds.js'
 import { FakePerk, resetSfallSettings, sfallSettings } from './sfallSettings.js'
 
 export { sfallSettings }
@@ -322,7 +322,11 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_swiftlearner_mod(v: number) { sfallSettings.swiftLearnerMod = Math.trunc(v) },
     set_hp_per_level_mod(v: number) { sfallSettings.hpPerLevelMod = (Math.trunc(v) << 24) >> 24 },
     set_pyromaniac_mod(v: number) { sfallSettings.pyromaniacMod = (Math.trunc(v) << 24) >> 24 },
-    apply_heaveho_fix: noop,
+    /** apply_heaveho_fix: Heave Ho! extends thrown range past 3×STR and needs no Strength. */
+    apply_heaveho_fix() {
+        sfallSettings.heaveHoFix = true
+        PERK_DESCRIPTIONS[PerkId.HEAVE_HO].stats[0] = 0
+    },
     remove_trait(trait: number) { (globalState.player as any)?.charTraits?.delete?.(trait) },
     /** inc_npc_level(name or pid): the party member goes up its next level now (partyMemberIncLevels). */
     inc_npc_level(who: unknown) {
@@ -401,15 +405,30 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
 
     // ── interface ──
     set_pipboy_available(v: number) { sfallSettings.pipboyAvailable = v },
-    show_iface_tag(tag: number) { sfallSettings.ifaceTags.add(tag) },
-    hide_iface_tag(tag: number) { sfallSettings.ifaceTags.delete(tag) },
-    is_iface_tag_active(tag: number) {
-        // 0 sneak, 3 level up, 4 addict are the engine's own indicators.
+    /** show_iface_tag / hide_iface_tag: 0, 3 and 4 are the player's sneak, level and addict flags. */
+    show_iface_tag(tag: number) {
         const player: any = globalState.player
-        if (tag === 0) {return playerInSneakMode(player) ? 1 : 0}
+        if (tag === 0 || tag === 3 || tag === 4) {
+            if (player) {player.pcFlags = (player.pcFlags ?? 0) | (1 << tag)}
+        } else {sfallSettings.ifaceTags.add(tag)}
+    },
+    hide_iface_tag(tag: number) {
+        const player: any = globalState.player
+        if (tag === 0 || tag === 3 || tag === 4) {
+            if (player) {player.pcFlags = (player.pcFlags ?? 0) & ~(1 << tag)}
+        } else {sfallSettings.ifaceTags.delete(tag)}
+    },
+    /** is_iface_tag_active: 1 and 2 are the poison and radiation boxes, 0/3/4 the player's flags. */
+    is_iface_tag_active(tag: number) {
+        const player: any = globalState.player
+        if (tag >= 0 && tag < 5) {
+            if (tag === 1) {return (player?.getStat?.('Poison Level') ?? player?.stats?.getBase?.('Poison Level') ?? 0) > 0 ? 1 : 0}
+            if (tag === 2) {return (player?.getStat?.('Radiation Level') ?? player?.stats?.getBase?.('Radiation Level') ?? 0) > 65 ? 1 : 0}
+            if (tag === 0 && playerInSneakMode(player)) {return 1}
+            return ((player?.pcFlags ?? 0) & (1 << tag)) !== 0 ? 1 : 0
+        }
         return sfallSettings.ifaceTags.has(tag) ? 1 : 0
     },
-    /** get_viewport_x/y, set_viewport_x/y: the world map's scroll offset (wmWorldOffsetX/Y). */
     get_viewport_x: () => worldmapElement()?.scrollLeft ?? 0,
     get_viewport_y: () => worldmapElement()?.scrollTop ?? 0,
     set_viewport_x(v: number) { const el = worldmapElement(); if (el) {el.scrollLeft = Math.trunc(v)} },

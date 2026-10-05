@@ -34,6 +34,8 @@ function defaultSettings() {
         /** The constant in Max HP per level, END/2 + this (stat.cc; 2 unless set_hp_per_level_mod). */
         hpPerLevelMod: 2,
         pyromaniacMod: 5,
+        /** apply_heaveho_fix: Heave Ho! adds 6 hexes per rank past the 3×STR cap. */
+        heaveHoFix: false,
         mapTimeMulti: 1,
         combatBlocked: false,
         combatBlockedMessage: '',
