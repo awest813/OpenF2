@@ -61,6 +61,7 @@ import {
     isFleeing,
     isWithinPerception,
     Maneuver,
+    playerInSneakMode,
     setWhoHitMe,
     teamOf,
 } from './combat/aiPacket.js'
@@ -1246,10 +1247,9 @@ export class Combat {
         }
     }
 
-    /** Sneak mode (pc flag 3). */
+    /** dudeHasState(DUDE_STATE_SNEAKING). */
     private playerIsSneaking(): boolean {
-        const p: any = this.player ?? globalState.player
-        return typeof p?.pcFlags === 'number' && (p.pcFlags & (1 << 3)) !== 0
+        return playerInSneakMode(this.player ?? globalState.player)
     }
 
     /**

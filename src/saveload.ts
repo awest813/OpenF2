@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { getSkillUsage, setSkillUsage } from './skillUse.js'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { deserializeObj } from './object.js'
@@ -78,6 +79,8 @@ function applyExtraSaveState(save: SaveGame): void {
     if (globalState.player && typeof save.playerPcFlags === 'number') {
         globalState.player.pcFlags = save.playerPcFlags
     }
+    // skillsUsageLoad: the First Aid / Doctor / Repair uses of the last day.
+    setSkillUsage(save.skillUsage)
     // Restore active hand selection (BLK-034).
     if (globalState.player && typeof save.playerActiveHand === 'number') {
         (globalState.player as any).activeHand = save.playerActiveHand
@@ -341,6 +344,7 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // Snapshot player character state flags (pc_flag_on/pc_flag_off) so that
     // sneak mode and other PC flags survive save/load cycles.
     save.playerPcFlags = globalState.player.pcFlags ?? 0
+    save.skillUsage = getSkillUsage()
 
     // Snapshot active hand state (BLK-034) so the player's current weapon slot
     // selection survives across save/load cycles.

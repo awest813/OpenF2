@@ -1,33 +1,18 @@
 /**
- * Skilldex helpers (parity Slice D / P0-3).
+ * Skilldex helpers.
  *
  * The eight Skilldex skills map to Fallout 2 skill IDs used by
- * `use_skill_on_p_proc` / `action_being_used`. Passive Sneak toggles
- * `pcFlags` SNK_MODE (bit 3). First Aid / Doctor get a Critter-side heal
- * fallback when the target has no script override.
+ * `use_skill_on_p_proc` / `action_being_used`. Sneak toggles the player's
+ * sneak state (dudeToggleState); the others are used on a target through
+ * actionUseSkill → _obj_use_skill_on → skillUse (see skillUse.ts).
  */
 
 import { Skills, skillRequiresTarget } from './skills.js'
-import { rollSkillCheck } from './skillCheck.js'
 import { Critter, Obj } from './object.js'
 import { Scripting } from './scripting.js'
 import globalState from './globalState.js'
-import { syncPlayerEntityFromCritter } from './playerProjection.js'
-
-function skilldexLog(msg: string): void {
-    console.log('[skilldex]', msg)
-    // Avoid importing ui.ts (circular): push into the DOM log if present.
-    try {
-        const el = typeof document !== 'undefined' ? document.getElementById('logList') : null
-        if (el) {
-            const li = document.createElement('li')
-            li.textContent = msg
-            el.insertBefore(li, el.firstChild)
-        }
-    } catch {
-        // ignore
-    }
-}
+import { playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
+import { canUseSkillOn, useSkillOn } from './skillUse.js'
 
 /** Fallout 2 engine skill IDs (same table as scripting `skillNumToName`). */
 export const FALLOUT_SKILL_ID: Record<Exclude<Skills, Skills.None>, number> = {
@@ -60,136 +45,34 @@ export const SKILLDEX_ENTRIES: readonly SkilldexEntry[] = [
     { skill: Skills.Repair, label: 'Repair', labelY: 300 },
 ]
 
-const SNK_MODE_BIT = 3
-const HEAL_USES_PER_DAY = 3
-
-interface HealUseTracker {
-    dayKey: number
-    firstAid: number
-    doctor: number
-}
-
-let healUses: HealUseTracker = { dayKey: 0, firstAid: 0, doctor: 0 }
-
-function currentDayKey(): number {
-    // gameTickTime runs at 10 ticks/second (see vm_bridge get_month).
-    return Math.floor((globalState.gameTickTime ?? 0) / (10 * 86400))
-}
-
-function refreshHealDay(): void {
-    const day = currentDayKey()
-    if (healUses.dayKey !== day) {
-        healUses = { dayKey: day, firstAid: 0, doctor: 0 }
-    }
-}
-
-/** Test helper — reset First Aid / Doctor daily use counters. */
-export function resetSkilldexHealUses(): void {
-    healUses = { dayKey: currentDayKey(), firstAid: 0, doctor: 0 }
-}
-
 export function getFalloutSkillId(skill: Skills): number {
-    if (skill === Skills.None) return -1
+    if (skill === Skills.None) {return -1}
     return FALLOUT_SKILL_ID[skill] ?? -1
 }
 
 export function isPlayerSneaking(player: { pcFlags?: number } | null | undefined): boolean {
-    return !!((player?.pcFlags ?? 0) & (1 << SNK_MODE_BIT))
+    return playerInSneakMode(player)
 }
 
-/** Toggle SNK_MODE on the live player. Returns the new sneaking state. */
+/** dudeToggleState(DUDE_STATE_SNEAKING): silent; the SNEAK indicator shows the state. */
 export function togglePlayerSneak(): boolean {
     const player = globalState.player as any
-    if (!player) return false
-    if (typeof player.pcFlags !== 'number') player.pcFlags = 0
-    const on = isPlayerSneaking(player)
-    if (on) {
-        player.pcFlags &= ~(1 << SNK_MODE_BIT)
-        skilldexLog('You stop sneaking.')
-        return false
-    }
-    // Soft skill gate: always allow toggle, but warn on very low Sneak.
-    const sneak = typeof player.getSkill === 'function' ? player.getSkill('Sneak') : 0
-    player.pcFlags |= 1 << SNK_MODE_BIT
-    if (sneak < 20) {
-        skilldexLog('You attempt to sneak (poorly).')
-    } else {
-        skilldexLog('You begin sneaking.')
-    }
-    return true
+    if (!player) {return false}
+    const on = !playerInSneakMode(player)
+    setPlayerSneakMode(player, on)
+    return on
 }
 
-function skillDisplayName(skill: Skills): string {
-    switch (skill) {
-        case Skills.FirstAid: return 'First Aid'
-        case Skills.Doctor: return 'Doctor'
-        case Skills.Sneak: return 'Sneak'
-        case Skills.Lockpick: return 'Lockpick'
-        case Skills.Steal: return 'Steal'
-        case Skills.Traps: return 'Traps'
-        case Skills.Science: return 'Science'
-        case Skills.Repair: return 'Repair'
-        default: return 'Unknown'
-    }
+/** actionUseSkill's checks for the player using a Skilldex skill on `obj`. */
+export function canPlayerUseSkillOn(skill: Skills, obj: Obj): boolean {
+    return canUseSkillOn(globalState.player, obj, getFalloutSkillId(skill))
 }
 
-/**
- * Apply First Aid / Doctor heal when the target script does not override.
- * Returns true if a heal attempt was made (success or fail).
- */
-export function applyHealingSkillFallback(skill: Skills, target: Obj): boolean {
-    if (skill !== Skills.FirstAid && skill !== Skills.Doctor) return false
-    if (!target || (target as Critter).type !== 'critter') {
-        skilldexLog('That cannot be healed.')
-        return true
-    }
-
-    refreshHealDay()
-    const uses = skill === Skills.FirstAid ? healUses.firstAid : healUses.doctor
-    if (uses >= HEAL_USES_PER_DAY) {
-        skilldexLog("You're too tired to try that again today.")
-        return true
-    }
-
-    const player = globalState.player as Critter
-    const skillName = skillDisplayName(skill)
-    const skillValue = typeof player.getSkill === 'function' ? player.getSkill(skillName) : 0
-    const check = rollSkillCheck(skillValue, 0)
-
-    if (skill === Skills.FirstAid) healUses.firstAid++
-    else healUses.doctor++
-
-    const critter = target as Critter
-    if (!critter.stats) {
-        skilldexLog('Nothing happens.')
-        return true
-    }
-
-    const maxHp = critter.getStat?.('Max HP') ?? critter.stats.get?.('Max HP') ?? 0
-    const hp = critter.getStat?.('HP') ?? critter.stats.get?.('HP') ?? 0
-    if (hp >= maxHp && skill === Skills.FirstAid) {
-        skilldexLog('They do not need First Aid.')
-        return true
-    }
-
-    if (!check.success) {
-        skilldexLog(`You fail the ${skillName} attempt.`)
-        return true
-    }
-
-    // FO2-ish: First Aid heals a modest amount; Doctor heals more / can help cripples later.
-    const heal = skill === Skills.FirstAid
-        ? Math.max(1, Math.floor(skillValue / 10) + 1)
-        : Math.max(2, Math.floor(skillValue / 5) + 2)
-    const newHp = Math.min(maxHp, hp + heal)
-    if (critter.stats.baseStats) {
-        critter.stats.baseStats['HP'] = newHp
-    }
-    if (critter === globalState.player) {
-        syncPlayerEntityFromCritter()
-    }
-    skilldexLog(`You heal ${newHp - hp} HP with ${skillName}.`)
-    return true
+/** _obj_use_skill_on for the player: the target's script, then the engine's skillUse. */
+export function applyPlayerSkill(skill: Skills, obj: Obj): void {
+    useSkillOn(globalState.player, obj, getFalloutSkillId(skill), (source, target, id) =>
+        Scripting.useSkillOn(source as Critter, id, target as Obj)
+    )
 }
 
 /**
@@ -197,7 +80,7 @@ export function applyHealingSkillFallback(skill: Skills, target: Obj): boolean {
  * Returns true if the action was handled.
  */
 export function useSkilldexSkill(skill: Skills, obj?: Obj | null): boolean {
-    if (skill === Skills.None) return false
+    if (skill === Skills.None) {return false}
 
     if (skill === Skills.Sneak) {
         togglePlayerSneak()
@@ -205,15 +88,8 @@ export function useSkilldexSkill(skill: Skills, obj?: Obj | null): boolean {
     }
 
     if (skillRequiresTarget(skill)) {
-        if (!obj) {
-            console.warn('[skilldex] skill', skill, 'requires a target')
-            return false
-        }
-        const skillId = getFalloutSkillId(skill)
-        const overridden = Scripting.useSkillOn(globalState.player as Critter, skillId, obj)
-        if (!overridden && (skill === Skills.FirstAid || skill === Skills.Doctor)) {
-            applyHealingSkillFallback(skill, obj)
-        }
+        if (!obj) {return false}
+        if (canPlayerUseSkillOn(skill, obj)) {applyPlayerSkill(skill, obj)}
         return true
     }
 

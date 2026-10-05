@@ -540,13 +540,13 @@ describe('Phase 96-F — sfall 0x8308–0x830F: critter remaining SPECIAL stats 
         expect(script.get_critter_sneak_state_sfall(critter)).toBe(0)
     })
 
-    it('0x830E get_critter_sneak_state_sfall: returns 1 when SNK_MODE bit is set', () => {
-        critter.pcFlags = 0x8  // SNK_MODE = bit 3
+    it('0x830E get_critter_sneak_state_sfall: returns 1 when sneaking bit is set', () => {
+        critter.pcFlags = 0x1  // DUDE_STATE_SNEAKING = bit 0
         expect(script.get_critter_sneak_state_sfall(critter)).toBe(1)
     })
 
-    it('0x830E get_critter_sneak_state_sfall: returns 0 when other flags set but not SNK_MODE', () => {
-        critter.pcFlags = 0x4  // bit 2 only, not bit 3
+    it('0x830E get_critter_sneak_state_sfall: returns 0 when other flags set but not sneaking', () => {
+        critter.pcFlags = 0x8  // bit 3 (LEVEL_UP_AVAILABLE) only
         expect(script.get_critter_sneak_state_sfall(critter)).toBe(0)
     })
 
@@ -560,23 +560,23 @@ describe('Phase 96-F — sfall 0x8308–0x830F: critter remaining SPECIAL stats 
     })
 
     // 0x830F — set_critter_sneak_state_sfall
-    it('0x830F set_critter_sneak_state_sfall: sets SNK_MODE bit on critter', () => {
+    it('0x830F set_critter_sneak_state_sfall: sets sneaking bit on critter', () => {
         critter.pcFlags = 0
         script.set_critter_sneak_state_sfall(critter, 1)
-        expect((critter.pcFlags & 0x8) !== 0).toBe(true)
+        expect((critter.pcFlags & 0x1) !== 0).toBe(true)
     })
 
-    it('0x830F set_critter_sneak_state_sfall: clears SNK_MODE bit on critter', () => {
-        critter.pcFlags = 0x8
+    it('0x830F set_critter_sneak_state_sfall: clears sneaking bit on critter', () => {
+        critter.pcFlags = 0x1
         script.set_critter_sneak_state_sfall(critter, 0)
-        expect((critter.pcFlags & 0x8) !== 0).toBe(false)
+        expect((critter.pcFlags & 0x1) !== 0).toBe(false)
     })
 
     it('0x830F set_critter_sneak_state_sfall: initialises pcFlags when missing', () => {
         // critter has no pcFlags property initially
         delete critter.pcFlags
         script.set_critter_sneak_state_sfall(critter, 1)
-        expect((critter.pcFlags & 0x8) !== 0).toBe(true)
+        expect((critter.pcFlags & 0x1) !== 0).toBe(true)
     })
 
     it('0x830F set_critter_sneak_state_sfall: round-trips with getter', () => {

@@ -2,7 +2,7 @@
  * Parity Slice D — Skilldex 8 skills (P0-3).
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Skills, skillRequiresTarget } from './skills.js'
 import {
     SKILLDEX_ENTRIES,
@@ -10,19 +10,15 @@ import {
     getFalloutSkillId,
     togglePlayerSneak,
     isPlayerSneaking,
-    applyHealingSkillFallback,
     useSkilldexSkill,
-    resetSkilldexHealUses,
 } from './skilldex.js'
 import { Player } from './player.js'
 import globalState from './globalState.js'
 
-const TICKS_PER_GAME_DAY = 10 * 86400
 import { UIManagerImpl } from './ui2/uiPanel.js'
 import { registerDefaultPanels } from './ui2/registerPanels.js'
 import { QuestLog } from './quest/questLog.js'
 import { SkilldexPanel } from './ui2/skilldexPanel.js'
-import * as skillCheck from './skillCheck.js'
 
 describe('Parity Slice D — Skilldex catalog', () => {
     it('exposes all 8 Skilldex skills', () => {
@@ -67,7 +63,7 @@ describe('Parity Slice D — Sneak toggle', () => {
         globalState.player = savedPlayer
     })
 
-    it('toggles SNK_MODE bit 3', () => {
+    it('toggles the sneaking state (dude state bit 0)', () => {
         expect(isPlayerSneaking(globalState.player)).toBe(false)
         expect(togglePlayerSneak()).toBe(true)
         expect(isPlayerSneaking(globalState.player)).toBe(true)
@@ -78,56 +74,6 @@ describe('Parity Slice D — Sneak toggle', () => {
     it('useSkilldexSkill(Sneak) does not need a target', () => {
         expect(useSkilldexSkill(Skills.Sneak)).toBe(true)
         expect(isPlayerSneaking(globalState.player)).toBe(true)
-    })
-})
-
-describe('Parity Slice D — First Aid fallback heal', () => {
-    let savedPlayer: typeof globalState.player
-
-    beforeEach(() => {
-        savedPlayer = globalState.player
-        globalState.player = new Player()
-        resetSkilldexHealUses()
-        vi.spyOn(skillCheck, 'rollSkillCheck').mockReturnValue({
-            success: true,
-            roll: 1,
-            threshold: 95,
-        })
-    })
-
-    afterEach(() => {
-        vi.restoreAllMocks()
-        globalState.player = savedPlayer
-    })
-
-    it('heals the player Critter on successful First Aid', () => {
-        const player = globalState.player as Player
-        player.stats.baseStats['Max HP'] = 50
-        player.stats.baseStats['HP'] = 10
-        const ok = applyHealingSkillFallback(Skills.FirstAid, player)
-        expect(ok).toBe(true)
-        expect(player.stats.baseStats['HP']).toBeGreaterThan(10)
-    })
-
-    it('resets First Aid uses after one in-game day (10 Hz tick clock)', () => {
-        const player = globalState.player as Player
-        globalState.gameTickTime = 0
-        resetSkilldexHealUses()
-        const rollSpy = vi.spyOn(skillCheck, 'rollSkillCheck').mockReturnValue({
-            success: false,
-            roll: 99,
-            threshold: 1,
-        })
-        for (let i = 0; i < 3; i++) {
-            expect(applyHealingSkillFallback(Skills.FirstAid, player)).toBe(true)
-        }
-        expect(rollSpy).toHaveBeenCalledTimes(3)
-        applyHealingSkillFallback(Skills.FirstAid, player)
-        expect(rollSpy).toHaveBeenCalledTimes(3)
-
-        globalState.gameTickTime = TICKS_PER_GAME_DAY
-        applyHealingSkillFallback(Skills.FirstAid, player)
-        expect(rollSpy).toHaveBeenCalledTimes(4)
     })
 })
 

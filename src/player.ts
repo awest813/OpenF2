@@ -50,11 +50,10 @@ export class Player extends Critter {
     /**
      * Player-character state flags (bitfield).
      *
-     * Known bits:
-     *   0 = LEVEL_UP_UNUSED  (legacy; not used at runtime)
-     *   1 = LEVEL_UP2        (second level-up flag)
-     *   2 = I_AM_EVIL        (evil-alignment karma flag)
-     *   3 = SNK_MODE         (sneak mode — reduces NPC perception range)
+     * The engine's dude states (critter.h):
+     *   0 = SNEAKING
+     *   3 = LEVEL_UP_AVAILABLE
+     *   4 = ADDICTED
      *
      * Set/cleared by pc_flag_on(flag) / pc_flag_off(flag) scripting calls.
      * Persisted in save schema v12+.

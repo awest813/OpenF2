@@ -24,6 +24,7 @@ import { GameMap } from './map.js'
 import { Player } from './player.js'
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { saveLoadInit } from './saveload.js'
+import { resetSkillUsage } from './skillUse.js'
 import { initUI } from './ui.js'
 import { Worldmap } from './worldmap.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
@@ -38,6 +39,7 @@ export function initGame(options: InitGameOptions = {}): void {
     globalState.gMap = new GameMap()
     // scr_game_init: a new game starts at 8:24 in the morning on 25 July 2241.
     globalState.gameTickTime = NEW_GAME_TICKS
+    resetSkillUsage()
 
     if (shouldSkipMainMenu()) {
         // Dev shortcut: `?artemple` (or any map name) loads immediately.

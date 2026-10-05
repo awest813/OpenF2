@@ -343,11 +343,30 @@ export function canSee(critter: any, target: any): boolean {
 }
 
 const OBJECT_TRANS_GLASS = 0x20000
-const PC_FLAG_SNEAKING = 1 << 3
+/** DUDE_STATE_SNEAKING is state bit 0 (bit 3 is LEVEL_UP_AVAILABLE, bit 4 ADDICTED). */
+export const PC_FLAG_SNEAKING = 1 << 0
 
 /** dudeHasState(DUDE_STATE_SNEAKING). */
 export function playerInSneakMode(player: any = globalState.player): boolean {
     return typeof player?.pcFlags === 'number' && (player.pcFlags & PC_FLAG_SNEAKING) !== 0
+}
+
+/**
+ * dudeEnableState / dudeDisableState(DUDE_STATE_SNEAKING). Turning sneak on
+ * makes the first Sneak roll at once (sneakEventProcess); turning it off
+ * drops the pending one.
+ */
+export function setPlayerSneakMode(player: any, on: boolean, rng?: Rng): void {
+    if (!player) {return}
+    if (typeof player.pcFlags !== 'number') {player.pcFlags = 0}
+    player.sneakCheckTick = undefined
+    player.sneakWorking = false
+    if (on) {
+        player.pcFlags |= PC_FLAG_SNEAKING
+        playerIsSneaking(rng ?? ((min, max) => min + Math.floor(Math.random() * (max - min + 1))), player)
+    } else {
+        player.pcFlags &= ~PC_FLAG_SNEAKING
+    }
 }
 
 /**

@@ -128,6 +128,8 @@ export interface SaveGame {
      * Defaults to 0 (no flags set) for old saves.
      */
     playerPcFlags?: number
+    /** skillsUsageSave: per skill, the game times of its last three uses. */
+    skillUsage?: number[][]
 
     /**
      * Currently active weapon hand (added in v13 / BLK-034).

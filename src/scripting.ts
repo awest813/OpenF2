@@ -43,8 +43,8 @@ import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
-import { isWithinPerception as perceives, playerIsSneaking } from './combat/aiPacket.js'
-import { randomRoll as engineRandomRoll } from './combat/fo2Formulas.js'
+import { isWithinPerception as perceives, playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
+import { skillRoll as engineSkillRoll } from './skillUse.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
@@ -1952,8 +1952,10 @@ export namespace Scripting {
             critter.skills.setBase(skillName, critter.skills.getBase(skillName) + amount)
             return critter.getSkill(skillName)
         }
+        /** opUsingSkill: only the player's Sneak state is known (1 while sneak mode is on); 0 otherwise. */
         using_skill(obj: Obj, skill: number) {
-            return this.has_skill(obj, skill)
+            const SNEAK = 8
+            return skill === SNEAK && obj === globalState.player && playerInSneakMode(obj) ? 1 : 0
         }
         has_skill(obj: Obj, skill: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -1982,19 +1984,8 @@ export namespace Scripting {
          */
         roll_vs_skill(obj: Obj, skill: number, bonus: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {return RollResult.CRITICAL_FAILURE}
-            let skillValue = this.has_skill(obj, skill)
             const safeBonus = (typeof bonus === 'number' && isFinite(bonus)) ? bonus : 0
-            const STEAL = 10
-            if ((obj as Critter).isPlayer && skill === STEAL && playerIsSneaking((min, max) => getRandomInt(min, max), obj)) {
-                skillValue += 30
-            }
-            let critChance = 0
-            try {
-                critChance = (obj as Critter).getStat?.('Critical Chance') ?? 0
-            } catch {
-                critChance = 0
-            }
-            const result = engineRandomRoll(skillValue + safeBonus, critChance, (min, max) => getRandomInt(min, max))
+            const result = engineSkillRoll(obj, skill, safeBonus, (min, max) => getRandomInt(min, max))
             this._howMuch = result.delta
             return result.roll
         }
@@ -2426,10 +2417,9 @@ export namespace Scripting {
 
         // ---------------------------------------------------------------------------
         // PC flags — player character state bitfield
-        //   Bit 0: LEVEL_UP_UNUSED (legacy level-up flag, not used at runtime)
-        //   Bit 1: LEVEL_UP2       (second level-up flag)
-        //   Bit 2: I_AM_EVIL       (character is evil-aligned for karma logic)
-        //   Bit 3: SNK_MODE        (sneak mode active; reduces NPC perception range)
+        //   Bit 0: SNEAKING            (DUDE_STATE_SNEAKING)
+        //   Bit 3: LEVEL_UP_AVAILABLE  (DUDE_STATE_LEVEL_UP_AVAILABLE)
+        //   Bit 4: ADDICTED            (DUDE_STATE_ADDICTED)
         // ---------------------------------------------------------------------------
         pc_flag_on(flag: number) {
             log('pc_flag_on', arguments)
@@ -8555,37 +8545,22 @@ export namespace Scripting {
             ;(obj as Critter).stats.setBase('INT', v)
         }
 
-        // sfall 0x830E — get_critter_sneak_state_sfall(obj): sneak-mode state.
-        // Returns 1 if the critter has sneak mode active (pcFlags bit 3 = SNK_MODE),
-        // 0 otherwise.  Used by Arroyo guard-AI detection scripts to reduce the
-        // critter perception radius when the player is sneaking through the village.
-        // Non-player critters that lack pcFlags always return 0.
+        // get_critter_sneak_state_sfall / set_critter_sneak_state_sfall: the
+        // player's sneak state (DUDE_STATE_SNEAKING, state bit 0).
         get_critter_sneak_state_sfall(obj: Obj): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('get_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
                 return 0
             }
-            const flags = (obj as any).pcFlags ?? 0
-            return (flags & 0x8) !== 0 ? 1 : 0
+            return playerInSneakMode(obj) ? 1 : 0
         }
 
-        // sfall 0x830F — set_critter_sneak_state_sfall(obj, val): set sneak-mode.
-        // Sets (val !== 0) or clears (val === 0) SNK_MODE (bit 3) in pcFlags.
-        // Arroyo stealth scripts use this to simulate or cancel sneak attempts for
-        // the player and companion critters.
         set_critter_sneak_state_sfall(obj: Obj, val: number): void {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('set_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
                 return
             }
-            if ((obj as any).pcFlags === undefined) {
-                (obj as any).pcFlags = 0
-            }
-            if (val) {
-                ;(obj as any).pcFlags |= 0x8  // set SNK_MODE bit 3
-            } else {
-                ;(obj as any).pcFlags &= ~0x8  // clear SNK_MODE bit 3
-            }
+            setPlayerSneakMode(obj, !!val)
         }
 
         // -------------------------------------------------------------------------

@@ -29,7 +29,7 @@ import { Critter, Obj } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
-import { useSkilldexSkill } from './skilldex.js'
+import { applyPlayerSkill, canPlayerUseSkillOn, useSkilldexSkill } from './skilldex.js'
 import { openCompanionTrade, canTradeWithPartyMember } from './partyTrade.js'
 import { UIMode } from './uiMode.js'
 import {
@@ -63,15 +63,26 @@ import { CreditsPanel } from './ui2/creditsPanel.js'
 import { Engine } from './engine.js'
 import { midnightCheck } from './mapAging.js'
 
+/**
+ * actionUseSkill: check the skill fits the target (and that combat is not
+ * on), walk up to it, then _obj_use_skill_on.
+ */
 function playerUseSkill(skill: Skills, obj: Obj): void {
-    console.log('use skill %o on %o', skill, obj)
-
-    if (!obj && skillRequiresTarget(skill)) {
-        console.warn('playerUseSkill: skill ' + skill + ' requires a target but none was provided — skipping')
+    if (!obj) {return}
+    if (!skillRequiresTarget(skill)) {
+        useSkilldexSkill(skill)
         return
     }
-
-    useSkilldexSkill(skill, obj)
+    if (!canPlayerUseSkillOn(skill, obj)) {return}
+    const player = globalState.player
+    if (obj === player || !obj.position || Config.engine.doInfiniteUse === true) {
+        applyPlayerSkill(skill, obj)
+        return
+    }
+    player.walkInFrontOf(obj.position, () => {
+        player.clearAnim()
+        applyPlayerSkill(skill, obj)
+    })
 }
 
 export function playerUse(obj?: Obj) {
