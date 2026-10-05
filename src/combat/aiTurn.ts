@@ -8,6 +8,7 @@
  * (_combat_turn_run); here every step that animates is awaited instead.
  */
 
+import { HOOK, hookReturn, runHook } from '../hookScripts.js'
 import { sfallSettings } from '../sfallSettings.js'
 import type { Combat } from '../combat.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, Point } from '../geometry.js'
@@ -469,6 +470,16 @@ export class AiTurn {
             this.sortByDistance(targets)
         }
 
+        // sfall HOOK_FINDTARGET: scripts may give the four choices themselves (-1 keeps one).
+        const hook = runHook(HOOK.FINDTARGET, [c, targets[0] ?? 0, targets[1] ?? 0, targets[2] ?? 0, targets[3] ?? 0])
+        if (hook && hook.rets.length > 0) {
+            for (let i = 0; i < 4; i++) {
+                const r = hook.rets[i]
+                if (r === undefined || r === -1) {continue}
+                targets[i] = r && typeof r === 'object' ? r as AnyCritter : null
+            }
+        }
+
         for (const candidate of targets) {
             if (!candidate || !isWithinPerception(c, candidate, this.rng, 3)) {continue}
             if (this.reachable(candidate) || this.combat.checkBadShot(c, candidate, 1, false) === 'ok') {
@@ -498,7 +509,14 @@ export class AiTurn {
     }
 
     /** _ai_can_use_weapon. */
+    /** _ai_can_use_weapon, then sfall HOOK_CANUSEWEAPON. */
     private canUseWeapon(weapon: AnyCritter, hitMode: AiHitMode): boolean {
+        const result = this.engineCanUseWeapon(weapon, hitMode)
+        const hook = runHook(HOOK.CANUSEWEAPON, [this.c, weapon, hitMode === 2 ? 3 : 2, result ? 1 : 0])
+        return hook ? hookReturn(hook, 0, result ? 1 : 0) !== 0 : result
+    }
+
+    private engineCanUseWeapon(weapon: AnyCritter, hitMode: AiHitMode): boolean {
         const c = this.c
         if (c.crippledLeftArm && c.crippledRightArm) {return false}
         const info = getAttackWeaponInfo(withWeapon(c, weapon), (hitMode || 1) as HitMode)
@@ -541,7 +559,16 @@ export class AiTurn {
     }
 
     /** _ai_best_weapon. */
+    /** _ai_best_weapon, then sfall HOOK_BESTWEAPON. */
     private bestWeapon(w1: AnyCritter | null, w2: AnyCritter | null, defender: AnyCritter | null): AnyCritter | null {
+        const best = this.engineBestWeapon(w1, w2, defender)
+        const hook = runHook(HOOK.BESTWEAPON, [this.c, best ?? 0, w1 ?? 0, w2 ?? 0, defender ?? 0])
+        const chosen = hook?.rets[0]
+        if (chosen !== undefined) {return chosen && typeof chosen === 'object' ? chosen as AnyCritter : null}
+        return best
+    }
+
+    private engineBestWeapon(w1: AnyCritter | null, w2: AnyCritter | null, defender: AnyCritter | null): AnyCritter | null {
         const ai = this.ai
         if (ai.bestWeapon === BestWeapon.RANDOM) {return this.rng(1, 100) <= 50 ? w1 : w2}
         const order = WEAPON_PREF_ORDERINGS[ai.bestWeapon + 1] ?? WEAPON_PREF_ORDERINGS[0]
