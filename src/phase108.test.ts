@@ -41,18 +41,6 @@ describe('Phase 108-A — get_object_lighting reads lightmap', () => {
         expect(script.get_object_lighting(obj as any)).toBeCloseTo(12000, -2)
     })
 
-    it('obj_set_light_level syncs lightIntensity and lightLevel', () => {
-        const obj: any = {
-            type: 'scenery',
-            position: { x: 10, y: 10 },
-            lightIntensity: 655,
-            lightRadius: 0,
-        }
-        script.obj_set_light_level(obj, 40000, 4)
-        expect(obj.lightIntensity).toBe(40000)
-        expect(obj.lightLevel).toBe(40000)
-        expect(obj.lightRadius).toBe(4)
-    })
 })
 
 describe('Phase 108-B — tile light level sfall opcodes', () => {

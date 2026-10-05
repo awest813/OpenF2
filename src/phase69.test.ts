@@ -98,22 +98,6 @@ describe('Phase 69-B — BLK-083: tile_is_visible null player.position guard', (
         gs.player = origPlayer
     })
 
-    it('tile_is_visible returns 1 (visible) when player.position is null', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origPlayer = gs.player
-        gs.player = { position: null } as any
-        const result = script.tile_is_visible(20100)
-        expect(result).toBe(1)
-        gs.player = origPlayer
-    })
-
-    it('tile_is_visible returns 1 when player is null', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origPlayer = gs.player
-        gs.player = null as any
-        expect(script.tile_is_visible(20100)).toBe(1)
-        gs.player = origPlayer
-    })
 })
 
 // ===========================================================================

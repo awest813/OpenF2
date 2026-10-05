@@ -294,29 +294,12 @@ describe('Phase 94-D — BLK-198: tile_is_visible() non-finite tile guard', () =
         expect(() => (script as any).tile_is_visible(NaN)).not.toThrow()
     })
 
-    it('returns 1 (visible) when tile is NaN', () => {
-        expect((script as any).tile_is_visible(NaN)).toBe(1)
-    })
-
     it('does not throw when tile is Infinity', () => {
         expect(() => (script as any).tile_is_visible(Infinity)).not.toThrow()
     })
 
-    it('returns 1 (visible) when tile is Infinity', () => {
-        expect((script as any).tile_is_visible(Infinity)).toBe(1)
-    })
-
     it('does not throw when tile is -Infinity', () => {
         expect(() => (script as any).tile_is_visible(-Infinity)).not.toThrow()
-    })
-
-    it('returns 1 (visible) when tile is -Infinity', () => {
-        expect((script as any).tile_is_visible(-Infinity)).toBe(1)
-    })
-
-    it('returns 1 (visible) with valid tile when no player', () => {
-        globalState.player = null as any
-        expect((script as any).tile_is_visible(10000)).toBe(1)
     })
 
     it('does not throw with a valid tile number', () => {
@@ -361,13 +344,6 @@ describe('Phase 94-E — BLK-199: obj_set_light_level() non-finite intensity/dis
         const obj = makeCritter() as any
         ;(script as any).obj_set_light_level(obj, Infinity, 3)
         expect(obj.lightIntensity).toBe(0)
-    })
-
-    it('sets valid intensity and distance normally', () => {
-        const obj = makeCritter() as any
-        ;(script as any).obj_set_light_level(obj, 32768, 4)
-        expect(obj.lightIntensity).toBe(32768)
-        expect(obj.lightRadius).toBe(4)
     })
 
     it('clamps intensity to [0, 65536]', () => {

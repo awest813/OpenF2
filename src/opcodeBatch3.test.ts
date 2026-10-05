@@ -119,3 +119,33 @@ describe('kill / damage / destroy / timers', () => {
         expect(Scripting.timeEventList.map((e: any) => e.obj)).toEqual([b])
     })
 })
+
+describe('messages, lights, floating text, dialogue entry', () => {
+    it('message_str gives Error for a negative line', () => {
+        const script: any = new (Scripting as any).Script()
+        expect(script.message_str(1, -1)).toBe('Error')
+    })
+
+    it('float_msg floats over the given object; empty text clears it', () => {
+        const script: any = new (Scripting as any).Script()
+        const saved = globalState.floatMessages
+        globalState.floatMessages = []
+        const other: any = { _type: 'obj', type: 'critter', position: { x: 1, y: 1 } }
+        script.self_obj = { _type: 'obj', type: 'critter' }
+        script.float_msg(other, 'Hey', 2)
+        expect(globalState.floatMessages[0].obj).toBe(other)
+        expect(globalState.floatMessages[0].color).toBe('rgb(255,0,0)')
+        script.float_msg(other, '', 0)
+        expect(globalState.floatMessages).toEqual([])
+        globalState.floatMessages = saved
+    })
+
+    it('obj_pid gives -1 for no object; dialogue_system_enter does nothing in combat', () => {
+        const script: any = new (Scripting as any).Script()
+        expect(script.obj_pid(null)).toBe(-1)
+        script.self_obj = { _type: 'obj', type: 'critter', _script: {} }
+        globalState.inCombat = true
+        expect(() => script.dialogue_system_enter()).not.toThrow()
+        globalState.inCombat = false
+    })
+})

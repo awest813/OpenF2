@@ -336,6 +336,13 @@ export function centerCamera(around: Point) {
     globalState.cameraPosition.y = Math.max(0, (scr.y - SCREEN_HEIGHT / 2) | 0)
 }
 
+/** gCenterTile: the tile under the middle of the view. */
+export function centerTile(): number {
+    const cam = globalState.cameraPosition ?? { x: 0, y: 0 }
+    const hex = hexFromScreen(cam.x + SCREEN_WIDTH / 2, cam.y + SCREEN_HEIGHT / 2)
+    return hex.y * 200 + hex.x
+}
+
 export function objectOnScreen(obj: Obj): boolean {
     const bbox = objectBoundingBox(obj)
     if (bbox === null) {

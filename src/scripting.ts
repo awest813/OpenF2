@@ -38,7 +38,7 @@ import { parseIntFile } from './intfile.js'
 import { actionExplode, Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
 import { lookupArt, makePID, loadPRO } from './pro.js'
-import { centerCamera, objectOnScreen } from './renderer.js'
+import { centerCamera, centerTile, objectOnScreen } from './renderer.js'
 import { Lightmap } from './lightmap.js'
 import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
@@ -380,6 +380,17 @@ export namespace Scripting {
         }
         return null
     }
+
+    /** RGB555 colour-table entries as CSS. */
+    const rgb555 = (c: number) => `rgb(${Math.round(((c >> 10) & 31) * 255 / 31)},${Math.round(((c >> 5) & 31) * 255 / 31)},${Math.round((c & 31) * 255 / 31)})`
+    /** opFloatMessage's colours by message type (-2 warning … 12 light grey). */
+    const FLOAT_COLORS: Record<number, string> = {
+        [-2]: rgb555(31744), 0: rgb555(32747), 1: rgb555(10570), 2: rgb555(31744), 3: rgb555(992),
+        4: rgb555(31), 5: rgb555(10570), 6: rgb555(21140), 7: rgb555(32074), 8: rgb555(32747),
+        9: rgb555(32767), 10: rgb555(10570), 11: rgb555(8456), 12: rgb555(15855),
+    }
+    /** _last_color: where FLOATING_MESSAGE_TYPE_COLOR_SEQUENCE is in the cycle. */
+    let lastFloatColor = 0
 
     function lookupMapNameSafe(mapID: number): string | null {
         try {
@@ -1082,8 +1093,10 @@ export namespace Scripting {
             if (this._vm) {updateScriptDebuggerVMInfo(this._vm)}
             uiLog(msg)
         }
+        /** opGetMessageString: "Error" for a negative index or a missing message. */
         message_str(msgList: number, msgNum: number) {
-            return getScriptMessage(msgList, msgNum)
+            if (typeof msgNum === 'number' && msgNum < 0) {return 'Error'}
+            return getScriptMessage(msgList, msgNum) ?? 'Error'
         }
         /** opMetarule: the engine's rules 13–53; any other id gives 0. */
         metarule(id: number, target: any): any {
@@ -1510,20 +1523,11 @@ export namespace Scripting {
             if (elevationOf(a) !== elevationOf(b)) {return 0}
             return +objCanSeeObj(a, b)
         }
+        /** opObjectCanHearObject (with sfall's fix): same elevation and within perception. */
         obj_can_hear_obj(a: Obj, b: Obj) {
-            if (!isGameObject(a) || !isGameObject(b)) {
-                warn(`obj_can_hear_obj: not game object: a=${a} b=${b}`, undefined, this)
-                return 0
-            }
-            // BLK-085: Guard against null positions — objects without a position
-            // (e.g. items in inventory, or critters mid-map-transition) would
-            // crash hexDistance with a TypeError.  Return 0 (out of earshot) when
-            // either position is missing so combat/AI scripts can continue safely.
-            if (!a.position || !b.position) {
-                warn(`obj_can_hear_obj: one or both objects lack a position`, undefined, this)
-                return 0
-            }
-            return hexDistance(a.position, b.position) <= 12 ? 1 : 0
+            if (!isGameObject(a) || !isGameObject(b) || !a.position || !b.position) {return 0}
+            if (elevationOf(a) !== elevationOf(b)) {return 0}
+            return isWithinPerception(a as Critter, b as Critter) ? 1 : 0
         }
         /**
          * opCritterModifySkill: only the player. Adds or takes skill points one at
@@ -2428,22 +2432,13 @@ export namespace Scripting {
             globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
             Lightmap.applyAmbientLight()
         }
+        /** opSetObjectLightLevel: intensity is a percentage (scaled by 65636/100, as the engine does). */
         obj_set_light_level(obj: Obj, intensity: number, distance: number) {
-            log('obj_set_light_level', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_set_light_level: not a game object: ' + obj)
-                return
-            }
-            // BLK-199: Guard against non-finite intensity and distance — Arroyo and
-            // Temple torch/fire barrel scripts compute intensity from tile index or
-            // time-of-day arithmetic that can yield NaN.  Math.max(0, Math.min(65536,
-            // NaN)) = NaN, which would store NaN on obj.lightIntensity and corrupt
-            // the lighting pipeline.  Clamp non-finite values to 0.
-            const safeIntensity = (typeof intensity === 'number' && isFinite(intensity))
-                ? Math.max(0, Math.min(65536, intensity)) : 0
-            const safeDistance = (typeof distance === 'number' && isFinite(distance))
-                ? Math.max(0, distance) : 0
-            Lightmap.syncObjectEmitterLight(obj, safeIntensity, safeDistance)
+            if (!isGameObject(obj)) {return}
+            const pct = Number.isFinite(intensity) ? intensity : 0
+            const value = pct !== 0 ? Math.trunc((pct * 65636) / 100) : 0
+            const dist = Number.isFinite(distance) ? Math.max(0, distance) : 0
+            Lightmap.syncObjectEmitterLight(obj, value, dist)
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {
             log('override_map_start', arguments)
@@ -2459,11 +2454,7 @@ export namespace Scripting {
             overrideStartPos = { position: { x, y }, orientation: rotation, elevation }
         }
         obj_pid(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_pid: not game object: ' + obj, undefined, this)
-                return null
-            }
-            return obj.pid
+            return isGameObject(obj) ? obj.pid : -1
         }
         obj_get_rot(obj: Obj): number {
             if (!isGameObject(obj)) {
@@ -2575,29 +2566,11 @@ export namespace Scripting {
             }
             return 0 // it's not there
         }
+        /** tileIsVisible: the engine's coarse test against the tile at the middle of the view. */
         tile_is_visible(tile: number) {
-            // BLK-198: Guard against non-finite tile numbers — Arroyo ceremony scripts
-            // compute the reference tile from arithmetic that can yield NaN when a
-            // critter's starting tile is uninitialised.  fromTileNum(NaN) returns
-            // {x:NaN, y:NaN} and hexDistance returns NaN, so NaN <= 14 is false and
-            // the tile is incorrectly reported as not visible.  Return 1 (visible) for
-            // non-finite tile numbers so dependent script branches can still execute.
-            if (typeof tile !== 'number' || !isFinite(tile)) {return 1}
-            // A tile is considered visible if the player exists and the tile is within
-            // the Fallout 2 standard view radius of 14 hexes.  When the player is not
-            // available (e.g. scripts run at startup), fall back to returning 1 so that
-            // scripts that use this as a guard condition can still run.
-            if (globalState.player) {
-                // BLK-083: Guard against a null player.position — can happen when the
-                // player object exists but has not yet been placed on the map (e.g.
-                // during initial script execution before map_enter_p_proc completes).
-                // Fall back to always-visible (1) so scripts proceed safely.
-                if (!globalState.player.position) {return 1}
-                const tilePos = fromTileNum(tile)
-                const dist = hexDistance(globalState.player.position, tilePos)
-                return dist <= 14 ? 1 : 0
-            }
-            return 1
+            if (!Number.isFinite(tile)) {return 0}
+            const d = Math.abs(centerTile() - tile)
+            return d % 200 < 5 || Math.trunc(d / 200) < 5 ? 1 : 0
         }
         /** opTileInTileRect: x between the 4th and 1st corners, y between the 1st and 4th. */
         tile_in_tile_rect(ul: number, _ur: number, _ll: number, lr: number, t: number) {
@@ -2826,56 +2799,36 @@ export namespace Scripting {
                 warn('dialogue_system_enter: no self_obj')
                 return
             }
+            // opGameDialogSystemEnter: not in combat, nor with a critter that cannot act.
+            if (globalState.inCombat) {return}
+            const speaker: any = this.self_obj
+            if (speaker.type === 'critter' && (speaker.dead || speaker.knockedOut || speaker.knockedDown)) {return}
             talk(this.self_obj._script, this.self_obj as Obj)
         }
+        /**
+         * opFloatMessage: text over the object. Empty text clears the object's
+         * messages; nothing shows for an object on another level. Colours follow
+         * the engine's palette; -1 cycles through them, -2 is a warning.
+         */
         float_msg(obj: Obj, msg: string, type: number) {
-            log('float_msg', arguments)
-            //info("FLOAT MSG: " + msg, "floatMessage")
-            if (!isGameObject(obj)) {
-                warn('float_msg: not game object: ' + obj)
+            if (!isGameObject(obj) || !Array.isArray(globalState.floatMessages)) {return}
+            if (typeof msg !== 'string' || msg === '') {
+                globalState.floatMessages = globalState.floatMessages.filter((m: any) => m.obj !== obj)
                 return
             }
-            // BLK-170: Guard against null/undefined message — Arroyo and Temple scripts
-            // occasionally call float_msg() with the result of message_str() which can
-            // return null when a message key is missing from the loaded .msg file.
-            // Storing null in floatMessages causes the renderer to crash when trying
-            // to measure text width.  Coerce to empty string and skip silently.
-            if (msg == null || msg === '') {return}
-            const colorMap: { [color: number]: string } = {
-                // approximate color mapping; exact values should come from the game palette
-                0: 'white',
-                1: 'black',
-                2: 'red',
-                3: 'green',
-                4: 'blue',
-                5: 'purple',
-                6: 'white',
-                7: 'red',
-                8: 'white', //8: "yellow",
-                9: 'white',
-                10: 'dark gray',
-                11: 'dark gray',
-                12: 'light gray',
+            if (elevationOf(obj) !== globalState.currentElevation) {return}
+            let kind = typeof type === 'number' ? type : 0
+            if (kind === -1) {
+                kind = lastFloatColor + 1
+                if (kind >= 13) {kind = 1}
+                lastFloatColor = kind
             }
-            let color = colorMap[type]
-            if (type === -2 /* FLOAT_MSG_WARNING */ || type === -1 /* FLOAT_MSG_SEQUENTIAL */) {color = colorMap[9]}
-            // BLK-131: Guard against missing floatMessages array — globalState is
-            // initialised with floatMessages:[] but a custom init path or a partial
-            // reset could leave it undefined.  Array spread access on undefined
-            // would throw; skip the push and emit a warning instead.
-            if (!Array.isArray(globalState.floatMessages)) {
-                warn('float_msg: globalState.floatMessages is not an array — skipping', undefined, this)
-                return
-            }
+            if (kind === -2 && globalState.player?.position) {centerCamera(globalState.player.position)}
             globalState.floatMessages.push({
-                msg: msg,
-                obj: this.self_obj as Obj,
-                // BLK-082: Use performance.now() with a typeof guard rather than
-                // window.performance.now() directly — the window global is not
-                // available in Node.js test environments and would throw a ReferenceError.
-                // This matches the pattern already used by get_uptime().
+                msg,
+                obj,
                 startTime: typeof performance !== 'undefined' ? performance.now() : 0,
-                color: color,
+                color: FLOAT_COLORS[kind] ?? FLOAT_COLORS[0],
             })
         }
 
