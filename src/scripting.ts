@@ -30,6 +30,7 @@ import {
     hexNearestNeighbor,
     Point,
     tile_in_tile_rect,
+    hexToScreen,
 } from './geometry.js'
 import { Spatial } from './map.js'
 import globalState from './globalState.js'
@@ -319,6 +320,15 @@ export namespace Scripting {
         if (maxBlood && critter?.type === 'critter' && critterArt(critter, anim)) {return anim}
         if (forceBack) {return ANIM_FALL_BACK}
         return critter?.type === 'critter' && critterArt(critter, ANIM_FALL_FRONT) ? ANIM_FALL_FRONT : ANIM_FALL_BACK
+    }
+
+    /** The map level holding an object (the current level for anything not on the map). */
+    function elevationOf(obj: any): number {
+        const levels: any[][] = (globalState.gMap as any)?.objects ?? []
+        for (let level = 0; level < levels.length; level++) {
+            if (levels[level]?.includes(obj)) {return level}
+        }
+        return globalState.currentElevation ?? 0
     }
 
     function lookupMapNameSafe(mapID: number): string | null {
@@ -1438,12 +1448,10 @@ export namespace Scripting {
             }
             return find(obj) ?? 0
         }
+        /** opGetObjectElevation: the level the object is on (0 for no object). */
         elevation(obj: Obj) {
-            if (isSpatial(obj) || isGameObject(obj)) {return globalState.currentElevation}
-            else {
-                warn('elevation: not an object: ' + obj)
-                return -1
-            }
+            if (!isSpatial(obj) && !isGameObject(obj)) {return 0}
+            return elevationOf(obj)
         }
         obj_can_see_obj(a: Critter, b: Critter) {
             log('obj_can_see_obj', arguments)
@@ -1583,27 +1591,41 @@ export namespace Scripting {
             if (!Array.isArray(inv) || itemIndex < 0 || itemIndex >= inv.length) {return null}
             return inv[itemIndex]
         }
+        /**
+         * opCritterAttemptPlacement (_obj_attempt_placement with radius 1): the
+         * tile, or when something blocks it the nearest free tile two or more
+         * hexes away that the player can reach, else a free adjacent one.
+         */
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
-            // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
-            // Fallout 2 returns -1 when placement fails; we mirror that here so
-            // calling scripts can detect and handle the failure gracefully.
-            // BLK-192: Also guard against non-finite tile numbers — Arroyo encounter
-            // scripts compute tile positions from arithmetic that can yield NaN (e.g.
-            // when a critter's source tile is uninitialised).  tileNum <= 0 does NOT
-            // catch NaN because NaN <= 0 is false in JavaScript.
-            if (!isGameObject(obj) || typeof tileNum !== 'number' || !Number.isFinite(tileNum) || tileNum <= 0) {return -1}
-            // BLK-108: Guard against null gMap — critter_attempt_placement delegates
-            // to move_to(), which calls gMap.changeElevation() without checking gMap.
-            // During map transitions or in test environments this crash is silent and
-            // hard to diagnose.  Return -1 (placement failure) so calling scripts can
-            // handle it gracefully rather than receiving an uncaught TypeError.
-            if (!globalState.gMap) {
-                warn('critter_attempt_placement: gMap is null — returning -1', undefined, this)
-                return -1
+            if (!isGameObject(obj) || !Number.isFinite(tileNum) || tileNum === -1 || !isValidTileNum(tileNum)) {return -1}
+            const map = globalState.gMap
+            if (!map) {return -1}
+            const level = Number.isInteger(elevation) ? elevation : globalState.currentElevation
+            const blocked = (t: Point) => (map.getObjects(level) ?? []).some((o: any) => o !== obj && o.position && o.position.x === t.x && o.position.y === t.y && o.blocks?.())
+            const origin = fromTileNum(tileNum)
+            let place: Point | null = origin
+            if (blocked(origin)) {
+                place = null
+                const player = globalState.player
+                for (let dist = 2; dist < 7 && !place; dist++) {
+                    for (let rotation = 0; rotation < 6; rotation++) {
+                        const t = hexInDirectionDistance(origin, rotation, dist)
+                        if (!t || t.x < 0 || t.x >= 200 || t.y < 0 || t.y >= 200 || blocked(t)) {continue}
+                        if (player?.position && map.recalcPath(player.position, t).length === 0) {continue}
+                        place = t
+                        break
+                    }
+                }
+                if (!place) {
+                    for (let rotation = 0; rotation < 6 && !place; rotation++) {
+                        const t = hexInDirectionDistance(origin, rotation, 1)
+                        if (t && !blocked(t)) {place = t}
+                    }
+                }
+                place = place ?? origin
             }
-            // Place the critter at tileNum; move_to handles finding a nearby tile if
-            // the exact position is occupied.
-            return this.move_to(obj, tileNum, elevation)
+            this.move_to(obj, toTileNum(place), level)
+            return 0
         }
         /**
          * opGetCritterState: CRITTER_STATE_DEAD (1) for a dead or non-critter
@@ -2474,16 +2496,12 @@ export namespace Scripting {
         }
 
         // tiles
+        /** opTileDistanceBetweenObjects: 9999 unless both are on the map at the same elevation. */
         tile_distance_objs(a: Obj, b: Obj) {
-            if (!isSpatial(a) && !isSpatial(b) && (!isGameObject(a) || !isGameObject(b))) {
-                warn('tile_distance_objs: ' + a + ' or ' + b + ' are not game objects')
-                return null
-            }
-            // BLK-060: Guard null positions to prevent hexDistance crash.
-            if (!a.position || !b.position) {
-                warn('tile_distance_objs: one or both objects lack a position', undefined, this)
-                return 0
-            }
+            const okA = isSpatial(a) || isGameObject(a)
+            const okB = isSpatial(b) || isGameObject(b)
+            if (!okA || !okB || !a.position || !b.position) {return 9999}
+            if (elevationOf(a) !== elevationOf(b)) {return 9999}
             return hexDistance(a.position, b.position)
         }
         tile_distance(a: number, b: number) {
@@ -2502,16 +2520,9 @@ export namespace Scripting {
             }
             return hexDistance(fromTileNum(a), fromTileNum(b))
         }
+        /** opGetObjectTile: -1 for no object or one off the map. */
         tile_num(obj: Obj) {
-            if (!isSpatial(obj) && !isGameObject(obj)) {
-                warn('tile_num: not a game object: ' + obj, undefined, this)
-                return null
-            }
-            // BLK-060: Guard null position to prevent toTileNum crash.
-            if (!obj.position) {
-                warn('tile_num: object has no position', undefined, this)
-                return -1
-            }
+            if ((!isSpatial(obj) && !isGameObject(obj)) || !obj.position) {return -1}
             return toTileNum(obj.position)
         }
         tile_contains_pid_obj(tile: number, elevation: number, pid: number): any {
@@ -2558,14 +2569,12 @@ export namespace Scripting {
             }
             return 1
         }
-        tile_in_tile_rect(ul: number, ur: number, ll: number, lr: number, t: number) {
-            //stub("tile_in_tile_rect", arguments, "tiles")
-            const _ul = fromTileNum(ul),
-                _ur = fromTileNum(ur)
-            const _ll = fromTileNum(ll),
-                _lr = fromTileNum(lr)
-            const _t = fromTileNum(t)
-            return tile_in_tile_rect(_t, _ur, _lr, _ll, _ul) ? 1 : 0
+        /** opTileInTileRect: x between the 4th and 1st corners, y between the 1st and 4th. */
+        tile_in_tile_rect(ul: number, _ur: number, _ll: number, lr: number, t: number) {
+            const x = t % 200, y = Math.trunc(t / 200)
+            const minX = lr % 200, maxX = ul % 200
+            const minY = Math.trunc(ul / 200), maxY = Math.trunc(lr / 200)
+            return x >= minX && x <= maxX && y >= minY && y <= maxY ? 1 : 0
         }
         tile_contains_obj_pid(tile: number, elevation: number, pid: number) {
             // BLK-037: use getObjects(elevation) so that objects on a non-current
@@ -2583,26 +2592,21 @@ export namespace Scripting {
             }
             return 0
         }
+        /** opGetRotationToTile (tileGetRotationTo): the screen angle between the hexes in sixths. */
         rotation_to_tile(srcTile: number, destTile: number) {
-            // BLK-211: Guard against non-finite tile numbers — Arroyo NPC patrol and
-            // escort scripts compute tile positions from critter.position arithmetic
-            // that can yield NaN when a critter's starting tile is uninitialised.
-            // fromTileNum(NaN) returns {x:NaN,y:NaN} and hexNearestNeighbor silently
-            // returns null (minIdx never updates from -1 against NaN distances), so
-            // rotation_to_tile would return -1 without any diagnostic.  Emit an
-            // explicit warning for traceability and return -1 immediately.
-            if (typeof srcTile !== 'number' || !isFinite(srcTile) ||
-                typeof destTile !== 'number' || !isFinite(destTile)) {
-                warn('rotation_to_tile: non-finite tile (src=' + srcTile + ' dest=' + destTile + ') — returning -1', undefined, this)
-                return -1
-            }
-            const src = fromTileNum(srcTile),
-                dest = fromTileNum(destTile)
-            const hex = hexNearestNeighbor(src, dest)
-            if (hex !== null) {return hex.direction}
-            warn('rotation_to_tile: invalid hex: ' + srcTile + ' / ' + destTile)
-            // -1 is the standard FO2 sentinel for "no valid direction".
-            return -1
+            if (!Number.isFinite(srcTile) || !Number.isFinite(destTile)) {return -1}
+            const a = fromTileNum(srcTile)
+            const b = fromTileNum(destTile)
+            const s1 = hexToScreen(a.x, a.y)
+            const s2 = hexToScreen(b.x, b.y)
+            const dx = s2.x - s1.x
+            const dy = s2.y - s1.y
+            if (dx === 0) {return dy < 0 ? 0 : 2}
+            const angle = Math.trunc((Math.atan2(-dy, dx) * 180) / Math.PI)
+            let rotation = 360 - (angle + 180) - 90
+            if (rotation < 0) {rotation += 360}
+            rotation = Math.trunc(rotation / 60)
+            return rotation >= 6 ? 5 : rotation
         }
         move_to(obj: Obj, tileNum: number, elevation: number) {
             if (!isGameObject(obj)) {
@@ -3741,27 +3745,21 @@ export namespace Scripting {
         //   count — number of steps to take in that direction
         // Returns the tile number of the destination, or the original tile when
         // the input is out of range (count <= 0 or bad tile).
+        /** opGetTileInDirection: -1 for no tile, a rotation out of range, a zero distance, or off the map. */
+        /**
+         * opGetTileInDirection (tileGetTileInDirection): step `count` hexes, stopping
+         * at the map's edge. -1 for no tile, a rotation out of range or a zero
+         * distance; a negative distance stays put.
+         */
         tile_num_in_direction(tile: number, dir: number, count: number): number {
-            if (typeof tile !== 'number' || typeof dir !== 'number' || typeof count !== 'number') {return tile ?? 0}
-            // BLK-206: Guard against non-finite direction or count — Arroyo NPC
-            // patrol-point and Temple trigger-zone scripts compute direction values
-            // from arithmetic on uninitialised critter orientation fields that can
-            // yield NaN.  NaN % 6 === NaN, which breaks hexInDirectionDistance and
-            // returns a garbage tile number.  Return the original tile unchanged as
-            // a safe no-movement fallback.
-            if (!isFinite(tile) || !isFinite(dir) || !isFinite(count)) {
-                warn(
-                    'tile_num_in_direction: non-finite arg (tile=' + tile +
-                    ', dir=' + dir + ', count=' + count + ') — returning tile',
-                    undefined, this
-                )
-                return isFinite(tile) ? Math.trunc(tile) : 0
+            if (!Number.isFinite(tile) || tile === -1 || !isValidTileNum(tile)) {return -1}
+            if (!Number.isInteger(dir) || dir < 0 || dir >= 6 || !Number.isFinite(count) || count === 0) {return -1}
+            let hex = fromTileNum(tile)
+            for (let i = 0; i < count; i++) {
+                if (hex.x === 0 || hex.x === 199 || hex.y === 0 || hex.y === 199) {break}
+                hex = hexInDirection(hex, dir)
             }
-            if (count <= 0) {return tile}
-            const start = fromTileNum(tile)
-            if (!start) {return tile}
-            const dest = hexInDirectionDistance(start, ((dir % 6) + 6) % 6, count)
-            return toTileNum(dest)
+            return toTileNum(hex)
         }
 
         // sfall extended opcode — get elevation of an object (0x818A).

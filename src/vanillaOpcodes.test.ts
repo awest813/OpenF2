@@ -246,3 +246,40 @@ describe('inventory opcodes (interpreter_extra.cc / item.cc)', () => {
         expect(rock.amount).toBe(3)
     })
 })
+
+describe('tile opcodes (interpreter_extra.cc / tile.cc)', () => {
+    const script: any = new (Scripting as any).Script()
+    const mid = 100 * 200 + 100
+
+    it('tile_num_in_direction: -1 for a bad rotation or zero distance; stops at the map edge', () => {
+        expect(script.tile_num_in_direction(mid, 6, 1)).toBe(-1)
+        expect(script.tile_num_in_direction(mid, 0, 0)).toBe(-1)
+        expect(script.tile_num_in_direction(-1, 0, 1)).toBe(-1)
+        expect(script.tile_num_in_direction(mid, 0, -3)).toBe(mid)
+        expect(script.tile_num_in_direction(mid, 1, 1)).not.toBe(mid)
+        const edge = 5 * 200 // x = 0
+        expect(script.tile_num_in_direction(edge, 1, 5)).toBe(edge)
+    })
+
+    it('tile_distance_objs gives 9999 when an object is missing or off the map', () => {
+        const a: any = { _type: 'obj', type: 'item', position: { x: 1, y: 1 } }
+        expect(script.tile_distance_objs(a, null)).toBe(9999)
+        expect(script.tile_distance_objs(a, { _type: 'obj', type: 'item', position: null })).toBe(9999)
+        expect(script.tile_num(null)).toBe(-1)
+    })
+
+    it('rotation_to_tile follows the screen angle', () => {
+        // Each neighbour lies in its own direction.
+        for (let dir = 0; dir < 6; dir++) {
+            const next = script.tile_num_in_direction(mid, dir, 1)
+            expect(script.rotation_to_tile(mid, next)).toBe(dir)
+        }
+    })
+
+    it('tile_in_tile_rect spans the first and fourth corners', () => {
+        const at = (x: number, y: number) => y * 200 + x
+        const ul = at(120, 80), lr = at(100, 90)
+        expect(script.tile_in_tile_rect(ul, 0, 0, lr, at(110, 85))).toBe(1)
+        expect(script.tile_in_tile_rect(ul, 0, 0, lr, at(130, 85))).toBe(0)
+    })
+})

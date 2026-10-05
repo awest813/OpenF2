@@ -120,29 +120,6 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// A. BLK-215 — tile_num_in_direction out-of-bounds / unplaced objects guard
-// ---------------------------------------------------------------------------
-
-describe('Phase 98-A — BLK-215: tile_num_in_direction out-of-bounds / unplaced objects guard', () => {
-    it('returns source tile when dir is NaN', () => {
-        expect(script.tile_num_in_direction(1000, NaN, 2)).toBe(1000)
-    })
-
-    it('returns source tile when count is NaN', () => {
-        expect(script.tile_num_in_direction(1000, 2, NaN)).toBe(1000)
-    })
-
-    it('returns source tile when tile is NaN', () => {
-        expect(script.tile_num_in_direction(NaN, 2, 2)).toBe(0)
-    })
-
-    it('returns source tile when count is <= 0', () => {
-        expect(script.tile_num_in_direction(1000, 2, 0)).toBe(1000)
-        expect(script.tile_num_in_direction(1000, 2, -5)).toBe(1000)
-    })
-})
-
-// ---------------------------------------------------------------------------
 // B. BLK-216 — critter_heal non-finite amount guard
 // ---------------------------------------------------------------------------
 

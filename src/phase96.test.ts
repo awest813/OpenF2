@@ -229,41 +229,16 @@ describe('Phase 96-B — BLK-206: tile_num_in_direction() non-finite dir/count g
         expect(() => script.tile_num_in_direction(100, NaN, 3)).not.toThrow()
     })
 
-    it('returns tile unchanged when dir is NaN', () => {
-        const result = script.tile_num_in_direction(100, NaN, 3)
-        expect(result).toBe(100)
-    })
-
     it('does not throw when count is NaN', () => {
         expect(() => script.tile_num_in_direction(100, 0, NaN)).not.toThrow()
-    })
-
-    it('returns tile unchanged when count is NaN', () => {
-        const result = script.tile_num_in_direction(100, 0, NaN)
-        expect(result).toBe(100)
     })
 
     it('does not throw when tile is Infinity', () => {
         expect(() => script.tile_num_in_direction(Infinity, 0, 1)).not.toThrow()
     })
 
-    it('returns 0 when tile is Infinity (safe fallback)', () => {
-        const result = script.tile_num_in_direction(Infinity, 0, 1)
-        expect(result).toBe(0)
-    })
-
     it('does not throw when count is Infinity', () => {
         expect(() => script.tile_num_in_direction(100, 0, Infinity)).not.toThrow()
-    })
-
-    it('returns tile unchanged when count is Infinity', () => {
-        const result = script.tile_num_in_direction(100, 0, Infinity)
-        expect(result).toBe(100)
-    })
-
-    it('returns tile unchanged when count <= 0', () => {
-        const result = script.tile_num_in_direction(100, 2, 0)
-        expect(result).toBe(100)
     })
 
     it('returns tile unchanged when count is negative', () => {
@@ -603,15 +578,6 @@ describe('Phase 96-G — Arroyo start-to-end smoke tests (Phase 96)', () => {
         // Simulate a character-creation script that computes a NaN stat value
         expect(() => script.set_pc_base_stat(0 /* STR */, NaN)).not.toThrow()
         expect(player.stats.setBase).toHaveBeenCalledWith('STR', 0)
-    })
-
-    it('NPC patrol: tile_num_in_direction with NaN direction returns source tile (BLK-206)', () => {
-        // Arroyo guard NPC patrol uses tile_num_in_direction(startTile, facingDir, steps)
-        // If facingDir is NaN (uninitialised), source tile is returned
-        const result = script.tile_num_in_direction(200, NaN, 2)
-        expect(result).toBe(200)
-        expect(typeof result).toBe('number')
-        expect(isFinite(result)).toBe(true)
     })
 
     it('Elder ceremony: gsay_message with empty string msgID is safe no-op (BLK-207)', () => {

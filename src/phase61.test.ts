@@ -48,20 +48,6 @@ describe('Phase 61-A — BLK-060: tile_distance_objs / tile_num null-position gu
         script = new (Scripting as any).Script()
     })
 
-    it('tile_distance_objs returns 0 when first object has null position', () => {
-        const a = makeObj({ position: null })
-        const b = makeObj({ position: { x: 5, y: 5 } })
-        expect(() => script.tile_distance_objs(a, b)).not.toThrow()
-        expect(script.tile_distance_objs(a, b)).toBe(0)
-    })
-
-    it('tile_distance_objs returns 0 when second object has null position', () => {
-        const a = makeObj({ position: { x: 5, y: 5 } })
-        const b = makeObj({ position: null })
-        expect(() => script.tile_distance_objs(a, b)).not.toThrow()
-        expect(script.tile_distance_objs(a, b)).toBe(0)
-    })
-
     it('tile_distance_objs returns correct distance for valid positions', () => {
         const a = makeObj({ position: { x: 0, y: 0 } })
         const b = makeObj({ position: { x: 0, y: 0 } })

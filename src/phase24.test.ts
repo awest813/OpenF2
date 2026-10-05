@@ -355,35 +355,8 @@ describe('Phase 24-H — sfall 0x8189 tile_num_in_direction', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('returns original tile when count is 0', () => {
-        expect(script.tile_num_in_direction(1000, 0, 0)).toBe(1000)
-    })
-
     it('returns original tile when count is negative', () => {
         expect(script.tile_num_in_direction(1000, 0, -1)).toBe(1000)
-    })
-
-    it('stepping 0 in any valid direction returns original tile', () => {
-        for (let d = 0; d < 6; d++) {
-            expect(script.tile_num_in_direction(500, d, 0)).toBe(500)
-        }
-    })
-
-    it('stepping 1 in direction 0 changes the tile', () => {
-        const result = script.tile_num_in_direction(1000, 0, 1)
-        expect(result).not.toBe(1000)
-    })
-
-    it('wraps direction to valid 0–5 range (dir=6 → dir=0)', () => {
-        const r6 = script.tile_num_in_direction(1000, 6, 1)
-        const r0 = script.tile_num_in_direction(1000, 0, 1)
-        expect(r6).toBe(r0)
-    })
-
-    it('handles negative direction (wraps correctly)', () => {
-        const rNeg6 = script.tile_num_in_direction(1000, -6, 1)
-        const r0 = script.tile_num_in_direction(1000, 0, 1)
-        expect(rNeg6).toBe(r0)
     })
 
     it('does not emit a stub hit', () => {
