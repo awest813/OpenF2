@@ -118,19 +118,6 @@ describe('Phase 48-C — rm_mult_objs_from_inven multi-stack draining', () => {
         expect(container.inventory[0].amount).toBe(7)
     })
 
-    it('drains from two stacks when first stack has fewer items than count', () => {
-        const script = new Scripting.Script()
-        const stack1 = makeItem(55, 3)
-        const stack2 = makeItem(55, 4)
-        const container = makeGameObj({ inventory: [stack1, stack2] })
-        const target = makeItem(55, 1)
-        const removed = script.rm_mult_objs_from_inven(container, target, 6)
-        expect(removed).toBe(6)
-        // total available was 7; removing 6 should leave 1 in the remaining stack
-        const remaining = container.inventory.reduce((s: number, i: any) => s + i.amount, 0)
-        expect(remaining).toBe(1)
-    })
-
     it('returns actual removed count when stacks have fewer items than requested', () => {
         const script = new Scripting.Script()
         const stack = makeItem(77, 2)
@@ -141,16 +128,6 @@ describe('Phase 48-C — rm_mult_objs_from_inven multi-stack draining', () => {
         expect(container.inventory.length).toBe(0)
     })
 
-    it('removes entire stacks and prunes zero-amount entries', () => {
-        const script = new Scripting.Script()
-        const s1 = makeItem(88, 5)
-        const s2 = makeItem(88, 5)
-        const container = makeGameObj({ inventory: [s1, s2] })
-        const target = makeItem(88, 1)
-        const removed = script.rm_mult_objs_from_inven(container, target, 10)
-        expect(removed).toBe(10)
-        expect(container.inventory.length).toBe(0)
-    })
 })
 
 // ===========================================================================

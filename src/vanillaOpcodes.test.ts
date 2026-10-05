@@ -190,3 +190,57 @@ describe('set_critter_stat / critter_mod_skill / is_success / is_critical', () =
         expect([0, 1, 2, 3, 7].map((r) => script.is_critical(r))).toEqual([1, 0, 0, 1, -1])
     })
 })
+
+describe('inventory opcodes (interpreter_extra.cc / item.cc)', () => {
+    const script: any = new (Scripting as any).Script()
+    const item = (pid: number, amount = 1, extra: Record<string, unknown> = {}): any => ({
+        _type: 'obj', type: 'item', pid, amount, inventory: [], approxEq(o: any) { return o.pid === this.pid }, ...extra,
+    })
+
+    it('obj_is_carrying_obj_pid counts items, not stacks, including containers and equipped slots', () => {
+        const bag = item(9, 1, { subtype: 'container', inventory: [item(41, 30)] })
+        const gun = item(8)
+        const c: any = { _type: 'obj', type: 'critter', inventory: [item(41, 50), bag], rightHand: gun }
+        expect(script.obj_is_carrying_obj_pid(c, 41)).toBe(80)
+        expect(script.obj_is_carrying_obj_pid(c, 8)).toBe(1)
+        expect(script.obj_carrying_pid_obj(c, 8)).toBe(gun)
+        expect(script.item_caps_total(c)).toBe(80)
+    })
+
+    it('item_caps_adjust takes from money then containers, and refuses to overdraw', () => {
+        const bag = item(9, 1, { subtype: 'container', inventory: [item(41, 30)] })
+        const c: any = { _type: 'obj', type: 'critter', inventory: [item(41, 50), bag] }
+        expect(script.item_caps_adjust(c, -100)).toBe(-1)
+        expect(script.item_caps_total(c)).toBe(80)
+        expect(script.item_caps_adjust(c, -60)).toBe(0)
+        expect(script.item_caps_total(c)).toBe(20)
+        expect(c.inventory.some((o: any) => o.pid === 41)).toBe(false)
+        expect(script.item_caps_adjust(c, 5)).toBe(0)
+    })
+
+    it('rm_mult_objs_from_inven takes from that stack and frees an emptied slot', () => {
+        const gun = item(8)
+        const c: any = { _type: 'obj', type: 'critter', inventory: [gun], rightHand: gun }
+        expect(script.rm_mult_objs_from_inven(c, gun, 5)).toBe(1)
+        expect(c.inventory).toEqual([])
+        expect(c.rightHand).toBeUndefined()
+    })
+
+    it('move_obj_inven_to_obj adds to what the other object already holds', () => {
+        const from: any = { _type: 'obj', type: 'critter', inventory: [item(41, 10), item(5)] }
+        const to: any = { _type: 'obj', type: 'item', inventory: [item(41, 3), item(6)] }
+        script.move_obj_inven_to_obj(from, to)
+        expect(from.inventory).toEqual([])
+        expect(to.inventory.map((o: any) => [o.pid, o.amount])).toEqual([[41, 13], [6, 1], [5, 1]])
+    })
+
+    it('add_mult_objs_to_inven moves the object itself; a negative count means 1', () => {
+        const box: any = { _type: 'obj', type: 'item', inventory: [] }
+        const rock = item(7)
+        script.add_mult_objs_to_inven(box, rock, -4)
+        expect(box.inventory).toEqual([rock])
+        expect(rock.amount).toBe(1)
+        script.add_mult_objs_to_inven(box, item(7), 2)
+        expect(rock.amount).toBe(3)
+    })
+})

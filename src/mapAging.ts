@@ -84,7 +84,10 @@ export interface AgingDeps {
 
 /** itemDropAll: everything the critter carries lands on its hex. */
 export function itemDropAll(critter: any, level: number, deps: Pick<AgingDeps, 'addObject'>): void {
-    const items: any[] = critter.inventory ?? []
+    // The player's equipped items live only in the hand and armor slots.
+    const inv: any[] = critter.inventory ?? []
+    const slots = [critter.leftHand, critter.rightHand, critter.equippedArmor].filter((x, i, a) => x && !inv.includes(x) && a.indexOf(x) === i)
+    const items: any[] = [...inv, ...slots]
     if (!critter.position || items.length === 0) {return}
     for (const item of items) {
         item.position = { x: critter.position.x, y: critter.position.y }

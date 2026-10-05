@@ -80,12 +80,6 @@ describe('Phase 39-B — item_caps_total safe default for non-game-object', () =
         expect(script.item_caps_total(42)).toBe(0)
     })
 
-    it('item_caps_total with a valid game object returns the money field', () => {
-        const script = new (Scripting as any).Script()
-        const obj = { _id: 1, type: 'item', position: { x: 0, y: 0 }, orientation: 0,
-                      frame: 0, pid: 0, fid: 0, flags: 0, inventory: [], money: 250 }
-        expect(script.item_caps_total(obj)).toBe(250)
-    })
 })
 
 // ===========================================================================

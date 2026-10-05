@@ -58,7 +58,7 @@ import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, S
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
-import { getCritterCarryLimitLbs, getCritterInventoryWeightLbs } from './critterInventory.js'
+import { canCritterCarryMore, getCritterCarryLimitLbs, getCritterInventoryWeightLbs } from './critterInventory.js'
 import { perkRank } from './character/perkIds.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
@@ -253,6 +253,65 @@ export namespace Scripting {
     const MISC_EXPLOSION_FID = 0x0500000a
     const DAMAGE_TYPE_NUMBERS: Record<string, number> = {
         Normal: 0, Laser: 1, Fire: 2, Plasma: 3, Electrical: 4, EMP: 5, Explosive: 6, Explosion: 6, explosion: 6,
+    }
+
+    const PID_MONEY = 41
+
+    /**
+     * Everything an object carries. The player's equipped items live only in
+     * the hand and armor slots, so those count as carried too.
+     */
+    function carriedItems(obj: any): any[] {
+        const inv: any[] = Array.isArray(obj?.inventory) ? obj.inventory : []
+        const slots = [obj?.leftHand, obj?.rightHand, obj?.equippedArmor].filter((x, i, a) => x && !inv.includes(x) && a.indexOf(x) === i)
+        return [...inv, ...slots]
+    }
+
+    /** itemGetTotalCaps. */
+    function totalCaps(obj: any): number {
+        let caps = 0
+        for (const item of obj?.inventory ?? []) {
+            if (item.pid === PID_MONEY) {caps += item.amount ?? 1}
+            else if (item.subtype === 'container') {caps += totalCaps(item)}
+        }
+        return caps
+    }
+
+    /** itemCapsAdjust; false when there are not enough caps to take. */
+    function adjustCaps(obj: any, amount: number): boolean {
+        if (amount < 0 && totalCaps(obj) < -amount) {return false}
+        if (!Array.isArray(obj.inventory)) {obj.inventory = []}
+        if (amount > 0) {
+            const stack = obj.inventory.find((o: any) => o.pid === PID_MONEY)
+            if (stack) {
+                stack.amount += amount
+            } else {
+                const money = createObjectWithPID(PID_MONEY)
+                if (!money) {return false}
+                money.amount = amount
+                obj.inventory.push(money)
+            }
+            return true
+        }
+        for (let i = 0; i < obj.inventory.length && amount < 0; i++) {
+            const item = obj.inventory[i]
+            if (item.pid !== PID_MONEY) {continue}
+            if (-amount >= item.amount) {
+                amount += item.amount
+                obj.inventory.splice(i--, 1)
+            } else {
+                item.amount += amount
+                amount = 0
+            }
+        }
+        for (const item of obj.inventory) {
+            if (amount >= 0) {break}
+            if (item.subtype !== 'container') {continue}
+            const inside = totalCaps(item)
+            const take = Math.min(inside, -amount)
+            if (take > 0 && adjustCaps(item, -take)) {amount += take}
+        }
+        return true
     }
 
     function lookupMapNameSafe(mapID: number): string | null {
@@ -1262,191 +1321,96 @@ export namespace Scripting {
             }
             return -1
         }
+        /** itemGetTotalCaps: money carried, counting what is inside containers. */
         item_caps_total(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('item_caps_total: not a game object — returning 0', undefined, this)
-                return 0
-            }
-            return obj.money
+            if (!isGameObject(obj)) {return 0}
+            return totalCaps(obj)
         }
+        /**
+         * itemCapsAdjust: add caps to the first money stack (or a new one), or
+         * take them from money and then containers. Taking more than there is
+         * changes nothing and gives -1.
+         */
         item_caps_adjust(obj: Obj, amount: number) {
-            const MONEY_PID = 41
-            if (!isGameObject(obj)) {
-                warn('item_caps_adjust: not a game object', undefined, this)
-                return
-            }
-            // BLK-134: Guard against non-finite amount values — NaN or Infinity would
-            // corrupt the caps item's amount field silently.  Return early and warn.
-            if (typeof amount !== 'number' || !isFinite(amount)) {
-                warn('item_caps_adjust: non-finite amount (' + amount + ') — no-op', undefined, this)
-                return
-            }
-            for (let i = obj.inventory.length - 1; i >= 0; i--) {
-                if (obj.inventory[i].pid === MONEY_PID) {
-                    obj.inventory[i].amount = Math.max(0, obj.inventory[i].amount + amount)
-                    if (obj.inventory[i].amount <= 0) {obj.inventory.splice(i, 1)}
-                    return
-                }
-            }
-            // No existing caps item — create one when adding a positive amount.
-            // Fallout 2 scripts commonly call item_caps_adjust(critter, n) to
-            // hand the player money without pre-seeding a caps item in inventory.
-            if (amount > 0) {
-                let capsItem: Obj | null = null
-                try {
-                    capsItem = createObjectWithPID(MONEY_PID, -1)
-                } catch (e) {
-                    // createObjectWithPID throws when PRO data is unavailable (e.g. tests).
-                    // Fall through to the stub path below.
-                    info('item_caps_adjust: createObjectWithPID failed (' + e + '), using minimal stub', 'inventory')
-                }
-                if (capsItem) {
-                    capsItem.amount = amount
-                    obj.inventory.push(capsItem)
-                } else {
-                    // PRO not available — create a minimal stub caps object so the
-                    // amount is not silently discarded.  The stub has just enough
-                    // fields for item_caps_total and subsequent item_caps_adjust calls.
-                    const stub = { pid: MONEY_PID, amount, type: 'item', subtype: 'misc',
-                                   approxEq(o: any) { return o.pid === MONEY_PID } } as any
-                    obj.inventory.push(stub)
-                }
-            }
+            if (!isGameObject(obj) || !Number.isFinite(amount)) {return -1}
+            return adjustCaps(obj, Math.trunc(amount)) ? 0 : -1
         }
+        /** opMoveObjectInventoryToObject (itemMoveAll): everything moves over, joining matching stacks. */
         move_obj_inven_to_obj(obj: Obj, other: Obj) {
-            if (obj === null || other === null) {
-                warn('move_obj_inven_to_obj: null pointer passed in')
-                return
-            }
-
-            if (!isGameObject(obj) || !isGameObject(other)) {
-                warn('move_obj_inven_to_obj: not game object')
-                return
-            }
-
-            // BLK-172: Guard against undefined/null inventory arrays — isGameObject()
-            // validates type and pid but not the presence of an inventory array.
-            // Temple item containers (chests, boxes) created via create_object_sid may
-            // not have their inventory array initialised yet when move_obj_inven_to_obj
-            // is called, causing a TypeError on the .length access below.
-            if (obj.inventory == null) {
-                warn('move_obj_inven_to_obj: obj has no inventory — treating as empty', undefined, this)
-                obj.inventory = []
-            }
-            if (other.inventory == null) {
-                warn('move_obj_inven_to_obj: other has no inventory — treating as empty', undefined, this)
-                other.inventory = []
-            }
-
-            info('move_obj_inven_to_obj: ' + obj.inventory.length + ' to ' + other.inventory.length, 'inventory')
-            other.inventory = obj.inventory
+            if (!isGameObject(obj) || !isGameObject(other)) {return}
+            if (!Array.isArray(other.inventory)) {other.inventory = []}
+            const items = carriedItems(obj)
             obj.inventory = []
+            const c = obj as any
+            c.leftHand = undefined
+            c.rightHand = undefined
+            if ('equippedArmor' in c) {c.equippedArmor = null}
+            for (const item of items) {
+                const stack = other.inventory.find((o: Obj) => o.approxEq(item))
+                if (stack) {stack.amount += typeof item.amount === 'number' ? item.amount : 1}
+                else {other.inventory.push(item)}
+            }
+            if (obj === globalState.player || other === globalState.player) {syncPlayerEntityFromCritter()}
         }
+        /** objectGetCarriedQuantityByPid: how many, counting stacks and what containers hold. */
         obj_is_carrying_obj_pid(obj: Obj, pid: number) {
-            // Number of inventory items with matching PID
-            log('obj_is_carrying_obj_pid', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_is_carrying_obj_pid: not a game object')
-                return 0
-            }
-            // BLK-200: Guard against null/undefined inventory — Arroyo character-creation
-            // scripts may create critters with `inventory: null` rather than omitting the
-            // field entirely.  The old guard (`=== undefined`) did not catch `null`, so
-            // null.length on the for-loop condition threw a TypeError.  Use Array.isArray()
-            // to guard both null and undefined, consistent with BLK-162 and BLK-188.
-            if (!Array.isArray(obj.inventory)) {
-                warn('obj_is_carrying_obj_pid: object has no inventory array', undefined, this)
-                return 0
-            }
-
-            //info("obj_is_carrying_obj_pid: " + pid, "inventory")
-            let count = 0
-            for (let i = 0; i < obj.inventory.length; i++) {
-                if (obj.inventory[i].pid === pid) {count++}
-            }
-            return count
-        }
-        add_mult_objs_to_inven(obj: Obj, item: Obj, count: number) {
-            // Add count copies of item to obj's inventory
-            if (!isGameObject(obj)) {
-                warn('add_mult_objs_to_inven: not a game object')
-                return
-            } else if (!isGameObject(item)) {
-                warn('add_mult_objs_to_inven: item not a game object: ' + item)
-                return
-            }
-            // BLK-201: Guard against null/undefined inventory — Arroyo start-sequence
-            // scripts (e.g. tribal equipment distribution) call add_mult_objs_to_inven()
-            // on freshly created critters that may have `inventory: null`.  The old guard
-            // (`=== undefined`) silently passed null inventory, which then caused
-            // addInventoryItem() to crash when it accessed this.inventory.push().
-            // Use Array.isArray() to catch both null and undefined, consistent with
-            // BLK-162 (obj_carrying_pid_obj), BLK-188 (rm_mult_objs_from_inven), and
-            // BLK-200 (obj_is_carrying_obj_pid).
-            if (!Array.isArray(obj.inventory)) {
-                warn('add_mult_objs_to_inven: object has no inventory array', undefined, this)
-                return
-            }
-            // BLK-146: Guard against non-positive counts — New Reno reward scripts
-            // sometimes compute item quantities dynamically; when the result is 0 or
-            // negative (e.g. a condition yields count=0), calling addInventoryItem with
-            // a non-positive value does nothing useful but can trigger assertion failures
-            // or leave corrupted zero-quantity stack entries in some inventory paths.
-            // Reject early with a warning so the issue is traceable.
-            if (typeof count !== 'number' || !isFinite(count) || count <= 0) {
-                warn('add_mult_objs_to_inven: non-positive count (' + count + ') — no-op', undefined, this)
-                return
-            }
-
-            //info("add_mult_objs_to_inven: " + count + " counts of " + item.toString(), "inventory")
-            log('add_mult_objs_to_inven: ' + count + ' × ' + (item as any)?.art, arguments, 'inventory')
-            obj.addInventoryItem(item, count)
-        }
-        rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
-            // Remove up to count copies of item from obj's inventory, draining
-            // multiple stacks if necessary (stacks are rare but can occur after
-            // separate add_obj_to_inven calls with cloned item references).
-            if (!isGameObject(obj)) {
-                warn('rm_mult_objs_from_inven: not a game object', undefined, this)
-                return 0
-            }
-            if (!isGameObject(item)) {
-                warn('rm_mult_objs_from_inven: item not a game object: ' + item, undefined, this)
-                return 0
-            }
-            // BLK-161: Guard against non-positive/non-finite count — New Reno quest-completion
-            // scripts sometimes compute item removal quantities from combat math that can
-            // produce NaN or a non-positive value.  A non-finite count would leave `remaining`
-            // as NaN; the loop condition `remaining > 0` evaluates to false (no items removed)
-            // but the return value `count - remaining = NaN - NaN = NaN` then propagates as a
-            // corrupt removal count into the caller.  Mirror BLK-146 (add_mult_objs_to_inven):
-            // treat non-positive/non-finite count as a no-op and return 0.
-            if (typeof count !== 'number' || !isFinite(count) || count <= 0) {
-                warn('rm_mult_objs_from_inven: non-positive count (' + count + ') — no-op', undefined, this)
-                return 0
-            }
-            let remaining = count
-            // BLK-188: Guard against undefined/null inventory — arroyo reward scripts
-            // sometimes call rm_mult_objs_from_inven() on a freshly created chest or
-            // container object that has no inventory array yet (inventory is initialised
-            // lazily on first add, not during create_object_sid).  Accessing
-            // obj.inventory.length on undefined throws TypeError.  Mirror the parallel
-            // guard in add_mult_objs_to_inven (which checks obj.inventory === undefined):
-            // return 0 as a no-op with a warning so the caller receives a safe result.
-            if (!Array.isArray(obj.inventory)) {
-                warn('rm_mult_objs_from_inven: obj has no inventory — no-op', undefined, this)
-                return 0
-            }
-            // Iterate backward so splicing does not skip entries.
-            for (let i = obj.inventory.length - 1; i >= 0 && remaining > 0; i--) {
-                if (obj.inventory[i].approxEq(item)) {
-                    const removed = Math.min(remaining, obj.inventory[i].amount)
-                    obj.inventory[i].amount -= removed
-                    remaining -= removed
-                    if (obj.inventory[i].amount <= 0) {obj.inventory.splice(i, 1)}
+            if (!isGameObject(obj)) {return 0}
+            const count = (o: any): number => {
+                let n = 0
+                for (const item of carriedItems(o)) {
+                    if (item.pid === pid) {n += typeof item.amount === 'number' ? item.amount : 1}
+                    n += count(item)
                 }
+                return n
             }
-            return count - remaining
+            return count(obj)
+        }
+        /**
+         * opAddMultipleObjectsToInventory: the object itself leaves the map and joins
+         * the inventory (merging into a stack of the same pid). A negative count
+         * means 1; at most 99999.
+         */
+        add_mult_objs_to_inven(obj: Obj, item: Obj, count: number) {
+            if (!isGameObject(obj) || !isGameObject(item) || !Array.isArray(obj.inventory)) {return}
+            let quantity = Number.isFinite(count) ? Math.trunc(count) : 0
+            if (quantity < 0) {quantity = 1}
+            if (quantity > 99999) {quantity = 99999}
+            if (quantity < 1) {return}
+            if (obj.type === 'critter' && !canCritterCarryMore(obj as Critter, item, quantity)) {return}
+            globalState.gMap?.removeObject?.(item)
+            const stack = obj.inventory.find((o: Obj) => o !== item && o.approxEq(item))
+            if (stack) {
+                stack.amount += quantity
+            } else if (!obj.inventory.includes(item)) {
+                item.amount = quantity
+                obj.inventory.push(item)
+            }
+            if (obj === globalState.player) {syncPlayerEntityFromCritter()}
+        }
+        /**
+         * opRemoveMultipleObjectsFromInventory: take up to `count` of that item's
+         * stack; an emptied stack leaves its hand or armor slot. Returns how many.
+         */
+        rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
+            if (!isGameObject(obj) || !isGameObject(item)) {return 0}
+            if (!Array.isArray(obj.inventory)) {obj.inventory = []}
+            const carried = carriedItems(obj)
+            const stack = carried.includes(item) ? item : carried.find((o: Obj) => o.approxEq(item))
+            if (!stack) {return 0}
+            const have = typeof stack.amount === 'number' ? stack.amount : 1
+            const quantity = Math.max(0, Math.min(have, Number.isFinite(count) ? Math.trunc(count) : 0))
+            if (quantity === 0) {return 0}
+            stack.amount = have - quantity
+            if (stack.amount <= 0) {
+                const index = obj.inventory.indexOf(stack)
+                if (index >= 0) {obj.inventory.splice(index, 1)}
+                const c = obj as any
+                if (c.leftHand === stack) {c.leftHand = undefined}
+                if (c.rightHand === stack) {c.rightHand = undefined}
+                if (c.equippedArmor === stack) {c.equippedArmor = null}
+            }
+            if (obj === globalState.player) {syncPlayerEntityFromCritter()}
+            return quantity
         }
         add_obj_to_inven(obj: Obj, item: Obj) {
             this.add_mult_objs_to_inven(obj, item, 1)
@@ -1454,40 +1418,18 @@ export namespace Scripting {
         rm_obj_from_inven(obj: Obj, item: Obj) {
             this.rm_mult_objs_from_inven(obj, item, 1)
         }
+        /** objectGetCarriedObjectByPid: the first such item, looking inside containers too. */
         obj_carrying_pid_obj(obj: Obj, pid: number) {
-            log('obj_carrying_pid_obj', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_carrying_pid_obj: not a game object: ' + obj)
-                return 0
+            if (!isGameObject(obj)) {return 0}
+            const find = (o: any): any => {
+                for (const item of carriedItems(o)) {
+                    if (item.pid === pid) {return item}
+                    const inner = find(item)
+                    if (inner) {return inner}
+                }
+                return null
             }
-
-            // BLK-066: Also check equipped slots (leftHand, rightHand, equippedArmor).
-            // In Fallout 2, equipped items are removed from the inventory array and placed
-            // in dedicated slots, so a simple inventory scan would miss them.  Scripts
-            // commonly use obj_carrying_pid_obj() to detect whether an NPC has a specific
-            // weapon equipped before giving them ammo or initiating trade.
-            const equipped = [
-                (obj as any).leftHand,
-                (obj as any).rightHand,
-                (obj as any).equippedArmor,
-            ]
-            for (const slot of equipped) {
-                if (slot && slot.pid === pid) {return slot}
-            }
-
-            // BLK-162: Guard against null/undefined inventory array — critters created
-            // via create_object_sid() or spawned by encounter scripts may not have an
-            // inventory array initialised (obj.inventory is undefined).  Accessing
-            // obj.inventory.length directly would throw a TypeError.  Return 0 safely.
-            if (!Array.isArray(obj.inventory)) {
-                warn('obj_carrying_pid_obj: object has no inventory array', undefined, this)
-                return 0
-            }
-
-            for (let i = 0; i < obj.inventory.length; i++) {
-                if (obj.inventory[i].pid === pid) {return obj.inventory[i]}
-            }
-            return 0
+            return find(obj) ?? 0
         }
         elevation(obj: Obj) {
             if (isSpatial(obj) || isGameObject(obj)) {return globalState.currentElevation}
@@ -1623,7 +1565,7 @@ export namespace Scripting {
                 case 0: return c.equippedArmor ?? 0
                 case 1: return isDude && leftInUse ? 0 : (c.rightHand ?? 0)
                 case 2: return isDude && !leftInUse ? 0 : (c.leftHand ?? 0)
-                case -2: return Array.isArray(c.inventory) ? c.inventory.length : 0
+                case -2: return carriedItems(c).length
                 default: return 0
             }
         }

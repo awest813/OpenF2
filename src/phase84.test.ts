@@ -170,13 +170,6 @@ describe('Phase 84-B — BLK-146: add_mult_objs_to_inven non-positive count', ()
         expect(npc.addInventoryItem).not.toHaveBeenCalled()
     })
 
-    it('calls addInventoryItem normally when count is positive', () => {
-        const npc = makeObj()
-        const item = makeObj({ type: 'item', inventory: undefined })
-        script.add_mult_objs_to_inven(npc, item, 3)
-        expect(npc.addInventoryItem).toHaveBeenCalledWith(item, 3)
-    })
-
     it('does not throw for non-game-object owner', () => {
         expect(() => script.add_mult_objs_to_inven(null as any, makeObj(), 1)).not.toThrow()
     })
@@ -557,13 +550,6 @@ describe('Phase 84-F — New Reno progression smoke', () => {
         const reward = makeObj({ type: 'item', inventory: undefined })
         expect(() => script.add_mult_objs_to_inven(player, reward, 0)).not.toThrow()
         expect(player.addInventoryItem).not.toHaveBeenCalled()
-    })
-
-    it('family quest reward: add_mult_objs_to_inven with count=3 works correctly', () => {
-        const player = makeObj()
-        const reward = makeObj({ type: 'item', inventory: undefined })
-        script.add_mult_objs_to_inven(player, reward, 3)
-        expect(player.addInventoryItem).toHaveBeenCalledWith(reward, 3)
     })
 
     it('combat timer: NaN local var from formula error is clamped and does not cascade', () => {
