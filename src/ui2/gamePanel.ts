@@ -604,7 +604,7 @@ export class GamePanel extends UIPanel {
             }
             return
         }
-        globalState.attackCursor = true
+        globalState.mouseMode = 'crosshair'
         if (!globalState.inCombat && player) {
             void import('../combat.js').then(({ Combat }) => {
                 if (!globalState.inCombat) {Combat.start()}

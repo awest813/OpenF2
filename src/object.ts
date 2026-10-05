@@ -673,13 +673,15 @@ export class Obj {
         return deepClone(this)
     }
 
-    addInventoryItem(item: Obj, count = 1): void {
+    /**
+     * itemAttemptAdd: false (and nothing added) when a critter cannot carry
+     * the weight. Callers print the context's message (proto.msg 905 on a
+     * pickup, inventory.msg 31 in the inventory screens).
+     */
+    addInventoryItem(item: Obj, count = 1): boolean {
         const asCritter = this.type === 'critter' ? (this as unknown as Critter) : null
         if (asCritter && !canCritterCarryMore(asCritter, item, count)) {
-            if (asCritter.isPlayer) {
-                uiLog('You cannot carry that much.')
-            }
-            return
+            return false
         }
 
         for (let i = 0; i < this.inventory.length; i++) {
@@ -688,7 +690,7 @@ export class Obj {
                 if (asCritter?.isPlayer && globalState.player === asCritter) {
                     syncPlayerEntityFromCritter()
                 }
-                return
+                return true
             }
         }
 
@@ -699,6 +701,7 @@ export class Obj {
         if (asCritter?.isPlayer && globalState.player === asCritter) {
             syncPlayerEntityFromCritter()
         }
+        return true
     }
 
     getMessageCategory(): string {

@@ -43,7 +43,9 @@ import {
     setPlayerUseHandler,
     uiWorldMap,
 } from './ui.js'
-import { getFileJSON, getProtoMsg } from './util.js'
+import { getFileJSON, getProtoMsg, getRandomInt } from './util.js'
+import { examineLines, lookAtText } from './examine.js'
+import { arrowPrimaryAction, cycleMouseMode, HoverLook } from './mouseMode.js'
 import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
@@ -133,8 +135,7 @@ export function playerUse(obj?: Obj) {
         // Attack cursor armed from the item button (game_mouse.cc crosshair):
         // outside combat, clicking a critter starts combat with the player
         // attacking it first (combat.cc _combat with gcsd attacker/defender).
-        if (globalState.attackCursor && !who.dead && !globalState.inCombat && Config.engine.doCombat) {
-            globalState.attackCursor = false
+        if (globalState.mouseMode === 'crosshair' && !who.dead && !globalState.inCombat && Config.engine.doCombat) {
             if (!Combat.playerCanStartAttack(globalState.player, who)) {return}
             Combat.start(globalState.player, who)
             if (globalState.combat?.inPlayerTurn) {
@@ -217,6 +218,151 @@ export function playerUse(obj?: Obj) {
 }
 
 setPlayerUseHandler(playerUse)
+
+/** proto.msg text with an English fallback. */
+function protoMsg(id: number, fallback: string): string {
+    try {
+        return getProtoMsg(id) || fallback
+    } catch {
+        return fallback
+    }
+}
+
+/** Walk the player to the hex under the cursor (MOVE mode, _dude_move / _dude_run). */
+function walkToMouseHex(): void {
+    const mousePos = heart.mouse.getPosition()
+    const mouseHex = hexFromScreen(mousePos[0] + globalState.cameraPosition.x, mousePos[1] + globalState.cameraPosition.y)
+    if (globalState.inCombat) {
+        if (!(globalState.combat.inPlayerTurn || Config.combat.allowWalkDuringAnyTurn)) {return}
+        if (globalState.player.AP.getAvailableMoveAP() === 0) {
+            uiLog(protoMsg(700, "You don't have enough action points."))
+            return
+        }
+        globalState.combat.playerWalkTo(mouseHex, Config.engine.doAlwaysRun)
+        return
+    }
+    globalState.player.walkTo(mouseHex, Config.engine.doAlwaysRun)
+}
+
+/** _obj_examine: description_p_proc, then the examine lines. */
+function examineObject(obj: Obj): void {
+    const overridden = Scripting.description(obj, globalState.player) === true
+    for (const line of examineLines(globalState.player, obj, overridden)) {
+        if (line) {uiLog(line)}
+    }
+}
+
+/** _obj_look_at: look_at_p_proc, else "You see: <name>." */
+function lookAtObject(obj: Obj): void {
+    if (Scripting.lookAt(obj, globalState.player) === true) {return}
+    uiLog(lookAtText(obj, (min, max) => getRandomInt(min, max)))
+}
+
+/**
+ * _obj_pickup: pickup_p_proc, then into the pack (money by the stack), or
+ * proto.msg 905 when it is too heavy.
+ */
+function pickUpItem(item: Obj): void {
+    const player = globalState.player
+    if (Scripting.pickup(item, player) === true) {return}
+    const amount = typeof (item as any).amount === 'number' && (item as any).amount > 0 ? (item as any).amount : 1
+    if (!player.addInventoryItem(item, amount)) {
+        uiLog(protoMsg(905, 'You cannot pick up that item. You are at your maximum weight capacity.'))
+        return
+    }
+    globalState.gMap.removeObject(item)
+}
+
+/**
+ * In combat an action on an object needs the player's turn, standing next
+ * to it, and 3 AP (_check_scenery_ap_cost); out of combat the player walks
+ * over first.
+ */
+function actOnObject(obj: Obj, action: () => void): void {
+    if (!globalState.inCombat) {
+        if (Config.engine.doInfiniteUse === true || !obj.position) {
+            action()
+        } else {
+            globalState.player.walkInFrontOf(obj.position, () => {
+                globalState.player.clearAnim()
+                action()
+            })
+        }
+        return
+    }
+    const combat = globalState.combat
+    if (!combat?.inPlayerTurn || !obj.position || !globalState.player.position) {return}
+    if (hexDistance(globalState.player.position, obj.position) > 1) {
+        combat.playerWalkTo(obj.position, Config.engine.doAlwaysRun)
+        return
+    }
+    if (globalState.player.AP.getAvailableCombatAP() < 3) {
+        uiLog(protoMsg(700, "You don't have enough action points."))
+        return
+    }
+    globalState.player.AP.subtractCombatAP(3)
+    action()
+    combat.afterPlayerAction()
+}
+
+/** The left click in ARROW mode: the object's primary action. */
+function arrowClick(): void {
+    const obj = getObjectUnderCursor((o) => o.visible !== false)
+    const action = arrowPrimaryAction(obj, globalState.player, globalState.inCombat)
+    if (!obj || !action) {return}
+    const who = obj as Critter
+    switch (action) {
+        case 'pickup':
+            actOnObject(obj, () => pickUpItem(obj))
+            return
+        case 'rotate':
+            globalState.player.orientation = ((globalState.player.orientation ?? 0) + 1) % 6
+            return
+        case 'examine':
+            examineObject(obj)
+            return
+        case 'talk':
+            actOnObject(obj, () => {
+                if (who._script && who._script.talk_p_proc !== undefined) {
+                    Scripting.talk(who._script, who)
+                } else if (canTradeWithPartyMember(who)) {
+                    openCompanionTrade(who)
+                }
+            })
+            return
+        case 'loot':
+            if (who.dead) {actOnObject(obj, () => uiLoot(obj))}
+            return
+        case 'use':
+            actOnObject(obj, () => obj.use(globalState.player))
+            return
+    }
+}
+
+/** The left click on the map, by cursor mode (_gmouse_handle_event). */
+function handleMapClick(): void {
+    if (globalState.uiMode === UIMode.useSkill) {
+        playerUse()
+        return
+    }
+    switch (globalState.mouseMode) {
+        case 'crosshair': {
+            const target = getObjectUnderCursor((o) => o.type === 'critter' && o !== globalState.player)
+            if (target) {playerUse(target)}
+            return
+        }
+        case 'arrow':
+            arrowClick()
+            return
+        default:
+            walkToMouseHex()
+    }
+}
+
+const hoverLook = new HoverLook()
+/** Left button held this long in ARROW mode opens the action menu instead. */
+const ACTION_MENU_HOLD_MS = 400
+let leftPress: { time: number; x: number; y: number } | null = null
 
 /**
  * Create and wire the UIManagerImpl (ui2 WebGL/OffscreenCanvas path).
@@ -476,14 +622,29 @@ heart.mousepressed = (x: number, y: number, btn: string) => {
         return
     }
     if (btn === 'l') {
-        playerUse()
+        // The action happens on release (MOUSE_EVENT_LEFT_BUTTON_UP); a long
+        // press in ARROW mode opens the action menu.
+        leftPress = { time: performance.now(), x, y }
     } else if (btn === 'r') {
-        // item context menu
-        const obj = getObjectUnderCursor((obj) => obj.isSelectable)
-        if (obj) {
-            uiContextMenu(obj, { clientX: x, clientY: y })
-        }
+        // gameMouseCycleMode: move → arrow → crosshair (in combat, with a weapon) → move.
+        const weapon = globalState.player?.equippedWeapon
+        globalState.mouseMode = cycleMouseMode(globalState.mouseMode ?? 'move', globalState.inCombat, !!weapon)
+        hoverLook.reset()
     }
+}
+
+heart.mousereleased = (x: number, y: number, btn: string) => {
+    if (btn !== 'l' || !leftPress) {return}
+    const press = leftPress
+    leftPress = null
+    if (globalState.isInitializing || globalState.isLoading || globalState.isWaitingOnRemote) {return}
+    if (globalState.uiMode !== UIMode.none && globalState.uiMode !== UIMode.useSkill) {return}
+    if (globalState.mouseMode === 'arrow' && performance.now() - press.time >= ACTION_MENU_HOLD_MS) {
+        const obj = getObjectUnderCursor((o) => o.isSelectable)
+        if (obj) {uiContextMenu(obj, { clientX: press.x, clientY: press.y })}
+        return
+    }
+    handleMapClick()
 }
 
 heart.keydown = (k: string) => {
@@ -796,12 +957,13 @@ heart.update = function () {
             // every .75 seconds, check the object under the cursor
             globalState.lastMousePickTime = time
 
-            const obj = getObjectUnderCursor((obj) => obj.isSelectable)
-            if (obj !== null) {
-                changeCursor('pointer')
-            } else {
-                changeCursor('auto')
-            }
+            changeCursor(globalState.mouseMode === 'crosshair' ? 'crosshair' : 'default')
+        }
+
+        // ARROW mode: resting on an object looks at it once (gameMouseRefresh).
+        if (globalState.mouseMode === 'arrow' && !globalState.inCombat) {
+            const looked = hoverLook.update(time, mousePos[0], mousePos[1], () => getObjectUnderCursor((o) => o.visible !== false))
+            if (looked) {lookAtObject(looked as Obj)}
         }
 
         for (let i = 0; i < globalState.floatMessages.length; i++) {

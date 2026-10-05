@@ -104,7 +104,7 @@ export default {
 
     combatDifficulty: 1, // Normal
     gameDifficulty: 1, // Normal
-    attackCursor: false,
+    mouseMode: 'move',
     violenceLevel: 2, // Maximum blood
 
     mapAreas: null,
@@ -267,7 +267,8 @@ export default {
      * Attack (crosshair) cursor armed from the interface item button: the next
      * critter clicked is attacked, starting combat if needed (game_mouse.cc).
      */
-    attackCursor: boolean
+    /** game_mouse.cc cursor mode: hex (move), action arrow, or attack crosshair. */
+    mouseMode: 'move' | 'arrow' | 'crosshair'
     /** Game difficulty: 0=Easy, 1=Normal, 2=Hard. Controls encounter/XP formula branches. */
     gameDifficulty: number
     /** Violence level: 0=minimal, 1=normal, 2=maximum blood. */

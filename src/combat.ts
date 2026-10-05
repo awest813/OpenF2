@@ -1710,6 +1710,8 @@ export class Combat {
         this.inPlayerTurn = false
         globalState.combat = null
         globalState.inCombat = false
+        // _combat_over: gameMouseSetMode(GAME_MOUSE_MODE_MOVE).
+        globalState.mouseMode = 'move'
         EventBus.emit('combat:end')
 
         globalState.gMap.updateMap()

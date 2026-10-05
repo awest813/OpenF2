@@ -103,7 +103,8 @@ export class Renderer {
             const label = this.cursorReadout(mouseHex)
             if (label?.crosshair) {
                 cursorLabel = { label: label.label, x: mousePos[0] + 16, y: mousePos[1] + 4 }
-            } else {
+            } else if ((globalState.mouseMode ?? 'move') === 'move') {
+                // Only the MOVE cursor is a hex (game_mouse.cc).
                 this.renderImage('hex_outline', cx, cy, 32, 16)
                 if (label) {cursorLabel = { label: label.label, x: cx + 12, y: cy + 12 }}
             }
@@ -187,9 +188,9 @@ export class Renderer {
     private _pathCache: { from: string; to: string; length: number } | null = null
 
     /**
-     * What the cursor shows (game_mouse.cc): over a critter in combat or
-     * with the crosshair armed, the chance to hit; on an empty hex during
-     * the player's combat turn, what walking there costs.
+     * What the cursor shows (game_mouse.cc): in CROSSHAIR mode over a
+     * critter, the chance to hit; in MOVE mode during the player's combat
+     * turn, what walking to the hex costs.
      */
     private cursorReadout(mouseHex: Point): { label: CursorLabel; crosshair: boolean } | null {
         const player: any = globalState.player
@@ -197,11 +198,12 @@ export class Renderer {
         const combat = globalState.combat
         const playersTurn = globalState.inCombat && combat?.inPlayerTurn === true
         const critter: any = (globalState.gMap as any).critterAtPosition?.(mouseHex)
-        if (critter && critter !== player && !critter.dead && (playersTurn || globalState.attackCursor)) {
+        if (globalState.mouseMode === 'crosshair') {
+            if (!critter || critter === player || critter.dead) {return null}
             const accuracy = player.AP ? Combat.playerToHit(player, critter) : null
             return { label: accuracyLabel({ accuracy, isCritter: true, team: critter.teamNum ?? 0 }), crosshair: true }
         }
-        if (!playersTurn) {return null}
+        if (!playersTurn || (globalState.mouseMode ?? 'move') !== 'move') {return null}
         const from = player.position.x + ',' + player.position.y
         const to = mouseHex.x + ',' + mouseHex.y
         if (!this._pathCache || this._pathCache.from !== from || this._pathCache.to !== to) {
