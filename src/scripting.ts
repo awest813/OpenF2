@@ -19,7 +19,7 @@ Scripting system/engine for DarkFO
 
 declare const __dirname: string
 
-import { Combat } from './combat.js'
+import { Combat, CombatStartData } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
 import { areaContainingMap, lookupMapName, lookupScriptName } from './data.js'
 import {
@@ -78,6 +78,7 @@ import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
 import { getSettings, iniOverride, violenceToIni, patchSettings } from './settings.js'
 import { itemDropAll } from './mapAging.js'
+import { sfxAmbientName, sfxCharName, sfxInterfaceName, sfxOpenName, sfxSceneryName, sfxWeaponName } from './sfxNames.js'
 import { equipItem, isRealItem, removeItem } from './equipment.js'
 import { hasDrugEvent } from './character/timedEffects.js'
 import {
@@ -1455,10 +1456,9 @@ export namespace Scripting {
         }
         obj_can_see_obj(a: Critter, b: Critter) {
             log('obj_can_see_obj', arguments)
-            if (!isGameObject(a) || !isGameObject(b)) {
-                warn(`obj_can_see_obj: not game object: a=${a} b=${b}`, undefined, this)
-                return 0
-            }
+            if (!isGameObject(a) || !isGameObject(b) || !a.position || !b.position) {return 0}
+            // opObjectCanSeeObject: both on the map at the same elevation.
+            if (elevationOf(a) !== elevationOf(b)) {return 0}
             return +objCanSeeObj(a, b)
         }
         obj_can_hear_obj(a: Obj, b: Obj) {
@@ -1880,21 +1880,34 @@ export namespace Scripting {
                 warn('attack_complex: self_obj is null — combat start skipped', undefined, this)
                 return
             }
+            // opAttackComplex: no fight starts from inside a conversation.
+            if (currentDialogueObject) {return}
 
-            this._scriptAttack(this.self_obj, obj)
+            this._scriptAttack(this.self_obj, obj, {
+                accuracyBonus: bonus | 0,
+                damageBonus: 0,
+                minDamage: minDmg | 0,
+                maxDamage: maxDmg | 0,
+                overrideAttackResults: attackerResults === targetResults,
+                attackerResults: attackerResults | 0,
+                targetResults: targetResults | 0,
+            })
         }
         /** attack_setup(attacker, defender) (opAttackSetup): attack_complex with an explicit attacker. */
         attack_setup(attacker: Obj, defender: Obj) {
             info('[enter combat via attack_setup]')
             if (!attacker) {return}
-            this._scriptAttack(attacker, defender)
+            this._scriptAttack(attacker, defender, {
+                accuracyBonus: 0, damageBonus: 0, minDamage: 0, maxDamage: 0x7fffffff,
+                overrideAttackResults: false, attackerResults: 0, targetResults: 0,
+            })
         }
         /**
          * opAttackComplex / opAttackSetup: nothing happens when either side is
          * dead, knocked out or hidden, or the target is fleeing; mid-fight the
          * attacker just engages (joining at the end of the round).
          */
-        private _scriptAttack(attacker: any, target: any) {
+        private _scriptAttack(attacker: any, target: any, startData: CombatStartData) {
             const inactive = (c: any) => !c || c.dead || c.knockedOut || c.visible === false
             if (inactive(attacker) || inactive(target)) {return}
             if (((target.combatManeuver ?? 0) & 0x04) !== 0) {return}
@@ -1908,7 +1921,7 @@ export namespace Scripting {
                 }
                 return
             }
-            if (Config.engine.doCombat) {Combat.start(attacker as Critter, target instanceof Critter ? target : undefined)}
+            if (Config.engine.doCombat) {Combat.start(attacker as Critter, target instanceof Critter ? target : undefined, { startData })}
         }
         critter_stop_attacking(obj: Obj) {
             // opCritterStopAttacking: disengage and forget the enemy.
@@ -2010,27 +2023,15 @@ export namespace Scripting {
         // (e.g. quest item hand-offs).  The object is removed from the map and pushed
         // onto the player inventory array.
         // ---------------------------------------------------------------------------
+        /** opPickup (actionPickUp): the script's critter picks the object up into its inventory. */
         pickup_obj(obj: Obj) {
-            log('pickup_obj', arguments)
-            if (!isGameObject(obj)) {
-                warn('pickup_obj: not a game object: ' + obj, undefined, this)
-                return
-            }
-            const player = globalState.player
-            if (!player) {
-                warn('pickup_obj: no player', undefined, this)
-                return
-            }
-            // BLK-194: Guard against null/undefined player.inventory — in the Arroyo
-            // opening sequence the player object may be constructed before its inventory
-            // array is initialised.  Calling push() on null/undefined throws TypeError;
-            // silently no-op so the item-pickup scripted event doesn't crash the map.
-            if (!Array.isArray(player.inventory)) {
-                warn('pickup_obj: player has no inventory array — no-op', undefined, this)
-                return
-            }
+            if (!isGameObject(obj)) {return}
+            const self: any = isGameObject(this.target_obj) ? this.target_obj : this.self_obj
+            if (!isGameObject(self) || self.type !== 'critter') {return}
+            // _obj_pickup: the item's own pickup_p_proc runs first and may override.
+            if (obj._script && Scripting.pickup(obj, self)) {return}
             if (globalState.gMap) {globalState.gMap.removeObject(obj)}
-            player.inventory.push(obj)
+            this.add_mult_objs_to_inven(self, obj, (obj as any).amount ?? 1)
         }
 
         // ---------------------------------------------------------------------------
@@ -2208,6 +2209,10 @@ export namespace Scripting {
             // negative tile gives it an out-of-bounds position ({x:<0, y:0}), which
             // corrupts pathfinding and LOS calculations.  Return null so the caller
             // can detect the failure and defer placement.
+            // opCreateObject: nothing for pid 0 or while a save is being restored;
+            // tile -1 means tile 0.
+            if (pid === 0 || globalState.loadingGame) {return null}
+            if (tile === -1) {tile = 0}
             if (!isValidTileNum(tile)) {
                 warn('create_object_sid: invalid tile (' + tile + ') — no-op', undefined, this)
                 return null
@@ -2341,27 +2346,12 @@ export namespace Scripting {
                 use(who, obj)
             }
         }
+        /** opUseObject: the script's critter (or object) uses the object. */
         use_obj(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('use_obj: not a game object: ' + obj, undefined, this)
-                return
-            }
-
-            const sourceObj = this.source_obj
-            const source =
-                sourceObj !== 0 && isGameObject(sourceObj) && (sourceObj as Obj).type === 'critter'
-                    ? (sourceObj as Critter)
-                    : globalState.player
-            // BLK-180: Guard against objects that don't implement use() — Arroyo
-            // exit grids and misc items (e.g. pip-boy trigger objects) may not have a
-            // use() method in the browser build.  Without this guard, calling use()
-            // on such an object throws TypeError and halts the script VM, preventing
-            // the map transition from firing.  Mirror BLK-166 (obj_open/obj_close).
-            if (typeof (obj as any).use !== 'function') {
-                warn('use_obj: object has no use() method — no-op', undefined, this)
-                return
-            }
-            obj.use(source)
+            if (!isGameObject(obj) || typeof (obj as any).use !== 'function') {return}
+            const user: any = isGameObject(this.target_obj) ? this.target_obj : this.self_obj
+            if (!isGameObject(user)) {return}
+            obj.use(user)
         }
         /**
          * opAnim: an animation code below ANIM_COUNT plays once (forwards for
@@ -2611,14 +2601,14 @@ export namespace Scripting {
         move_to(obj: Obj, tileNum: number, elevation: number) {
             if (!isGameObject(obj)) {
                 warn('move_to: not a game object: ' + obj)
-                return
+                return -1
             }
             // BLK-136: Guard against non-finite tileNum — NaN/Infinity passed by a
             // script arithmetic error would set obj.position to {x: NaN, y: NaN},
             // breaking all subsequent position checks.  Skip and warn instead.
             if (typeof tileNum !== 'number' || !isFinite(tileNum) || tileNum < 0) {
                 warn('move_to: invalid tileNum (' + tileNum + ') — no-op', undefined, this)
-                return
+                return -1
             }
             if (elevation !== globalState.currentElevation) {
                 info('move_to: moving to elevation ' + elevation)
@@ -2636,6 +2626,8 @@ export namespace Scripting {
             obj.position = fromTileNum(tileNum)
 
             if (obj instanceof Critter && obj.isPlayer) {centerCamera(obj.position)}
+            // opMoveTo returns the tile the object now stands on.
+            return tileNum
         }
 
         // combat
@@ -2684,6 +2676,8 @@ export namespace Scripting {
                 warn('start_gdialog: no self_obj — dialogue start skipped', undefined, this)
                 return
             }
+            // opStartGameDialog: no conversation during combat.
+            if (globalState.inCombat) {return}
             currentDialogueObject = this.self_obj as Critter
             // gameDialogEnter clears the barter modifier.
             this._barterMod = 0
@@ -3009,27 +3003,28 @@ export namespace Scripting {
         }
         dialogue_reaction(_reaction: number) {}
         set_map_music(_map: number, _name: string) {}
-        /** sfx_build_*_name: sound effect file names; the bridge has no sound bank, so names pass through or are empty. */
-        sfx_build_open_name(_obj: Obj, _action: number) {
-            return ''
+        /** opSfxBuild*Name: sound effect file names, built as game_sound.cc does. */
+        sfx_build_open_name(obj: Obj, action: number) {
+            return isGameObject(obj) ? sfxOpenName(obj, action) : 0
         }
-        sfx_build_char_name(_obj: Obj, _anim: number, _extra: number) {
-            return ''
+        sfx_build_char_name(obj: Obj, anim: number, extra: number) {
+            return isGameObject(obj) ? (sfxCharName(obj, anim, extra) ?? 0) : 0
         }
         sfx_build_ambient_name(name: string) {
-            return typeof name === 'string' ? name : ''
+            return sfxAmbientName(name)
         }
         sfx_build_interface_name(name: string) {
-            return typeof name === 'string' ? name : ''
+            return sfxInterfaceName(name)
         }
-        sfx_build_item_name(_name: string) {
-            return ''
+        /** The engine builds item sounds with the interface-sound name. */
+        sfx_build_item_name(name: string) {
+            return sfxInterfaceName(name)
         }
-        sfx_build_weapon_name(_type: number, _weapon: Obj, _hitMode: number, _target: Obj) {
-            return ''
+        sfx_build_weapon_name(effectType: number, weapon: Obj, hitMode: number, target: Obj) {
+            return sfxWeaponName(effectType, weapon, hitMode, isGameObject(target) ? target : null)
         }
-        sfx_build_scenery_name(_obj: Obj, _action: number, _extra: number) {
-            return ''
+        sfx_build_scenery_name(name: string, action: number, actionType: number) {
+            return sfxSceneryName(actionType, action, name)
         }
         /**
          * destroy_mult_objs(obj, count): take up to `count` of the item out of
@@ -3860,8 +3855,9 @@ export namespace Scripting {
                     // MARK_STATE_INVISIBLE — hide the area
                     if (globalState.markAreaKnown) {globalState.markAreaKnown(area, 0)}
                 } else {
-                    // MARK_STATE_UNKNOWN (0), MARK_STATE_KNOWN (1), MARK_STATE_VISITED (2)
-                    if (globalState.markAreaKnown) {globalState.markAreaKnown(area, markState)}
+                    // opMarkAreaKnown: any state but invisible shows the town
+                    // (wmAreaSetVisibleState(area, 1)); state 0 leaves it unvisited.
+                    if (globalState.markAreaKnown) {globalState.markAreaKnown(area, markState === 0 ? 1 : markState)}
                     else {log('mark_area_known', arguments)}
                 }
             } else if (areaType === 1) {

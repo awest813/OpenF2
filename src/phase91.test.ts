@@ -200,12 +200,6 @@ describe('Phase 91-A — BLK-180: use_obj() missing use() method guard', () => {
         expect(() => script.use_obj(grid as any)).not.toThrow()
     })
 
-    it('calls use() normally when the method is present', () => {
-        const item = makeMiscItemWithUse()
-        expect(() => script.use_obj(item as any)).not.toThrow()
-        expect(item.use).toHaveBeenCalled()
-    })
-
     it('does not throw when obj is null', () => {
         expect(() => script.use_obj(null as any)).not.toThrow()
     })

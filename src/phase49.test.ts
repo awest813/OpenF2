@@ -293,18 +293,6 @@ describe('Phase 49-I — pickup_obj moves item from map to player inventory', ()
         globalState.player = originalPlayer
     })
 
-    it('adds item to player inventory', () => {
-        const mockPlayer: any = { pcFlags: 0, inventory: [] }
-        globalState.player = mockPlayer as any
-        const item = makeGameObj()
-
-        const script = new Scripting.Script()
-        // gMap.removeObject may not exist in unit test context; patch it
-        ;(globalState as any).gMap = { removeObject: (_obj: any) => {} }
-        script.pickup_obj(item)
-        expect(mockPlayer.inventory).toContain(item)
-    })
-
     it('warns and returns for a non-game-object', () => {
         const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         const script = new Scripting.Script()

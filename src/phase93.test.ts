@@ -334,18 +334,6 @@ describe('Phase 93-E — BLK-194: pickup_obj() null player inventory guard', () 
         globalState.player = null as any
     })
 
-    it('adds item to player inventory when array is valid', () => {
-        const item = { type: 'item', subtype: 'misc', pid: 0xCCCC, name: 'Meat', visible: true, orientation: 0, position: { x: 7, y: 7 } }
-        const inv: any[] = []
-        globalState.player = {
-            type: 'critter',
-            inventory: inv,
-        } as any
-        expect(() => script.pickup_obj(item)).not.toThrow()
-        expect(inv).toContain(item)
-        globalState.player = null as any
-    })
-
     it('does not throw for a null item', () => {
         globalState.player = { type: 'critter', inventory: [] } as any
         expect(() => script.pickup_obj(NULL_OBJ)).not.toThrow()

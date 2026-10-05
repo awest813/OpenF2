@@ -244,7 +244,21 @@ export interface AttackOutcome {
     roll: Roll
 }
 
+/** CombatStartData: how a script-started fight's first turn is skewed (attack_complex). */
+export interface CombatStartData {
+    accuracyBonus: number
+    damageBonus: number
+    minDamage: number
+    maxDamage: number
+    overrideAttackResults: boolean
+    attackerResults: number
+    targetResults: number
+}
+
 export class Combat {
+    /** The script's CombatStartData while it applies (the first combatant's turn). */
+    startData: CombatStartData | null = null
+
     combatants: Critter[]
     playerIdx: number
     player: Player
@@ -519,6 +533,7 @@ export class Combat {
             targetKnockedDownOrOut: knocked,
             combatDifficulty: globalState.combatDifficulty ?? 1,
             attackerIsHostileToPlayer: this.hostileToPlayer(obj),
+            scriptAccuracyBonus: this.startData?.accuracyBonus ?? 0,
         })
 
         if (isNaN(hitChance)) {
@@ -1102,7 +1117,14 @@ export class Combat {
                 && !isHitFromFront(obj, target) && (target as any).lastCombatAttacker !== obj) {
                 damageMultiplier *= 2
             }
-            const damage = this.getDamageDone(obj, target, damageMultiplier, outcome.flags, 1, hitMode)
+            let damage = this.getDamageDone(obj, target, damageMultiplier, outcome.flags, 1, hitMode)
+            // A script-started fight's first turn: its damage bonus and range,
+            // and its forced result flags (the engine copies targetResults).
+            const csd = this.startData
+            if (csd) {
+                damage = Math.min(csd.maxDamage, Math.max(csd.minDamage, damage + csd.damageBonus))
+                if (csd.overrideAttackResults) {outcome.flags = csd.targetResults}
+            }
             const extraMsg = outcome.crit && outcome.msgID ? this.getCombatMsg(outcome.msgID) || '' : ''
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage ' + extraMsg)
             this.hitCritter(obj, target, damage, outcome.flags, info)
@@ -1607,7 +1629,7 @@ export class Combat {
      * nearest member of the other (combat_ai.cc _caiSetupTeamCombat, used by
      * random-encounter ambushes).
      */
-    static start(attacker?: Critter, defender?: Critter, opts: { teamCombat?: boolean } = {}): void {
+    static start(attacker?: Critter, defender?: Critter, opts: { teamCombat?: boolean; startData?: CombatStartData } = {}): void {
         const objects = globalState.gMap.getObjects()
         if (opts.teamCombat) {
             for (const o of objects) {
@@ -1618,6 +1640,7 @@ export class Combat {
         }
         globalState.inCombat = true
         const combat = new Combat(objects, attacker ?? null, defender ?? null)
+        combat.startData = opts.startData ?? null
         globalState.combat = combat
         if (opts.teamCombat && attacker && defender) {combat.initTeamCombat(attacker, defender)}
         EventBus.emit('combat:start', { combatants: combat.combatants.map((_, i) => i) })
@@ -1775,6 +1798,8 @@ export class Combat {
      */
     nextTurn(): void {
         if (globalState.combat !== this && globalState.combat !== undefined && globalState.combat !== null) {return}
+        // CombatStartData lasts for the first combatant's turn only.
+        if (this.whoseTurn >= 0) {this.startData = null}
         if (!this.player) {
             console.warn('[combat] nextTurn: no player — ending combat')
             return this.end()

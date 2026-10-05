@@ -84,6 +84,8 @@ export type AttackType = 'unarmed' | 'melee' | 'ranged' | 'throw'
 export interface ToHitInput {
     /** Attacker is the player (dude): enables player-only rules. */
     isPlayer: boolean
+    /** The script-started combat's accuracy bonus (CombatStartData), for its first turn. */
+    scriptAccuracyBonus?: number
     /** Weapon skill (or Unarmed skill when no weapon). */
     skill: number
     /** A weapon is in the attacking hand (brass knuckles count; bare fists do not). */
@@ -207,6 +209,8 @@ export function computeToHit(i: ToHitInput): number {
         else if (light <= 39321) {toHit -= 25}
         else if (light <= 52428) {toHit -= 10}
     }
+
+    toHit += i.scriptAccuracyBonus ?? 0
 
     if (i.attackerBlind) {toHit -= 25}
     if (i.targetKnockedDownOrOut) {toHit += 40}
