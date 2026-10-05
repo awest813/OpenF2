@@ -14,7 +14,8 @@
 // ---------------------------------------------------------------------------
 
 /**
- * The sfall compatibility version reported by `metarule(56, 0)`.
+ * The sfall compatibility version OpenF2 advertises.  (Not reported through
+ * `metarule`: ID 56 is not an engine metarule and returns 0.)
  *
  * Encoded as  major * 1_000_000 + minor * 1_000 + patch  (matches the
  * convention used by real sfall installations so mod scripts can parse it).

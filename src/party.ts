@@ -172,7 +172,7 @@ export class Party {
     }
 
     /**
-     * FO2-ish state bitfield for metarule(25).
+     * Party-member state bitfield (party control UI / saves).
      * Bit 0 (PARTY_STATE_WAITING) = ordered to wait / stay.
      */
     getStateFlags(obj: Critter): number {

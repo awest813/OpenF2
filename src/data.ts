@@ -161,6 +161,41 @@ function areaContainingMap(mapName: string) {
     return null
 }
 
+/** ID of the world-map area whose entrance list contains `mapName`, or -1. */
+export function lookupAreaIDForMap(mapName: string | null | undefined): number {
+    if (!mapName || !globalState.mapAreas) {return -1}
+    const needle = mapName.toLowerCase()
+    for (const area in globalState.mapAreas) {
+        const entrances = globalState.mapAreas[area].entrances
+        if (entrances.some((e) => e.mapName.toLowerCase() === needle)) {return globalState.mapAreas[area].id}
+    }
+    return -1
+}
+
+/**
+ * Engine `wmMapIsKnown`: true when map `mapID` belongs to an area entrance
+ * whose state is on.  OpenF2 does not track per-entrance state changes yet, so
+ * the entrance's city.txt start state is used.
+ */
+export function isMapEntranceKnown(mapID: number): boolean {
+    if (!globalState.mapAreas) {return false}
+    let mapName: string | undefined
+    try {
+        if (mapInfo === null) {parseMapInfo()}
+        mapName = mapInfo?.[mapID]?.name
+    } catch (err) {
+        console.warn('isMapEntranceKnown: maps.txt unavailable', err)
+        return false
+    }
+    if (!mapName) {return false}
+    const needle = mapName.toLowerCase()
+    for (const area in globalState.mapAreas) {
+        const entrance = globalState.mapAreas[area].entrances.find((e) => e.mapName.toLowerCase() === needle)
+        if (entrance) {return entrance.startState.trim().toLowerCase() === 'on'}
+    }
+    return false
+}
+
 export function loadAreas() {
     return parseAreas(getFileText('data/data/city.txt'))
 }

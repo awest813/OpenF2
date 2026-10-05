@@ -5,7 +5,7 @@
  *   A. Scripting — has_trait TRAIT_CHAR (type 2) reads critter.charTraits
  *   B. Scripting — critter_add_trait TRAIT_CHAR (type 2) writes critter.charTraits
  *   C. Scripting — sfall list opcodes: list_begin / list_next / list_end
- *   D. Scripting — metarule IDs 1–13 and 16–54 (de-stubbed; no stub hits)
+ *   D. Scripting — metarule IDs the engine does not define return 0
  *   E. Save schema — v9 adds playerCharTraits; migration from v8 sets []
  *   F. object.ts — Critter.charTraits serializes to/from sorted number array
  *   G. Checklist — Phase 23 entries reflect correct status
@@ -261,10 +261,13 @@ describe('Phase 23-C — sfall list opcodes (0x8186-0x8188)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// D. metarule IDs 1–13 and 16–54 de-stubbed
+// D. metarule IDs the engine does not define return 0
 // ---------------------------------------------------------------------------
 
-describe('Phase 23-D — metarule IDs de-stubbed (no stub hits)', () => {
+// fallout2-ce opMetarule only handles the METARULE_* enum IDs (13–19, 22,
+// 30–32, 40, 42–53); everything else pushes the default result of 0.
+// Engine-ID behaviour is covered in metaruleParity.test.ts.
+describe('Phase 23-D — non-engine metarule IDs return 0 (no stub hits)', () => {
     let script: Scripting.Script
 
     beforeEach(() => {
@@ -272,208 +275,16 @@ describe('Phase 23-D — metarule IDs de-stubbed (no stub hits)', () => {
         script = new (Scripting as any).Script()
     })
 
-    // Low IDs (previously catch-all)
-    it('metarule(1, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(1, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
+    const NON_ENGINE_IDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 21, 23, 24, 25, 26, 27, 28, 29, 33, 34, 35, 36, 37, 38, 39, 41, 54, 55, 56]
 
-    it('metarule(2, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(2, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(3, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(3, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(4, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(4, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(5, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(5, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(6, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(6, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(7, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(7, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(8, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(8, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(9, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(9, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(10, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(10, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(11, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(11, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(12, 0) returns 50 (neutral reaction)', () => {
-        drainStubHits()
-        expect(script.metarule(12, 0)).toBe(50)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(13, 0) returns 50 (neutral reaction to PC)', () => {
-        drainStubHits()
-        expect(script.metarule(13, 0)).toBe(50)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(16, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(16, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(19, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(19, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(20, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(20, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(25, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(25, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(26, 0) returns 0 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(26, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(27, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(27, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(28, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(28, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(29, 0) returns 1 (area reachable) without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(29, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(31, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(31, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(32, 0) returns 1 (level fallback) without stub hit', () => {
-        drainStubHits()
-        // target=0 is not a game object so falls through to default level=1
-        expect(typeof script.metarule(32, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(33, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(33, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(34, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(34, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(36, 0) through metarule(43, 0) return numbers without stub hits', () => {
-        drainStubHits()
-        for (let id = 36; id <= 43; id++) {
-            expect(typeof script.metarule(id, 0)).toBe('number')
-        }
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(45, 0) returns a number without stub hit', () => {
-        drainStubHits()
-        expect(typeof script.metarule(45, 0)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(50, 0) returns 0 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(50, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(51, 0) returns 50 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(51, 0)).toBe(50)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(52, 0) returns 1 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(52, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(53, 0) returns 0 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(53, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(54, 0) returns 1 without stub hit', () => {
-        drainStubHits()
-        expect(script.metarule(54, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(6, critter) returns 0 for a non-game-object critter arg', () => {
-        drainStubHits()
-        // METARULE_ARMOR_WORN: target=0 is not a game object → no equippedArmor
-        expect(script.metarule(6, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
+    for (const id of NON_ENGINE_IDS) {
+        it(`metarule(${id}, …) returns 0 without stub hit`, () => {
+            const critter = makeCritter({ hostile: true, dead: true, isFleeing: true, level: 7, equippedArmor: makeObj() })
+            expect(script.metarule(id, 0)).toBe(0)
+            expect(script.metarule(id, critter)).toBe(0)
+            expect(stubHitCount()).toBe(0)
+        })
+    }
 })
 
 // ---------------------------------------------------------------------------

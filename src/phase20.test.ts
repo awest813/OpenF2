@@ -2,7 +2,7 @@
  * Phase 20 regression tests.
  *
  * Covers:
- *   A. Scripting — metarule de-stubs: IDs 30, 35, 44, 47, 55
+ *   A. Scripting — metarule IDs 30, 35, 44, 47, 55 follow fallout2-ce meanings
  *   B. Scripting — metarule3 de-stubs: IDs 101 (constrained random), 107 (tile visible)
  *   C. Scripting — has_trait TRAIT_OBJECT new cases: 1, 2, 3, 667, 668
  *   D. Scripting — critter_add_trait TRAIT_OBJECT new cases: 667, 668
@@ -10,8 +10,11 @@
  *   F. Checklist — Phase 20 entries reflect correct status
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
+import globalState from './globalState.js'
+import { setHasCar } from './car.js'
+import { patchSettings, resetSettings } from './settings.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
 // ---------------------------------------------------------------------------
@@ -67,63 +70,54 @@ function makeCritter(overrides: Record<string, any> = {}): any {
 }
 
 // ---------------------------------------------------------------------------
-// A. metarule de-stubs: IDs 30, 35, 44, 47, 55
+// A. metarule IDs 30, 35, 44, 47, 55 — engine meanings
 // ---------------------------------------------------------------------------
 
-describe('Phase 20-A — metarule de-stubs (IDs 30, 35, 44, 47, 55)', () => {
+// fallout2-ce: 30 = CAR_CURRENT_TOWN, 44 = GET_WORLDMAP_XPOS,
+// 47 = LANGUAGE_FILTER; 35 and 55 are not engine metarules (→ 0).
+describe('Phase 20-A — metarule IDs 30, 35, 44, 47, 55 (engine meanings)', () => {
     let script: Scripting.Script
 
     beforeEach(() => {
         drainStubHits()
         script = new (Scripting as any).Script()
+        setHasCar(false)
+        resetSettings(false)
     })
 
-    it('metarule(30, unloaded_weapon) returns 0 — weapon has no ammo loaded', () => {
-        const weapon = makeObj({ extra: { ammoLoaded: 0 } })
-        expect(script.metarule(30, weapon)).toBe(0)
-        expect(stubHitCount()).toBe(0)
+    afterEach(() => {
+        setHasCar(false)
+        resetSettings(false)
     })
 
-    it('metarule(30, loaded_weapon) returns 1 — weapon has ammo loaded', () => {
+    it('metarule(30, …) is CAR_CURRENT_TOWN — -1 without a car, ignores its argument', () => {
         const weapon = makeObj({ extra: { ammoLoaded: 6 } })
-        expect(script.metarule(30, weapon)).toBe(1)
+        expect(script.metarule(30, weapon)).toBe(-1)
+        expect(script.metarule(30, 0)).toBe(-1)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule(30, null) returns 0 — non-game-object is treated as unloaded', () => {
-        expect(script.metarule(30, null)).toBe(0)
+    it('metarule(35, 0) and metarule(55, 0) are not engine metarules and return 0', () => {
+        expect(script.metarule(35, 0)).toBe(0)
+        expect(script.metarule(55, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule(35, 0) returns 1 — normal combat difficulty', () => {
-        expect(script.metarule(35, 0)).toBe(1)
+    it('metarule(44, …) is GET_WORLDMAP_XPOS, not a drug check', () => {
+        const saved = globalState.worldPosition
+        globalState.worldPosition = { x: 321, y: 654 }
+        try {
+            expect(script.metarule(44, makeCritter())).toBe(321)
+        } finally {
+            globalState.worldPosition = saved
+        }
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule(44, critter) returns 0 — no drug system', () => {
-        const critter = makeCritter()
-        expect(script.metarule(44, critter)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(47, unknown_area) returns 0 — unknown area is undiscovered', () => {
+    it('metarule(47, …) is LANGUAGE_FILTER, not an area lookup', () => {
         expect(script.metarule(47, 9999)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(55, 0) returns 1 — normal game difficulty', () => {
-        expect(script.metarule(55, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule 30/35/44/47/55 do not emit stub hits', () => {
-        const weapon = makeObj({ extra: {} })
-        drainStubHits()
-        script.metarule(30, weapon)
-        script.metarule(35, 0)
-        script.metarule(44, weapon)
-        script.metarule(47, 0)
-        script.metarule(55, 0)
+        patchSettings({ languageFilter: true }, false)
+        expect(script.metarule(47, 9999)).toBe(1)
         expect(stubHitCount()).toBe(0)
     })
 })

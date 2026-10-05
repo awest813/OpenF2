@@ -12,6 +12,8 @@ import { UIMode } from './uiMode.js'
 import { uiLog } from './ui.js'
 
 export const CAR_FUEL_MAX = 80000
+/** Proto ID of the Highwayman trunk container (PROTO_ID_CAR_TRUNK). */
+export const CAR_TRUNK_PID = 455
 /** Fuel burned per world-map travel update tick while the car is moving. */
 export const CAR_FUEL_BURN_PER_TICK = 12
 /** Speed multiplier when the player owns a fueled car. */
@@ -198,4 +200,55 @@ export function hydrateCarPark(raw: CarParkState | null | undefined): void {
         return
     }
     carPark = { mapName, x, y, elevation }
+}
+
+/**
+ * METARULE_GIVE_CAR_GAS (wmCarFillGas): add `amount` fuel to the tank and
+ * return the part that did not fit (0 when everything fit).  Unlike
+ * setCarFuel() this does not change ownership.
+ */
+export function fillCarGas(amount: number): number {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) {return 0}
+    const fuel = getCarFuel()
+    const add = Math.trunc(amount)
+    if (fuel + add <= CAR_FUEL_MAX) {
+        globalState.carFuel = Math.max(0, fuel + add)
+        return 0
+    }
+    globalState.carFuel = CAR_FUEL_MAX
+    return CAR_FUEL_MAX - fuel
+}
+
+/**
+ * METARULE_GIVE_CAR_TO_PARTY (wmCarGiveToParty): put the party in the car.
+ * Returns -1 (with the engine's "out of power" message) when the tank is
+ * empty, 0 otherwise.
+ */
+export function giveCarToParty(): number {
+    if (getCarFuel() <= 0) {
+        uiLog('The car is out of power.')
+        return -1
+    }
+    setHasCar(true)
+    return 0
+}
+
+/** Name of the map the Highwayman was last parked on, or null. */
+export function getCarParkMapName(): string | null {
+    return carPark ? carPark.mapName : null
+}
+
+/**
+ * Car trunk capacity override set by METARULE_SET_CAR_CARRY_AMOUNT.  The
+ * engine writes this into the car-trunk proto (PID 455), which is not
+ * persisted in saves; null means "use the proto value".
+ */
+let carTrunkCapacity: number | null = null
+
+export function setCarTrunkCapacity(amount: number): void {
+    carTrunkCapacity = typeof amount === 'number' && Number.isFinite(amount) ? Math.trunc(amount) : null
+}
+
+export function getCarTrunkCapacity(protoMaxSize = 0): number {
+    return carTrunkCapacity ?? protoMaxSize
 }

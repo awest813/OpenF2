@@ -340,7 +340,7 @@ export namespace ScriptVMBridge {
        ,0x8166: bridged("get_critter_base_stat", 2)    // get_critter_base_stat(critter, stat) → base stat value
        ,0x8167: bridged("set_critter_base_stat", 3, false) // set_critter_base_stat(critter, stat, value)
        ,0x8168: bridged("in_combat", 0)                // in_combat() → 1 if engine is in combat, 0 otherwise
-       ,0x8169: bridged("get_current_town", 0)         // get_current_town() → current map/area ID (sfall-style shortcut for metarule(46, 0))
+       ,0x8169: bridged("get_current_town", 0)         // get_current_town() → current map ID (metarule(46) returns the world-map area instead)
        ,0x816A: bridged("critter_is_dead", 1)          // critter_is_dead(obj) → 1 if critter HP <= 0
        ,0x816B: bridged("get_dialogue_active", 0)      // get_dialogue_active() → 1 if dialogue is currently active
        ,0x816C: bridged("abs_value", 1)                // abs_value(x) → |x|
@@ -836,7 +836,7 @@ export namespace ScriptVMBridge {
        // -----------------------------------------------------------------------
 
        // 0x81E0 — get_current_map_id_sfall(): return the current map index.
-       // Alias of metarule(46, 0) / metarule(55, 0).  Useful for map-specific branches.
+       // Useful for map-specific branches.
        ,0x81E0: bridged("get_current_map_id_sfall", 0) // get_current_map_id() → mapID
 
        // 0x81E1 — get_object_dude_distance(obj): return tile distance from obj to dude_obj.

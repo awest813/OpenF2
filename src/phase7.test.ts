@@ -169,7 +169,7 @@ describe('sfall global variable store', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 4. SFALL_VER — metarule(56, 0) value and structure
+// 4. SFALL_VER value and structure
 // ---------------------------------------------------------------------------
 
 describe('SFALL_VER constant', () => {
@@ -191,17 +191,7 @@ describe('SFALL_VER constant', () => {
         expect(patch).toBeGreaterThanOrEqual(0)
     })
 
-    it('metarule(56, …) returns the same version constant', () => {
-        // Inline replica of the metarule(56) handler so we can test the
-        // round-trip without importing browser-only modules.
-        function metarule56(): number {
-            return SFALL_VER
-        }
-        expect(metarule56()).toBe(SFALL_VER)
-    })
-
     it('version is distinguishable from 0 (sfall not present)', () => {
-        // In original Fallout 2 without sfall, metarule(56,0) returns 0.
         expect(SFALL_VER).not.toBe(0)
     })
 })

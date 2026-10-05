@@ -21,7 +21,7 @@ declare const __dirname: string
 
 import { Combat } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
-import { lookupScriptName } from './data.js'
+import { isMapEntranceKnown, lookupAreaIDForMap, lookupScriptName } from './data.js'
 import {
     hexDirectionTo,
     hexDistance,
@@ -47,7 +47,7 @@ import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResu
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
-import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
+import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
@@ -55,7 +55,17 @@ import { getCritterCarryLimitLbs } from './critterInventory.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
-import { setCarFuel, setHasCar } from './car.js'
+import {
+    CAR_TRUNK_PID,
+    fillCarGas,
+    getCarParkMapName,
+    getCarTrunkCapacity,
+    giveCarToParty,
+    hasCar,
+    setCarFuel,
+    setCarTrunkCapacity,
+    setHasCar,
+} from './car.js'
 import {
     syncReputationFromGvar,
     pullReputationFromGvars,
@@ -68,7 +78,7 @@ import {
 import { signalEndGame } from './endgame.js'
 import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
-import { iniOverride, violenceToIni, patchSettings } from './settings.js'
+import { getSettings, iniOverride, violenceToIni, patchSettings } from './settings.js'
 
 export namespace Scripting {
     let useElevatorHandler: () => void = () => {}
@@ -237,9 +247,8 @@ export namespace Scripting {
      * Maps a critter object reference to the game-tick time at which its active
      * drug effect(s) expire.  Any drug item whose use_p_proc fires marks the
      * using/target critter for the default Fallout 2 drug duration (600 ticks =
-     * 60 seconds).  metarule(18) (CRITTER_ON_DRUGS) and metarule(44)
-     * (WHO_ON_DRUGS) query this map to determine whether a critter is currently
-     * under drug influence.
+     * 60 seconds).  metarule(18) (METARULE_WHO_ON_DRUGS) queries this map to
+     * determine whether a critter is currently under drug influence.
      *
      * A WeakRef-like approach is not needed here because the map is cleared on
      * every map transition (reset()), which is the natural lifetime boundary.
@@ -1016,70 +1025,100 @@ export namespace Scripting {
         message_str(msgList: number, msgNum: number) {
             return getScriptMessage(msgList, msgNum)
         }
-        metarule(id: number, target: number): any {
+        // metarule(id, param) — mirrors opMetarule in fallout2-ce
+        // (src/interpreter_extra.cc).  Only the IDs defined by the engine's
+        // METARULE_* enum have behaviour; every other ID returns the engine's
+        // default result of 0.
+        metarule(id: number, target: any): any {
             switch (id) {
+                case 13: {
+                    // METARULE_SIGNAL_END_GAME: the engine flags the game loop to quit
+                    // into the ending slideshow; result is always 0.
+                    signalEndGame(0, globalVars, { play: true })
+                    return 0
+                }
                 case 14:
-                    return mapFirstRun // map_first_run
-                case 15: // elevator
-                    // target === -1 is the canonical "no explicit type" call.
-                    // Some scripts pass an explicit type constant; log and proceed
-                    // rather than throwing so the elevator is still activated.
+                    // METARULE_FIRST_RUN: 1 until the current map has been saved once.
+                    return mapFirstRun ? 1 : 0
+                case 15:
+                    // METARULE_ELEVATOR: open the elevator panel for the elevator stub
+                    // near self_obj.  `target` is the elevator type; useElevator()
+                    // reads the type from the stub itself.
                     if (target !== -1) {log('metarule(15): elevator called with explicit type ' + target + ' (ignored)', arguments)}
                     useElevatorHandler()
-                    break
+                    return 0
+                case 16: {
+                    // METARULE_PARTY_COUNT: the player plus every party member that is
+                    // a living, visible critter (_getPartyMemberCount).
+                    const members = globalState.gParty ? globalState.gParty.getPartyMembers() : []
+                    return 1 + members.filter((m: any) => m && m.type === 'critter' && !m.dead && m.visible !== false).length
+                }
                 case 17:
-                    // METARULE_IS_AREA_KNOWN: 1 if the area with ID `target` has been discovered
+                    // METARULE_AREA_KNOWN: 1 if the world-map area `target` is known.
                     if (globalState.mapAreas && globalState.mapAreas[target] !== undefined) {
                         return globalState.mapAreas[target].state === true ? 1 : 0
                     }
-                    return 0 // unknown area ID — treat as undiscovered
+                    return 0
                 case 18:
-                    // METARULE_CRITTER_ON_DRUGS: 1 if the self_obj critter is currently
-                    // under drug influence (e.g. just used a stimpak or buffout).
-                    return isOnDrugs(this.self_obj as object)
-                case 21:
-                    // METARULE_VENDOR_CAPS: return vendor's current available caps.
-                    // Used by barter scripts to cap the amount the vendor will trade.
-                    // Without a vendor inventory system, return a large default budget.
-                    return 99999
+                    // METARULE_WHO_ON_DRUGS: 1 if critter `target` has a pending drug event.
+                    return isGameObject(target) ? isOnDrugs(target as object) : 0
+                case 19:
+                    // METARULE_MAP_KNOWN: 1 if the entrance for map index `target` is known.
+                    return isMapEntranceKnown(target) ? 1 : 0
                 case 22:
-                    return 0 // is_game_loading
-                case 23:
-                    // METARULE_RAND_RANGE: random integer in range.
-                    // The full 2-arg metarule form doesn't carry both bounds; callers
-                    // that need a bounded random should use the metarule3 variant.
-                    // Return 0 as a safe placeholder so existing scripts don't throw.
-                    return 0
-                case 24:
-                    // METARULE_PARTY_COUNT: return number of NPCs currently in the party
-                    return globalState.gParty ? globalState.gParty.getPartyMembers().length : 0
-                case 30: {
-                    // METARULE_CHECK_WEAPON_LOADED: 1 if the weapon object has ammo loaded, 0 otherwise.
-                    const wLoaded = isGameObject(target) ? ((target as any).extra?.ammoLoaded ?? 0) : 0
-                    return wLoaded > 0 ? 1 : 0
+                    // METARULE_IS_LOADGAME: 1 while a saved game is being restored.
+                    return globalState.mapLoadedFromSave ? 1 : 0
+                case 30:
+                    // METARULE_CAR_CURRENT_TOWN: area the car is in, -1 when there is none.
+                    return hasCar() ? lookupAreaIDForMap(getCarParkMapName()) : -1
+                case 31:
+                    // METARULE_GIVE_CAR_TO_PARTY: 0 on success, -1 when out of fuel.
+                    return giveCarToParty()
+                case 32:
+                    // METARULE_GIVE_CAR_GAS: add `target` fuel; returns the overflow.
+                    return fillCarGas(target)
+                case 40: {
+                    // METARULE_SKILL_CHECK_TAG: 1 if skill number `target` is tagged.
+                    const skillName = skillNumToName[target]
+                    const skills = (globalState.player as any)?.skills
+                    return skillName && skills && typeof skills.isTagged === 'function' && skills.isTagged(skillName) ? 1 : 0
                 }
-                case 35:
-                    // METARULE_COMBAT_DIFFICULTY: 0=easy, 1=normal, 2=hard.
-                    return globalState.combatDifficulty
-                case 44: {
-                    // METARULE_WHO_ON_DRUGS: 1 if the target critter is currently under drug influence.
-                    // Uses the drug-tracking map populated when drug items are used via use/useObjOn.
-                    const drugTarget = isGameObject(target) ? target : this.self_obj
-                    return isOnDrugs(drugTarget as unknown as object)
-                }
-                case 46:
-                    // METARULE_CURRENT_TOWN: return the current map/area ID as the town identifier
-                    return currentMapID !== null ? currentMapID : 0
-                case 47:
-                    // METARULE_MAP_KNOWN: 1 if the world-map area with the given ID is discovered.
-                    // Identical logic to case 17 but keyed by a numeric map ID argument.
-                    if (globalState.mapAreas && globalState.mapAreas[target] !== undefined) {
-                        return globalState.mapAreas[target].state === true ? 1 : 0
+                case 42: {
+                    // METARULE_DROP_ALL_INVEN: drop everything `target` carries onto its
+                    // tile, unequipping worn and wielded items.
+                    if (!isGameObject(target) || !Array.isArray((target as Obj).inventory)) {return 0}
+                    const owner = target as Critter
+                    const items = owner.inventory.splice(0)
+                    if (items.includes(owner.equippedArmor as Obj)) {owner.equippedArmor = null}
+                    if (items.includes(owner.leftHand as Obj)) {owner.leftHand = undefined}
+                    if (items.includes(owner.rightHand as Obj)) {owner.rightHand = undefined}
+                    if (globalState.gMap && owner.position) {
+                        for (const item of items) {
+                            item.position = { ...owner.position }
+                            globalState.gMap.addObject(item)
+                        }
                     }
                     return 0
+                }
+                case 43:
+                    // METARULE_INVEN_UNWIELD_WHO: put away `target`'s active weapon.
+                    this.inven_unwield(target)
+                    return 0
+                case 44:
+                    // METARULE_GET_WORLDMAP_XPOS
+                    return globalState.worldPosition ? globalState.worldPosition.x : 0
+                case 45:
+                    // METARULE_GET_WORLDMAP_YPOS
+                    return globalState.worldPosition ? globalState.worldPosition.y : 0
+                case 46:
+                    // METARULE_CURRENT_TOWN: world-map area containing the current map.
+                    return lookupAreaIDForMap(globalState.gMap?.name)
+                case 47:
+                    // METARULE_LANGUAGE_FILTER
+                    return getSettings().languageFilter ? 1 : 0
                 case 48:
                     return violenceToIni(globalState.violenceLevel) // METARULE_VIOLENCE_FILTER
-                case 49: { // METARULE_W_DAMAGE_TYPE
+                case 49: { // METARULE_WEAPON_DAMAGE_TYPE
                     // Map the damage-type string to the Fallout 2 DMG_* constants:
                     //   0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP, 6=Explosion
                     const _dmgTypeMap: Record<string, number> = {
@@ -1098,204 +1137,41 @@ export namespace Scripting {
                     warn('metarule(49): unrecognised damage type: ' + _dtype)
                     return 0 // fall back to Normal
                 }
-                case 55:
-                    // METARULE_GAME_DIFFICULTY: 0=easy, 1=normal, 2=hard.
-                    return globalState.gameDifficulty
-                case 56:
-                    return SFALL_VER // METARULE_SFALL_VER — sfall compatibility version
-                // -----------------------------------------------------------------------
-                // Additional metarule IDs — de-stubbed with safe defaults
-                // -----------------------------------------------------------------------
-                case 1:
-                    // METARULE_SIGNAL_END_GAME: trigger end-game slideshow (P1-8).
-                    {
-                        const reason = typeof target === 'number' && Number.isFinite(target) ? target : 0
-                        signalEndGame(reason, globalVars, { play: true })
-                        return 0
-                    }
-                case 2:
-                    // METARULE_TIMER_FIRED: 1 if the timed event for `target` has elapsed.
-                    // Without a running timer-fired table, default to 0 (not fired).
-                    return 0
-                case 3:
-                    // METARULE_FIRST_TIME / METARULE_MAKE_CRITTER_BARTER: context-dependent.
-                    // Return 0 (not first time / barter not active) as safe placeholder.
-                    return 0
-                case 4:
-                    // METARULE_RADIATION_GAUGE: current radiation gauge level (0–7).
-                    // No radiation display panel in browser build; return 0.
-                    return 0
-                case 5:
-                    // METARULE_MOVIE: play a game movie by ID (P1-9 stub).
-                    {
-                        const movieID = typeof target === 'number' && Number.isFinite(target) ? target : 0
-                        playMovie(movieID)
-                        return 0
-                    }
-                case 6:
-                    // METARULE_ARMOR_WORN: 1 if `target` is a critter wearing armor.
-                    if (isGameObject(target) && (target as any).equippedArmor) {return 1}
-                    return 0
-                case 7:
-                    // METARULE_CRITTER_IN_PARTY / METARULE_CRITTER_BARTER_INFO.
-                    // Return 0 (not in party / no barter info) as safe default.
-                    return globalState.gParty ? (globalState.gParty.getPartyMembers().includes(target as any) ? 1 : 0) : 0
-                case 8:
-                    // METARULE_CRITTER_ON_TEAM: 1 if two critters share a team number.
-                    // `target` is not enough to encode two critters; return 0 (different teams).
-                    return 0
-                case 9:
-                    // METARULE_CUR_TOWN / METARULE_CRITTER_STATUS: return current map ID.
-                    // Matches metarule(46, 0) in most usage contexts.
-                    return currentMapID !== null ? currentMapID : 0
-                case 10:
-                    // METARULE_TILE_LOCKED: 1 if the tile with the given tilenum is locked.
-                    // No tile-lock tracking in browser build; return 0 (not locked).
-                    return 0
-                case 11:
-                    // METARULE_MAP_INFO: return map info flags for the current map.
-                    // Return 0 (no special flags) as a safe default.
-                    return 0
-                case 12:
-                    // METARULE_CRITTER_REACTION: return the NPC critter's current reaction level
-                    // toward the player.  Range 0–100; 50 = neutral.
-                    return 50
-                case 13:
-                    // METARULE_CRITTER_REACTION_TO_PC: similar to case 12 but for direction
-                    // toward the PC specifically.  Return 50 (neutral).
-                    return 50
-                case 16:
-                    // METARULE_IS_BIG_GUN: 1 if `target` weapon is a big gun (skill area = big guns).
-                    // Check proto flags2 bit for big-gun flag (0x0800 in Fallout 2).
-                    if (!isGameObject(target)) {return 0}
-                    return ((target as any).extra?.flags2 ?? (target as any).flags2 ?? 0) & 0x0800 ? 1 : 0
-                case 19: {
-                    // METARULE_PARTY_MEMBER_FOLLOW: 1 if the party-member critter is following.
-                    const followTarget = isGameObject(target) ? target : this.self_obj
-                    if (!isGameObject(followTarget) || !globalState.gParty) return 0
-                    if (!globalState.gParty.isPartyMember(followTarget as Critter)) return 0
-                    return globalState.gParty.isFollowing(followTarget as Critter) ? 1 : 0
-                }
-                case 20:
-                    // METARULE_IS_BIG_GUN_EQUIPPED: 1 if the player currently wields a big gun.
-                    if (!globalState.player) {return 0}
-                    {
-                        const wep = (globalState.player as any).rightHand ?? (globalState.player as any).leftHand
-                        if (!wep) {return 0}
-                        return ((wep as any).extra?.flags2 ?? (wep as any).flags2 ?? 0) & 0x0800 ? 1 : 0
-                    }
-                case 25: {
-                    // METARULE_PARTY_MEMBER_STATE: state flags for a party-member critter.
-                    // Bit 0 = waiting / stay.
-                    const stateTarget = isGameObject(target) ? target : this.self_obj
-                    if (!isGameObject(stateTarget) || !globalState.gParty) return 0
-                    if (!globalState.gParty.isPartyMember(stateTarget as Critter)) return 0
-                    return globalState.gParty.getStateFlags(stateTarget as Critter)
-                }
-                case 26:
-                    // METARULE_CRITICAL_HIT_ADJUST: return critical-hit table adjustment for critter.
-                    // No per-critter critical table override; return 0 (standard table).
-                    return 0
-                case 27:
-                    // METARULE_HOSTILE_TO_PC: 1 if the critter is currently hostile to the player.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).hostile ? 1 : 0
-                case 28:
-                    // METARULE_CRITTER_STATE: return state-flags bitfield for the critter.
-                    // Dead=1; alive=0.  Prone state not tracked separately yet.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).dead ? 1 : 0
-                case 29:
-                    // METARULE_AREA_REACHABLE: 1 if the world-map area with ID `target` is
-                    // reachable from the current position.  Always return 1 (partial).
-                    return 1
-                case 31:
-                    // METARULE_CRITTER_FLEEING: 1 if the critter is currently fleeing.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).isFleeing ? 1 : 0
-                case 32:
-                    // METARULE_CRITTER_LEVEL: return the critter's effective level.
-                    // For the player, returns player.level; for NPCs return 1 as safe default.
-                    if (!isGameObject(target)) {return 1}
-                    return (target as any).level ?? 1
-                case 33:
-                    // METARULE_PLAYER_ALIVE: 1 if the player is alive.
-                    return globalState.player && !globalState.player.dead ? 1 : 0
-                case 34:
-                    // METARULE_COMBAT_MODE: 1 if combat is active.
-                    return globalState.inCombat ? 1 : 0
-                case 36:
-                    // METARULE_CRITTER_KNOCKED_OUT: 1 if critter is knocked out.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).knockedOut ? 1 : 0
-                case 37:
-                    // METARULE_CRITTER_KNOCKED_DOWN: 1 if critter is knocked down.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).knockedDown ? 1 : 0
-                case 38:
-                    // METARULE_CRITTER_STUNNED: 1 if critter is stunned.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).stunned ? 1 : 0
-                case 39:
-                    // METARULE_CRITTER_ON_FIRE: 1 if critter is on fire.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).onFire ? 1 : 0
-                case 40:
-                    // METARULE_CRITTER_CRIPPLED_LEFT_LEG: 1 if critter's left leg is crippled.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).crippledLeftLeg ? 1 : 0
-                case 41:
-                    // METARULE_CRITTER_CRIPPLED_RIGHT_LEG: 1 if critter's right leg is crippled.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).crippledRightLeg ? 1 : 0
-                case 42:
-                    // METARULE_CRITTER_CRIPPLED_LEFT_ARM: 1 if critter's left arm is crippled.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).crippledLeftArm ? 1 : 0
-                case 43:
-                    // METARULE_CRITTER_CRIPPLED_RIGHT_ARM: 1 if critter's right arm is crippled.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).crippledRightArm ? 1 : 0
-                case 45:
-                    // METARULE_CRITTER_BLINDED: 1 if critter is blinded.
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).blinded ? 1 : 0
                 case 50:
-                    // METARULE_CRITTERS_ENTER_REALSPACE: trigger critters to re-enter real-space
-                    // after a scripted encounter.  No-op in browser build; return 0.
-                    log('metarule(50/CRITTERS_ENTER_REALSPACE)', arguments)
-                    return 0
+                    // METARULE_CRITTER_BARTERS: 1 if critter `target`'s proto has the
+                    // CRITTER_BARTER flag (0x02).
+                    if (!isGameObject(target) || (target as Obj).type !== 'critter') {return 0}
+                    return ((target as any).pro?.extra?.flags ?? 0) & 0x02 ? 1 : 0
                 case 51:
-                    // METARULE_GET_BASE_TOHIT: return base to-hit chance for the current attack.
-                    // No persistent attack context; return 50 (50% base).
-                    return 50
+                    // METARULE_CRITTER_KILL_TYPE: the player is KILL_TYPE_MAN (0) or
+                    // KILL_TYPE_WOMAN (1); other critters use their proto kill type;
+                    // non-critters are -1.
+                    if (!isGameObject(target)) {return -1}
+                    if (target === globalState.player || (target as any).isPlayer) {
+                        return (target as Player).gender === 'female' ? 1 : 0
+                    }
+                    if ((target as Obj).type !== 'critter') {return -1}
+                    return (target as any).pro?.extra?.killType ?? 0
                 case 52:
-                    // METARULE_TILE_ACCESSIBILITY: 1 if tile is accessible to the given critter.
+                    // METARULE_SET_CAR_CARRY_AMOUNT: set the car trunk capacity.
+                    setCarTrunkCapacity(target)
                     return 1
-                case 53:
-                    // METARULE_HAVE_DRUG: 1 if the critter (target) has any drug item in its
-                    // inventory.  A "drug" item has subtype === 2 in the PRO sub-type table
-                    // (0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key).
-                    if (!isGameObject(target)) {return 0}
-                    return (target as any).inventory?.some(
-                        (inv: any) => inv.subtype === 'drug' || (inv.pro?.extra?.subType === 2)
-                    ) ? 1 : 0
-                case 54:
-                    // METARULE_WEAPON_IS_SUITABLE: 1 if a weapon is suitable for use.
-                    // Return 1 (always suitable) as a safe default.
-                    return 1
+                case 53: {
+                    // METARULE_GET_CAR_CARRY_AMOUNT: car trunk (PID 455) capacity.
+                    let protoMaxSize = 0
+                    try {
+                        protoMaxSize = loadPRO(makePID(0, CAR_TRUNK_PID), CAR_TRUNK_PID)?.extra?.maxSize ?? 0
+                    } catch (err) {
+                        warn('metarule(53): car trunk proto unavailable: ' + err)
+                    }
+                    return getCarTrunkCapacity(protoMaxSize)
+                }
                 default:
-                    // Unknown metarule IDs above the defined range — log silently
-                    // and return 0 rather than emitting a stub hit that floods the
-                    // console during normal gameplay.  This covers sfall-specific
-                    // extensions and future vanilla IDs not yet mapped.
+                    // Not a METARULE_* ID in the engine: opMetarule falls through
+                    // and pushes 0.
                     log('metarule (unknown id=' + id + ')', arguments)
-                    break
+                    return 0
             }
-            // Default return for any case that uses break instead of return
-            // (e.g. elevator case 15, unknown id) — ensures VM stack gets a
-            // valid number rather than undefined.
-            return 0
         }
         metarule3(id: number, obj: any, userdata: any, radius: number): any {
             if (id < 100) {

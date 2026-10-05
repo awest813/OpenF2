@@ -88,7 +88,7 @@ not-a-row
         EventBus.offAll('endgame:returnToMenu')
     })
 
-    it('metarule(1) triggers endgame selection', () => {
+    it('metarule(13) METARULE_SIGNAL_END_GAME triggers endgame selection', () => {
         setEndgameTableForTests([
             { gvar: 410, value: 2, imageIndex: 1, narrId: 'NAR_DE1' },
         ])
@@ -96,7 +96,9 @@ not-a-row
         Scripting.setGlobalVars({ 410: 2 })
         const spy = vi.fn()
         EventBus.on('endgame:start', spy)
-        script.metarule(1, 0)
+        expect(script.metarule(1, 0)).toBe(0)
+        expect(spy).not.toHaveBeenCalled()
+        expect(script.metarule(13, 0)).toBe(0)
         expect(spy).toHaveBeenCalled()
         EventBus.offAll('endgame:start')
     })
@@ -123,13 +125,13 @@ describe('Parity P1-9 — movie playback stub', () => {
         EventBus.offAll('movie:end')
     })
 
-    it('play_gmovie and metarule(5) invoke playMovie', () => {
+    it('play_gmovie invokes playMovie; metarule(5) is not a movie metarule', () => {
         const plays: any[] = []
         EventBus.on('movie:play', (p) => plays.push(p))
         const script = new (Scripting as any).Script()
         script.play_gmovie(2)
-        script.metarule(5, 9)
-        expect(plays.map((p) => p.movieId)).toEqual(['elder', 'enclave'])
+        expect(script.metarule(5, 9)).toBe(0)
+        expect(plays.map((p) => p.movieId)).toEqual(['elder'])
         EventBus.offAll('movie:play')
     })
 })

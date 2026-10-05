@@ -141,7 +141,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_17',
         kind: 'metarule',
-        description: 'METARULE_IS_AREA_KNOWN(17): check if a world-map area has been discovered. Reads globalState.mapAreas[target].state; returns 0 for unknown areas.',
+        description:
+            'METARULE_AREA_KNOWN(17): 1 if world-map area `target` is known. ' +
+            'Reads globalState.mapAreas[target].state; returns 0 for unknown areas.',
         status: 'implemented',
         frequency: 'high',
         impact: 'high',
@@ -150,9 +152,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_46',
         kind: 'metarule',
         description:
-            'METARULE_CURRENT_TOWN(46): return the current city/town ID. Returns currentMapID ' +
-            '(the numeric map identifier set when a map loads). Returns 0 when no map is active. ' +
-            'Used by town-reputation and encounter scripts.',
+            'METARULE_CURRENT_TOWN(46): the world-map area ID containing the current map ' +
+            '(wmGetPartyCurArea), via data.lookupAreaIDForMap(gMap.name); -1 when the map belongs to no area. ' +
+            'Previously returned the map ID.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -161,9 +163,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_18',
         kind: 'metarule',
         description:
-            'METARULE_CRITTER_ON_DRUGS(18): check if a critter is under drug influence. ' +
-            'Phase 49 implemented full drug tracking via _druggedCritters Map and isDrugItem helper; ' +
-            'this entry is superseded by drug_tracking_metarule18 but retained for reference.',
+            'METARULE_WHO_ON_DRUGS(18): 1 if the critter passed as the argument has an active ' +
+            'drug effect (engine: queueHasEvent(param, EVENT_TYPE_DRUG)). Previously read self_obj; ' +
+            'see drug_tracking_metarule18.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -255,9 +257,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_21',
         kind: 'metarule',
         description:
-            'METARULE_VENDOR_CAPS(21): return vendor\'s available caps budget. ' +
-            'Returns 99999 (large default caps budget; no per-vendor cap tracking). ' +
-            'Scripts use this to cap barter offers.',
+            'metarule(21): not an engine METARULE_* ID (invented VENDOR_CAPS removed); ' +
+            'returns the engine default 0.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -265,7 +266,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_24',
         kind: 'metarule',
-        description: 'METARULE_PARTY_COUNT(24): return number of NPCs currently in the party. Uses gParty.getPartyMembers().length.',
+        description:
+            'metarule(24): not an engine METARULE_* ID; returns the engine default 0. ' +
+            'Party size is METARULE_PARTY_COUNT(16).',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -427,7 +430,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'get_current_town',
         kind: 'opcode',
-        description: 'sfall 0x8169: get_current_town() → current map/area ID. Sfall-style shortcut for metarule(46, 0). Used by town-scoped NPC dialogue.',
+        description:
+            'sfall 0x8169: get_current_town() → current map ID. Used by town-scoped NPC dialogue. ' +
+            '(metarule(46) METARULE_CURRENT_TOWN returns the world-map area instead.)',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -585,7 +590,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_30',
         kind: 'metarule',
-        description: 'METARULE_CHECK_WEAPON_LOADED(30): 1 if the weapon object passed as target has ammo loaded (extra.ammoLoaded > 0), 0 otherwise.',
+        description:
+            'METARULE_CAR_CURRENT_TOWN(30): area ID of the Highwayman (area of its last ' +
+            'parking map, car.getCarParkMapName), -1 without a car. Replaces the invented ' +
+            'CHECK_WEAPON_LOADED meaning.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -594,9 +602,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_35',
         kind: 'metarule',
         description:
-            'METARULE_COMBAT_DIFFICULTY(35): returns combat difficulty (0=easy, 1=normal, 2=hard). ' +
-            'Reads globalState.combatDifficulty (default 1). Set from the Options panel or ' +
-            'set_combat_difficulty_sfall.',
+            'metarule(35): not an engine METARULE_* ID (invented COMBAT_DIFFICULTY removed); ' +
+            'returns 0. Scripts read difficulty via get_ini_setting / combat_difficulty opcodes.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',
@@ -605,9 +612,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_44',
         kind: 'metarule',
         description:
-            'METARULE_WHO_ON_DRUGS(44): returns 1 if the target critter is under drug influence. ' +
-            'Phase 49 implemented drug tracking via _druggedCritters Map; this entry reflects ' +
-            'the earlier partial stub (see drug_tracking_metarule44 for the Phase-49 entry).',
+            'METARULE_GET_WORLDMAP_XPOS(44): world-map X position (globalState.worldPosition.x). ' +
+            'Replaces the invented WHO_ON_DRUGS meaning (that is metarule 18).',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -615,7 +621,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule_47',
         kind: 'metarule',
-        description: 'METARULE_MAP_KNOWN(47): 1 if the world-map area with the given numeric map ID is discovered. Mirrors case 17 logic.',
+        description:
+            'METARULE_LANGUAGE_FILTER(47): 1 when the Options language filter is on. ' +
+            'Replaces the invented MAP_KNOWN meaning (that is metarule 19).',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -624,9 +632,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_55',
         kind: 'metarule',
         description:
-            'METARULE_GAME_DIFFICULTY(55): returns game difficulty (0=easy, 1=normal, 2=hard). ' +
-            'Reads globalState.gameDifficulty (default 1). Set from the Options panel or ' +
-            'set_game_difficulty_sfall; also drives world-map encounterDifficulty.',
+            'metarule(55): not an engine METARULE_* ID (invented GAME_DIFFICULTY removed); ' +
+            'returns 0. Scripts read difficulty via get_ini_setting / game_difficulty opcodes.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',
@@ -891,9 +898,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_1_to_13',
         kind: 'metarule',
         description:
-            'metarule IDs 1–13: signal_end_game, timer_fired, first_time, radiation_gauge, movie, ' +
-            'armor_worn, critter_in_party, critter_on_team, cur_town, tile_locked, map_info, ' +
-            'critter_reaction, critter_reaction_to_pc. All implemented with safe defaults or real values.',
+            'metarule IDs 1–12 are not engine METARULE_* IDs and return 0. ' +
+            '13 is METARULE_SIGNAL_END_GAME (starts the ending slideshow, returns 0). The previously ' +
+            'invented meanings (timer_fired, radiation_gauge, movie, armor_worn, critter_reaction, …) were removed.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -902,10 +909,11 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_16_20_25_32',
         kind: 'metarule',
         description:
-            'metarule IDs 16 (is_big_gun), 19 (party_follow), 20 (is_big_gun_equipped), ' +
-            '25 (party_member_state), 26 (critical_hit_adjust), 27 (hostile_to_pc), ' +
-            '28 (critter_state), 29 (area_reachable), 31–43 (various critter conditions), ' +
-            '45 (blinded), 50–54 (misc). All implemented with safe defaults.',
+            'Engine IDs in this range: 16 PARTY_COUNT (player + living, visible members), ' +
+            '19 MAP_KNOWN (entrance start state from city.txt), 22 IS_LOADGAME (mapLoadedFromSave), ' +
+            '30 CAR_CURRENT_TOWN, 31 GIVE_CAR_TO_PARTY (-1 when out of fuel), 32 GIVE_CAR_GAS (returns overflow). ' +
+            '20, 21, 23–29 are not engine IDs and return 0 (invented is_big_gun, party_follow, hostile_to_pc, ' +
+            'critter_state, area_reachable, critter_fleeing, critter_level, … removed).',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -1345,10 +1353,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_unknown_silent',
         kind: 'metarule',
         description:
-            'metarule() unknown IDs (above the currently defined range of 1–56) now ' +
-            'log silently instead of emitting a stub hit.  Eliminates console flooding ' +
-            'from scripts that probe sfall-specific or future metarule IDs that are ' +
-            'not yet defined in the browser build.',
+            'metarule() IDs outside the engine METARULE_* enum (13–19, 22, 30–32, 40, 42–53) ' +
+            'log silently and return 0 instead of emitting a stub hit, matching opMetarule\'s default result.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',
@@ -2624,10 +2630,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule_53_have_drug_implemented',
         kind: 'metarule',
         description:
-            'METARULE_HAVE_DRUG (metarule case 53): now returns 1 if the target critter\'s ' +
-            'inventory contains any item with subtype "drug" (subType===2 in PRO extra data). ' +
-            'Previously always returned 0, causing NPC scripts that check for doctor\'s bags, ' +
-            'stimpaks, etc. to mis-branch and NPCs to ignore their healing items.',
+            'metarule(53) is METARULE_GET_CAR_CARRY_AMOUNT: the car trunk capacity ' +
+            '(override from metarule(52) SET_CAR_CARRY_AMOUNT, else the PID 455 proto value). The invented ' +
+            'HAVE_DRUG inventory check was removed.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -2708,7 +2713,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'drug_tracking_metarule18',
         kind: 'metarule',
         description:
-            'METARULE_CRITTER_ON_DRUGS(18): returns 1 if self_obj critter is currently under ' +
+            'METARULE_WHO_ON_DRUGS(18): returns 1 if the target critter is currently under ' +
             'drug influence. Implemented via _druggedCritters Map: drug items (subtype===2) ' +
             'mark the using critter for DRUG_EFFECT_TICKS (600) when use/useObjOn fires.',
         status: 'implemented',
@@ -2719,9 +2724,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'drug_tracking_metarule44',
         kind: 'metarule',
         description:
-            'METARULE_WHO_ON_DRUGS(44): returns 1 if the target critter is currently under ' +
-            'drug influence. Uses same _druggedCritters Map as metarule(18). Fixes NPC healer ' +
-            'scripts (e.g. "only heal if not already on drugs" logic).',
+            'metarule(44) is METARULE_GET_WORLDMAP_XPOS, not a drug check; the drug ' +
+            'query lives on METARULE_WHO_ON_DRUGS(18) using the _druggedCritters Map.',
         status: 'implemented',
         frequency: 'low',
         impact: 'medium',
@@ -3637,7 +3641,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'sfall 0x81E0: get_current_map_id_sfall() — return the current map index. ' +
-            'Alias of metarule(46,0); fully implemented.',
+            'Fully implemented.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'low',

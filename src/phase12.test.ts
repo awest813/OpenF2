@@ -29,34 +29,11 @@ import { QuestLog } from './quest/questLog.js'
 // Phase 12-A — metarule_46 (METARULE_CURRENT_TOWN) implementation
 // ===========================================================================
 
-/**
- * Inline replica of the de-stubbed metarule case 46 implementation.
- *
- * Returns the currentMapID when non-null (treated as the town/area ID),
- * or 0 if the scripting module has not yet been initialised for a map.
- */
-function metarule46CurrentTown(currentMapID: number | null): number {
-    return currentMapID !== null ? currentMapID : 0
-}
+// metarule(46) is the engine's METARULE_CURRENT_TOWN: the world-map *area*
+// containing the current map (wmGetPartyCurArea), not the map ID.  Its
+// behaviour is exercised against the real handler in metaruleParity.test.ts.
 
 describe('Phase 12-A — metarule_46 (METARULE_CURRENT_TOWN) de-stub', () => {
-    it('returns 0 when currentMapID is null (pre-init)', () => {
-        expect(metarule46CurrentTown(null)).toBe(0)
-    })
-
-    it('returns the map ID when set', () => {
-        expect(metarule46CurrentTown(5)).toBe(5)
-        expect(metarule46CurrentTown(42)).toBe(42)
-    })
-
-    it('returns 0 for map ID 0 (valid edge case)', () => {
-        expect(metarule46CurrentTown(0)).toBe(0)
-    })
-
-    it('passes through large map IDs unchanged', () => {
-        expect(metarule46CurrentTown(999)).toBe(999)
-    })
-
     it('checklist entry for metarule_46 is now "implemented"', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule_46')
         expect(entry).toBeDefined()

@@ -1,7 +1,7 @@
 /**
  * Game movie playback registry (parity P1-9 stub).
  *
- * Maps FO2 `play_gmovie` / metarule(MOVIE) IDs to named entries, emits
+ * Maps FO2 `play_gmovie` movie IDs to named entries, emits
  * EventBus notifications, and can drive a placeholder CinematicPlayer slide
  * when no browser video asset is available.
  */

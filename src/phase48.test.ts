@@ -10,7 +10,7 @@
  *   Phase 48-B — set_global_var(0, v) syncs reputation.karma
  *   Phase 48-C — rm_mult_objs_from_inven drains multiple stacks
  *   Phase 48-D — item_caps_adjust creates caps item when none exists
- *   Phase 48-E — METARULE_HAVE_DRUG (metarule case 53) checks inventory
+ *   Phase 48-E — metarule(53) is GET_CAR_CARRY_AMOUNT (was misread as HAVE_DRUG)
  *   Phase 48-F — Critter equippedArmor serialized via equippedArmorPID
  *   Phase 48-G — sfall 0x81A8 get_combat_free_move returns freeMoveAP
  *   Phase 48-H — sfall 0x81A9 set_combat_free_move clamps to >= 0
@@ -24,6 +24,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import globalState from './globalState.js'
+import { setCarTrunkCapacity } from './car.js'
 import { Reputation } from './quest/reputation.js'
 import { SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
@@ -194,41 +195,26 @@ describe('Phase 48-D — item_caps_adjust creates caps item when none in invento
 })
 
 // ===========================================================================
-// Phase 48-E — METARULE_HAVE_DRUG (case 53) checks inventory
+// Phase 48-E — metarule(53) is METARULE_GET_CAR_CARRY_AMOUNT, not a drug check
 // ===========================================================================
 
-describe('Phase 48-E — metarule(53) METARULE_HAVE_DRUG inventory check', () => {
-    it('returns 1 when target has a drug item (subtype "drug") in inventory', () => {
+describe('Phase 48-E — metarule(53) METARULE_GET_CAR_CARRY_AMOUNT', () => {
+    afterEach(() => {
+        setCarTrunkCapacity(NaN) // clear the override
+    })
+
+    it('ignores the target critter\'s inventory (no drug lookup)', () => {
         const script = new Scripting.Script()
         const drugItem = makeItem(300, 1, 'drug')
         const critter = makeGameObj({ type: 'critter', inventory: [drugItem] })
-        expect(script.metarule(53, critter)).toBe(1)
-    })
-
-    it('returns 1 when target has an item with PRO subType===2 (drug numeric type)', () => {
-        const script = new Scripting.Script()
-        const drugItem = { _type: 'obj', type: 'item', subtype: 'misc', pid: 305, amount: 1, pro: { extra: { subType: 2 } } }
-        const critter = makeGameObj({ type: 'critter', inventory: [drugItem] })
-        expect(script.metarule(53, critter)).toBe(1)
-    })
-
-    it('returns 0 when target has no drug items in inventory', () => {
-        const script = new Scripting.Script()
-        const weaponItem = makeItem(50, 1, 'weapon')
-        const critter = makeGameObj({ type: 'critter', inventory: [weaponItem] })
         expect(script.metarule(53, critter)).toBe(0)
-    })
-
-    it('returns 0 for a non-game-object target', () => {
-        const script = new Scripting.Script()
         expect(script.metarule(53, null)).toBe(0)
-        expect(script.metarule(53, 0)).toBe(0)
     })
 
-    it('returns 0 for a target with an empty inventory', () => {
+    it('returns the capacity set by metarule(52)', () => {
         const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter', inventory: [] })
-        expect(script.metarule(53, critter)).toBe(0)
+        expect(script.metarule(52, 250)).toBe(1)
+        expect(script.metarule(53, 0)).toBe(250)
     })
 })
 

@@ -1,13 +1,13 @@
 /**
  * Phase 49 regression tests.
  *
- * Focus: drug tracking (metarule 18/44), pc_flag_on/off + sneak detection,
+ * Focus: drug tracking (metarule 18), pc_flag_on/off + sneak detection,
  * inven_unwield, script_action opcode, map_first_run opcode, pickup_obj,
  * drop_obj, sfall opcodes 0x81AA–0x81AD, save schema v12 pcFlags, and
  * checklist integrity.
  *
- *   Phase 49-A — metarule(18) CRITTER_ON_DRUGS uses _druggedCritters map
- *   Phase 49-B — metarule(44) WHO_ON_DRUGS checks target critter
+ *   Phase 49-A — metarule(18) WHO_ON_DRUGS checks the target critter
+ *   Phase 49-B — metarule(44) is GET_WORLDMAP_XPOS (not a drug check)
  *   Phase 49-C — Scripting.use() marks source as on drugs for drug items
  *   Phase 49-D — Scripting.useObjOn() marks target as on drugs for drug items
  *   Phase 49-E — pc_flag_on(3) sets SNK_MODE bit in player.pcFlags
@@ -50,14 +50,14 @@ function makeCritter(overrides: Record<string, any> = {}): any {
 }
 
 // ===========================================================================
-// Phase 49-A — metarule(18) CRITTER_ON_DRUGS
+// Phase 49-A — metarule(18) METARULE_WHO_ON_DRUGS
 // ===========================================================================
 
-describe('Phase 49-A — metarule(18) CRITTER_ON_DRUGS', () => {
-    it('returns 0 when critter has not used a drug', () => {
+describe('Phase 49-A — metarule(18) METARULE_WHO_ON_DRUGS', () => {
+    it('returns 0 when the target critter has not used a drug', () => {
         const script = new Scripting.Script()
         const critter = makeCritter()
-        script.self_obj = critter
+        expect(script.metarule(18, critter)).toBe(0)
         expect(script.metarule(18, 0)).toBe(0)
     })
 
@@ -69,14 +69,19 @@ describe('Phase 49-A — metarule(18) CRITTER_ON_DRUGS', () => {
 })
 
 // ===========================================================================
-// Phase 49-B — metarule(44) WHO_ON_DRUGS
+// Phase 49-B — metarule(44) is METARULE_GET_WORLDMAP_XPOS, not a drug check
 // ===========================================================================
 
-describe('Phase 49-B — metarule(44) WHO_ON_DRUGS', () => {
-    it('returns 0 when target critter has not used a drug', () => {
+describe('Phase 49-B — metarule(44) METARULE_GET_WORLDMAP_XPOS', () => {
+    it('returns the world-map X position regardless of the argument', () => {
         const script = new Scripting.Script()
-        const critter = makeCritter()
-        expect(script.metarule(44, critter)).toBe(0)
+        const saved = globalState.worldPosition
+        globalState.worldPosition = { x: 77, y: 88 }
+        try {
+            expect(script.metarule(44, makeCritter())).toBe(77)
+        } finally {
+            globalState.worldPosition = saved
+        }
     })
 
     it('checklist entry drug_tracking_metarule44 is present and implemented', () => {

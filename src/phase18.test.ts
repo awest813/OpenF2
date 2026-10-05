@@ -7,7 +7,7 @@
  *   C. Scripting — inven_cmds LEFT_HAND (11) and RIGHT_HAND (12)
  *   D. Scripting — obj_item_subtype fallback using string subtype
  *   E. Scripting — game_time_hour computed from gameTickTime
- *   F. Scripting — metarule cases 21 (vendor caps) and 24 (party count)
+ *   F. Scripting — metarule 21/24 return 0 (not engine IDs); 22 is IS_LOADGAME
  *   G. Scripting — proto_data data_member 7 (flags2)
  *   H. Scripting — sfall opcodes 0x8175–0x8177 (string_compare, substr, get_uptime)
  *   I. Checklist — new Phase 18 entries reflect implemented status
@@ -527,34 +527,18 @@ describe('Phase 18-E — game_time_hour computed from gameTickTime', () => {
 })
 
 // ---------------------------------------------------------------------------
-// F. Scripting — metarule cases 21 (vendor caps) and 24 (party count)
+// F. Scripting — metarule 21/24 are not engine metarules; 22 is IS_LOADGAME
 // ---------------------------------------------------------------------------
 
-describe('Phase 18-F — metarule cases 21 and 24', () => {
+describe('Phase 18-F — metarule cases 21, 22 and 24', () => {
     beforeEach(() => {
         drainStubHits()
     })
 
-    it('metarule(21, 0) does not stub and returns a positive number', () => {
+    it('metarule(21, 0) and metarule(24, 0) return the engine default 0 without stubbing', () => {
         const script = new Scripting.Script()
-        const result = script.metarule(21, 0)
-        // We don't care about the exact value — just that it's numeric and doesn't stub
-        expect(typeof result).toBe('number')
-        expect(result).toBeGreaterThan(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule(24, 0) does not stub and returns a number', () => {
-        const script = new Scripting.Script()
-        // globalState.gParty is null in test env; implementation should handle gracefully
-        let result: number
-        try {
-            result = script.metarule(24, 0)
-        } catch (_e) {
-            // If gParty is not available in test, that's fine as long as no stub is recorded
-            result = 0
-        }
-        expect(typeof result).toBe('number')
+        expect(script.metarule(21, 0)).toBe(0)
+        expect(script.metarule(24, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
