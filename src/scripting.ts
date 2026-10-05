@@ -19,9 +19,9 @@ Scripting system/engine for DarkFO
 
 declare const __dirname: string
 
-import { Combat } from './combat.js'
+import { AI, Combat } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
-import { isMapEntranceKnown, lookupAreaIDForMap, lookupScriptName } from './data.js'
+import { isMapEntranceKnown, lookupAreaIDForMap, lookupScriptName, markMapEntranceState } from './data.js'
 import {
     hexDirectionTo,
     hexDistance,
@@ -36,7 +36,7 @@ import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
 import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
-import { makePID, loadPRO } from './pro.js'
+import { makePID, loadPRO, lookupArt } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
 import { Lightmap } from './lightmap.js'
 import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
@@ -58,6 +58,7 @@ import { advanceGameTime, bindTimedEventList } from './character/rest.js'
 import {
     CAR_TRUNK_PID,
     fillCarGas,
+    getCarFuel,
     getCarParkMapName,
     getCarTrunkCapacity,
     giveCarToParty,
@@ -76,6 +77,7 @@ import {
     reactionBiasForTier,
 } from './quest/townReputation.js'
 import { signalEndGame } from './endgame.js'
+import { getSubtileState, markSubtileRadiusVisited } from './worldmapMarks.js'
 import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
 import { getSettings, iniOverride, violenceToIni, patchSettings } from './settings.js'
@@ -412,6 +414,12 @@ export namespace Scripting {
         // 34: Gender — handled separately in get_critter_stat
         35: 'HP',       // Current HP
     }
+
+    /** KILL_TYPE_COUNT from fallout2-ce proto_types.h (KILL_TYPE_MAN … BIG_BAD_BOSS). */
+    const KILL_TYPE_COUNT = 19
+
+    /** gChemUseKeys order from fallout2-ce combat_ai.cc (index = AI chem_use value). */
+    const CHEM_USE_KEYS = ['clean', 'stims_when_hurt_little', 'stims_when_hurt_lots', 'sometimes', 'anytime', 'always']
 
     const skillNumToName: { [num: number]: string } = {
         0: 'Small Guns',
@@ -1173,151 +1181,105 @@ export namespace Scripting {
                     return 0
             }
         }
-        metarule3(id: number, obj: any, userdata: any, radius: number): any {
-            if (id < 100) {
-                // metarule3 IDs below 100 are not defined in vanilla Fallout 2.
-                // Return 0 silently so scripts probing future or sfall-specific
-                // extensions do not crash or flood the console.
-                log('metarule3 (unknown id<100, id=' + id + ')', arguments)
-                return 0
-            } else if (id === 100) {
-                // METARULE3_CLR_FIXED_TIMED_EVENTS
-                for (let i = 0; i < timeEventList.length; i++) {
-                    if (timeEventList[i].obj === obj && timeEventList[i].userdata === userdata) {
-                        // comparison uses object identity (===) per Fallout 2 semantics
-                        info('removing timed event (userdata ' + userdata + ')', 'timer')
-                        timeEventList.splice(i, 1)
-                        return 0
+        // metarule3(id, p1, p2, p3) — mirrors opMetarule3 in fallout2-ce
+        // (src/interpreter_extra.cc).  Only the METARULE3_* enum IDs (100–111)
+        // have behaviour; every other ID, including 102 (SET_WM_MUSIC, which the
+        // engine's switch never handles), returns 0.
+        metarule3(id: number, obj: any, userdata: any, radius: any): any {
+            switch (id) {
+                case 100: {
+                    // METARULE3_CLR_FIXED_TIMED_EVENTS(obj, fixedParam): drop every
+                    // pending timer event on `obj` whose fixed param matches.
+                    for (let i = timeEventList.length - 1; i >= 0; i--) {
+                        if (timeEventList[i].obj === obj && timeEventList[i].userdata === userdata) {
+                            info('removing timed event (userdata ' + userdata + ')', 'timer')
+                            timeEventList.splice(i, 1)
+                        }
                     }
+                    return 0
                 }
-                return 0 // no matching event found — still return 0 cleanly
-            } else if (id === 101) {
-                // METARULE3_RAND: random integer in range [obj..userdata] (inclusive).
-                // Used by many encounter scripts for randomised script behaviour.
-                const min = typeof obj === 'number' ? obj : 0
-                const max = typeof userdata === 'number' ? userdata : 0
-                return getRandomInt(min, max)
-            } else if (id === 106) {
-                // METARULE3_TILE_GET_NEXT_CRITTER(tile, elevation, lastCritter)
-                // Returns the first (or next, if lastCritter is non-zero) non-player
-                // critter standing on the given tile at the specified elevation.
-                // With lastCritter == 0: return the first matching critter.
-                // With lastCritter != 0: return the critter after lastCritter in the
-                //   encounter list (supports iterating all critters at a tile).
-                // BLK-036: now uses getObjects(elevation) so multi-floor maps return
-                // the correct critter without being biased by the current floor.
-                const tile = obj
-                const tileElevation = typeof userdata === 'number' ? userdata : (globalState.currentElevation ?? 0)
-                const lastCritter: any = radius
-                const tilePos = fromTileNum(typeof tile === 'number' ? tile : 0)
-                const allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
-                const critters = allObjs.filter(function(o) {
-                    // BLK-088: Guard against null position — objects without a tile
-                    // position (inventory items, mid-transition objects) would crash
-                    // on o.position.x without this check.
-                    return o.type === 'critter' &&
-                        !(o as Critter).isPlayer &&
-                        !!o.position &&
-                        o.position.x === tilePos.x &&
-                        o.position.y === tilePos.y
-                })
-                log('metarule3 106 (tile_get_next_critter)', arguments)
-                if (!lastCritter || lastCritter === 0) {
-                    // Return the first non-player critter at the tile.
-                    return critters.length > 0 ? critters[0] : 0
+                case 101:
+                    // METARULE3_MARK_SUBTILE(worldX, worldY, radius)
+                    return markSubtileRadiusVisited(obj, userdata, radius)
+                case 103:
+                    // METARULE3_GET_KILL_COUNT(killType)
+                    if (typeof obj !== 'number' || obj < 0 || obj >= KILL_TYPE_COUNT) {return 0}
+                    return globalState.critterKillCounts?.[obj] ?? 0
+                case 104:
+                    // METARULE3_MARK_MAP_ENTRANCE(map, elevation, state): 0, or -1 when
+                    // the map has no matching area entrance.
+                    return markMapEntranceState(obj, userdata, radius)
+                case 105:
+                    // METARULE3_WM_SUBTILE_STATE(worldX, worldY): 0 unknown, 1 known, 2 visited.
+                    return getSubtileState(obj, userdata)
+                case 106: {
+                    // METARULE3_TILE_GET_NEXT_CRITTER(tile, elevation, previousCritter):
+                    // the first critter (player included) on the tile, or the one after
+                    // `previousCritter`; 0 when there is none.
+                    if (!isValidTileNum(obj)) {return 0}
+                    const tilePos = fromTileNum(obj)
+                    const tileElevation = typeof userdata === 'number' ? userdata : (globalState.currentElevation ?? 0)
+                    const allObjs = (globalState.gMap?.getObjects(tileElevation)) ?? []
+                    // BLK-088: objects without a position (inventory items, mid-transition
+                    // objects) are skipped.
+                    const critters = allObjs.filter((o) =>
+                        o.type === 'critter' && !!o.position && o.position.x === tilePos.x && o.position.y === tilePos.y)
+                    if (!isGameObject(radius)) {return critters.length > 0 ? critters[0] : 0}
+                    const idx = critters.indexOf(radius as Obj)
+                    return idx >= 0 && idx + 1 < critters.length ? critters[idx + 1] : 0
                 }
-                // Return the critter immediately after lastCritter in the list.
-                const idx = critters.findIndex(function(o: any) { return o === lastCritter })
-                if (idx >= 0 && idx + 1 < critters.length) {return critters[idx + 1]}
-                return 0 // no critter found (or lastCritter was the last one)
-            } else if (id === 102) {
-                // METARULE3_CHECK_WALKING_ALLOWED: 1 if movement is permitted at the given tile.
-                // Reads globalState.blockedTiles (populated by tile_add_blocking/remove_blocking)
-                // and returns 0 if the tile is blocked, 1 otherwise.
-                if (!isValidTileNum(obj)) {return 1}
-                const blocked = (globalState as any).blockedTiles as Set<number> | undefined
-                return blocked?.has(obj) ? 0 : 1
-            } else if (id === 103) {
-                // METARULE3_CRITTER_IN_COMBAT: 1 if the given critter is currently in combat.
-                if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-                if (!globalState.inCombat) {return 0}
-
-                // Prefer explicit membership in the active combat roster when available.
-                // Fall back to the global combat flag for compatibility with contexts that
-                // do not expose globalState.combat (legacy scripted checks).
-                const active = globalState.combat?.combatants
-                if (!active) {return 1}
-                return active.includes(obj as Critter) ? 1 : 0
-            } else if (id === 104) {
-                // METARULE3_TILE_LINE_OF_SIGHT: 1 if there is line-of-sight between two tiles.
-                // A full LOS raycasting system is not yet implemented; approximate by distance:
-                // tiles within 14 hexes of each other are considered in line-of-sight.
-                const tileA = typeof obj === 'number' ? fromTileNum(obj) : null
-                const tileB = typeof userdata === 'number' ? fromTileNum(userdata) : null
-                if (!tileA || !tileB) {
-                    warn('metarule3(104): invalid tile argument — defaulting to visible (1)')
-                    return 1
+                case 107: {
+                    // METARULE3_ART_SET_BASE_FID_NUM(obj, frmId): swap the object's base
+                    // art, keeping its type, animation and rotation.
+                    if (!isGameObject(obj) || typeof userdata !== 'number') {return 0}
+                    const target = obj as Obj
+                    const frmId = userdata & 0xfff
+                    target.frmPID = ((target.frmPID ?? 0) & ~0xfff) | frmId
+                    try {
+                        if (target.type === 'critter' && typeof target.art === 'string' && target.art.length > 2) {
+                            // Critter art is <base><anim suffix>; keep the current suffix.
+                            const base = lookupArt(makePID(1, frmId)).slice(0, -2)
+                            target.art = base + target.art.slice(-2)
+                        } else {
+                            const typeIndex = ['item', 'critter', 'scenery', 'wall', 'tile', 'misc'].indexOf(target.type)
+                            if (typeIndex >= 0) {target.art = lookupArt(makePID(typeIndex, target.frmPID))}
+                        }
+                    } catch (err) {
+                        warn('metarule3(107): could not resolve art for frm ' + frmId + ': ' + err)
+                    }
+                    return 0
                 }
-                return hexDistance(tileA, tileB) <= 14 ? 1 : 0
-            } else if (id === 105) {
-                // METARULE3_OBJ_CAN_HEAR_OBJ: alias for obj_can_hear_obj; 1 if obj can hear target.
-                // obj = source object (first arg), userdata = target object.
-                const src = obj
-                const tgt = userdata
-                if (!isGameObject(src) || !isGameObject(tgt)) {return 0}
-                // BLK-096: Guard against null positions — objects in inventory or mid-transition
-                // may have no position; hexDistance would crash with a TypeError if either is null.
-                if (!src.position || !tgt.position) {return 0}
-                return hexDistance(src.position, tgt.position) <= 12 ? 1 : 0
-            } else if (id === 107) {
-                // METARULE3_TILE_VISIBLE: returns 1 if the given tile is currently visible.
-                // Approximation: returns 1 if the tile is within 14 hexes of the player
-                // (the FO2 default sight range).  No fog-of-war system implemented yet.
-                if (!isValidTileNum(obj)) {return 0}
-                if (!globalState.player?.position) {return 0}
-                const tilePos = fromTileNum(obj)
-                return hexDistance(globalState.player.position, tilePos) <= 14 ? 1 : 0
-            } else if (id === 108) {
-                // METARULE3_CRITTER_DIST: distance in hexes between two critters (obj, userdata).
-                // Returns 0 if either argument is not a valid game object or lacks a position.
-                if (!isGameObject(obj) || !isGameObject(userdata)) {return 0}
-                // BLK-058: Guard against null positions to prevent hexDistance crash.
-                if (!obj.position || !userdata.position) {return 0}
-                return hexDistance(obj.position, userdata.position)
-            } else if (id === 109) {
-                // METARULE3_TILE_DIST: distance in hexes between two tile numbers.
-                const tileA = typeof obj === 'number' ? fromTileNum(obj) : null
-                const tileB = typeof userdata === 'number' ? fromTileNum(userdata) : null
-                if (!tileA || !tileB) {return 0}
-                return hexDistance(tileA, tileB)
-            } else if (id === 110) {
-                // METARULE3_CRITTER_TILE: tile number of the given critter.
-                if (!isGameObject(obj)) {return -1}
-                // BLK-097: Guard against null position — critters in inventory or
-                // mid-transition may have no position; toTileNum(null) crashes.
-                if (!obj.position) {return -1}
-                return toTileNum(obj.position)
-            } else if (id === 111) {
-                // METARULE3_OBJ_IS_CRITTER_DEAD: 1 if the given critter is dead.
-                if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-                return (obj as Critter).dead ? 1 : 0
-            } else if (id === 112) {
-                // METARULE3_CRITTER_INVEN_OBJ2: return the item at the given inventory slot
-                // of the given critter (obj=critter, userdata=slot index).
-                if (!isGameObject(obj) || obj.type !== 'critter') {return null}
-                const slotIdx = typeof userdata === 'number' ? userdata : 0
-                const inv = (obj as Critter).inventory
-                if (!inv || slotIdx < 0 || slotIdx >= inv.length) {return null}
-                return inv[slotIdx]
-            } else if (id >= 113 && id <= 115) {
-                // METARULE3 IDs 113–115 — unspecified; return 0 as a safe default.
-                log('metarule3 ' + id + ' (safe default 0)', arguments)
-                return 0
-            } else {
-                // Unrecognised metarule3 IDs above 115 — return 0 silently so that
-                // scripts using future or sfall-specific extensions do not crash.
-                log('metarule3 ' + id + ' (unknown id — safe default 0)', arguments)
-                return 0
+                case 108:
+                    // METARULE3_TILE_SET_CENTER(tile): 0, or -1 for an invalid tile.
+                    if (!isValidTileNum(obj)) {return -1}
+                    centerCamera(fromTileNum(obj))
+                    return 0
+                case 109: {
+                    // METARULE3_109 (aiGetChemUse): index of the critter's AI chem_use
+                    // (0 clean … 5 always), honouring party-control overrides.
+                    if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+                    const critter = obj as Critter
+                    let chemUse: unknown = globalState.gParty?.getControl?.(critter)?.chemUse ?? critter.ai?.info?.chem_use
+                    if (chemUse === undefined) {
+                        try {
+                            if (AI.aiTxt === null) {AI.init()}
+                            chemUse = AI.getPacketInfo(critter.aiNum)?.chem_use
+                        } catch (err) {
+                            warn('metarule3(109): AI.TXT unavailable: ' + err)
+                        }
+                    }
+                    const chemIndex = CHEM_USE_KEYS.indexOf(String(chemUse ?? '').trim().toLowerCase())
+                    return chemIndex >= 0 ? chemIndex : 0
+                }
+                case 110:
+                    // METARULE3_110 (wmCarIsOutOfGas)
+                    return getCarFuel() <= 0 ? 1 : 0
+                case 111:
+                    // METARULE3_111 (_map_target_load_area): area containing the current map.
+                    return lookupAreaIDForMap(globalState.gMap?.name)
+                default:
+                    log('metarule3 (unknown id=' + id + ')', arguments)
+                    return 0
             }
         }
         script_overrides() {
@@ -7485,8 +7447,7 @@ export namespace Scripting {
 
         // sfall 0x82C3 — get_critter_in_combat_sfall(obj):
         // Return 1 if the given critter is currently a participant in the
-        // active combat session, 0 otherwise.  Delegates to the same combat-
-        // roster check used by metarule3(103).
+        // active combat session, 0 otherwise.
         // New Reno faction-combat scripts query this to skip AI updates for
         // critters that are already engaged.
         get_critter_in_combat_sfall(obj: Obj): number {

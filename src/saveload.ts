@@ -23,6 +23,7 @@ import { Scripting } from './scripting.js'
 import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
 import { serializeTimedEffects, hydrateTimedEffects } from './character/timedEffects.js'
 import { serializeAutomap, hydrateAutomap } from './character/automap.js'
+import { hydrateWorldmapMarks, serializeWorldmapMarks } from './worldmapMarks.js'
 import { setHasCar, serializeCarTrunk, hydrateCarTrunk, serializeCarPark, hydrateCarPark } from './car.js'
 
 export { SAVE_VERSION, SaveGame, migrateSave }
@@ -179,6 +180,8 @@ function applyExtraSaveState(save: SaveGame): void {
     hydrateCarTrunk(save.carTrunk)
     // P1-6: Highwayman parking spot.
     hydrateCarPark(save.carPark ?? null)
+    // World-map subtile fog and script-set entrance states.
+    hydrateWorldmapMarks(save.worldmapMarks)
 }
 
 // Saving and loading support
@@ -469,6 +472,8 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     save.carTrunk = serializeCarTrunk()
     // P1-6: Highwayman parking spot.
     save.carPark = serializeCarPark()
+    // World-map subtile fog and script-set entrance states.
+    save.worldmapMarks = serializeWorldmapMarks()
 
     const dirtyMapNames = Object.keys(globalState.dirtyMapCache)
     // BLK-080: Guard against null gMap in the log message — save() can be called

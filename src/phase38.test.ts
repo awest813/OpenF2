@@ -206,12 +206,12 @@ describe('Phase 38-F — metarule3 id<100 safe default (no stub hit)', () => {
         expect(drainStubHits().filter((h) => h.name === 'metarule3').length).toBe(0)
     })
 
-    it('metarule3 known IDs (101, 108, 110) still return correct values', () => {
+    it('metarule3 engine IDs keep their fallout2-ce meanings (101 MARK_SUBTILE, 102 unhandled)', () => {
         const script = new (Scripting as any).Script()
-        // 101 = METARULE3_RAND: rand(5,5) = 5
-        expect(script.metarule3(101, 5, 5, 0)).toBe(5)
-        // 102 = CHECK_WALKING_ALLOWED → 1
-        expect(script.metarule3(102, null, null, 0)).toBe(1)
+        // 101 = METARULE3_MARK_SUBTILE → 0 (not a random-number rule)
+        expect(script.metarule3(101, 5, 5, 0)).toBe(0)
+        // 102 = METARULE3_SET_WM_MUSIC is not handled by opMetarule3 → 0
+        expect(script.metarule3(102, null, null, 0)).toBe(0)
     })
 })
 

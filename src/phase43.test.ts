@@ -3,14 +3,14 @@
  *
  * Focus: VM step-limit throw→warn+halt, combat perk fidelity (Sharpshooter,
  * Sniper, Jinxed trait), tile_is_visible distance-based check,
- * metarule3(104) LOS distance approximation.
+ * metarule3(104) checklist correction (it is MARK_MAP_ENTRANCE, not LOS).
  *
  *   Phase 43-A — vm.ts: step limit exceeded → warn+halt (no throw)
  *   Phase 43-B — combat.ts: Sharpshooter perk reduces distance penalty
  *   Phase 43-C — combat.ts: Sniper perk second roll for critical
  *   Phase 43-D — combat.ts: Jinxed trait crit miss
  *   Phase 43-E — scripting.ts: tile_is_visible uses hex distance
- *   Phase 43-F — scripting.ts: metarule3(104) LOS distance approximation
+ *   Phase 43-F — checklist: metarule3(104) is MARK_MAP_ENTRANCE (LOS meaning removed)
  *   Phase 43-G — checklist integrity: all Phase 43 entries present and implemented
  */
 
@@ -112,20 +112,19 @@ describe('Phase 43-E — tile_is_visible uses hex distance', () => {
 })
 
 // ===========================================================================
-// Phase 43-F — scripting.ts: metarule3(104) LOS distance approximation
+// Phase 43-F — checklist: metarule3(104) is MARK_MAP_ENTRANCE
 // ===========================================================================
 
-describe('Phase 43-F — metarule3(104) LOS distance approximation', () => {
+describe('Phase 43-F — metarule3(104) is MARK_MAP_ENTRANCE', () => {
     it('checklist entry metarule3_tile_los_distance is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule3_tile_los_distance')
         expect(entry).toBeDefined()
         expect(entry?.status).toBe('implemented')
     })
 
-    it('metarule3_tile_los_distance description mentions hex distance and view radius', () => {
+    it('metarule3_tile_los_distance description records the engine meaning', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'metarule3_tile_los_distance')
-        expect(entry?.description).toContain('hex distance')
-        expect(entry?.description).toContain('14')
+        expect(entry?.description).toContain('MARK_MAP_ENTRANCE')
     })
 })
 

@@ -3,7 +3,7 @@
  *
  * Covers:
  *   A. Scripting — metarule IDs 30, 35, 44, 47, 55 follow fallout2-ce meanings
- *   B. Scripting — metarule3 de-stubs: IDs 101 (constrained random), 107 (tile visible)
+ *   B. Scripting — metarule3 IDs 101 (MARK_SUBTILE), 107 (ART_SET_BASE_FID_NUM)
  *   C. Scripting — has_trait TRAIT_OBJECT new cases: 1, 2, 3, 667, 668
  *   D. Scripting — critter_add_trait TRAIT_OBJECT new cases: 667, 668
  *   E. Scripting — sfall opcodes 0x817D–0x817F (get_critter_name, get_game_mode, set_global_script_repeat)
@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import globalState from './globalState.js'
 import { setHasCar } from './car.js'
+import { getSubtileState, resetWorldmapMarks } from './worldmapMarks.js'
 import { patchSettings, resetSettings } from './settings.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
@@ -123,51 +124,32 @@ describe('Phase 20-A — metarule IDs 30, 35, 44, 47, 55 (engine meanings)', () 
 })
 
 // ---------------------------------------------------------------------------
-// B. metarule3 de-stubs: IDs 101 (random range), 107 (tile visible)
+// B. metarule3 IDs 101 (MARK_SUBTILE) and 107 (ART_SET_BASE_FID_NUM)
 // ---------------------------------------------------------------------------
 
-describe('Phase 20-B — metarule3 de-stubs (IDs 101, 107)', () => {
+// fallout2-ce: 101 marks world-map subtiles (it is not a random-number rule);
+// 107 swaps an object's base art (it is not a tile-visibility check).
+describe('Phase 20-B — metarule3 IDs 101 and 107 (engine meanings)', () => {
     let script: Scripting.Script
 
     beforeEach(() => {
         drainStubHits()
+        resetWorldmapMarks()
         script = new (Scripting as any).Script()
     })
 
-    it('metarule3(101, 5, 10, 0) returns a number in [5..10]', () => {
-        for (let i = 0; i < 20; i++) {
-            const r = script.metarule3(101, 5, 10, 0)
-            expect(r).toBeGreaterThanOrEqual(5)
-            expect(r).toBeLessThanOrEqual(10)
-        }
+    afterEach(() => {
+        resetWorldmapMarks()
+    })
+
+    it('metarule3(101, x, y, radius) marks the subtile visited and returns 0', () => {
+        expect(script.metarule3(101, 75, 75, 0)).toBe(0)
+        expect(getSubtileState(75, 75)).toBe(2)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(101, 0, 0, 0) returns exactly 0', () => {
-        expect(script.metarule3(101, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(101, 3, 3, 0) always returns 3 (single-value range)', () => {
-        for (let i = 0; i < 10; i++) {
-            expect(script.metarule3(101, 3, 3, 0)).toBe(3)
-        }
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(107, tile, elev, 0) — tile visibility check (no fog-of-war fallback)', () => {
-        // Without a player position, the visibility check returns 0 (not visible).
-        // With a player nearby, valid tiles would return 1.  This test verifies the
-        // function does not throw and does not emit a stub hit.
-        const result = script.metarule3(107, 12345, 0, 0)
-        expect(typeof result).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3 IDs 101 and 107 do not emit stubs', () => {
-        drainStubHits()
-        script.metarule3(101, 1, 5, 0)
-        script.metarule3(107, 0, 0, 0)
+    it('metarule3(107, non-object, …) is a no-op returning 0', () => {
+        expect(script.metarule3(107, 12345, 0, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 })

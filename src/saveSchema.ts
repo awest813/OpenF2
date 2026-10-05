@@ -10,9 +10,10 @@ import type { SerializedMap } from './map.js'
 import type { SerializedObj } from './object.js'
 import type { SerializedQuestLog } from './quest/questLog.js'
 import type { SerializedReputation } from './quest/reputation.js'
+import { sanitizeWorldmapMarks, type WorldmapMarksSave } from './worldmapMarks.js'
 
 /** Current save schema version. Increment when the SaveGame shape changes. */
-export const SAVE_VERSION = 26
+export const SAVE_VERSION = 27
 
 export interface SaveGame {
     id?: number
@@ -362,6 +363,12 @@ export interface SaveGame {
      */
     carPark?: { mapName: string; x: number; y: number; elevation: number } | null
 
+    /**
+     * World-map subtile fog states and script-set entrance states (v27+;
+     * metarule3 MARK_SUBTILE / MARK_MAP_ENTRANCE).
+     */
+    worldmapMarks?: WorldmapMarksSave
+
     player: {
         position: Point
         orientation: number
@@ -575,6 +582,11 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
             if (save.carPark === undefined) {save.carPark = null}
             save.version = 26
             // falls through
+        case 26:
+            // v26 → v27: world-map subtile / entrance marks.
+            if (save.worldmapMarks === undefined) {save.worldmapMarks = { subtiles: {}, entrances: {} }}
+            save.version = 27
+            // falls through
         case SAVE_VERSION:
             // Already current — nothing to do.
             break
@@ -717,6 +729,7 @@ export function migrateSave(raw: Record<string, any>): SaveGame {
     } else {
         save.carPark = null
     }
+    save.worldmapMarks = sanitizeWorldmapMarks(save.worldmapMarks)
     // Defensive: ensure party is always an array so validateSaveForHydration never
     // aborts on saves written without the party field (e.g. very old sessions).
     if (!Array.isArray(save.party)) {

@@ -18,6 +18,7 @@ import { fixMojibake, getFileJSON, getFileText, parseIni } from './util.js'
 import globalState from './globalState.js'
 import { Point } from './geometry.js'
 import { lookupInterfaceArt } from './pro.js'
+import { getEntranceStateOverride, setEntranceState } from './worldmapMarks.js'
 
 const lstFiles: { [lsgFile: string]: string[] } = {}
 let mapInfo: { [mapID: number]: MapInfo } | null = null
@@ -172,28 +173,61 @@ export function lookupAreaIDForMap(mapName: string | null | undefined): number {
     return -1
 }
 
-/**
- * Engine `wmMapIsKnown`: true when map `mapID` belongs to an area entrance
- * whose state is on.  OpenF2 does not track per-entrance state changes yet, so
- * the entrance's city.txt start state is used.
- */
-export function isMapEntranceKnown(mapID: number): boolean {
-    if (!globalState.mapAreas) {return false}
-    let mapName: string | undefined
+function mapNameForID(mapID: number): string | null {
     try {
         if (mapInfo === null) {parseMapInfo()}
-        mapName = mapInfo?.[mapID]?.name
+        return mapInfo?.[mapID]?.name ?? null
     } catch (err) {
-        console.warn('isMapEntranceKnown: maps.txt unavailable', err)
-        return false
+        console.warn('mapNameForID: maps.txt unavailable', err)
+        return null
     }
-    if (!mapName) {return false}
+}
+
+/**
+ * First area entrance leading to map `mapID` (engine wmMatchAreaFromMap +
+ * wmMatchEntranceElevFromMap).  `elevation` -1 matches any entrance, as does
+ * an entrance whose own elevation is -1.
+ */
+function findMapEntrance(mapID: number, elevation = -1): { areaID: number; index: number; entrance: AreaEntrance } | null {
+    if (!globalState.mapAreas) {return null}
+    const mapName = mapNameForID(mapID)
+    if (!mapName) {return null}
     const needle = mapName.toLowerCase()
     for (const area in globalState.mapAreas) {
-        const entrance = globalState.mapAreas[area].entrances.find((e) => e.mapName.toLowerCase() === needle)
-        if (entrance) {return entrance.startState.trim().toLowerCase() === 'on'}
+        const entrances = globalState.mapAreas[area].entrances
+        if (!entrances.some((e) => e.mapName.toLowerCase() === needle)) {continue}
+        const index = entrances.findIndex((e) =>
+            e.mapName.toLowerCase() === needle &&
+            (elevation === -1 || e.elevation === -1 || e.elevation === elevation))
+        if (index === -1) {return null}
+        return { areaID: globalState.mapAreas[area].id, index, entrance: entrances[index] }
     }
-    return false
+    return null
+}
+
+/**
+ * Engine `wmMapIsKnown`: true when the entrance for map `mapID` is on — the
+ * state set by mark_map_entrance (metarule3 104) if any, else its city.txt
+ * start state.
+ */
+export function isMapEntranceKnown(mapID: number): boolean {
+    const found = findMapEntrance(mapID)
+    if (!found) {return false}
+    const override = getEntranceStateOverride(found.areaID, found.index)
+    if (override !== undefined) {return override === 1}
+    return found.entrance.startState.trim().toLowerCase() === 'on'
+}
+
+/**
+ * Engine `wmMapMarkMapEntranceState` (metarule3 MARK_MAP_ENTRANCE): set the
+ * state of the entrance for map `mapID` on `elevation` (-1 = any).  Returns 0,
+ * or -1 when the map has no matching area entrance.
+ */
+export function markMapEntranceState(mapID: number, elevation: number, state: number): number {
+    const found = findMapEntrance(mapID, elevation)
+    if (!found) {return -1}
+    setEntranceState(found.areaID, found.index, state)
+    return 0
 }
 
 export function loadAreas() {

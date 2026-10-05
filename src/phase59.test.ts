@@ -114,10 +114,10 @@ describe('Phase 59-B — BLK-057: node998() exits dialogue and initiates combat'
 })
 
 // ===========================================================================
-// Phase 59-C — BLK-058: metarule3(108) null-position guard
+// Phase 59-C — BLK-058: metarule3(108) is TILE_SET_CENTER, not a distance
 // ===========================================================================
 
-describe('Phase 59-C — BLK-058: metarule3(108) null-position guard', () => {
+describe('Phase 59-C — BLK-058: metarule3(108) TILE_SET_CENTER rejects non-tile args', () => {
     let script: Scripting.Script
 
     beforeEach(() => {
@@ -125,32 +125,12 @@ describe('Phase 59-C — BLK-058: metarule3(108) null-position guard', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('metarule3(108) returns 0 when first critter has null position', () => {
+    it('metarule3(108) does not throw and returns -1 for objects (with or without positions)', () => {
         const a = makeObj({ position: null })
         const b = makeObj({ position: { x: 5, y: 5 } })
         expect(() => script.metarule3(108, a, b, 0)).not.toThrow()
-        expect(script.metarule3(108, a, b, 0)).toBe(0)
-    })
-
-    it('metarule3(108) returns 0 when second critter has null position', () => {
-        const a = makeObj({ position: { x: 5, y: 5 } })
-        const b = makeObj({ position: null })
-        expect(() => script.metarule3(108, a, b, 0)).not.toThrow()
-        expect(script.metarule3(108, a, b, 0)).toBe(0)
-    })
-
-    it('metarule3(108) returns 0 when both positions are null', () => {
-        const a = makeObj({ position: null })
-        const b = makeObj({ position: null })
-        expect(script.metarule3(108, a, b, 0)).toBe(0)
-    })
-
-    it('metarule3(108) returns correct distance when both positions are valid', () => {
-        const a = makeObj({ position: { x: 0, y: 0 } })
-        const b = makeObj({ position: { x: 0, y: 0 } })
-        const result = script.metarule3(108, a, b, 0)
-        expect(typeof result).toBe('number')
-        expect(result).toBeGreaterThanOrEqual(0)
+        expect(script.metarule3(108, a, b, 0)).toBe(-1)
+        expect(script.metarule3(108, b, a, 0)).toBe(-1)
     })
 })
 

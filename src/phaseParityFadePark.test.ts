@@ -104,8 +104,8 @@ describe('Parity P1-6 — car parking (save v26)', () => {
         expect(getCarPark()?.x).toBe(40)
     })
 
-    it('SAVE_VERSION is 26 and v25 migrates null carPark', () => {
-        expect(SAVE_VERSION).toBe(26)
+    it('SAVE_VERSION is 27 and v25 migrates null carPark', () => {
+        expect(SAVE_VERSION).toBe(27)
         const migrated = migrateSave({
             version: 25,
             name: 'park-mig',
@@ -118,7 +118,7 @@ describe('Parity P1-6 — car parking (save v26)', () => {
             party: [],
             savedMaps: {},
         } as any)
-        expect(migrated.version).toBe(26)
+        expect(migrated.version).toBe(27)
         expect(migrated.carPark).toBeNull()
     })
 })

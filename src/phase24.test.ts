@@ -11,15 +11,16 @@
  *   C. metarule(49) — METARULE_W_DAMAGE_TYPE handles all 7 Fallout 2 damage types
  *   D. critter_state() — bit 1 set when critter is knocked down (prone flag)
  *   E. proto_data() field 13 — ITEM_DATA_MATERIAL returns 0 with no stub
- *   F. metarule3() IDs 108–115 — de-stubbed with safe/meaningful defaults
+ *   F. metarule3() IDs 108–115 — fallout2-ce meanings (112+ return 0)
  *   G. anim() — codes 100–999 and > 1010 log silently (no stub hits)
  *   H. sfall 0x8189 — tile_num_in_direction(tile, dir, count) returns a number
  *   I. sfall 0x818A — get_obj_elevation(obj) returns current elevation
  *   J. Checklist — Phase 24 entries reflect correct status
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
+import globalState from './globalState.js'
 import { objectGetDamageType } from './object.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 
@@ -276,98 +277,63 @@ describe('Phase 24-E — proto_data field 13 (ITEM_DATA_MATERIAL)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// F. metarule3() IDs 108–115 — de-stubbed
+// F. metarule3() IDs 108–115 — engine meanings
 // ---------------------------------------------------------------------------
 
-describe('Phase 24-F — metarule3 IDs 108–115 de-stub', () => {
+// fallout2-ce: 108 TILE_SET_CENTER, 109 AI chem_use, 110 car out of gas,
+// 111 area of the current map; 112+ are not engine IDs (→ 0).  The previously
+// invented critter-distance / tile-distance / critter-tile / is-dead /
+// inventory-slot meanings are gone.
+describe('Phase 24-F — metarule3 IDs 108–115 (engine meanings)', () => {
     let script: Scripting.Script
+    let savedFuel: number
+    let savedGMap: any
 
     beforeEach(() => {
         drainStubHits()
         script = new (Scripting as any).Script()
+        savedFuel = globalState.carFuel
+        savedGMap = globalState.gMap
     })
 
-    // ID 108 — critter distance
-    it('metarule3(108, srcCritter, tgtCritter, 0) returns a distance number', () => {
-        const src = makeCritter({ position: { x: 5, y: 5 } })
-        const tgt = makeCritter({ position: { x: 8, y: 5 } })
-        const dist = script.metarule3(108, src, tgt, 0)
-        expect(typeof dist).toBe('number')
-        expect(dist).toBeGreaterThanOrEqual(0)
+    afterEach(() => {
+        globalState.carFuel = savedFuel
+        globalState.gMap = savedGMap
+    })
+
+    it('metarule3(108, tile) centers the camera; -1 for an invalid tile', () => {
+        expect(script.metarule3(108, 1000, 0, 0)).toBe(0)
+        expect(script.metarule3(108, -5, 0, 0)).toBe(-1)
+        expect(script.metarule3(108, makeCritter(), makeCritter(), 0)).toBe(-1)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(108) returns 0 for non-game-object args', () => {
-        expect(script.metarule3(108, 0, 0, 0)).toBe(0)
+    it('metarule3(109, critter) returns the AI chem_use index', () => {
+        const c = makeCritter({ ai: { info: { chem_use: 'stims_when_hurt_lots' } } })
+        expect(script.metarule3(109, c, 0, 0)).toBe(2)
+        expect(script.metarule3(109, 0, 0, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
-    // ID 109 — tile distance
-    it('metarule3(109, tileA, tileB, 0) returns a number', () => {
-        const r = script.metarule3(109, 1000, 1010, 0)
-        expect(typeof r).toBe('number')
+    it('metarule3(110) is 1 when the car is out of gas', () => {
+        globalState.carFuel = 0
+        expect(script.metarule3(110, makeCritter(), 0, 0)).toBe(1)
+        globalState.carFuel = 500
+        expect(script.metarule3(110, 0, 0, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
-    // ID 110 — critter tile number
-    it('metarule3(110, critter, ...) returns a tile number', () => {
-        const c = makeCritter()
-        const r = script.metarule3(110, c, 0, 0)
-        expect(typeof r).toBe('number')
+    it('metarule3(111) returns -1 when the current map belongs to no area', () => {
+        globalState.gMap = { name: 'nowhere' } as any
+        expect(script.metarule3(111, makeCritter({ dead: true }), 0, 0)).toBe(-1)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(110) returns -1 for non-game-object', () => {
-        expect(script.metarule3(110, 0, 0, 0)).toBe(-1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 111 — critter is dead
-    it('metarule3(111, liveCritter, ...) returns 0', () => {
-        const c = makeCritter({ dead: false })
-        expect(script.metarule3(111, c, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(111, deadCritter, ...) returns 1', () => {
-        const c = makeCritter({ dead: true })
-        expect(script.metarule3(111, c, 0, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 112 — inventory slot lookup
-    it('metarule3(112, critter, slotIndex, ...) returns inventory item at slot', () => {
-        const item = makeObj({ pid: 99 })
-        const c = makeCritter({ inventory: [item] })
-        expect(script.metarule3(112, c, 0, 0)).toBe(item)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(112, critter, outOfRange, ...) returns null', () => {
-        const c = makeCritter({ inventory: [] })
-        expect(script.metarule3(112, c, 5, 0)).toBeNull()
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // IDs 113–115 — safe defaults
-    it('metarule3(113, ...) returns 0 without stub', () => {
-        expect(script.metarule3(113, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(114, ...) returns 0 without stub', () => {
-        expect(script.metarule3(114, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(115, ...) returns 0 without stub', () => {
-        expect(script.metarule3(115, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('none of IDs 108–115 emit stub hits', () => {
-        drainStubHits()
-        for (let id = 108; id <= 115; id++) {script.metarule3(id, 0, 0, 0)}
+    it('metarule3(112–115, …) return 0 without stub hits', () => {
+        const c = makeCritter({ inventory: [makeObj({ pid: 99 })] })
+        for (let id = 112; id <= 115; id++) {
+            expect(script.metarule3(id, c, 0, 0)).toBe(0)
+        }
         expect(stubHitCount()).toBe(0)
     })
 })

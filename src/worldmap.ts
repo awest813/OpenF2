@@ -27,6 +27,7 @@ import { Config } from './config.js'
 import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
 import { applyEncounterCritterLoadout } from './encounterLoadout.js'
 import { burnCarFuelOnTravel, worldmapTravelSpeed } from './car.js'
+import { markSubtileRadiusVisited } from './worldmapMarks.js'
 
 // World Map system
 
@@ -811,12 +812,21 @@ export namespace Worldmap {
         return null
     }
 
+    /** PERK_SCOUT (id 28) widens the revealed subtile radius from 1 to 2. */
+    function scoutRadius(): number {
+        const ranks = (globalState.player as any)?.perkRanks?.[28] ?? 0
+        return ranks > 0 ? 2 : 1
+    }
+
     function updateWorldmapPlayer() {
         $worldmapPlayer.style.left = worldmapPlayer.x + 'px'
         $worldmapPlayer.style.top = worldmapPlayer.y + 'px'
 
         // Keep persistent world-map position in sync for save/load continuity.
         globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
+        // Engine wmMarkSubTileRadiusVisited: reveal the fog around the party
+        // (radius 2 with the Scout perk).
+        markSubtileRadiusVisited(globalState.worldPosition.x, globalState.worldPosition.y, scoutRadius())
 
         if (worldmapPlayer.target) {
             let dx = worldmapPlayer.target.x - worldmapPlayer.x

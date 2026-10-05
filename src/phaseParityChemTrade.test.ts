@@ -114,7 +114,7 @@ describe('Timed effects save/load', () => {
             partyControls: {},
         })
         expect(migrated.version).toBe(SAVE_VERSION)
-        expect(SAVE_VERSION).toBe(26)
+        expect(SAVE_VERSION).toBe(27)
         expect(migrated.timedEffects).toEqual({})
     })
 })

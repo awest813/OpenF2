@@ -641,7 +641,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_101',
         kind: 'metarule',
-        description: 'METARULE3_RAND(101): random integer in range [obj..userdata] inclusive. Uses getRandomInt(min, max).',
+        description:
+            'METARULE3_MARK_SUBTILE(101)(worldX, worldY, radius): marks world-map subtiles within ' +
+            'radius known and the centre subtile visited (worldmapMarks.markSubtileRadiusVisited); returns 0. ' +
+            'Replaces the invented METARULE3_RAND meaning.',
         status: 'implemented',
         frequency: 'high',
         impact: 'medium',
@@ -649,7 +652,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_107',
         kind: 'metarule',
-        description: 'METARULE3_TILE_VISIBLE(107): returns 1 if the given tile is currently visible. Always 1 — no fog-of-war system yet (partial).',
+        description:
+            'METARULE3_ART_SET_BASE_FID_NUM(107)(obj, frmId): swaps the object\'s base art (low 12 bits of ' +
+            'frmPID), keeping a critter\'s current animation suffix; returns 0. Replaces the invented TILE_VISIBLE meaning.',
         status: 'partial',
         frequency: 'low',
         impact: 'low',
@@ -788,7 +793,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_102',
         kind: 'metarule',
-        description: 'METARULE3_CHECK_WALKING_ALLOWED(102): 1 if movement is allowed at the given tile. No path-blocking registry in VM; always returns 1 (partial).',
+        description:
+            'metarule3(102) METARULE3_SET_WM_MUSIC is declared but never handled by opMetarule3, so it ' +
+            'returns 0. Replaces the invented CHECK_WALKING_ALLOWED meaning.',
         status: 'partial',
         frequency: 'low',
         impact: 'low',
@@ -796,7 +803,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_103',
         kind: 'metarule',
-        description: 'METARULE3_CRITTER_IN_COMBAT(103): 1 if the given critter is in combat. Uses active combat roster membership when available; falls back to global inCombat in legacy contexts.',
+        description:
+            'METARULE3_GET_KILL_COUNT(103)(killType): globalState.critterKillCounts[killType]; 0 for -1 or ' +
+            'types >= KILL_TYPE_COUNT (19). Replaces the invented CRITTER_IN_COMBAT meaning.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -804,7 +813,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_104',
         kind: 'metarule',
-        description: 'METARULE3_TILE_LINE_OF_SIGHT(104): 1 if there is line-of-sight between two tiles. Approximated via hex distance: tiles within 14 hexes return 1 (visible), farther tiles return 0.',
+        description:
+            'METARULE3_MARK_MAP_ENTRANCE(104)(map, elevation, state): sets the state of the area entrance ' +
+            'leading to that map (persisted in saves, read by metarule MAP_KNOWN); -1 when the map has no entrance. ' +
+            'Replaces the invented TILE_LINE_OF_SIGHT meaning.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -812,7 +824,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
     {
         id: 'metarule3_105',
         kind: 'metarule',
-        description: 'METARULE3_OBJ_CAN_HEAR_OBJ(105): 1 if source object can hear target (proximity <= 12 hexes). Mirrors obj_can_hear_obj logic.',
+        description:
+            'METARULE3_WM_SUBTILE_STATE(105)(worldX, worldY): 0 unknown, 1 known, 2 visited. ' +
+            'Replaces the invented OBJ_CAN_HEAR_OBJ meaning.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -1023,9 +1037,10 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_108_115',
         kind: 'metarule',
         description:
-            'metarule3 IDs 108–115: de-stubbed with meaningful or safe-default implementations. ' +
-            '108=critter distance, 109=tile distance, 110=critter tile number, ' +
-            '111=critter is dead, 112=inventory slot lookup, 113–115=safe 0.',
+            'metarule3 108 TILE_SET_CENTER (centerCamera; -1 for an invalid tile), 109 AI chem_use index ' +
+            '(0 clean … 5 always, party-control override first), 110 car out of gas, 111 area of the current map. ' +
+            '112+ are not engine IDs and return 0. The invented critter-distance, tile-distance, critter-tile, ' +
+            'is-dead and inventory-slot meanings were removed.',
         status: 'implemented',
         frequency: 'low',
         impact: 'medium',
@@ -1149,9 +1164,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_116_plus',
         kind: 'metarule',
         description:
-            'metarule3(): IDs above 115 now return 0 silently instead of emitting a stub hit. ' +
-            'Prevents crashes from scripts using future or sfall-specific metarule3 extensions ' +
-            'not yet defined in the vanilla Fallout 2 engine.',
+            'metarule3(): IDs outside the engine METARULE3_* enum (100–111) return 0 silently ' +
+            'instead of emitting a stub hit, matching opMetarule3\'s default result.',
         status: 'implemented',
         frequency: 'low',
         impact: 'low',
@@ -1410,10 +1424,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_id100_fallthrough_fix',
         kind: 'metarule',
         description:
-            'metarule3(100, ...) CLR_FIXED_TIMED_EVENTS now returns 0 after the event ' +
-            'loop regardless of whether a matching event was found.  Previously the ' +
-            'loop fell through to the stub() call when no event matched, causing a ' +
-            'spurious stub hit and undefined return value.',
+            'metarule3(100, obj, fixedParam) CLR_FIXED_TIMED_EVENTS removes every pending timer ' +
+            'event on obj whose fixed param matches (engine _scrQueueRemoveFixed) and returns 0.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -1974,10 +1986,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_tile_los_distance',
         kind: 'metarule',
         description:
-            'scripting.ts metarule3(104) METARULE3_TILE_LINE_OF_SIGHT: previously always ' +
-            'returned 1. Now approximates LOS by hex distance: if the two tile arguments ' +
-            'are within 14 hexes the function returns 1, otherwise 0, matching the ' +
-            'Fallout 2 view radius and preventing distant triggers from firing falsely.',
+            'metarule3(104) is METARULE3_MARK_MAP_ENTRANCE in fallout2-ce; the former line-of-sight ' +
+            'approximation (hex distance <= 14) was an invented meaning and has been removed.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -2676,9 +2686,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         kind: 'opcode',
         description:
             'opcodes 0x8140 (tile_add_blocking) and 0x8141 (tile_remove_blocking): mark/clear ' +
-            'a tile as blocking line of sight/movement. Now implemented using ' +
-            'globalState.blockedTiles Set, which is also read by metarule3(102) ' +
-            '(METARULE3_CHECK_WALKING_ALLOWED) and the map hexLinecast pathfinding.',
+            'a tile as blocking line of sight/movement. Implemented using ' +
+            'globalState.blockedTiles Set, which is also read by the map hexLinecast pathfinding.',
         status: 'implemented',
         frequency: 'low',
         impact: 'medium',
@@ -3080,12 +3089,9 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'metarule3_106_elevation',
         kind: 'metarule',
         description:
-            'BLK-036: METARULE3_TILE_GET_NEXT_CRITTER(106) — previously used ' +
-            'gMap.objectsAtPosition() which only searched the current floor, ignoring the ' +
-            'elevation argument. Now uses gMap.getObjects(elevation) + position filter so ' +
-            'multi-floor maps (Vaults, Oil Rig) return the correct critter at the target tile. ' +
-            'Also implements the lastCritter iteration parameter for enumerating all critters ' +
-            'at a tile in sequence.',
+            'BLK-036: METARULE3_TILE_GET_NEXT_CRITTER(106)(tile, elevation, previous) — uses ' +
+            'gMap.getObjects(elevation) + position filter so multi-floor maps (Vaults, Oil Rig) return the correct ' +
+            'critter, and iterates via the previous-critter argument. Like the engine it includes the player.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'high',
@@ -3972,9 +3978,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'blk_058_metarule3_108_null_position',
         kind: 'procedure',
         description:
-            'BLK-058: metarule3(108) CRITTER_DIST now guards both object positions ' +
-            'before calling hexDistance.  Prevents crash when either critter lacks a ' +
-            'position (e.g. just-created or off-map objects).',
+            'BLK-058: metarule3(108) is METARULE3_TILE_SET_CENTER; object arguments (with or without ' +
+            'positions) are rejected as invalid tiles (-1) without throwing. The former CRITTER_DIST meaning was invented.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -5626,9 +5631,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'blk_096_metarule3_105_null_position',
         kind: 'metarule',
         description:
-            'BLK-096: metarule3(105) METARULE3_OBJ_CAN_HEAR_OBJ — added null-position guard ' +
-            'before hexDistance() call.  Objects in inventory or mid-map-transition have no ' +
-            'position; without this guard the call crashes with a TypeError.',
+            'BLK-096: metarule3(105) is METARULE3_WM_SUBTILE_STATE; object arguments return 0 without ' +
+            'throwing. The former OBJ_CAN_HEAR_OBJ meaning was invented.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -5639,9 +5643,8 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         id: 'blk_097_metarule3_110_null_position',
         kind: 'metarule',
         description:
-            'BLK-097: metarule3(110) METARULE3_CRITTER_TILE — added null-position guard before ' +
-            'toTileNum() call.  Critters without a placed position (inventory, transitions) ' +
-            'would crash; now returns -1 instead.',
+            'BLK-097: metarule3(110) is the car out-of-gas check and ignores its arguments, so ' +
+            'objects with null positions cannot crash it. The former CRITTER_TILE meaning was invented.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',
@@ -7494,8 +7497,7 @@ export const SCRIPTING_STUB_CHECKLIST: readonly StubEntry[] = Object.freeze([
         description:
             'sfall 0x82C3: get_critter_in_combat_sfall(obj) → 0|1. ' +
             'Returns 1 if the critter is a participant in the active combat session, ' +
-            '0 otherwise.  Delegates to the same combat-roster check as metarule3(103).  ' +
-            'New Reno faction-combat scripts skip AI updates for critters already engaged.',
+            '0 otherwise.  New Reno faction-combat scripts skip AI updates for critters already engaged.',
         status: 'implemented',
         frequency: 'medium',
         impact: 'medium',

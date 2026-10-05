@@ -4,7 +4,7 @@
  * Covers:
  *   A. Scripting — proto_data armor DT fields (cases 40-46)
  *   B. Scripting — proto_data armor perk (case 47) + critter XP/kill type (48-49)
- *   C. Scripting — metarule3 IDs 102-105 de-stub
+ *   C. Scripting — metarule3 IDs 102-105 follow fallout2-ce meanings
  *   D. Scripting — sfall opcodes 0x8183-0x8185 (get_critter_hp, set_critter_hp, get_critter_max_ap)
  *   E. Checklist — metarule_17 promoted to implemented; Phase 22 entries correct
  */
@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { drainStubHits, stubHitCount, SCRIPTING_STUB_CHECKLIST } from './scriptingChecklist.js'
 import globalState from './globalState.js'
+import { resetWorldmapMarks } from './worldmapMarks.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -165,130 +166,58 @@ describe('Phase 22-B — proto_data perk (47) + critter XP/kill (48-49)', () => 
 })
 
 // ---------------------------------------------------------------------------
-// C. metarule3 IDs 102-105 de-stub
+// C. metarule3 IDs 102-105 — engine meanings
 // ---------------------------------------------------------------------------
 
-describe('Phase 22-C — metarule3 IDs 102-105 de-stub', () => {
+// fallout2-ce: 102 SET_WM_MUSIC is never handled (→ 0), 103 GET_KILL_COUNT,
+// 104 MARK_MAP_ENTRANCE, 105 WM_SUBTILE_STATE.  The previously invented
+// walkability / in-combat / line-of-sight / can-hear meanings are gone.
+describe('Phase 22-C — metarule3 IDs 102-105 (engine meanings)', () => {
     let script: Scripting.Script
-    let originalInCombat: boolean
-    let originalCombat: any
+    let originalKills: any
+    let originalAreas: any
 
     beforeEach(() => {
         drainStubHits()
+        resetWorldmapMarks()
         script = new (Scripting as any).Script()
-        originalInCombat = globalState.inCombat
-        originalCombat = globalState.combat
+        originalKills = globalState.critterKillCounts
+        originalAreas = globalState.mapAreas
     })
 
     afterEach(() => {
-        globalState.inCombat = originalInCombat
-        globalState.combat = originalCombat
+        globalState.critterKillCounts = originalKills
+        globalState.mapAreas = originalAreas
+        resetWorldmapMarks()
     })
 
-    // ID 102 — METARULE3_CHECK_WALKING_ALLOWED
-    it('metarule3(102, ...) returns a number and does not stub', () => {
-        drainStubHits()
-        const r = script.metarule3(102, 0, 0, 0)
-        expect(typeof r).toBe('number')
+    it('metarule3(102, …) returns 0 (SET_WM_MUSIC is unhandled in the engine)', () => {
+        expect(script.metarule3(102, 12345, 0, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(102, ...) returns 1 (tile walkable partial)', () => {
-        expect(script.metarule3(102, 12345, 0, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 103 — METARULE3_CRITTER_IN_COMBAT
-    it('metarule3(103, ...) returns a number and does not stub', () => {
-        drainStubHits()
-        const r = script.metarule3(103, 0, 0, 0)
-        expect(typeof r).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(103, ...) returns 0 when not in combat', () => {
-        // globalState.inCombat is falsy in test context
+    it('metarule3(103, killType) returns the kill count for that type', () => {
+        globalState.critterKillCounts = { 3: 7 }
+        expect(script.metarule3(103, 3, 0, 0)).toBe(7)
         expect(script.metarule3(103, 0, 0, 0)).toBe(0)
+        expect(script.metarule3(103, -1, 0, 0)).toBe(0)
+        expect(script.metarule3(103, 19, 0, 0)).toBe(0) // KILL_TYPE_COUNT
+        expect(script.metarule3(103, makeCritter(), 0, 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(103, critter, ...) returns 1 when critter is in active combat roster', () => {
-        const critter = makeCritter()
-        globalState.inCombat = true
-        globalState.combat = { combatants: [critter] } as any
-        expect(script.metarule3(103, critter, 0, 0)).toBe(1)
+    it('metarule3(104, map, elev, state) returns -1 for a map with no area entrance', () => {
+        globalState.mapAreas = {} as any
+        expect(script.metarule3(104, 0, 0, 1)).toBe(-1)
         expect(stubHitCount()).toBe(0)
     })
 
-    it('metarule3(103, critter, ...) returns 0 when critter is not in active combat roster', () => {
-        const critter = makeCritter()
-        const other = makeCritter({ pid: 999 })
-        globalState.inCombat = true
-        globalState.combat = { combatants: [other] } as any
-        expect(script.metarule3(103, critter, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(103, critter, ...) falls back to global inCombat when no combat roster exists', () => {
-        const critter = makeCritter()
-        globalState.inCombat = true
-        globalState.combat = null as any
-        expect(script.metarule3(103, critter, 0, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 104 — METARULE3_TILE_LINE_OF_SIGHT
-    it('metarule3(104, ...) returns a number and does not stub', () => {
-        drainStubHits()
-        const r = script.metarule3(104, 0, 0, 0)
-        expect(typeof r).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(104, tile, tile, ...) returns 1 when tiles are the same (distance 0)', () => {
-        // Both tile args equal 0 → same position → distance 0 ≤ 14 → visible (1)
-        expect(script.metarule3(104, 0, 0, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(104, tile, farTile, ...) returns 0 when tiles are far apart', () => {
-        // tile 0 is (0,0); tile 99999 is far away → distance > 14 → not visible (0)
-        expect(script.metarule3(104, 0, 99999, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 105 — METARULE3_OBJ_CAN_HEAR_OBJ
-    it('metarule3(105, ...) returns 0 when arguments are not game objects', () => {
-        drainStubHits()
-        const r = script.metarule3(105, 0, 0, 0)
-        expect(r).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(105, src, tgt, ...) returns 1 when objects are within 12 hexes', () => {
-        const src = makeCritter({ position: { x: 10, y: 10 } })
-        const tgt = makeCritter({ position: { x: 12, y: 12 } })
-        drainStubHits()
-        const r = script.metarule3(105, src, tgt, 0)
-        expect(r).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(105, src, tgt, ...) returns 0 when objects are far apart', () => {
-        const src = makeCritter({ position: { x: 0, y: 0 } })
-        const tgt = makeCritter({ position: { x: 100, y: 100 } })
-        drainStubHits()
-        const r = script.metarule3(105, src, tgt, 0)
-        expect(r).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('none of IDs 102-105 emit stub hits', () => {
-        drainStubHits()
-        script.metarule3(102, 0, 0, 0)
-        script.metarule3(103, 0, 0, 0)
-        script.metarule3(104, 0, 0, 0)
-        script.metarule3(105, 0, 0, 0)
+    it('metarule3(105, x, y) reports the world-map subtile state', () => {
+        expect(script.metarule3(105, 120, 80, 0)).toBe(0)
+        script.metarule3(101, 120, 80, 1)
+        expect(script.metarule3(105, 120, 80, 0)).toBe(2)
+        expect(script.metarule3(105, 170, 80, 0)).toBe(1)
+        expect(script.metarule3(105, makeCritter(), makeCritter(), 0)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 })

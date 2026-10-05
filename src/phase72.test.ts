@@ -63,36 +63,16 @@ afterEach(() => {
 })
 
 // ===========================================================================
-// Phase 72-A — BLK-096: metarule3(105) null-position guard
+// Phase 72-A — BLK-096: metarule3(105) is WM_SUBTILE_STATE; object args are safe
 // ===========================================================================
 
-describe('Phase 72-A — BLK-096: metarule3(105) OBJ_CAN_HEAR_OBJ null-position guard', () => {
-    it('returns 0 when src has null position', () => {
+describe('Phase 72-A — BLK-096: metarule3(105) WM_SUBTILE_STATE with object args', () => {
+    it('returns 0 (unknown) without throwing when given objects instead of coordinates', () => {
         const src = makeObj({ position: null })
         const tgt = makeObj({ position: { x: 3, y: 4 } })
         expect(() => script.metarule3(105, src, tgt, 0)).not.toThrow()
         expect(script.metarule3(105, src, tgt, 0)).toBe(0)
-    })
-
-    it('returns 0 when tgt has null position', () => {
-        const src = makeObj({ position: { x: 1, y: 1 } })
-        const tgt = makeObj({ position: null })
-        expect(() => script.metarule3(105, src, tgt, 0)).not.toThrow()
-        expect(script.metarule3(105, src, tgt, 0)).toBe(0)
-    })
-
-    it('returns 0 when both objects have null positions', () => {
-        const src = makeObj({ position: null })
-        const tgt = makeObj({ position: null })
-        expect(() => script.metarule3(105, src, tgt, 0)).not.toThrow()
-        expect(script.metarule3(105, src, tgt, 0)).toBe(0)
-    })
-
-    it('returns 1 when objects are within 12 hexes', () => {
-        const src = makeObj({ position: { x: 5, y: 5 } })
-        const tgt = makeObj({ position: { x: 6, y: 5 } })
-        // 1 hex apart — within earshot
-        expect(script.metarule3(105, src, tgt, 0)).toBe(1)
+        expect(script.metarule3(105, tgt, src, 0)).toBe(0)
     })
 
     it('BLK-096 checklist entry is present and implemented', () => {
@@ -103,27 +83,15 @@ describe('Phase 72-A — BLK-096: metarule3(105) OBJ_CAN_HEAR_OBJ null-position 
 })
 
 // ===========================================================================
-// Phase 72-B — BLK-097: metarule3(110) CRITTER_TILE null-position guard
+// Phase 72-B — BLK-097: metarule3(110) is the car out-of-gas check
 // ===========================================================================
 
-describe('Phase 72-B — BLK-097: metarule3(110) CRITTER_TILE null-position guard', () => {
-    it('returns -1 when critter has null position', () => {
+describe('Phase 72-B — BLK-097: metarule3(110) ignores its object argument', () => {
+    it('does not throw for objects with null positions or non-objects', () => {
         const obj = makeObj({ position: null })
         expect(() => script.metarule3(110, obj, 0, 0)).not.toThrow()
-        expect(script.metarule3(110, obj, 0, 0)).toBe(-1)
-    })
-
-    it('returns -1 when a non-game-object is passed', () => {
         expect(() => script.metarule3(110, 0 as any, 0, 0)).not.toThrow()
-        expect(script.metarule3(110, 0 as any, 0, 0)).toBe(-1)
-    })
-
-    it('returns a valid tile number when object has a position', () => {
-        // tile_num for position {x:0,y:0} should be 0 (origin)
-        const obj = makeObj({ position: { x: 0, y: 0 } })
-        const tileNum = script.metarule3(110, obj, 0, 0)
-        expect(typeof tileNum).toBe('number')
-        expect(tileNum).toBeGreaterThanOrEqual(0)
+        expect(script.metarule3(110, obj, 0, 0)).toBe(script.metarule3(110, 0 as any, 0, 0))
     })
 
     it('BLK-097 checklist entry is present and implemented', () => {
