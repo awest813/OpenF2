@@ -17,7 +17,7 @@ limitations under the License.
 import { Config } from './config.js'
 import { getCurrentMapInfo, lookupMapName, mapDeadBodiesAge } from './data.js'
 import { Events } from './events.js'
-import { hexDistance, hexInDirectionDistance, hexLine, HEX_GRID_SIZE, Point, pointInBoundingBox } from './geometry.js'
+import { hexDistance, hexInDirectionDistance, hexLine, HEX_GRID_SIZE, Point } from './geometry.js'
 import globalState from './globalState.js'
 import { heart } from './heart.js'
 import { Lightmap } from './lightmap.js'
@@ -26,7 +26,7 @@ import { ageMapOnReentry } from './mapAging.js'
 import { centerCamera } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { fromTileNum, hexToTile, toTileNum } from './tile.js'
-import { arrayRemove, arrayWithout, getFileJSON, getRandomInt } from './util.js'
+import { arrayRemove, getFileJSON, getRandomInt } from './util.js'
 import { markPlayerExplored } from './character/automap.js'
 
 declare let PF: any
@@ -505,13 +505,6 @@ export class GameMap {
         // change to our new elevation (sets up map state)
         this.changeElevation(elevation, false, true)
 
-        // NOTE: objectsAndSpatials is captured here so the scripting engine
-        // has a stable view of "what's on the map" for the duration of
-        // doEnterNewMap + the script-driven updateMap.  If we mutated
-        // getObjectsAndSpatials() lazily (e.g. per-tick), the engine could
-        // see new objects added mid-tick and miss a frame.  See
-        // scripting.ts updateMap for the consumer.
-        const objectsAndSpatials = this.getObjectsAndSpatials()
 
         if (Config.engine.doLoadScripts) {
             // party member NPCs get the new map script

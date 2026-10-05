@@ -12,8 +12,6 @@ import { tickTimedEffects } from './timedEffects.js'
 import { processRadPoisonUpTo } from './radiationPoison.js'
 import { processChargedItemsUpTo } from '../chargedItems.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
-import { EventBus } from '../eventBus.js'
-import { Config } from '../config.js'
 import { midnightCheck } from '../mapAging.js'
 
 /** FO2: heal `Healing Rate` HP every 3 game hours while resting. */

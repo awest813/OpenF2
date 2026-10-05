@@ -27,12 +27,11 @@ import { Scripting } from './scripting.js'
 import { Skills, skillRequiresTarget } from './skills.js'
 import { SKILLDEX_ENTRIES, useSkilldexSkill } from './skilldex.js'
 import { fromTileNum } from './tile.js'
-import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl, ElementOptions } from './dom.js'
-import { CSSBoundingBox, Widget, WindowFrame, SmallButton, Label, List, ListItem } from './widgets.js'
+import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl } from './dom.js'
+import { Widget, WindowFrame, SmallButton, Label, List } from './widgets.js'
 import { pad } from './util.js'
 import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
-import { Point } from './geometry.js'
 import { lazyLoadImage } from './images.js'
 import { assertNoLegacyGameplayPanelFallback } from './ui2/index.js'
 import type { DialoguePanel } from './ui2/dialoguePanel.js'
@@ -908,11 +907,6 @@ type InventorySlot = typeof INVENTORY_SLOTS[number]
 function playerGetSlot(slot: string): Obj | null {
     const player = globalState.player as any
     return player[slot] ?? null
-}
-
-function playerSetSlot(slot: string, obj: Obj | null): void {
-    const player = globalState.player as any
-    player[slot] = obj
 }
 
 function uiMoveSlot(data: string, target: string) {

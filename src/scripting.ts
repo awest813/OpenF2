@@ -20,18 +20,9 @@ Scripting system/engine for DarkFO
 declare const __dirname: string
 
 import { Combat, CombatStartData } from './combat.js'
-import { critterDamage, critterKill } from './critter.js'
+import { critterDamage } from './critter.js'
 import { areaContainingMap, lookupMapName, lookupScriptName, setMapMusic } from './data.js'
-import {
-    hexDirectionTo,
-    hexDistance,
-    hexInDirection,
-    hexInDirectionDistance,
-    hexNearestNeighbor,
-    Point,
-    tile_in_tile_rect,
-    hexToScreen,
-} from './geometry.js'
+import { hexDistance, hexInDirection, hexInDirectionDistance, Point, hexToScreen } from './geometry.js'
 import { Spatial } from './map.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
@@ -51,14 +42,14 @@ import { installSfallFunctions, resetSfallState, sfallSettings } from './sfallFu
 import { setPerkGvarReader } from './character/perks.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
-import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
+import { RollResult } from './skillCheck.js'
 import { skillDependencies } from './skills.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
 import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
-import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
+import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
@@ -820,14 +811,6 @@ export namespace Scripting {
 
         currentDialogueObject = null
         globalState.dialogueObject = null
-    }
-
-    function canSee(obj: Obj, target: Obj): boolean {
-        // BLK-086: Guard against null positions — objects in inventory or mid-transition
-        // often have null positions.  Without this guard hexDirectionTo crashes.
-        if (!obj.position || !target.position) {return false}
-        const dir = Math.abs(obj.orientation - hexDirectionTo(obj.position, target.position))
-        return [0, 1, 5].indexOf(dir) !== -1
     }
 
     // combat_ai.cc isWithinPerception: seen within PER×5 in the forward arc,

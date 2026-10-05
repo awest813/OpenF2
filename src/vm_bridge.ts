@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Combat } from "./combat.js"
-import { Config } from "./config.js"
 import globalState from "./globalState.js"
 import { IntFile } from "./intfile.js"
 import { Scripting } from "./scripting.js"
-import { UIMode } from "./uiMode.js"
 import { BinaryReader } from "./util.js"
 import { opMap, ScriptVM } from "./vm.js"
 import { SFALL_FUNC_OPCODES, SFALL_OPCODES } from "./sfallOpcodes.js"
 import { sfallMetarules } from "./sfallFunctions.js"
-import { Worldmap } from "./worldmap.js"
 import { gameDate, gameTimeHour } from "./gameTime.js"
 
 // Bridge between Scripting API and the Scripting VM

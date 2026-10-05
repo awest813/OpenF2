@@ -41,7 +41,6 @@ import {
     canAimAttack,
     getAmmoModifiers,
     getAttackWeaponInfo,
-    weaponHasBurst,
     type AttackWeaponInfo,
     type HitMode,
 } from './combat/attackInfo.js'
@@ -49,13 +48,13 @@ import { PerkId, perkRank } from './character/perkIds.js'
 import { describeAttack, type AttackReport } from './combat/combatMessages.js'
 import { TraitId } from './character/statModifiers.js'
 import { Lightmap } from './lightmap.js'
-import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
+import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, Point } from './geometry.js'
 import globalState from './globalState.js'
-import { cloneItem, Critter, Obj, WeaponObj } from './object.js'
+import { cloneItem, Critter, Obj } from './object.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
-import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
+import { getFileText, getMessage, getRandomInt, parseIni } from './util.js'
 import { AI_MESSAGE, AiTurn, combatTaunt } from './combat/aiTurn.js'
 import { knockBack, liveMap } from './explosion.js'
 import {
@@ -692,17 +691,6 @@ export class Combat {
     /** AP cost of `obj`'s attack (item.cc weaponGetActionPointCost). */
     getAttackAPCost(obj: Critter, hitMode: HitMode = 1, aiming = false): number {
         return attackApCostFor(obj, getAttackWeaponInfo(obj, hitMode), aiming)
-    }
-
-    /** Get burst AP cost (secondary attack mode); 99 when the weapon cannot burst. */
-    private getBurstAPCost(obj: Critter): number {
-        if (!weaponHasBurst(obj)) {return 99}
-        return this.getAttackAPCost(obj, 2)
-    }
-
-    /** Check whether the critter's weapon has a burst secondary attack mode. */
-    private weaponHasBurstMode(obj: Critter): boolean {
-        return weaponHasBurst(obj)
     }
 
     /**

@@ -61,12 +61,6 @@ const STAT_NAMES: Record<number, string> = {
     31: 'DR Radiation', 32: 'DR Poison', 33: 'Age', 35: 'HP',
 }
 
-const SKILL_NAMES = [
-    'Small Guns', 'Big Guns', 'Energy Weapons', 'Unarmed', 'Melee Weapons', 'Throwing',
-    'First Aid', 'Doctor', 'Sneak', 'Lockpick', 'Steal', 'Traps', 'Science', 'Repair',
-    'Speech', 'Barter', 'Gambling', 'Outdoorsman',
-]
-
 /** sfall list types (LIST_CRITTERS … LIST_ALL). */
 const LIST_TYPES: Record<number, (o: any) => boolean> = {
     0: (o) => o?.type === 'critter',

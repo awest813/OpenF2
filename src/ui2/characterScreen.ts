@@ -5,7 +5,7 @@
  * EntityManager; all writes go through the leveling module.
  */
 
-import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, FALLOUT_BLACK, UIColor, cssColor, wrapText, drawUIFontText } from './uiPanel.js'
+import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, FALLOUT_BLACK, cssColor, wrapText, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import globalState from '../globalState.js'
 import { sfallSettings } from '../sfallSettings.js'
