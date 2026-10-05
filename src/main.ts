@@ -25,6 +25,7 @@ import { initGame, enterWorldMap } from './init.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
 import { tickTimedEffects } from './character/timedEffects.js'
 import { processRadPoisonUpTo } from './character/radiationPoison.js'
+import { processChargedItemsUpTo } from './chargedItems.js'
 import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -1025,6 +1026,7 @@ heart.update = function () {
         if (globalState.player && (globalState.player as Critter).stats) {
             tickTimedEffects(globalState.player as Critter)
             processRadPoisonUpTo(globalState.gameTickTime)
+            processChargedItemsUpTo(globalState.gameTickTime)
         }
     }
 

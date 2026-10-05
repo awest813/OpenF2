@@ -159,6 +159,10 @@ def readItem(f: BufferedReader):
 		obj["perk"] = read32(f)
 		obj["maleFID"] = read32(f)
 		obj["femaleFID"] = read32(f)
+	elif objSubType == SUBTYPE_MISC:
+		obj["powerPID"] = read32(f)
+		obj["powerType"] = read32(f)
+		obj["charges"] = read32(f)
 	elif objSubType == SUBTYPE_DRUG:
 		obj["stat0"] = read32(f)
 		obj["stat1"] = read32(f)

@@ -10,6 +10,7 @@ import globalState from '../globalState.js'
 import { Critter } from '../object.js'
 import { tickTimedEffects } from './timedEffects.js'
 import { processRadPoisonUpTo } from './radiationPoison.js'
+import { processChargedItemsUpTo } from '../chargedItems.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 import { EventBus } from '../eventBus.js'
 import { Config } from '../config.js'
@@ -153,6 +154,7 @@ function simulateEffectsAcrossAdvance(): boolean {
     // Chem expiry is absolute (expiresAt vs gameTickTime) — one pass after the clock jumps.
     tickTimedEffects(player)
 
+    processChargedItemsUpTo(globalState.gameTickTime)
     // Poison ticks, radiation sickness and the midnight radiation check, in time order.
     return processRadPoisonUpTo(globalState.gameTickTime)
 }

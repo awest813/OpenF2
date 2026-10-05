@@ -51,6 +51,7 @@ import { parkCarAtPlayer } from './car.js'
 import { finishStealing, openStealing, type StealScreen } from './steal.js'
 import { isDrug, takeDrug } from './character/timedEffects.js'
 import { isBook, useBook } from './books.js'
+import { isChargedItem, useChargedItem } from './chargedItems.js'
 import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
 
@@ -80,7 +81,7 @@ function refreshInventoryPanel(): void {
             name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
             amount: (o as any).amount ?? 1,
             // USE reloads with matching ammo and takes drugs (inventory.cc).
-            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o) || isBook(o),
+            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o) || isBook(o) || isChargedItem(o),
             pid,
         }
     })
@@ -443,6 +444,11 @@ export function initUI() {
         const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
         const item = panel?.items[index]
         const live = globalState.player?.inventory?.[index]
+        if (live && isChargedItem(live)) {
+            useChargedItem(live)
+            refreshInventoryPanel()
+            return
+        }
         if (live && isBook(live)) {
             // _obj_use_item: a book that was read is used up.
             if (useBook(live) === 1) {
