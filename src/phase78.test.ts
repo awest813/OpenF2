@@ -98,16 +98,6 @@ describe('Phase 78-A — BLK-123: sfallSetHookArgs / get_sfall_arg', () => {
         expect(sfallGetHookReturn()).toBe(0)
     })
 
-    it('get_sfall_args_count returns number of args in the buffer', () => {
-        sfallSetHookArgs([1, 2, 3])
-        expect(script.get_sfall_args_count()).toBe(3)
-    })
-
-    it('get_sfall_args_count returns 0 for empty buffer', () => {
-        sfallSetHookArgs([])
-        expect(script.get_sfall_args_count()).toBe(0)
-    })
-
     it('get_sfall_arg_at returns arg at given index without advancing cursor', () => {
         sfallSetHookArgs([10, 20, 30])
         expect(script.get_sfall_arg_at(0)).toBe(10)
@@ -133,23 +123,6 @@ describe('Phase 78-A — BLK-123: sfallSetHookArgs / get_sfall_arg', () => {
         expect(script.get_sfall_arg_at(0)).toBe(10) // unchanged
     })
 
-    it('get_script_return_val_sfall returns the hook return value', () => {
-        script.set_sfall_return(77)
-        expect(script.get_script_return_val_sfall()).toBe(77)
-    })
-
-    it('set_script_return_val_sfall also stores into the hook return buffer', () => {
-        script.set_script_return_val_sfall(88)
-        expect(sfallGetHookReturn()).toBe(88)
-    })
-
-    it('does not throw on any input', () => {
-        expect(() => script.get_sfall_arg()).not.toThrow()
-        expect(() => script.set_sfall_return(0)).not.toThrow()
-        expect(() => script.get_sfall_args_count()).not.toThrow()
-        expect(() => script.get_sfall_arg_at(0)).not.toThrow()
-        expect(() => script.set_sfall_arg(0, 5)).not.toThrow()
-    })
 })
 
 // ===========================================================================

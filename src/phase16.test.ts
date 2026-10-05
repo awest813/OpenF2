@@ -236,65 +236,6 @@ describe('Phase 16-D — sfall opcodes 0x8170–0x8174', () => {
         expect(script.get_critter_kills(0)).toBe(0)
     })
 
-    it('get_critter_body_type returns 0 for non-critter objects', () => {
-        const script = new Scripting.Script()
-        const item: any = { type: 'item', pid: 1, inventory: [], visible: true, orientation: 0 }
-        expect(script.get_critter_body_type(item)).toBe(0)
-    })
-
-    it('get_critter_body_type returns 0 for critter without proto body type', () => {
-        const script = new Scripting.Script()
-        const critter: any = {
-            type: 'critter',
-            pid: 0x01000001,
-            inventory: [],
-            visible: true,
-            orientation: 0,
-            isPlayer: false,
-            equippedArmor: null,
-            aiNum: 0,
-            teamNum: 0,
-            // no pro.extra.bodyType
-        }
-        expect(script.get_critter_body_type(critter)).toBe(0)
-    })
-
-    it('get_critter_body_type reads bodyType from proto when available', () => {
-        const script = new Scripting.Script()
-        const critter: any = {
-            type: 'critter',
-            pid: 0x01000002,
-            inventory: [],
-            visible: true,
-            orientation: 0,
-            isPlayer: false,
-            equippedArmor: null,
-            aiNum: 0,
-            teamNum: 0,
-            pro: { extra: { bodyType: 2 } }, // 2 = robotic
-        }
-        expect(script.get_critter_body_type(critter)).toBe(2)
-    })
-
-    it('floor2 returns correct math floor for positive values', () => {
-        const script = new Scripting.Script()
-        expect(script.floor2(3.9)).toBe(3)
-        expect(script.floor2(3.0)).toBe(3)
-        expect(script.floor2(0.1)).toBe(0)
-    })
-
-    it('floor2 returns correct math floor for negative values', () => {
-        const script = new Scripting.Script()
-        expect(script.floor2(-0.1)).toBe(-1)
-        expect(script.floor2(-3.0)).toBe(-3)
-        expect(script.floor2(-3.1)).toBe(-4)
-    })
-
-    it('obj_count_by_pid returns 0 when gMap is null', () => {
-        const script = new Scripting.Script()
-        // globalState.gMap is null in test environment
-        expect(script.obj_count_by_pid(1)).toBe(0)
-    })
 })
 
 // ---------------------------------------------------------------------------

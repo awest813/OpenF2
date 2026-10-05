@@ -269,39 +269,6 @@ describe('Phase 21-D — sfall opcodes 0x8180-0x8182', () => {
     })
 
     // get_critter_skill (0x8180)
-    it('get_critter_skill returns 0 for a critter with no skill allocation', () => {
-        const c = makeCritter()
-        expect(script.get_critter_skill(c, 0)).toBe(0) // Small Guns, base=0
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_skill returns allocated base skill value', () => {
-        const c = makeCritter()
-        c.skills.setBase('Small Guns', 45)
-        expect(script.get_critter_skill(c, 0)).toBe(45)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_skill returns 0 and warns for non-critter', () => {
-        const item = makeObj()
-        expect(script.get_critter_skill(item, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_skill returns 0 for unknown skill number', () => {
-        const c = makeCritter()
-        expect(script.get_critter_skill(c, 9999)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_skill handles all 18 standard skills by number', () => {
-        const c = makeCritter()
-        for (let i = 0; i <= 17; i++) {
-            expect(() => script.get_critter_skill(c, i)).not.toThrow()
-        }
-        expect(stubHitCount()).toBe(0)
-    })
-
     // set_critter_skill_points (0x8181)
     it('set_critter_skill_points sets base skill to the given value', () => {
         const c = makeCritter()
@@ -330,13 +297,6 @@ describe('Phase 21-D — sfall opcodes 0x8180-0x8182', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('get_critter_skill round-trip with set_critter_skill_points', () => {
-        const c = makeCritter()
-        script.set_critter_skill_points(c, 3, 65) // Unarmed = 65
-        expect(script.get_critter_skill(c, 3)).toBe(65)
-        expect(stubHitCount()).toBe(0)
-    })
-
     // get_light_level (0x8182)
     it('get_light_level returns a number', () => {
         expect(typeof script.get_light_level()).toBe('number')
@@ -356,14 +316,6 @@ describe('Phase 21-D — sfall opcodes 0x8180-0x8182', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('none of the Phase 21 sfall opcodes emit stub hits', () => {
-        const c = makeCritter()
-        drainStubHits()
-        script.get_critter_skill(c, 0)
-        script.set_critter_skill_points(c, 0, 50)
-        script.get_light_level()
-        expect(stubHitCount()).toBe(0)
-    })
 })
 
 // ---------------------------------------------------------------------------

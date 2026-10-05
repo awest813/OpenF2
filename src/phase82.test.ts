@@ -429,14 +429,6 @@ describe('Phase 82-C — BLK-142: map_update per-object isolation', () => {
 // ===========================================================================
 
 describe('Phase 82-E-1 — sfall 0x82A0: get_worldmap_free_move_sfall', () => {
-    it('returns 0', () => {
-        expect(script.get_worldmap_free_move_sfall()).toBe(0)
-    })
-
-    it('does not throw', () => {
-        expect(() => script.get_worldmap_free_move_sfall()).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_worldmap_free_move_82')
         expect(entry?.status).toBe('implemented')
@@ -444,11 +436,6 @@ describe('Phase 82-E-1 — sfall 0x82A0: get_worldmap_free_move_sfall', () => {
 })
 
 describe('Phase 82-E-2 — sfall 0x82A1: set_worldmap_free_move_sfall', () => {
-    it('does not throw', () => {
-        expect(() => script.set_worldmap_free_move_sfall(1)).not.toThrow()
-        expect(() => script.set_worldmap_free_move_sfall(0)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_set_worldmap_free_move_82')
         expect(entry?.status).toBe('implemented')
@@ -456,29 +443,6 @@ describe('Phase 82-E-2 — sfall 0x82A1: set_worldmap_free_move_sfall', () => {
 })
 
 describe('Phase 82-E-3 — sfall 0x82A2: get_car_current_town_sfall', () => {
-    it('returns -1 when carAreaID not set', () => {
-        const orig = (globalState as any).carAreaID
-        delete (globalState as any).carAreaID
-        const result = script.get_car_current_town_sfall()
-        expect(result).toBe(-1)
-        if (orig !== undefined) {(globalState as any).carAreaID = orig}
-    })
-
-    it('returns carAreaID when set', () => {
-        const orig = (globalState as any).carAreaID
-        ;(globalState as any).carAreaID = 7
-        expect(script.get_car_current_town_sfall()).toBe(7)
-        if (orig !== undefined) {
-            (globalState as any).carAreaID = orig
-        } else {
-            delete (globalState as any).carAreaID
-        }
-    })
-
-    it('does not throw', () => {
-        expect(() => script.get_car_current_town_sfall()).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_car_current_town_82')
         expect(entry?.status).toBe('implemented')
@@ -486,27 +450,6 @@ describe('Phase 82-E-3 — sfall 0x82A2: get_car_current_town_sfall', () => {
 })
 
 describe('Phase 82-E-4 — sfall 0x82A3: get_dude_obj_sfall', () => {
-    it('returns 0 when no player', () => {
-        const origPlayer = globalState.player
-        ;(globalState as any).player = null
-        const result = script.get_dude_obj_sfall()
-        expect(result).toBe(0)
-        ;(globalState as any).player = origPlayer
-    })
-
-    it('returns player when player exists', () => {
-        const origPlayer = globalState.player
-        const mockPlayer = makeObj({ name: 'Player' })
-        ;(globalState as any).player = mockPlayer
-        const result = script.get_dude_obj_sfall()
-        expect(result).toBe(mockPlayer)
-        ;(globalState as any).player = origPlayer
-    })
-
-    it('does not throw', () => {
-        expect(() => script.get_dude_obj_sfall()).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_dude_obj_82')
         expect(entry?.status).toBe('implemented')
@@ -514,10 +457,6 @@ describe('Phase 82-E-4 — sfall 0x82A3: get_dude_obj_sfall', () => {
 })
 
 describe('Phase 82-E-5 — sfall 0x82A4: set_dude_obj_sfall', () => {
-    it('does not throw', () => {
-        expect(() => script.set_dude_obj_sfall(makeObj())).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_set_dude_obj_82')
         expect(entry?.status).toBe('implemented')
@@ -525,31 +464,6 @@ describe('Phase 82-E-5 — sfall 0x82A4: set_dude_obj_sfall', () => {
 })
 
 describe('Phase 82-E-6 — sfall 0x82A5: get_critter_max_ap_sfall', () => {
-    it('returns 0 for non-critter', () => {
-        expect(script.get_critter_max_ap_sfall(0 as any)).toBe(0)
-        expect(script.get_critter_max_ap_sfall(null as any)).toBe(0)
-    })
-
-    it('derives max AP from AGI stat for valid critter', () => {
-        // Implementation uses: 5 + floor(AGI / 2) with 'AGI' stat key
-        const critter = makeObj({ getStat: (s: string) => s === 'AGI' ? 8 : 5 })
-        const result = script.get_critter_max_ap_sfall(critter)
-        // Expected: 5 + floor(8/2) = 5 + 4 = 9
-        expect(result).toBe(9)
-    })
-
-    it('returns a positive number from Fallout 2 AP formula', () => {
-        const critter = makeObj({ getStat: (s: string) => s === 'AGI' ? 5 : 5 })
-        const result = script.get_critter_max_ap_sfall(critter)
-        // 5 + floor(5/2) = 5 + 2 = 7
-        expect(typeof result).toBe('number')
-        expect(result).toBeGreaterThan(0)
-    })
-
-    it('does not throw for non-game-object', () => {
-        expect(() => script.get_critter_max_ap_sfall(undefined as any)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_critter_max_ap_82')
         expect(entry?.status).toBe('implemented')
@@ -557,17 +471,6 @@ describe('Phase 82-E-6 — sfall 0x82A5: get_critter_max_ap_sfall', () => {
 })
 
 describe('Phase 82-E-7 — sfall 0x82A6: get_tile_light_level_sfall', () => {
-    it('returns default tile intensity for valid tiles', () => {
-        // light_reset() initializes all tiles to 655
-        expect(script.get_tile_light_level_sfall(100)).toBe(65536)
-        expect(script.get_tile_light_level_sfall(0)).toBe(65536)
-    })
-
-    it('does not throw for invalid tiles', () => {
-        expect(() => script.get_tile_light_level_sfall(-1)).not.toThrow()
-        expect(() => script.get_tile_light_level_sfall(NaN)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_tile_light_level_82')
         expect(entry?.status).toBe('implemented')
@@ -575,14 +478,6 @@ describe('Phase 82-E-7 — sfall 0x82A6: get_tile_light_level_sfall', () => {
 })
 
 describe('Phase 82-E-8 — sfall 0x82A7: set_tile_light_level_sfall', () => {
-    it('does not throw', () => {
-        expect(() => script.set_tile_light_level_sfall(100, 32768)).not.toThrow()
-    })
-
-    it('does not throw for invalid arguments', () => {
-        expect(() => script.set_tile_light_level_sfall(-1, NaN)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_set_tile_light_level_82')
         expect(entry?.status).toBe('implemented')
@@ -592,25 +487,6 @@ describe('Phase 82-E-8 — sfall 0x82A7: set_tile_light_level_sfall', () => {
 // ===========================================================================
 // Phase 82-F — sfall method registration check (0x82A0–0x82A7)
 // ===========================================================================
-
-describe('Phase 82-F — sfall 0x82A0–0x82A7 scripting methods exist', () => {
-    const phase82Methods = [
-        'get_worldmap_free_move_sfall',
-        'set_worldmap_free_move_sfall',
-        'get_car_current_town_sfall',
-        'get_dude_obj_sfall',
-        'set_dude_obj_sfall',
-        'get_critter_max_ap_sfall',
-        'get_tile_light_level_sfall',
-        'set_tile_light_level_sfall',
-    ]
-
-    for (const methodName of phase82Methods) {
-        it(`script.${methodName} is a function`, () => {
-            expect(typeof (script as any)[methodName]).toBe('function')
-        })
-    }
-})
 
 // ===========================================================================
 // Phase 82-G — Checklist integrity

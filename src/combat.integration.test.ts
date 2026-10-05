@@ -619,17 +619,6 @@ describe('Phase 108: Combat sfall opcode implementations', () => {
         return { type: 'critter', dead: false, position: { x: 5, y: 5 }, ...overrides }
     }
 
-    it('get_combat_target returns 0 for critter with no target', () => {
-        expect(script.get_combat_target(makeObj())).toBe(0)
-    })
-
-    it('get_combat_target returns combatTarget when set via set_combat_target', () => {
-        const obj = makeObj()
-        const target = makeObj({ name: 'target' })
-        script.set_combat_target(obj, target)
-        expect(script.get_combat_target(obj)).toBe(target)
-    })
-
     it('get_critter_attack_mode_sfall returns 0 for non-critter', () => {
         expect(script.get_critter_attack_mode_sfall(null as any)).toBe(0)
         expect(script.get_critter_attack_mode_sfall({} as any)).toBe(0)
@@ -668,55 +657,6 @@ describe('Phase 108: Combat sfall opcode implementations', () => {
         expect(script.get_attack_type_sfall(critter, 1)).toBe(6) // secondary = fire single
     })
 
-    it('get_critter_attack_type_sfall delegates to get_attack_type_sfall', () => {
-        const critter = makeObj({ equippedWeapon: { pro: { extra: { attackMode: 0x63 } } } })
-        expect(script.get_critter_attack_type_sfall(critter, 0))
-            .toBe(script.get_attack_type_sfall(critter, 0))
-    })
-
-    it('get_critter_min_str_sfall returns 0 for non-critter', () => {
-        expect(script.get_critter_min_str_sfall({} as any)).toBe(0)
-    })
-
-    it('get_critter_min_str_sfall reads minST from weapon proto', () => {
-        const critter = makeObj({ equippedWeapon: { pro: { extra: { minST: 5 } } } })
-        expect(script.get_critter_min_str_sfall(critter)).toBe(5)
-    })
-
-    it('get_critter_combat_data_sfall returns 0 for non-critter', () => {
-        expect(script.get_critter_combat_data_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_combat_data_sfall shows inCombat bit when in combat', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origCombat = gs.combat
-        const origInCombat = gs.inCombat
-        try {
-            gs.inCombat = true
-            gs.combat = { combatants: [], whoseTurn: 0 } as any
-            const data = script.get_critter_combat_data_sfall(makeObj())
-            expect(data & 1).toBe(1)
-        } finally {
-            gs.combat = origCombat
-            gs.inCombat = origInCombat
-        }
-    })
-
-    it('get_critter_combat_data_sfall shows hostile bit', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origCombat = gs.combat
-        const origInCombat = gs.inCombat
-        try {
-            gs.inCombat = true
-            gs.combat = { combatants: [], whoseTurn: 0 } as any
-            const data = script.get_critter_combat_data_sfall(makeObj({ hostile: true }))
-            expect(data & 2).toBe(2)
-        } finally {
-            gs.combat = origCombat
-            gs.inCombat = origInCombat
-        }
-    })
-
     it('obj_is_disabled_sfall reads scriptDisabled flag', () => {
         expect(script.obj_is_disabled_sfall({} as any)).toBe(0)
         expect(script.obj_is_disabled_sfall(null as any)).toBe(0)
@@ -724,12 +664,6 @@ describe('Phase 108: Combat sfall opcode implementations', () => {
         expect(script.obj_is_disabled_sfall(obj)).toBe(1)
         obj.scriptDisabled = false
         expect(script.obj_is_disabled_sfall(obj)).toBe(0)
-    })
-
-    it('get_combat_free_move_sfall reads from script object', () => {
-        expect(script.get_combat_free_move_sfall()).toBe(0)
-        ;(script as any).combatFreeMove = 5
-        expect(script.get_combat_free_move_sfall()).toBe(5)
     })
 
     it('set_combat_free_move_sfall stores on critter', () => {

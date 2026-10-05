@@ -295,51 +295,6 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
 })
 
 // ===========================================================================
-// Phase 56-C — BLK-050: set_name opcode
-// ===========================================================================
-
-describe('Phase 56-C — BLK-050: set_name(obj, name) opcode', () => {
-    let script: Scripting.Script
-
-    beforeEach(() => {
-        drainStubHits()
-        script = new (Scripting as any).Script()
-        script._didOverride = false
-    })
-
-    it('set_name changes the name of a game object', () => {
-        const obj = makeObj({ name: 'OldName' })
-        script.set_name(obj, 'NewName')
-        expect(obj.name).toBe('NewName')
-    })
-
-    it('set_name on player object changes player name', () => {
-        const player = makeObj({ name: 'Stranger', isPlayer: true })
-        script.set_name(player, 'Chosen One')
-        expect(player.name).toBe('Chosen One')
-    })
-
-    it('set_name on non-game-object emits warning and is a no-op', () => {
-        const notObj = null
-        // Should not throw
-        expect(() => script.set_name(notObj as any, 'Foo')).not.toThrow()
-    })
-
-    it('set_name coerces numeric name to string', () => {
-        const obj = makeObj({ name: 'OldName' })
-        script.set_name(obj, 42 as any)
-        expect(obj.name).toBe('42')
-    })
-
-    it('set_name does not generate a stub hit', () => {
-        const obj = makeObj({ name: 'OldName' })
-        script.set_name(obj, 'NewName')
-        const hits = drainStubHits()
-        expect(hits.length).toBe(0)
-    })
-})
-
-// ===========================================================================
 // Phase 56-D — New sfall opcodes 0x81E0–0x81E7
 // ===========================================================================
 
@@ -359,30 +314,6 @@ describe('Phase 56-D — sfall opcodes 0x81E0–0x81E7', () => {
         expect(result).toBe(0)
     })
 
-    it('get_object_dude_distance (0x81E1) returns -1 for non-game-object', () => {
-        const result = script.get_object_dude_distance(null as any)
-        expect(result).toBe(-1)
-    })
-
-    it('get_object_dude_distance (0x81E1) returns -1 when no player', () => {
-        const savedPlayer = globalState.player
-        ;(globalState as any).player = null
-        const obj = makeObj()
-        const result = script.get_object_dude_distance(obj)
-        expect(result).toBe(-1)
-        ;(globalState as any).player = savedPlayer
-    })
-
-    it('get_object_dude_distance (0x81E1) returns 0 when obj is at same position as player', () => {
-        const savedPlayer = globalState.player
-        const fakePlayer = makeObj({ position: { x: 5, y: 10 } })
-        ;(globalState as any).player = fakePlayer
-        const obj = makeObj({ position: { x: 5, y: 10 } })
-        const result = script.get_object_dude_distance(obj)
-        expect(result).toBe(0)
-        ;(globalState as any).player = savedPlayer
-    })
-
     it('get_critter_attack_mode_sfall (0x81E2) returns 0 (stub)', () => {
         const obj = makeObj()
         const result = script.get_critter_attack_mode_sfall(obj)
@@ -394,18 +325,8 @@ describe('Phase 56-D — sfall opcodes 0x81E0–0x81E7', () => {
         expect(() => script.set_critter_attack_mode_sfall(obj, 2)).not.toThrow()
     })
 
-    it('get_map_first_run_sfall (0x81E4) returns 0 or 1', () => {
-        const result = script.get_map_first_run_sfall()
-        expect(result === 0 || result === 1).toBe(true)
-    })
-
     it('get_script_type_sfall (0x81E5) returns 0 (partial)', () => {
         const result = script.get_script_type_sfall()
-        expect(result).toBe(0)
-    })
-
-    it('get_tile_pid_sfall (0x81E6) returns 0 when no map is loaded', () => {
-        const result = script.get_tile_pid_sfall(0, 0)
         expect(result).toBe(0)
     })
 

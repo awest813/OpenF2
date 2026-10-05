@@ -262,51 +262,8 @@ describe('Phase 68-E — BLK-080: save() log gMap.name null guard', () => {
 
 describe('Phase 68-F — sfall opcodes 0x8240–0x8247', () => {
     // ---- 0x8240 get_critter_damage_type_sfall ----
-    it('get_critter_damage_type_sfall returns 0 for null', () => {
-        expect(script.get_critter_damage_type_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_damage_type_sfall returns 0 when damageType not set', () => {
-        const obj = makeObj()
-        delete obj.damageType
-        expect(script.get_critter_damage_type_sfall(obj)).toBe(0)
-    })
-
-    it('get_critter_damage_type_sfall returns stored damageType', () => {
-        const obj = makeObj({ damageType: 3 })
-        expect(script.get_critter_damage_type_sfall(obj)).toBe(3)
-    })
-
     // ---- 0x8241 set_critter_damage_type_sfall ----
-    it('set_critter_damage_type_sfall does not throw for null', () => {
-        expect(() => script.set_critter_damage_type_sfall(null as any, 2)).not.toThrow()
-    })
-
-    it('set_critter_damage_type_sfall stores clamped damage type', () => {
-        const obj = makeObj()
-        script.set_critter_damage_type_sfall(obj, 4)
-        expect(obj.damageType).toBe(4)
-    })
-
-    it('set_critter_damage_type_sfall clamps to [0, 6]', () => {
-        const obj = makeObj()
-        script.set_critter_damage_type_sfall(obj, 99)
-        expect(obj.damageType).toBe(6)
-        script.set_critter_damage_type_sfall(obj, -3)
-        expect(obj.damageType).toBe(0)
-    })
-
-    it('set and get damage type round-trips', () => {
-        const obj = makeObj()
-        script.set_critter_damage_type_sfall(obj, 2)
-        expect(script.get_critter_damage_type_sfall(obj)).toBe(2)
-    })
-
     // ---- 0x8242 get_combat_free_move_sfall ----
-    it('get_combat_free_move_sfall returns 0', () => {
-        expect(script.get_combat_free_move_sfall()).toBe(0)
-    })
-
     // ---- 0x8243 set_combat_free_move_sfall ----
     it('set_combat_free_move_sfall does not throw', () => {
         const obj = makeObj()
@@ -318,68 +275,9 @@ describe('Phase 68-F — sfall opcodes 0x8240–0x8247', () => {
     })
 
     // ---- 0x8244 get_base_stat_sfall ----
-    it('get_base_stat_sfall returns 0 for null obj', () => {
-        expect(script.get_base_stat_sfall(null as any, 0)).toBe(0)
-    })
-
-    it('get_base_stat_sfall returns 0 for unknown stat id', () => {
-        const obj = makeObj()
-        expect(script.get_base_stat_sfall(obj, 99)).toBe(0)
-    })
-
-    it('get_base_stat_sfall reads stat 0 (STR) via stats.getBase', () => {
-        const obj = makeObj({
-            stats: {
-                getBase: (s: string) => (s === 'STR' ? 8 : 0),
-                modifyBase: vi.fn(),
-            },
-        })
-        expect(script.get_base_stat_sfall(obj, 0)).toBe(8)
-    })
-
-    it('get_base_stat_sfall reads stat 4 (INT) via stats.getBase', () => {
-        const obj = makeObj({
-            stats: {
-                getBase: (s: string) => (s === 'INT' ? 7 : 0),
-                modifyBase: vi.fn(),
-            },
-        })
-        expect(script.get_base_stat_sfall(obj, 4)).toBe(7)
-    })
-
     // ---- 0x8245 set_base_stat_sfall ----
-    it('set_base_stat_sfall does not throw for null obj', () => {
-        expect(() => script.set_base_stat_sfall(null as any, 0, 5)).not.toThrow()
-    })
-
-    it('set_base_stat_sfall does not throw for unknown stat id', () => {
-        const obj = makeObj()
-        expect(() => script.set_base_stat_sfall(obj, 99, 5)).not.toThrow()
-    })
-
-    it('set_base_stat_sfall calls modifyBase with correct delta for stat 0 (STR)', () => {
-        let stored = 5
-        const modifyBase = vi.fn((s: string, delta: number) => { stored += delta })
-        const obj = makeObj({
-            stats: {
-                getBase: (s: string) => (s === 'STR' ? stored : 0),
-                modifyBase,
-            },
-        })
-        script.set_base_stat_sfall(obj, 0, 8) // set STR to 8 (delta = 8 - 5 = 3)
-        expect(modifyBase).toHaveBeenCalledWith('STR', 3)
-        expect(stored).toBe(8)
-    })
-
     // ---- 0x8246 get_game_difficulty_sfall ----
-    it('get_game_difficulty_sfall returns 1 (normal)', () => {
-        expect(script.get_game_difficulty_sfall()).toBe(1)
-    })
-
     // ---- 0x8247 get_violence_level_sfall ----
-    it('get_violence_level_sfall returns 2 (maximum)', () => {
-        expect(script.get_violence_level_sfall()).toBe(2)
-    })
 })
 
 // ===========================================================================

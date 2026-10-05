@@ -236,71 +236,8 @@ describe('Phase 66-C — sfall opcodes 0x8230–0x8237', () => {
     })
 
     // ---- 0x8230 get_object_name_sfall ----
-    it('get_object_name_sfall returns empty string for null', () => {
-        expect(script.get_object_name_sfall(null as any)).toBe('')
-    })
-
-    it('get_object_name_sfall returns name for any game object', () => {
-        const obj = makeObj({ name: 'Rusty Knife' })
-        expect(script.get_object_name_sfall(obj)).toBe('Rusty Knife')
-    })
-
-    it('get_object_name_sfall returns empty string when name is absent', () => {
-        const obj = makeObj({ name: undefined })
-        expect(script.get_object_name_sfall(obj)).toBe('')
-    })
-
     // ---- 0x8231 get_critter_gender_sfall ----
-    it('get_critter_gender_sfall returns 0 for null', () => {
-        expect(script.get_critter_gender_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_gender_sfall returns 0 for male critter', () => {
-        const critter = makeObj({ gender: 'male' })
-        expect(script.get_critter_gender_sfall(critter)).toBe(0)
-    })
-
-    it('get_critter_gender_sfall returns 1 for female critter', () => {
-        const critter = makeObj({ gender: 'female' })
-        expect(script.get_critter_gender_sfall(critter)).toBe(1)
-    })
-
-    it('get_critter_gender_sfall defaults to 0 when gender is undefined', () => {
-        const critter = makeObj()
-        expect(script.get_critter_gender_sfall(critter)).toBe(0)
-    })
-
     // ---- 0x8232 get_combat_round_sfall ----
-    it('get_combat_round_sfall returns 0 when not in combat', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origCombat = gs.inCombat
-        gs.inCombat = false
-        expect(script.get_combat_round_sfall()).toBe(0)
-        gs.inCombat = origCombat
-    })
-
-    it('get_combat_round_sfall returns 0 when in combat but no round set', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origCombat = gs.inCombat
-        const origCombatObj = gs.combat
-        gs.inCombat = true
-        ;(gs as any).combat = {}
-        expect(script.get_combat_round_sfall()).toBe(0)
-        gs.inCombat = origCombat
-        gs.combat = origCombatObj
-    })
-
-    it('get_combat_round_sfall returns round number when in combat', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origCombat = gs.inCombat
-        const origCombatObj = gs.combat
-        gs.inCombat = true
-        ;(gs as any).combat = { round: 3 }
-        expect(script.get_combat_round_sfall()).toBe(3)
-        gs.inCombat = origCombat
-        gs.combat = origCombatObj
-    })
-
     // ---- 0x8233 get_critter_action_points_sfall ----
     it('get_critter_action_points_sfall returns 0 for null', () => {
         expect(script.get_critter_action_points_sfall(null as any)).toBe(0)
@@ -348,65 +285,8 @@ describe('Phase 66-C — sfall opcodes 0x8230–0x8237', () => {
     })
 
     // ---- 0x8235 get_critter_max_ap_sfall ----
-    it('get_critter_max_ap_sfall returns 0 for null', () => {
-        expect(script.get_critter_max_ap_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_max_ap_sfall derives max AP from Agility', () => {
-        // AGI=8 → 5 + floor(8/2) = 5+4 = 9
-        const critter = makeObj({ getStat: (s: string) => (s === 'AGI' ? 8 : 5) })
-        expect(script.get_critter_max_ap_sfall(critter)).toBe(9)
-    })
-
-    it('get_critter_max_ap_sfall returns at least 1', () => {
-        const critter = makeObj({ getStat: (s: string) => (s === 'AGI' ? 0 : 0) })
-        expect(script.get_critter_max_ap_sfall(critter)).toBeGreaterThanOrEqual(1)
-    })
-
     // ---- 0x8236 get_critter_carry_weight_sfall ----
-    it('get_critter_carry_weight_sfall returns 0 for null', () => {
-        expect(script.get_critter_carry_weight_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_carry_weight_sfall derives capacity from Strength', () => {
-        // STR=5 → 25 + 5*25 = 150
-        const critter = makeObj({ getStat: (s: string) => (s === 'STR' ? 5 : 0) })
-        expect(script.get_critter_carry_weight_sfall(critter)).toBe(150)
-    })
-
-    it('get_critter_carry_weight_sfall uses STR=10 → 275', () => {
-        const critter = makeObj({ getStat: (s: string) => (s === 'STR' ? 10 : 0) })
-        expect(script.get_critter_carry_weight_sfall(critter)).toBe(275)
-    })
-
     // ---- 0x8237 get_critter_current_weight_sfall ----
-    it('get_critter_current_weight_sfall returns 0 for null', () => {
-        expect(script.get_critter_current_weight_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_current_weight_sfall returns 0 for empty inventory', () => {
-        const critter = makeObj({ inventory: [] })
-        expect(script.get_critter_current_weight_sfall(critter)).toBe(0)
-    })
-
-    it('get_critter_current_weight_sfall sums item weights from proto.extra.weight', () => {
-        // weight is in tenths of pounds: 50 → 5 lbs, 30 → 3 lbs
-        const critter = makeObj({
-            inventory: [
-                { pro: { extra: { weight: 50 } }, amount: 1 },
-                { pro: { extra: { weight: 30 } }, amount: 2 },
-            ],
-        })
-        // 5 + 3*2 = 5 + 6 = 11
-        expect(script.get_critter_current_weight_sfall(critter)).toBe(11)
-    })
-
-    it('get_critter_current_weight_sfall returns 0 for items without proto weight', () => {
-        const critter = makeObj({
-            inventory: [{ pid: 1, amount: 3 }],
-        })
-        expect(script.get_critter_current_weight_sfall(critter)).toBe(0)
-    })
 })
 
 // ===========================================================================

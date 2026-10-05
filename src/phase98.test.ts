@@ -189,26 +189,6 @@ describe('Phase 98-E — BLK-219: move_to non-finite coordinates guard', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 98-F — sfall opcodes 0x8318–0x831F', () => {
-    // 0x8318 / 0x8319 — get_critter_current_ap_sfall / set_critter_current_ap_sfall
-    describe('AP getters/setters (0x8318, 0x8319)', () => {
-        it('gets current AP', () => {
-            const critter = makeCritter()
-            critter.AP = { combat: 6, move: 2 }
-            expect(script.get_critter_current_ap_sfall(critter)).toBe(6)
-        })
-
-        it('sets current AP', () => {
-            const critter = makeCritter()
-            critter.AP = { combat: 6, move: 2 }
-            script.set_critter_current_ap_sfall(critter, 4)
-            expect(critter.AP.combat).toBe(4)
-        })
-
-        it('returns 0 for non-critter getter/setter', () => {
-            expect(script.get_critter_current_ap_sfall(NULL_OBJ)).toBe(0)
-            expect(() => script.set_critter_current_ap_sfall(NULL_OBJ, 5)).not.toThrow()
-        })
-    })
 
     // 0x831A / 0x831B — get_critter_extra_stat_sfall / set_critter_extra_stat_sfall
     describe('derived stat modifiers (0x831A, 0x831B)', () => {
@@ -235,47 +215,7 @@ describe('Phase 98-F — sfall opcodes 0x8318–0x831F', () => {
         })
     })
 
-    // 0x831C / 0x831D — get_critter_base_ac_sfall / set_critter_base_ac_sfall
-    describe('base AC modifiers (0x831C, 0x831D)', () => {
-        it('gets base AC', () => {
-            const critter = makeCritter({ ac: 15 })
-            expect(script.get_critter_base_ac_sfall(critter)).toBe(15)
-        })
 
-        it('sets base AC', () => {
-            const critter = makeCritter({ ac: 15 })
-            script.set_critter_base_ac_sfall(critter, 22)
-            expect(critter.stats.setBase).toHaveBeenCalledWith('AC', 22)
-        })
-
-        it('returns 0 for non-critter AC', () => {
-            expect(script.get_critter_base_ac_sfall(NULL_OBJ)).toBe(0)
-            expect(() => script.set_critter_base_ac_sfall(NULL_OBJ, 10)).not.toThrow()
-        })
-    })
-
-    // 0x831E / 0x831F — get_critter_gender_sfall / set_critter_gender_sfall
-    describe('gender modifiers (0x831E, 0x831F)', () => {
-        it('gets gender (0=male, 1=female)', () => {
-            const male = makeCritter({ gender: 'male' })
-            const female = makeCritter({ gender: 'female' })
-            expect(script.get_critter_gender_sfall(male)).toBe(0)
-            expect(script.get_critter_gender_sfall(female)).toBe(1)
-        })
-
-        it('sets gender correctly', () => {
-            const critter = makeCritter({ gender: 'male' })
-            script.set_critter_gender_sfall(critter, 1)
-            expect(critter.gender).toBe('female')
-            script.set_critter_gender_sfall(critter, 0)
-            expect(critter.gender).toBe('male')
-        })
-
-        it('returns 0 for non-critter gender', () => {
-            expect(script.get_critter_gender_sfall(NULL_OBJ)).toBe(0)
-            expect(() => script.set_critter_gender_sfall(NULL_OBJ, 1)).not.toThrow()
-        })
-    })
 })
 
 // ---------------------------------------------------------------------------

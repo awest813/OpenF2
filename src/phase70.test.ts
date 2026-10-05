@@ -174,40 +174,6 @@ describe('Phase 70-C — BLK-088: metarule3(106) filter null position guard', ()
 // ===========================================================================
 
 describe('Phase 70-D — BLK-089: num_critters_in_radius() null position guard', () => {
-    it('num_critters_in_radius does not throw when critters have null positions', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origGMap = gs.gMap
-
-        const critterNullPos = makeObj({ type: 'critter', dead: false, position: null })
-        const critterWithPos = makeObj({ type: 'critter', dead: false, position: { x: 1, y: 0 } })
-        ;(gs as any).gMap = {
-            getObjects: (_elev: number) => [critterNullPos, critterWithPos],
-        }
-
-        expect(() => script.num_critters_in_radius(0, 0, 5)).not.toThrow()
-
-        gs.gMap = origGMap
-    })
-
-    it('num_critters_in_radius counts only critters with valid positions', async () => {
-        const gs = (await import('./globalState.js')).default
-        const origGMap = gs.gMap
-
-        // tile 0 = position {x:0, y:0}; radius 3
-        const critterNullPos = makeObj({ type: 'critter', dead: false, position: null })
-        const critterInRange = makeObj({ type: 'critter', dead: false, position: { x: 1, y: 0 } })
-        const critterOutRange = makeObj({ type: 'critter', dead: false, position: { x: 100, y: 100 } })
-        ;(gs as any).gMap = {
-            getObjects: (_elev: number) => [critterNullPos, critterInRange, critterOutRange],
-        }
-
-        const count = script.num_critters_in_radius(0, 0, 3)
-        // null-pos critter is skipped; critterInRange is counted; critterOutRange is not
-        expect(count).toBe(1)
-
-        gs.gMap = origGMap
-    })
-
     it('BLK-089 checklist entry is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find(e => e.id === 'blk_089_num_critters_in_radius_null_position')
         expect(entry).toBeDefined()
@@ -258,64 +224,9 @@ describe('Phase 70-E — BLK-090: updateCritter() null position guard', () => {
 
 describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
     // ---- 0x8250 get_object_art_fid_sfall ----
-    it('get_object_art_fid_sfall returns 0 for a plain game object without frmType/frmPID', () => {
-        const obj = makeObj()
-        expect(script.get_object_art_fid_sfall(obj)).toBe(0)
-    })
-
-    it('get_object_art_fid_sfall returns correct fid when frmType and frmPID are set', () => {
-        const obj = makeObj({ frmType: 1, frmPID: 42 })
-        // (1 << 24) | 42 = 16777258
-        expect(script.get_object_art_fid_sfall(obj)).toBe((1 << 24) | 42)
-    })
-
-    it('get_object_art_fid_sfall returns 0 for null', () => {
-        expect(script.get_object_art_fid_sfall(null)).toBe(0)
-    })
-
-    it('get_object_art_fid_sfall returns 0 for plain number', () => {
-        expect(script.get_object_art_fid_sfall(0 as any)).toBe(0)
-    })
-
     // ---- 0x8251 set_object_art_fid_sfall ----
-    it('set_object_art_fid_sfall updates frmType and frmPID on object', () => {
-        const obj = makeObj()
-        const fid = (2 << 24) | 99 // frmType=2, frmPID=99
-        expect(() => script.set_object_art_fid_sfall(obj, fid)).not.toThrow()
-        expect(obj.frmType).toBe(2)
-        expect(obj.frmPID).toBe(99)
-    })
-
-    it('set_object_art_fid_sfall does not throw for null obj', () => {
-        expect(() => script.set_object_art_fid_sfall(null as any, 42)).not.toThrow()
-    })
-
     // ---- 0x8252 get_item_subtype_sfall ----
     // FO2 canonical mapping: armor=0, container=1, drug=2, weapon=3, ammo=4, misc=5, key=6
-    it('get_item_subtype_sfall returns correct index for weapon', () => {
-        const obj = makeObj({ type: 'item', subtype: 'weapon' })
-        expect(script.get_item_subtype_sfall(obj)).toBe(3)
-    })
-
-    it('get_item_subtype_sfall returns correct index for ammo', () => {
-        const obj = makeObj({ type: 'item', subtype: 'ammo' })
-        expect(script.get_item_subtype_sfall(obj)).toBe(4)
-    })
-
-    it('get_item_subtype_sfall returns correct index for armor', () => {
-        const obj = makeObj({ type: 'item', subtype: 'armor' })
-        expect(script.get_item_subtype_sfall(obj)).toBe(0)
-    })
-
-    it('get_item_subtype_sfall returns -1 for critter', () => {
-        const obj = makeObj({ type: 'critter' })
-        expect(script.get_item_subtype_sfall(obj)).toBe(-1)
-    })
-
-    it('get_item_subtype_sfall returns -1 for null', () => {
-        expect(script.get_item_subtype_sfall(null as any)).toBe(-1)
-    })
-
     // ---- 0x8253 get_combat_target_sfall ----
     it('get_combat_target_sfall returns 0 for critter with no target set', () => {
         const obj = makeObj({ type: 'critter' })
@@ -351,22 +262,6 @@ describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
     })
 
     // ---- 0x8255 combat_is_initialized_sfall ----
-    it('combat_is_initialized_sfall returns 0 when not in combat', async () => {
-        const gs = (await import('./globalState.js')).default
-        const orig = gs.inCombat
-        ;(gs as any).inCombat = false
-        expect(script.combat_is_initialized_sfall()).toBe(0)
-        ;(gs as any).inCombat = orig
-    })
-
-    it('combat_is_initialized_sfall returns 1 when in combat', async () => {
-        const gs = (await import('./globalState.js')).default
-        const orig = gs.inCombat
-        ;(gs as any).inCombat = true
-        expect(script.combat_is_initialized_sfall()).toBe(1)
-        ;(gs as any).inCombat = orig
-    })
-
     // ---- 0x8256 get_attack_type_sfall ----
     it('get_attack_type_sfall returns 0 for any critter (primary slot)', () => {
         const obj = makeObj({ type: 'critter' })
@@ -383,13 +278,6 @@ describe('Phase 70-F — sfall opcodes 0x8250–0x8257', () => {
     })
 
     // ---- 0x8257 get_map_script_idx_sfall ----
-    it('get_map_script_idx_sfall returns -1 when no map is active', () => {
-        expect(script.get_map_script_idx_sfall()).toBe(-1)
-    })
-
-    it('get_map_script_idx_sfall does not throw', () => {
-        expect(() => script.get_map_script_idx_sfall()).not.toThrow()
-    })
 })
 
 // ===========================================================================

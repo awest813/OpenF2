@@ -259,34 +259,6 @@ describe('Phase 81-E — BLK-137: get_critter_skill() non-number guard', () => {
         expect(entry?.status).toBe('implemented')
     })
 
-    it('returns 0 for NaN skill', () => {
-        const obj = makeObj()
-        expect(script.get_critter_skill(obj, NaN)).toBe(0)
-    })
-
-    it('returns 0 for Infinity skill', () => {
-        const obj = makeObj()
-        expect(script.get_critter_skill(obj, Infinity)).toBe(0)
-    })
-
-    it('does not throw for NaN skill', () => {
-        const obj = makeObj()
-        expect(() => script.get_critter_skill(obj, NaN)).not.toThrow()
-    })
-
-    it('does not throw for Infinity skill', () => {
-        const obj = makeObj()
-        expect(() => script.get_critter_skill(obj, Infinity)).not.toThrow()
-    })
-
-    it('returns skill value for valid skill 0 (Small Guns)', () => {
-        const obj = makeObj({ getSkill: (_s: string) => 75 })
-        expect(script.get_critter_skill(obj, 0)).toBe(75)
-    })
-
-    it('does not throw for non-critter', () => {
-        expect(() => script.get_critter_skill(0 as any, 0)).not.toThrow()
-    })
 })
 
 // ===========================================================================
@@ -294,25 +266,6 @@ describe('Phase 81-E — BLK-137: get_critter_skill() non-number guard', () => {
 // ===========================================================================
 
 describe('Phase 81-F-1 — sfall 0x8298: get_critter_stat_sfall2', () => {
-    it('returns 0 for null/non-critter', () => {
-        expect(script.get_critter_stat_sfall2(null as any, 7)).toBe(0)
-        expect(script.get_critter_stat_sfall2(0 as any, 7)).toBe(0)
-    })
-
-    it('does not throw for null', () => {
-        expect(() => script.get_critter_stat_sfall2(null as any, 0)).not.toThrow()
-    })
-
-    it('returns stat for valid critter', () => {
-        const obj = makeObj({
-            getStat: (s: string) => (s === 'Max HP' ? 120 : 5),
-            stats: { getBase: (_s: string) => 120, setBase: vi.fn(), modifyBase: vi.fn() },
-        })
-        // stat 7 = Max HP
-        const result = script.get_critter_stat_sfall2(obj, 7)
-        expect(typeof result).toBe('number')
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_critter_stat_sfall2')
         expect(entry?.status).toBe('implemented')
@@ -349,12 +302,6 @@ describe('Phase 81-F-2 — sfall 0x8299: set_critter_extra_stat_sfall', () => {
 })
 
 describe('Phase 81-F-3 — sfall 0x829A/0x829B: get/set_active_hand_sfall', () => {
-    it('get_active_hand_sfall returns a number 0 or 1', () => {
-        const hand = script.get_active_hand_sfall()
-        expect(typeof hand).toBe('number')
-        expect([0, 1]).toContain(hand)
-    })
-
     it('set_active_hand_sfall(1) then get returns 1', () => {
         if (!globalState.player) {return}
         script.set_active_hand_sfall(1)
@@ -374,12 +321,6 @@ describe('Phase 81-F-3 — sfall 0x829A/0x829B: get/set_active_hand_sfall', () =
         expect(script.get_active_hand_sfall()).toBe(0)
     })
 
-    it('does not throw', () => {
-        expect(() => script.get_active_hand_sfall()).not.toThrow()
-        expect(() => script.set_active_hand_sfall(0)).not.toThrow()
-        expect(() => script.set_active_hand_sfall(1)).not.toThrow()
-    })
-
     it('get is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_active_hand_81')
         expect(entry?.status).toBe('implemented')
@@ -392,51 +333,6 @@ describe('Phase 81-F-3 — sfall 0x829A/0x829B: get/set_active_hand_sfall', () =
 })
 
 describe('Phase 81-F-4 — sfall 0x829C: get_item_type_sfall', () => {
-    it('returns -1 for non-item', () => {
-        expect(script.get_item_type_sfall(0 as any)).toBe(-1)
-        const critter = makeObj({ type: 'critter' })
-        expect(script.get_item_type_sfall(critter)).toBe(-1)
-    })
-
-    it('returns 3 for weapon', () => {
-        const weapon = makeItemObj('weapon')
-        expect(script.get_item_type_sfall(weapon)).toBe(3)
-    })
-
-    it('returns 0 for armor (canonical FO2 mapping)', () => {
-        const armor = makeItemObj('armor')
-        expect(script.get_item_type_sfall(armor)).toBe(0)
-    })
-
-    it('returns 2 for drug (canonical FO2 mapping)', () => {
-        const drug = makeItemObj('drug')
-        expect(script.get_item_type_sfall(drug)).toBe(2)
-    })
-
-    it('returns 4 for ammo', () => {
-        const ammo = makeItemObj('ammo')
-        expect(script.get_item_type_sfall(ammo)).toBe(4)
-    })
-
-    it('returns 5 for misc', () => {
-        const misc = makeItemObj('misc')
-        expect(script.get_item_type_sfall(misc)).toBe(5)
-    })
-
-    it('returns 6 for key', () => {
-        const key = makeItemObj('key')
-        expect(script.get_item_type_sfall(key)).toBe(6)
-    })
-
-    it('returns 1 for container', () => {
-        const cont = makeItemObj('container')
-        expect(script.get_item_type_sfall(cont)).toBe(1)
-    })
-
-    it('does not throw', () => {
-        expect(() => script.get_item_type_sfall(null as any)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_item_type_81')
         expect(entry?.status).toBe('implemented')
@@ -444,42 +340,6 @@ describe('Phase 81-F-4 — sfall 0x829C: get_item_type_sfall', () => {
 })
 
 describe('Phase 81-F-5 — sfall 0x829D/0x829E: get/set_critter_perk_level_sfall', () => {
-    it('returns 0 for critter with no perks', () => {
-        const obj = makeObj({ perkRanks: {} })
-        expect(script.get_critter_perk_level_sfall(obj, 5)).toBe(0)
-    })
-
-    it('returns 0 for non-critter', () => {
-        expect(script.get_critter_perk_level_sfall(0 as any, 5)).toBe(0)
-    })
-
-    it('set then get round-trips correctly', () => {
-        const obj = makeObj({ perkRanks: {} })
-        script.set_critter_perk_sfall(obj, 47, 2) // Educated perk, rank 2
-        expect(script.get_critter_perk_level_sfall(obj, 47)).toBe(2)
-    })
-
-    it('set with 0 removes perk', () => {
-        const obj = makeObj({ perkRanks: { 47: 1 } })
-        script.set_critter_perk_sfall(obj, 47, 0)
-        expect(script.get_critter_perk_level_sfall(obj, 47)).toBe(0)
-    })
-
-    it('negative level is clamped to 0', () => {
-        const obj = makeObj({ perkRanks: { 47: 1 } })
-        script.set_critter_perk_sfall(obj, 47, -5)
-        expect(script.get_critter_perk_level_sfall(obj, 47)).toBe(0)
-    })
-
-    it('does not throw for non-critter set', () => {
-        expect(() => script.set_critter_perk_sfall(0 as any, 47, 1)).not.toThrow()
-    })
-
-    it('does not throw for non-finite level', () => {
-        const obj = makeObj()
-        expect(() => script.set_critter_perk_sfall(obj, 47, NaN)).not.toThrow()
-    })
-
     it('get is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_critter_perk_level_81')
         expect(entry?.status).toBe('implemented')
@@ -492,46 +352,6 @@ describe('Phase 81-F-5 — sfall 0x829D/0x829E: get/set_critter_perk_level_sfall
 })
 
 describe('Phase 81-F-6 — sfall 0x829F: get_distance_sfall', () => {
-    it('returns hex distance between two objects', () => {
-        const obj1 = makeObj({ position: { x: 0, y: 0 } })
-        const obj2 = makeObj({ position: { x: 3, y: 0 } })
-        const dist = script.get_distance_sfall(obj1, obj2)
-        expect(typeof dist).toBe('number')
-        expect(dist).toBeGreaterThanOrEqual(0)
-    })
-
-    it('returns -1 when obj1 has no position', () => {
-        const obj1 = makeObj({ position: null })
-        const obj2 = makeObj({ position: { x: 3, y: 0 } })
-        expect(script.get_distance_sfall(obj1, obj2)).toBe(-1)
-    })
-
-    it('returns -1 when obj2 has no position', () => {
-        const obj1 = makeObj({ position: { x: 0, y: 0 } })
-        const obj2 = makeObj({ position: null })
-        expect(script.get_distance_sfall(obj1, obj2)).toBe(-1)
-    })
-
-    it('returns -1 for null obj1', () => {
-        const obj2 = makeObj({ position: { x: 0, y: 0 } })
-        expect(script.get_distance_sfall(null as any, obj2)).toBe(-1)
-    })
-
-    it('returns -1 for null obj2', () => {
-        const obj1 = makeObj({ position: { x: 0, y: 0 } })
-        expect(script.get_distance_sfall(obj1, null as any)).toBe(-1)
-    })
-
-    it('returns 0 for same position', () => {
-        const obj1 = makeObj({ position: { x: 5, y: 5 } })
-        const obj2 = makeObj({ position: { x: 5, y: 5 } })
-        expect(script.get_distance_sfall(obj1, obj2)).toBe(0)
-    })
-
-    it('does not throw', () => {
-        expect(() => script.get_distance_sfall(null as any, null as any)).not.toThrow()
-    })
-
     it('is registered in the checklist', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_distance_81')
         expect(entry?.status).toBe('implemented')

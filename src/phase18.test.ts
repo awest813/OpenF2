@@ -489,26 +489,6 @@ describe('Phase 18-E — game_time_hour computed from gameTickTime', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 18-H — sfall opcodes 0x8175–0x8177', () => {
-    it('string_compare: equal strings (case-sensitive) returns 0', () => {
-        const script = new Scripting.Script()
-        expect(script.string_compare('hello', 'hello', 1)).toBe(0)
-    })
-
-    it('string_compare: different strings returns non-zero', () => {
-        const script = new Scripting.Script()
-        expect(script.string_compare('hello', 'world', 1)).not.toBe(0)
-    })
-
-    it('string_compare: case-insensitive match returns 0', () => {
-        const script = new Scripting.Script()
-        expect(script.string_compare('Hello', 'hello', 0)).toBe(0)
-    })
-
-    it('string_compare: case-sensitive case mismatch returns non-zero', () => {
-        const script = new Scripting.Script()
-        expect(script.string_compare('Hello', 'hello', 1)).not.toBe(0)
-    })
-
     it('substr: basic extraction', () => {
         const script = new Scripting.Script()
         expect(script.substr('fallout', 0, 4)).toBe('fall')

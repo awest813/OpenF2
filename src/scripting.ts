@@ -35,7 +35,7 @@ import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getMessage, getRandomInt, fixMojibake } from './util.js'
-import { aiPacketFor, isWithinPerception as perceives, playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
+import { aiPacketFor, isWithinPerception as perceives, playerInSneakMode } from './combat/aiPacket.js'
 import { SKILL_NAMES, skillRoll as engineSkillRoll } from './skillUse.js'
 import { adjustPoison, adjustRadiation } from './character/radiationPoison.js'
 import { installSfallFunctions, resetSfallState, sfallSettings } from './sfallFunctions.js'
@@ -51,27 +51,22 @@ import { sfallSprintf } from './sfallPrintf.js'
 import { iniInt, iniString, parseIniSetting } from './iniFiles.js'
 import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
-import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
-import { canCritterCarryMore, getCritterCarryLimitLbs, getCritterInventoryWeightLbs } from './critterInventory.js'
+import { canCritterCarryMore, getCritterInventoryWeightLbs } from './critterInventory.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
-import { fillCarGas, getCarFuel, getCarPark, getCarTrunkMaxSize, setCarFuel, setCarTrunkMaxSize, setHasCar } from './car.js'
+import { fillCarGas, getCarFuel, getCarPark, getCarTrunkMaxSize, setCarTrunkMaxSize, setHasCar } from './car.js'
 import {
     syncReputationFromGvar,
     pullReputationFromGvars,
     GVAR_PLAYER_GOT_CAR,
-    resolveTownIdFromMapName,
-    getTownRepValue,
-    townRepTier,
-    reactionBiasForTier,
 } from './quest/townReputation.js'
 import { signalEndGame } from './endgame.js'
 import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
-import { getSettings, iniOverride, violenceToIni, patchSettings } from './settings.js'
+import { getSettings, iniOverride, violenceToIni } from './settings.js'
 import { itemDropAll } from './mapAging.js'
 import { sfxAmbientName, sfxCharName, sfxInterfaceName, sfxOpenName, sfxSceneryName, sfxWeaponName } from './sfxNames.js'
 import { equipItem, isRealItem, removeItem } from './equipment.js'
@@ -160,11 +155,6 @@ export namespace Scripting {
         }
         loadTilesList()
         return tilesIndexMap?.get(tileName.toLowerCase()) ?? 0
-    }
-
-    function getTileFID(tile: number, elevation: number): number {
-        const index = getTileIndex(tile, elevation, 'floor')
-        return index ? 0x04000000 | index : 0
     }
 
     /** Patch the live map floor name from an FID (script-visible; renderer may lag). */
@@ -545,26 +535,7 @@ export namespace Scripting {
         17: 'Outdoorsman',
     }
 
-    // Ordered damage-type name table shared by the get/set damage-resist/thresh sfall
-    // opcodes (0x82FA–0x82FD).  Index matches the DAMAGE_TYPE_* constants used by
-    // Fallout 2 scripts: 0=Normal, 1=Laser, 2=Fire, 3=Plasma, 4=Electrical, 5=EMP,
-    // 6=Explosion.
-    const damageTypeNames: readonly string[] = [
-        'Normal', 'Laser', 'Fire', 'Plasma', 'Electrical', 'EMP', 'Explosion',
-    ]
-
     type DebugLogShowType = keyof typeof Config.scripting.debugLogShowType
-
-    function stub(name: string, args: IArguments, type?: DebugLogShowType) {
-        if (Config.scripting.debugLogShowType.stub === false || Config.scripting.debugLogShowType[type] === false)
-            {return}
-        let a = ''
-        for (let i = 0; i < args.length; i++)
-            {if (i === args.length - 1) {a += args[i]}
-            else {a += args[i] + ', '}}
-        console.log('STUB: ' + name + ': ' + a)
-        recordStubHit(name, a)
-    }
 
     function log(name: string, args: IArguments, type?: DebugLogShowType) {
         if (Config.scripting.debugLogShowType.log === false || Config.scripting.debugLogShowType[type] === false) {return}
@@ -1040,18 +1011,8 @@ export namespace Scripting {
             }
             return getRandomInt(min, max)
         }
-        abs_value(x: number): number {
-            return Math.abs(x)
-        }
-        string_length(str: string): number {
-            if (typeof str !== 'string') {return 0}
-            return str.length
-        }
         pow(base: number, exp: number): number {
             return Math.pow(base, exp)
-        }
-        obj_is_valid(obj: any): number {
-            return isGameObject(obj) ? 1 : 0
         }
         debug_msg(msg: string) {
             log('debug_msg', arguments)
@@ -1697,13 +1658,6 @@ export namespace Scripting {
             }
             return (obj as Critter).stats.getBase('Poison Level')
         }
-        get_radiation(obj: Obj) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_radiation: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).stats.getBase('Radiation Level')
-        }
         get_pc_stat(pcstat: number) {
             const player = globalState.player
             switch (pcstat) {
@@ -2263,17 +2217,6 @@ export namespace Scripting {
             // substitute a placeholder — callers can check for '' explicitly.
             return (obj as any).name ?? ''
         }
-        // set_name(obj, name) — set the display name of an object or critter (opcode 0x80A8).
-        // Used by character-creation scripts to set the player's name and by NPC
-        // scripts that rename critters dynamically (e.g. to distinguish clones).
-        // BLK-050: Previously absent; now assigns name directly on the game object.
-        set_name(obj: Obj, name: string): void {
-            if (!isGameObject(obj)) {
-                warn('set_name: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).name = String(name ?? '')
-        }
         /** opGetItemType: the item's type, or -1 for anything that is not an item. */
         obj_item_subtype(obj: Obj) {
             if (!isGameObject(obj) || obj.type !== 'item') {return -1}
@@ -2402,20 +2345,6 @@ export namespace Scripting {
         }
         obj_pid(obj: Obj) {
             return isGameObject(obj) ? obj.pid : -1
-        }
-        obj_get_rot(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('obj_get_rot: not a game object: ' + obj)
-                return 0
-            }
-            return obj.orientation
-        }
-        set_obj_rot(obj: Obj, rotation: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_obj_rot: not a game object: ' + obj)
-                return
-            }
-            obj.orientation = ((rotation % 6) + 6) % 6
         }
         /** opObjectOnScreen: on the current level and inside the view. */
         obj_on_screen(obj: Obj) {
@@ -3223,11 +3152,6 @@ export namespace Scripting {
             advanceGameTime(ticks, { heal: false, tickEffects: true, requireOutOfCombat: false })
         }
 
-        // sfall extended API
-        /** get_sfall_global_int / set_sfall_global: by an 8-character name or a number. */
-        get_sfall_global(name: string): number {
-            return getSfallGlobalAny(name)
-        }
         set_sfall_global(name: string | number, value: number): void {
             if (setSfallGlobalAny(name, value) !== 0) {
                 warn('set_sfall_global() - the name of the global variable must consist of 8 characters.', undefined, this)
@@ -3302,19 +3226,6 @@ export namespace Scripting {
             const critter = obj as Critter
             return critter.AP ? critter.AP.combat : 0
         }
-        get_critter_max_hp(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_max_hp: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            return critter.getStat('Max HP')
-        }
-        get_pc_level(): number {
-            const player = globalState.player
-            if (!player) {return 0}
-            return player.level
-        }
 
         // sfall extended opcodes — any-critter stat helpers
         get_critter_base_stat(obj: Obj, stat: number): number {
@@ -3341,27 +3252,6 @@ export namespace Scripting {
             }
             (obj as Critter).stats.setBase(statName, value)
         }
-        in_combat(): number {
-            return globalState.inCombat ? 1 : 0
-        }
-        get_current_town(): number {
-            return currentMapID !== null ? currentMapID : 0
-        }
-        critter_is_dead(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('critter_is_dead: not a game object', undefined, this)
-                return 0
-            }
-            if (obj.type !== 'critter') {
-                warn('critter_is_dead: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const hp = (obj as Critter).getStat('HP')
-            return hp <= 0 ? 1 : 0
-        }
-        get_dialogue_active(): number {
-            return currentDialogueObject !== null ? 1 : 0
-        }
 
         // sfall extended opcodes — kill count helpers (0x8170–0x8171)
         get_critter_kills(killType: number): number {
@@ -3384,55 +3274,6 @@ export namespace Scripting {
             // credit after boss encounters; a broken formula can yield NaN.  Clamp to 0.
             const safeAmount = (typeof amount === 'number' && isFinite(amount)) ? Math.max(0, Math.trunc(amount)) : 0
             globalState.critterKillCounts[killType] = safeAmount
-        }
-
-        // sfall extended opcodes — critter body type (0x8172)
-        get_critter_body_type(obj: Obj): number {
-            // Return the body-type index from the critter's prototype.
-            // 0 = biped, 1 = quadruped, 2 = robotic, 3 = bat, …
-            // Used by combat AI and animation scripts to gate attack modes.
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_body_type: not a critter: ' + obj)
-                return 0
-            }
-            const critter = obj as Critter
-            // bodyType is stored in the critter prototype extra data.
-            if (critter.pro?.extra?.bodyType !== undefined) {return critter.pro.extra.bodyType}
-            return 0
-        }
-
-        // sfall extended opcodes — math floor (0x8173)
-        floor2(x: number): number {
-            // Integer floor — mirrors the sfall floor2() opcode used by drug
-            // duration and formula scripts (distinct from the integer division
-            // already available via the division opcode).
-            return Math.floor(x)
-        }
-
-        // sfall extended opcodes — count objects on map by PID (0x8174)
-        obj_count_by_pid(mapPID: number): number {
-            // Return the number of live objects on the current map whose PID
-            // matches `mapPID`.  Used by scripted encounter clean-up and loot
-            // scripts to check whether all enemies are dead.
-            if (!globalState.gMap) {return 0}
-            let count = 0
-            for (const level of globalState.gMap.objects) {
-                if (!level) {continue}
-                for (const obj of level) {
-                    if (obj.pid === mapPID) {count++}
-                }
-            }
-            return count
-        }
-
-        // sfall extended opcodes — string comparison (0x8175)
-        string_compare(str1: string, str2: string, caseSensitive: number): number {
-            // Returns 0 if the strings are equal, non-zero otherwise.
-            // caseSensitive: 0 = case-insensitive, 1 = case-sensitive.
-            const a = typeof str1 === 'string' ? str1 : String(str1)
-            const b = typeof str2 === 'string' ? str2 : String(str2)
-            if (caseSensitive) {return a === b ? 0 : 1}
-            return a.toLowerCase() === b.toLowerCase() ? 0 : 1
         }
 
         // sfall extended opcodes — substring extraction (0x8176)
@@ -3460,23 +3301,6 @@ export namespace Scripting {
             return typeof performance !== 'undefined' ? Math.floor(performance.now()) : 0
         }
 
-        // sfall extended opcodes — type conversion (0x8190–0x8191)
-        string_to_int(str: any): number {
-            // Parse a string as a base-10 integer.  Mirrors sfall string_to_int().
-            // Returns 0 for non-string inputs or strings that cannot be parsed.
-            // parseInt already handles leading/trailing whitespace, so no trim needed.
-            if (typeof str !== 'string') {return 0}
-            const n = parseInt(str, 10)
-            return Number.isFinite(n) ? n : 0
-        }
-        int_to_string(n: any): string {
-            // Convert a number to its decimal string representation.  Mirrors
-            // the sfall sprintf("%d", n) pattern commonly used for display and logging.
-            // Returns '0' for non-number inputs to match sfall's safe-zero default for
-            // invalid arguments (consistent with how string_to_int returns 0 on error).
-            if (typeof n !== 'number') {return '0'}
-            return Math.trunc(n).toString()
-        }
 
         // sfall extended opcode — C-style single-argument string format (0x8192).
         // sprintf(format, arg) → formatted string.
@@ -3486,15 +3310,6 @@ export namespace Scripting {
         /** sprintf(format, value): sfall's sprintf_lite with one value. */
         sprintf(fmt: any, arg: any): string {
             return sfallSprintf(fmt, [arg])
-        }
-
-        // sfall extended opcode — check whether an object has a script attached (0x8193).
-        // obj_has_script(obj) → 1 if obj has a script, 0 otherwise.
-        // Used by scripts that conditionally call procedures only on scripted objects
-        // to avoid crashing when triggering NPC interactions on unscripted objects.
-        obj_has_script(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            return (obj as any)._script ? 1 : 0
         }
 
         /**
@@ -3608,21 +3423,6 @@ export namespace Scripting {
             weapon.extra.ammoLoaded = Math.max(0, count)
         }
 
-        // sfall extended opcode — tile number under mouse cursor (0x817C)
-        get_mouse_tile_num(): number {
-            // In a browser/VM context the mouse position is not directly available
-            // to scripts running without a live DOM event.  Return -1 to signal
-            // "no tile under cursor" — the same value the original engine returns
-            // when the mouse is outside the map area.
-            return -1
-        }
-
-        // sfall extended opcode — get the display name of any game object (0x817D)
-        get_critter_name(obj: Obj): string {
-            if (!isGameObject(obj)) {return ''}
-            return (obj as any).name ?? ''
-        }
-
         // sfall extended opcode — current game mode bitmask (0x817E).
         // Returns a bitmask encoding the current engine state:
         //   0x01 = combat is active
@@ -3659,39 +3459,6 @@ export namespace Scripting {
         }
         available_global_script_types(): number {
             return AVAILABLE_GLOBAL_SCRIPT_TYPES
-        }
-
-        // sfall extended opcode — get a critter's derived skill value (0x8180).
-        // Mirrors has_skill() but exposed as a dedicated sfall opcode.
-        get_critter_skill(obj: Obj, skill: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_skill: not a critter: ' + obj)
-                return 0
-            }
-            // BLK-137: Guard against non-number skill argument — scripts occasionally
-            // pass null, undefined, or a string for the skill parameter when a lookup
-            // table entry is missing.  The skillNumToName indexing silently returns
-            // undefined for non-integers; we warn explicitly so the issue is traceable.
-            if (typeof skill !== 'number' || !Number.isFinite(skill)) {
-                warn('get_critter_skill: non-number skill (' + skill + ') — returning 0', undefined, this)
-                return 0
-            }
-            const skillName = skillNumToName[skill]
-            if (!skillName) {
-                warn('get_critter_skill: unknown skill number: ' + skill)
-                return 0
-            }
-            // BLK-186: Guard against missing getSkill method — Arroyo NPC objects
-            // created via proto-only initialisation (e.g. summoned guards that use
-            // create_object_sid with a critter PID but no full SkillSet component)
-            // may lack getSkill().  Calling a non-function throws TypeError and halts
-            // the VM.  Fall back to 0 with a warning so the calling script can
-            // continue its logic path without crashing.
-            if (typeof (obj as Critter).getSkill !== 'function') {
-                warn('get_critter_skill: critter has no getSkill() method — returning 0', undefined, this)
-                return 0
-            }
-            return (obj as Critter).getSkill(skillName)
         }
 
         // sfall extended opcode — set a critter's base skill point allocation (0x8181).
@@ -3754,16 +3521,6 @@ export namespace Scripting {
             (obj as Critter).stats.setBase('HP', Math.max(0, hp))
         }
 
-        // sfall extended opcode — get max action points for a critter (0x8185).
-        // Returns the critter's maximum AP derived stat.
-        get_critter_max_ap(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_max_ap: not a critter: ' + obj)
-                return 0
-            }
-            return (obj as Critter).getStat('AP')
-        }
-
         /** opGetTileInDirection: -1 for no tile, a rotation out of range, a zero distance, or off the map. */
         /**
          * opGetTileInDirection (tileGetTileInDirection): step `count` hexes, stopping
@@ -3781,43 +3538,6 @@ export namespace Scripting {
             return toTileNum(hex)
         }
 
-        // sfall extended opcode — get elevation of an object (0x818A).
-        // Returns the current elevation (0-based floor index) that the given
-        // object belongs to.  In the browser build, all visible objects share
-        // the current elevation so we return globalState.currentElevation.
-        get_obj_elevation(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_obj_elevation: not a game object: ' + obj)
-                return 0
-            }
-            return globalState.currentElevation ?? 0
-        }
-
-        // sfall extended opcodes 0x818B–0x818F
-        get_object_art_fid(obj: Obj): number {
-            // Return the object's current art FID (Fallout Resource Image identifier).
-            // Used by appearance and disguise scripts to read what sprite a critter uses.
-            if (!isGameObject(obj)) {
-                warn('get_object_art_fid: not a game object: ' + obj)
-                return 0
-            }
-            // FID encoding: (frmType << 24) | frmPID
-            const frmType = (obj as any).frmType ?? 0
-            const frmPID = (obj as any).frmPID ?? (obj as any).fid ?? 0
-            return (frmType << 24) | (frmPID & 0xffffff)
-        }
-        set_object_art_fid(obj: Obj, fid: number): void {
-            // Set the object's art FID so it renders a different sprite.
-            // Used by disguise and appearance-change scripts.
-            if (!isGameObject(obj)) {
-                warn('set_object_art_fid: not a game object: ' + obj)
-                return
-            }
-            (obj as any).frmType = (fid >> 24) & 0xff
-            ;(obj as any).frmPID = fid & 0xffffff
-            ;(obj as any).fid = fid & 0xffffff
-            log('set_object_art_fid: fid=0x' + fid.toString(16), arguments)
-        }
         get_critter_combat_ap(obj: Obj): number {
             // Return the critter's current action points during combat.
             // Returns 0 outside of combat (critter.AP.combat is the in-combat pool).
@@ -3836,12 +3556,6 @@ export namespace Scripting {
             }
             const critter = obj as Critter
             if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
-        }
-        get_script_return_value(): number {
-            // Return the most recent sfall hook-script return value.
-            // Reads from _sfallHookReturnVal, which is also written by
-            // set_script_return_val_sfall (0x81FD) and set_sfall_return (0x819A).
-            return _sfallHookReturnVal
         }
 
         load_map(map: number | string, startLocation: number) {
@@ -4009,16 +3723,6 @@ export namespace Scripting {
             return 0
         }
 
-        // sfall extended opcode — return the world-map X coordinate (0x819C).
-        get_world_map_x(): number {
-            return globalState.worldPosition ? globalState.worldPosition.x : 0
-        }
-
-        // sfall extended opcode — return the world-map Y coordinate (0x819D).
-        get_world_map_y(): number {
-            return globalState.worldPosition ? globalState.worldPosition.y : 0
-        }
-
         // sfall extended opcode — teleport world-map cursor to (x, y) (0x819E).
         set_world_map_pos(x: number, y: number): void {
             log('set_world_map_pos', arguments)
@@ -4038,39 +3742,6 @@ export namespace Scripting {
         // Partial: returns 1 when no map is loaded (between maps), 0 otherwise.
         in_world_map(): number {
             return !globalState.gMap || !globalState.gMap.name ? 1 : 0
-        }
-
-        // sfall extended opcode — return the character level of a critter (0x81A0).
-        get_critter_level(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_level: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            // `level` is defined on Player; NPCs carry it as a dynamic property.
-            return (obj as any).level ?? 1
-        }
-
-        // sfall extended opcode — override a critter's character level (0x81A1).
-        set_critter_level(obj: Obj, level: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_level: not a critter: ' + obj, undefined, this)
-                return
-            }
-            // `level` is defined on Player; set it as a dynamic property for NPCs.
-            (obj as any).level = Math.max(1, level)
-        }
-
-        // sfall extended opcode — return the weight of an object in lbs (0x81A2).
-        get_object_weight(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_weight: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            // Weight is stored in proto data as weight in lbs * 10 (grams).
-            const pro = (obj as any).pro
-            if (pro?.extra?.weight !== undefined) {return Math.round(pro.extra.weight / 10)}
-            if (pro?.weight !== undefined) {return Math.round(pro.weight / 10)}
-            return 0
         }
 
         // sfall extended opcode — get a string value from the mod's INI configuration (0x81A3).
@@ -4099,202 +3770,9 @@ export namespace Scripting {
             return gameDate(globalState.gameTickTime).day
         }
 
-        // sfall extended opcode — get free movement AP for the current combat turn (0x81A8).
-        // "Free move" AP are bonus movement points that can only be spent on movement,
-        // not attacks.  Returns the critter's current freeMoveAP field; defaults to 0.
-        get_combat_free_move(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_combat_free_move: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).freeMoveAP ?? 0
-        }
-
-        // sfall extended opcode — set free movement AP for the current combat turn (0x81A9).
-        // Clamped to >= 0.  Used by level-scaling and difficulty scripts.
-        set_combat_free_move(obj: Obj, ap: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_combat_free_move: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).freeMoveAP = Math.max(0, typeof ap === 'number' ? ap : 0)
-        }
-
         // Phase 51 — sfall extended opcodes 0x81B6–0x81BD
 
-        // sfall 0x81B6 — get_critter_stat_bonus(obj, stat):
-        // Returns the stat modifier bonus applied to a critter's stat (derived minus base).
-        // Partial: returns 0 for most stats; implemented for HP (Max HP - base HP).
-        get_critter_stat_bonus(obj: Obj, stat: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_stat_bonus: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const statName = statMap[stat]
-            if (!statName) {
-                warn('get_critter_stat_bonus: unknown stat number: ' + stat + ' — returning 0', undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const derived = critter.stats.get(statName)
-            const base = critter.stats.getBase(statName)
-            return derived - base
-        }
-
-        // sfall 0x81B7 — obj_art_name(obj):
-        // Returns the art path/filename of a game object as a string.
-        // Used by scripts that want to check or display an object's sprite name.
-        obj_art_name(obj: Obj): string {
-            if (!isGameObject(obj)) {
-                warn('obj_art_name: not a game object: ' + obj, undefined, this)
-                return ''
-            }
-            return (obj as any).art ?? ''
-        }
-
-        // sfall 0x81B8 — get_item_type_int(item):
-        // Returns the Fallout 2 item subtype as a numeric constant.
-        // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key.
-        // Falls back to obj_item_subtype logic for consistency.
-        get_item_type_int(obj: Obj): number {
-            return this.obj_item_subtype(obj) ?? 0
-        }
-
-        // sfall 0x81B9 — set_pc_stat(pcstat, val):
-        // Sets a player-character stat by index.
-        // Supported: 0=unspent_skill_points, 1=level, 2=experience, 3/4=karma.
-        // Others: warn and no-op.
-        set_pc_stat(pcstat: number, val: number): void {
-            const player = globalState.player
-            if (!player) {
-                warn('set_pc_stat: no player', undefined, this)
-                return
-            }
-            switch (pcstat) {
-                case 0: // PCSTAT_unspent_skill_points
-                    // BLK-195: Guard against null player.skills — Arroyo Elder scripts
-                    // call set_pc_stat(0, points) to assign skill points after awarding
-                    // XP.  When the skills component has not yet been attached to a
-                    // partially-initialised player object, player.skills is null and
-                    // .skillPoints throws TypeError.  Mirror BLK-185 (get_pc_stat guard):
-                    // treat it as a no-op with a warning so the script can continue.
-                    if (!player.skills) {
-                        warn('set_pc_stat(0): player.skills is null — no-op', undefined, this)
-                        return
-                    }
-                    player.skills.skillPoints = Math.max(0, val)
-                    return
-                case 1: // PCSTAT_level
-                    player.level = Math.max(1, val)
-                    return
-                case 2: // PCSTAT_experience
-                    player.xp = Math.max(0, val)
-                    return
-                case 3: // PCSTAT_reputation (maps to GVAR_0)
-                case 4: // PCSTAT_karma — same as reputation in FO2
-                    globalVars[0] = val
-                    return
-                default:
-                    warn('set_pc_stat: unknown pcstat ' + pcstat + ' — no-op', undefined, this)
-            }
-        }
-
-        // sfall 0x81BA — num_critters_in_radius(tile, elev, radius):
-        // Returns the number of critters within `radius` hexes of `tile` at elevation `elev`.
-        // Used by AI and encounter scripts to assess nearby threat density.
-        num_critters_in_radius(tile: number, elev: number, radius: number): number {
-            if (!globalState.gMap) {return 0}
-            const origin = fromTileNum(tile)
-            if (!origin) {return 0}
-            // Use elevation-specific object list so critters on other floors are excluded.
-            const objects = typeof globalState.gMap.getObjects === 'function'
-                ? globalState.gMap.getObjects(elev)
-                : (gameObjects ?? [])
-            let count = 0
-            for (const obj of objects) {
-                if (obj.type !== 'critter') {continue}
-                if ((obj as Critter).dead) {continue}
-                // BLK-089: Guard against null position — critters in inventory or
-                // mid-transition may have no position; skip them instead of crashing.
-                if (!obj.position) {continue}
-                if (hexDistance(origin, obj.position) <= radius) {count++}
-            }
-            return count
-        }
-
-        // sfall 0x81BB — get_object_ai_num(obj):
-        // Returns the AI packet number of a critter.
-        // Used by scripts that need to inspect or override NPC behaviour.
-        get_object_ai_num(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_object_ai_num: not a critter: ' + obj, undefined, this)
-                return -1
-            }
-            return (obj as Critter).aiNum ?? -1
-        }
-
-        // sfall 0x81BC — set_object_ai_num(obj, num):
-        // Sets the AI packet number of a critter (aliases critter_add_trait TRAIT_OBJECT OBJECT_AI_PACKET).
-        set_object_ai_num(obj: Obj, num: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_object_ai_num: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as Critter).aiNum = num
-        }
-
-        // sfall 0x81BD — get_critter_hostile_to_dude(obj):
-        // Returns 1 if the critter is currently hostile to the player, 0 otherwise.
-        // Partial: checks the critter's `hostile` flag.
-        get_critter_hostile_to_dude(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_hostile_to_dude: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).hostile ? 1 : 0
-        }
-
         // Phase 52 — sfall extended opcodes 0x81BE–0x81C5
-
-        // sfall 0x81BE — get_critter_weapon(critter, slot):
-        // Returns the game object equipped in the specified weapon slot of a critter.
-        //   slot 0 = primary hand (rightHand — the main weapon hand)
-        //   slot 1 = secondary hand (leftHand — the off-hand / secondary weapon)
-        // Returns 0 if no weapon is equipped in that slot or the object is not a critter.
-        // Used by combat AI and equipment scripts to inspect what a critter is wielding.
-        get_critter_weapon(obj: Obj, slot: number): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_weapon: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            if (slot === 0) {
-                const w = critter.rightHand
-                return (w && (w as any).pid) ? w : 0
-            } else if (slot === 1) {
-                const w = critter.leftHand
-                return (w && (w as any).pid) ? w : 0
-            }
-            return 0
-        }
-
-        // sfall 0x81BF — critter_inven_size(critter):
-        // Returns the total number of items currently in the critter's inventory.
-        // Returns 0 for non-critters or critters with empty / missing inventory.
-        // Used by scripts that need to check whether a critter is carrying anything.
-        critter_inven_size(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_inven_size: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).inventory?.length ?? 0
-        }
-
-        // sfall 0x81C0 — get_sfall_args_count():
-        // BLK-123 (Phase 78): Returns the number of args in the sfall hook arg buffer.
-        get_sfall_args_count(): number {
-            return _sfallHookArgs.length
-        }
 
         // sfall 0x81C1 — get_sfall_arg_at(idx):
         // BLK-123 (Phase 78): Returns the hook-script arg at the given zero-based index.
@@ -4322,75 +3800,6 @@ export namespace Scripting {
                 return Lightmap.getObjectReceivedLight(obj as Obj)
             }
             return globalState.ambientLightLevel ?? 65536
-        }
-
-        // sfall 0x81C4 — get_critter_team(critter):
-        // Returns the team number of the given critter.  Team numbers control which
-        // factions will attack each other in combat (same team = allied).
-        // Returns 0 for non-critters.
-        get_critter_team(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_team: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).teamNum ?? 0
-        }
-
-        // sfall 0x81C5 — set_critter_team(critter, team):
-        // Sets the team number of the given critter.  Used by faction-switch scripts
-        // (e.g. turning a neutral NPC hostile by moving them to the player-enemy team).
-        set_critter_team(obj: Obj, team: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_team: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as Critter).teamNum = typeof team === 'number' ? team : 0
-        }
-
-        // Phase 53 — sfall 0x81C8 — critter_mod_skill_points(critter, delta):
-        // Add or subtract raw skill points from a critter. Only meaningful for the
-        // player critter — NPCs do not maintain a skill-point pool.
-        critter_mod_skill_points(obj: Obj, delta: number): void {
-            if (!isGameObject(obj)) {
-                warn('critter_mod_skill_points: not a game object', undefined, this)
-                return
-            }
-            if ((obj as any).isPlayer && globalState.player) {
-                globalState.player.skills.skillPoints = Math.max(
-                    0,
-                    (globalState.player.skills.skillPoints || 0) + (typeof delta === 'number' ? delta : 0)
-                )
-            }
-            // NPCs do not have a skill-point pool; silently ignore.
-        }
-
-        // Phase 53 — original 0x81CB — get_combat_target(critter):
-        // Return the current combat target of a critter.
-        // Delegates to the sfall 0x8253 implementation which reads combatTarget.
-        get_combat_target(obj: Obj): Obj | number {
-            return this.get_combat_target_sfall(obj)
-        }
-
-        // Phase 53 — original 0x81CC — set_combat_target(critter, target):
-        // Set a critter's combat target. Delegates to sfall 0x8254.
-        set_combat_target(obj: Obj, target: Obj): void {
-            this.set_combat_target_sfall(obj, target)
-        }
-
-        // Phase 53 — sfall 0x81CD — get_game_time_in_seconds:
-        // Return game time in seconds (gameTickTime / 10).
-        get_game_time_in_seconds(): number {
-            return Math.floor(globalState.gameTickTime / 10)
-        }
-
-        // Phase 53 — sfall 0x81CF — set_light_level_sfall(level, update):
-        // Set the global ambient light level (0–65536).
-        // Updates globalState and refreshes the lightmap baseline via Lightmap.applyAmbientLight().
-        set_light_level_sfall(level: number, _update: number): void {
-            if (typeof level === 'number') {
-                globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
-                Lightmap.applyAmbientLight()
-            }
         }
 
         // Phase 54 / Phase 78 — sfall 0x81D0 — get_game_mode_sfall():
@@ -4439,22 +3848,6 @@ export namespace Scripting {
             return currentMapID !== null ? currentMapID : 0
         }
 
-        // sfall 0x81E1 — get_object_dude_distance(obj):
-        // Return the tile distance (in hexes) from obj to the player character.
-        // Returns -1 if obj is not a game object or the player is unavailable.
-        // Useful for range/proximity checks in AI and encounter scripts.
-        get_object_dude_distance(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_dude_distance: not a game object: ' + obj, undefined, this)
-                return -1
-            }
-            const player = globalState.player
-            if (!player || !obj.position || !player.position) {return -1}
-            const objTile = toTileNum(obj.position)
-            const playerTile = toTileNum(player.position)
-            return this.tile_distance(objTile, playerTile)
-        }
-
         // sfall 0x81E2 — get_critter_attack_mode_sfall(obj):
         // Return the critter's current attack-mode index (0=unarmed, 1=melee, 2=ranged).
         // Reads from attackModeOverride (set by 0x81E3), then falls back to the
@@ -4488,39 +3881,11 @@ export namespace Scripting {
             ;(obj as any).attackModeOverride = (mode >= 0 && mode <= 2) ? mode : 0
         }
 
-        // sfall 0x81E4 — get_map_first_run_sfall():
-        // Return 1 if the current map is being visited for the first time in this
-        // playthrough, 0 otherwise.  Uses the same mapFirstRun flag as map_first_run.
-        get_map_first_run_sfall(): number {
-            return mapFirstRun ? 1 : 0
-        }
-
         // sfall 0x81E5 — get_script_type_sfall():
         // Return the type of the currently executing script (0=map, 1=critter/NPC,
         // 2=item, 3=scenery, 4=door, 5=container).  Browser build: returns 0.
         get_script_type_sfall(): number {
             log('get_script_type_sfall', arguments)
-            return 0
-        }
-
-        // sfall 0x81E6 — get_tile_pid_sfall(tile, elev):
-        // Return the PID of the first non-critter object found at the specified tile
-        // and elevation.  Returns 0 if no object is present.
-        // Useful for scripts that probe what's on the floor before triggering.
-        get_tile_pid_sfall(tile: number, elev: number): number {
-            if (!globalState.gMap) {return 0}
-            const objects = typeof globalState.gMap.getObjects === 'function'
-                ? globalState.gMap.getObjects(elev)
-                : []
-            const tilePos = fromTileNum(tile)
-            if (!tilePos) {return 0}
-            for (const o of objects) {
-                if (!isGameObject(o)) {continue}
-                if (o.type === 'critter') {continue}
-                if (o.position && o.position.x === tilePos.x && o.position.y === tilePos.y) {
-                    return o.pid ?? 0
-                }
-            }
             return 0
         }
 
@@ -4545,53 +3910,6 @@ export namespace Scripting {
         // Phase 57 — sfall extended opcodes 0x81E8–0x81EF
         // -----------------------------------------------------------------------
 
-        // sfall 0x81E8 — get_object_cost_sfall(obj):
-        // Return the base barter/store cost of an item from its proto data.
-        // If a cost override has been set via set_object_cost_sfall, return that
-        // override instead.  Returns 0 for critters and non-game objects.
-        get_object_cost_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_cost_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            const override = (obj as any).extra?.costOverride
-            if (override !== undefined) {return override}
-            const pro = (obj as any).pro
-            if (pro?.extra?.cost !== undefined) {return pro.extra.cost}
-            if (pro?.cost !== undefined) {return pro.cost}
-            return 0
-        }
-
-        // sfall 0x81E9 — set_object_cost_sfall(obj, cost):
-        // Override the barter cost for an object.  Stores the override on obj.extra.costOverride
-        // so subsequent get_object_cost_sfall (proto_data cost field) reads return the override.
-        set_object_cost_sfall(obj: Obj, cost: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_object_cost_sfall: not a game object', undefined, this)
-                return
-            }
-            if (typeof cost !== 'number' || !isFinite(cost)) {
-                warn('set_object_cost_sfall: non-finite cost (' + cost + ') — clamping to 0', undefined, this)
-                cost = 0
-            }
-            if (!(obj as any).extra) {(obj as any).extra = {}}
-            ;(obj as any).extra.costOverride = Math.max(0, Math.floor(cost))
-        }
-
-        // sfall 0x81EA — get_sfall_global_int_sfall(index):
-        // Alias of get_sfall_global_int — return the integer sfall global at the
-        // given numeric index.  Provided as a dedicated opcode for scripts that use
-        // the alt calling convention.
-        get_sfall_global_int_sfall(index: number): number {
-            return this.get_sfall_global_int(index)
-        }
-
-        // sfall 0x81EB — set_sfall_global_int_sfall(index, value):
-        // Alias of set_sfall_global_int.
-        set_sfall_global_int_sfall(index: number, value: number): void {
-            this.set_sfall_global_int(index, value)
-        }
-
         // sfall 0x81EC — get_combat_difficulty_sfall():
         // Return the current combat difficulty as an integer:
         //   0 = Easy, 1 = Normal (default), 2 = Hard.
@@ -4600,20 +3918,6 @@ export namespace Scripting {
         get_combat_difficulty_sfall(): number {
             log('get_combat_difficulty_sfall', arguments)
             return globalState.combatDifficulty
-        }
-
-        // sfall 0x81ED — game_in_combat_sfall():
-        // Return 1 if the engine is currently in turn-based combat, 0 otherwise.
-        // Equivalent to checking global_var(GVAR_IN_COMBAT) in vanilla scripts.
-        game_in_combat_sfall(): number {
-            return globalState.inCombat ? 1 : 0
-        }
-
-        // sfall 0x81EE — get_tile_fid_sfall(tile, elev):
-        // Return the FID (Frame ID) of the floor tile at the given tile/elevation.
-        // Browser build: partial — no tile-FID registry; returns 0.
-        get_tile_fid_sfall(tile: number, elev: number): number {
-            return getTileFID(tile, elev)
         }
 
         // sfall 0x81EF — set_tile_fid_sfall(tile, elev, fid):
@@ -4626,97 +3930,6 @@ export namespace Scripting {
         // -----------------------------------------------------------------------
         // Phase 58 — sfall extended opcodes 0x81F0–0x81F7
         // -----------------------------------------------------------------------
-
-        // sfall 0x81F0 — get_critter_xp_sfall(obj):
-        // Return the XP value of a critter from its proto data.  Used by loot/reward
-        // scripts that want to award a custom XP amount.  Returns 0 for non-critters.
-        get_critter_xp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_xp_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).pro?.extra?.XPValue ?? 0
-        }
-
-        // sfall 0x81F1 — get_object_sid_sfall(obj):
-        // Return the script SID (Script ID) associated with a game object.
-        // Returns 0 if the object has no script.
-        get_object_sid_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_sid_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).script ?? 0
-        }
-
-        // sfall 0x81F2 — get_game_mode_ex_sfall():
-        // Extended game mode bitfield (superset of get_game_mode).
-        // Browser build: alias of get_game_mode_sfall — returns 0 (field mode).
-        get_game_mode_ex_sfall(): number {
-            return this.get_game_mode_sfall()
-        }
-
-        // sfall 0x81F3 — get_object_pid_sfall(obj):
-        // Return the prototype ID (PID) of a game object.
-        // Equivalent to obj_pid(obj) (0x80D0) but exposed as a dedicated sfall opcode.
-        get_object_pid_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_pid_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return obj.pid ?? 0
-        }
-
-        // sfall 0x81F4 — get_critter_kill_type_sfall(obj):
-        // Return the kill-type index of a critter (used by get_critter_kills to
-        // attribute kill-counts per type).  Returns the proto's killType field.
-        get_critter_kill_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_kill_type_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).pro?.extra?.killType ?? 0
-        }
-
-        // sfall 0x81F5 — get_tile_at_sfall(x, y):
-        // Convert a hex-grid (x, y) coordinate pair to a Fallout 2 tile number.
-        // The inverse of fromTileNum — equivalent to toTileNum({x, y}).
-        get_tile_at_sfall(x: number, y: number): number {
-            if (typeof x !== 'number' || typeof y !== 'number') {
-                warn('get_tile_at_sfall: non-numeric coordinates', undefined, this)
-                return 0
-            }
-            return toTileNum({ x, y })
-        }
-
-        // sfall 0x81F6 — get_object_type_sfall(obj):
-        // Return the object type as an integer:
-        //   0 = item, 1 = critter, 2 = scenery, 3 = wall, 4 = tile, 5 = misc.
-        // Browser build: maps obj.type string to the Fallout 2 numeric index.
-        get_object_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_type_sfall: not a game object: ' + obj, undefined, this)
-                return 5
-            }
-            const typeMap: { [t: string]: number } = {
-                item: 0, critter: 1, scenery: 2, wall: 3, tile: 4, misc: 5,
-            }
-            return typeMap[obj.type] ?? 5
-        }
-
-        // sfall 0x81F7 — critter_at_sfall(tile, elev):
-        // Return the first non-player critter found at the given tile/elevation, or
-        // 0 if no critter is present.  Useful for ambush-trigger and trap scripts.
-        critter_at_sfall(tile: number, elev: number): Obj | number {
-            const pos = fromTileNum(tile)
-            const objects = globalState.gMap?.getObjects(elev) ?? []
-            for (const o of objects) {
-                if (!isGameObject(o) || o.type !== 'critter') {continue}
-                if (!o.position) {continue}
-                if (o.position.x === pos.x && o.position.y === pos.y) {return o}
-            }
-            return 0
-        }
 
         // -----------------------------------------------------------------------
         // Phase 59 — sfall extended opcodes 0x81F8–0x81FF
@@ -4753,176 +3966,9 @@ export namespace Scripting {
             critter.stats.setBase('Max HP', Math.max(1, typeof hp === 'number' ? hp : 0))
         }
 
-        // sfall 0x81FA — get_total_kills_sfall():
-        // Return the total number of critters killed across all kill-types.
-        // Sums the critterKillCounts globalState object.
-        get_total_kills_sfall(): number {
-            const counts = globalState.critterKillCounts
-            if (!counts) {return 0}
-            return Object.values(counts).reduce((sum: number, n: any) => sum + (n as number), 0)
-        }
-
-        // sfall 0x81FB — get_critter_extra_data_sfall(obj, field):
-        // Return a field from the critter's proto extra data.
-        // Partial: returns 0 for unknown fields.
-        get_critter_extra_data_sfall(obj: Obj, field: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_extra_data_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const extra = (obj as any).pro?.extra
-            if (!extra) {return 0}
-            // Map common field indices to proto.extra properties
-            switch (field) {
-                case 0: return extra.age ?? 0
-                case 1: return extra.gender ?? 0
-                case 2: return extra.killType ?? 0
-                case 3: return extra.XPValue ?? 0
-                case 4: return extra.AI ?? 0
-                default: return 0
-            }
-        }
-
-        // sfall 0x81FC — get_script_return_val_sfall():
-        // BLK-123 (Phase 78): Return the hook return value from the module-level buffer.
-        get_script_return_val_sfall(): number {
-            return _sfallHookReturnVal
-        }
-
-        // sfall 0x81FD — set_script_return_val_sfall(val):
-        // BLK-123 (Phase 78): Alias of set_sfall_return — store into module-level buffer.
-        set_script_return_val_sfall(val: number): void {
-            _sfallHookReturnVal = typeof val === 'number' ? val : 0
-        }
-
-        // sfall 0x81FE — get_active_map_id_sfall():
-        // Return the map ID of the currently active map.
-        // Alias of get_current_map_id_sfall() — provides an alternate call convention.
-        get_active_map_id_sfall(): number {
-            return this.get_current_map_id_sfall()
-        }
-
-        // sfall 0x81FF — get_critter_range_sfall(obj):
-        // Return the maximum attack range of a critter's currently equipped weapon.
-        // Fallback to 1 (melee) when no weapon or weapon data is available.
-        get_critter_range_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_range_sfall: not a critter: ' + obj, undefined, this)
-                return 1
-            }
-            const critter = obj as Critter
-            const weapon = critter.equippedWeapon?.weapon
-            if (!weapon) {return 1}
-            // maxRange1 is the primary-mode range; weapon.weapon is the raw WeaponObj.
-            return (weapon.weapon as any)?.pro?.extra?.maxRange1 ?? 1
-        }
-
         // -----------------------------------------------------------------------
         // Phase 60 — sfall extended opcodes 0x8200–0x8207
         // -----------------------------------------------------------------------
-
-        // sfall 0x8200 — get_critter_current_hp_sfall(obj):
-        // Return the critter's current HP.  Alias of critter_hp() via sfall convention.
-        get_critter_current_hp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_current_hp_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('HP') ?? 0
-        }
-
-        // sfall 0x8201 — get_critter_level_sfall2(obj):
-        // Return the critter's current level.  Used by level-scaling and encounter scripts.
-        // The name suffix '2' avoids collision with the existing get_critter_level alias.
-        get_critter_level_sfall2(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_level_sfall2: not a critter: ' + obj, undefined, this)
-                return 1
-            }
-            return (obj as any).level ?? 1
-        }
-
-        // sfall 0x8202 — get_num_nearby_critters_sfall(obj, radius, team):
-        // Return the number of living critters within radius hexes of obj that belong
-        // to the given team.  Pass -1 for team to count all critters regardless of team.
-        get_num_nearby_critters_sfall(obj: Obj, radius: number, team: number): number {
-            if (!isGameObject(obj)) {
-                warn('get_num_nearby_critters_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            if (!obj.position) {return 0}
-            const elev = globalState.currentElevation ?? 0
-            const objects = globalState.gMap?.getObjects(elev) ?? []
-            let count = 0
-            for (const o of objects) {
-                if (!isGameObject(o) || o.type !== 'critter') {continue}
-                if ((o as Critter).dead) {continue}
-                if (!o.position) {continue}
-                if (team !== -1 && (o as Critter).teamNum !== team) {continue}
-                if (hexDistance(obj.position, o.position) <= radius) {count++}
-            }
-            return count
-        }
-
-        // sfall 0x8203 — is_critter_hostile_sfall(obj):
-        // Return 1 if the critter is currently hostile to the player, 0 otherwise.
-        is_critter_hostile_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('is_critter_hostile_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).hostile ? 1 : 0
-        }
-
-        // sfall 0x8204 — set_critter_hostile_sfall(obj, hostile):
-        // Set the hostile flag on a critter.
-        set_critter_hostile_sfall(obj: Obj, hostile: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_hostile_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as Critter).hostile = hostile !== 0
-        }
-
-        // sfall 0x8205 — get_inven_slot_sfall(critter, slot):
-        // Return the item in the given inventory slot (0=left, 1=right, 2=armor).
-        // Returns 0 if the slot is empty or the argument is not a critter.
-        get_inven_slot_sfall(obj: Obj, slot: number): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_inven_slot_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            switch (slot) {
-                case 0: return critter.leftHand ?? 0
-                case 1: return critter.rightHand ?? 0
-                case 2: return critter.equippedArmor ?? 0
-                default:
-                    warn('get_inven_slot_sfall: unknown slot ' + slot, undefined, this)
-                    return 0
-            }
-        }
-
-        // sfall 0x8206 — get_critter_body_type_sfall(obj):
-        // Return the critter body type: 0=biped, 1=quadruped, 2=robotic.
-        // Reads pro.extra.bodyType if available; defaults to 0 (biped).
-        get_critter_body_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_body_type_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).pro?.extra?.bodyType ?? 0
-        }
-
-        // sfall 0x8207 — get_flags_sfall(obj):
-        // Return the raw Fallout 2 flags bitmask for a game object.
-        get_flags_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_flags_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).flags ?? 0
-        }
 
         // -----------------------------------------------------------------------
         // Phase 61 — sfall extended opcodes 0x8208–0x820F
@@ -4941,193 +3987,13 @@ export namespace Scripting {
             return traits && traits.has(traitId) ? 1 : 0
         }
 
-        // sfall 0x8209 — set_critter_trait_sfall(obj, traitId, value):
-        // Add or remove a trait from a critter's charTraits set.
-        set_critter_trait_sfall(obj: Obj, traitId: number, value: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_trait_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            if (!critter.charTraits) {critter.charTraits = new Set()}
-            if (value) {critter.charTraits.add(traitId)}
-            else {critter.charTraits.delete(traitId)}
-        }
-
-        // sfall 0x820A — get_critter_race_sfall(obj):
-        // Return the critter's race index from proto.extra.race.
-        // 0=human, 1=ghoul, 2=super mutant, 3=ghoul (special), …
-        // Defaults to 0 (human) when no race is set.
-        get_critter_race_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_race_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).pro?.extra?.race ?? 0
-        }
-
-        // sfall 0x820B — obj_has_trait_sfall(obj, traitId):
-        // Return 1 if a critter has the given trait; 0 otherwise.
-        // Alias of get_critter_trait_sfall() with a more script-friendly name.
-        obj_has_trait_sfall(obj: Obj, traitId: number): number {
-            return this.get_critter_trait_sfall(obj, traitId)
-        }
-
-        // sfall 0x820C — get_critter_move_ap_sfall(obj):
-        // Return the critter's current available move AP.
-        // Returns 0 when not in combat or AP not initialized.
-        get_critter_move_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_move_ap_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).AP?.getAvailableMoveAP() ?? 0
-        }
-
-        // sfall 0x820D — get_critter_combat_ap_sfall(obj):
-        // Return the critter's current available combat AP.
-        // Returns 0 when not in combat or AP not initialized.
-        get_critter_combat_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_combat_ap_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).AP?.getAvailableCombatAP() ?? 0
-        }
-
-        // sfall 0x820E — critter_knockout_sfall(obj):
-        // Return 1 if the critter is currently knocked out (unconscious), else 0.
-        critter_knockout_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_knockout_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).knockedOut ? 1 : 0
-        }
-
-        // sfall 0x820F — get_map_script_id_sfall():
-        // Return the script ID (SID) of the current map's map script.
-        // Browser build: returns the current map's script ID from the map object,
-        // or 0 if no map script is loaded.
-        get_map_script_id_sfall(): number {
-            return (globalState.gMap as any)?.mapObj?.scriptID ?? 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 62 — sfall extended opcodes 0x8210–0x8217
         // -----------------------------------------------------------------------
 
-        // sfall 0x8210 — critter_is_fleeing_sfall(obj):
-        // Return 1 if the critter is currently fleeing (low-HP flight behaviour),
-        // else 0.  Reads the isFleeing flag set by the AI flee code path.
-        critter_is_fleeing_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_is_fleeing_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).isFleeing ? 1 : 0
-        }
-
-        // sfall 0x8211 — get_perk_name_sfall(perkId):
-        // Return the localised display name of a perk by its numeric ID.
-        // Reads from PERK_MAP in character/perks.ts (the same table used by the
-        // character-screen perk picker).  Returns '' for unknown perk IDs.
-        get_perk_name_sfall(perkId: number): string {
-            if (typeof perkId !== 'number' || !isFinite(perkId)) {return ''}
-            return PERK_MAP.get(perkId)?.name ?? ''
-        }
-
-        // sfall 0x8212 — get_critter_perk_sfall(critter, perkId):
-        // Return the rank of a perk possessed by a critter (0 if not possessed).
-        // Reads from critter.perkRanks which is updated by critter_add_trait PERK calls.
-        get_critter_perk_sfall(obj: Obj, perkId: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_perk_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).perkRanks?.[perkId] ?? 0
-        }
-
-        // sfall 0x8213 — obj_is_open_sfall(obj):
-        // Return 1 if the object (door/container) is currently in the open state,
-        // else 0.  Reads the open flag on the object.
-        obj_is_open_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('obj_is_open_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).open === true ? 1 : 0
-        }
-
-        // sfall 0x8214 — get_world_map_x_sfall():
-        // Return the player's current world-map tile x-coordinate.
-        // Returns -1 when the player is not on the world map (inside a local map).
-        get_world_map_x_sfall(): number {
-            return globalState.worldPosition?.x ?? -1
-        }
-
-        // sfall 0x8215 — get_world_map_y_sfall():
-        // Return the player's current world-map tile y-coordinate.
-        // Returns -1 when the player is not on the world map.
-        get_world_map_y_sfall(): number {
-            return globalState.worldPosition?.y ?? -1
-        }
-
-        // sfall 0x8216 — set_world_map_pos_sfall(x, y):
-        // Update the player's stored world-map position.
-        // Used by travel and teleport scripts to reposition the player.
-        // Only takes effect when the player is already on the world map.
-        set_world_map_pos_sfall(x: number, y: number): void {
-            if (globalState.worldPosition !== undefined) {
-                globalState.worldPosition = { x, y }
-            }
-        }
-
-        // sfall 0x8217 — get_object_weight_sfall(obj):
-        // Return the weight of an object in pounds from its prototype data.
-        // Returns 0 for non-item objects or when prototype data is unavailable.
-        get_object_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_weight_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).pro?.extra?.weight ?? 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 63 — sfall extended opcodes 0x8218–0x821F
         // -----------------------------------------------------------------------
-
-        // sfall 0x8218 — get_year_sfall():
-        // Return the current in-game year (2241 at game start).
-        // From the engine calendar (gameTimeGetDate).
-        get_year_sfall(): number {
-            return gameDate(globalState.gameTickTime).year
-        }
-
-        // sfall 0x8219 — get_month_sfall():
-        // Return the current in-game month (1–12).
-        // From the engine calendar (gameTimeGetDate).
-        get_month_sfall(): number {
-            return gameDate(globalState.gameTickTime).month
-        }
-
-        // sfall 0x821A — get_day_sfall():
-        // Return the current in-game day of the month (1–30).
-        get_day_sfall(): number {
-            return gameDate(globalState.gameTickTime).day
-        }
-
-        // sfall 0x821B — get_time_sfall():
-        // Return the current in-game time in minutes since midnight (0–1439).
-        // This matches Fallout 2's time() script opcode which returns HHMM as number.
-        get_time_sfall(): number {
-            const totalSecs = globalState.gameTickTime / 10
-            const secsToday = Math.floor(totalSecs) % 86400
-            const hour = Math.floor(secsToday / 3600)
-            const minute = Math.floor((secsToday % 3600) / 60)
-            return hour * 100 + minute
-        }
 
         // sfall 0x821C — get_critter_kill_type_sfall(obj):
         // Return the kill-type constant for a critter (used for XP and kill counts).
@@ -5136,252 +4002,17 @@ export namespace Scripting {
         // Note: this method is already defined in Phase 58 at 0x81F4; the 0x821C
         // opcode entry in vm_bridge.ts is a second binding to the same function.
 
-        // sfall 0x821D — get_npc_pids_sfall():
-        // Return the number of active NPCs in the player's party.
-        // In sfall this returns a special array object; the browser build
-        // returns the count as a reasonable proxy.
-        get_npc_pids_sfall(): number {
-            return globalState.gParty?.getPartyMembers().length ?? 0
-        }
-
-        // sfall 0x821E — get_proto_num_sfall(obj):
-        // Return the prototype number (PID) of an object.
-        // Alias of obj_pid() exposed under the sfall opcode convention.
-        get_proto_num_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            return (obj as any).pid ?? 0
-        }
-
-        // sfall 0x821F — mark_area_known_sfall(areaID, markState):
-        // Mark or unmark a world-map location as known.
-        // markState: 0 = hide, 1 = reveal.
-        // Delegates to globalState.markAreaKnown if registered by the world-map system.
-        mark_area_known_sfall(areaID: number, markState: number): void {
-            if (typeof globalState.markAreaKnown === 'function') {
-                globalState.markAreaKnown(areaID, markState)
-            }
-        }
-
         // -----------------------------------------------------------------------
         // Phase 64 — sfall extended opcodes 0x8220–0x8227
         // -----------------------------------------------------------------------
-
-        // sfall 0x8220 — get_cursor_mode_sfall():
-        // BLK-126 (Phase 79): Return the current cursor mode from globalState.sfallCursorMode.
-        get_cursor_mode_sfall(): number {
-            return globalState.sfallCursorMode ?? 0
-        }
-
-        // sfall 0x8221 — set_cursor_mode_sfall(mode):
-        // BLK-126 (Phase 79): Store cursor mode into globalState.sfallCursorMode.
-        set_cursor_mode_sfall(mode: number): void {
-            globalState.sfallCursorMode = typeof mode === 'number' && isFinite(mode) ? Math.round(mode) : 0
-        }
-
-        // sfall 0x8222 — set_flags_sfall(obj, flags):
-        // Set the extended flags word on an object.
-        // BLK-070: Companion to get_flags_sfall() (Phase 61 0x8207); allows scripts
-        // to persistently modify object flags (used by combat AI and item-state scripts).
-        // Writes directly to obj.flags to match get_flags_sfall's read location.
-        set_flags_sfall(obj: Obj, flags: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_flags_sfall: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).flags = flags
-        }
-
-        // sfall 0x8223 — critter_skill_level_sfall(obj, skillId):
-        // Return the effective (modified) skill value for a critter.
-        // Reads the skill via getSkill which applies tag-bonuses and SPECIAL modifiers.
-        critter_skill_level_sfall(obj: Obj, skillId: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_skill_level_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const skillName = skillNumToName[skillId]
-            if (!skillName) {
-                warn('critter_skill_level_sfall: unknown skill id ' + skillId, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getSkill(skillName) ?? 0
-        }
-
-        // sfall 0x8224 — get_active_weapon_sfall(obj):
-        // Return the object currently wielded in the critter's active hand.
-        // Returns 0 when no weapon is equipped.
-        get_active_weapon_sfall(obj: Obj): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_active_weapon_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const activeHand = (critter as any).activeHand ?? 0
-            const weapon = activeHand === 1
-                ? ((critter as any).leftHand ?? (critter as any).rightHand)
-                : ((critter as any).rightHand ?? (critter as any).leftHand)
-            return weapon ?? 0
-        }
-
-        // sfall 0x8225 — get_inven_ap_cost_sfall(obj, item):
-        // Return the AP cost to use an item from inventory on a target.
-        // Reads APCost1 from the item's weapon proto data when applicable.
-        get_inven_ap_cost_sfall(obj: Obj, item: Obj): number {
-            if (!isGameObject(item)) {return 0}
-            const itemObj = item as any
-            // Check weapon AP cost
-            if (itemObj.weapon && typeof itemObj.weapon.getAPCost === 'function') {
-                return itemObj.weapon.getAPCost(1)
-            }
-            // Fall back to proto data
-            if (itemObj.pro?.extra?.APCost1 !== undefined) {
-                return itemObj.pro.extra.APCost1
-            }
-            // Default AP cost for unarmed/unknown
-            return 4
-        }
-
-        // sfall 0x8226 — obj_can_see_tile_sfall(obj, tileNum):
-        // Return 1 if the critter can see the given tile (LOS check).
-        // Browser build: returns 1 when distance is ≤ perception×5 (simplified LOS).
-        obj_can_see_tile_sfall(obj: Obj, tileNum: number): number {
-            if (!isGameObject(obj) || !obj.position) {return 0}
-            const dest = fromTileNum(tileNum)
-            if (!dest) {return 0}
-            const dist = hexDistance(obj.position, dest)
-            const per = isGameObject(obj) && obj.type === 'critter'
-                ? (obj as Critter).getStat('PER')
-                : 5
-            return dist <= per * 5 ? 1 : 0
-        }
-
-        // sfall 0x8227 — get_map_enter_position_sfall(type):
-        // Return a map-entry position value.
-        // type=0: tile number, type=1: elevation, type=2: rotation
-        // Returns the stored entry position set by the map loader, or -1
-        // when no entry position has been recorded.
-        get_map_enter_position_sfall(type: number): number {
-            const entryPos = (globalState as any)._mapEntryPosition
-            if (!entryPos) {return -1}
-            if (type === 0) {return entryPos.tile}
-            if (type === 1) {return entryPos.elevation}
-            if (type === 2) {return entryPos.rotation}
-            return -1
-        }
 
         // -----------------------------------------------------------------------
         // Phase 65 — sfall extended opcodes 0x8228–0x822F
         // -----------------------------------------------------------------------
 
-        // sfall 0x8228 — get_critter_name_sfall(obj):
-        // Return the display name of a critter.  Alias of get_critter_name().
-        get_critter_name_sfall(obj: Obj): string {
-            if (!isGameObject(obj)) {return ''}
-            return (obj as any).name ?? ''
-        }
-
-        // sfall 0x8229 — get_car_fuel_amount_sfall():
-        // Return the current fuel level of the player's car (Highwayman).
-        // Car fuel is stored in globalState.carFuel (BLK-071: persisted in save v18+).
-        get_car_fuel_amount_sfall(): number {
-            return globalState.carFuel ?? 0
-        }
-
-        // sfall 0x822A — set_car_fuel_amount_sfall(amount):
-        // Set the current fuel level of the player's car.
-        // Clamps to range [0, 80000] (FO2 maximum fuel capacity).
-        set_car_fuel_amount_sfall(amount: number): void {
-            setCarFuel(amount)
-        }
-
-        // sfall 0x822B — get_critter_ai_packet_sfall(obj):
-        // Return the AI packet index for a critter.
-        // Reads from critter.aiPacket or proto.extra.aiPacket.
-        get_critter_ai_packet_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return -1}
-            return (obj as any).aiPacket ?? (obj as any).pro?.extra?.aiPacket ?? 0
-        }
-
-        // sfall 0x822C — set_critter_ai_packet_sfall(obj, packetId):
-        // Set the AI packet index for a critter.
-        // Used by scripts to switch NPC behaviour patterns dynamically.
-        set_critter_ai_packet_sfall(obj: Obj, packetId: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_ai_packet_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).aiPacket = packetId
-        }
-
-        // sfall 0x822D — obj_under_cursor_sfall():
-        // BLK-127 (Phase 79): Return the game object under the cursor from globalState.objUnderCursor.
-        // Updated by renderer hover detection; returns 0 when no object is under the cursor.
-        obj_under_cursor_sfall(): Obj | 0 {
-            return globalState.objUnderCursor ?? 0
-        }
-
-        // sfall 0x822E — get_attack_weapon_sfall(obj, attackType):
-        // Return the weapon used by a critter for a given attack type.
-        // attackType: 0=rightHand (primary), 1=leftHand (secondary).
-        // Returns 0 when no weapon is equipped or the attack type is out of range.
-        get_attack_weapon_sfall(obj: Obj, attackType: number): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const critter = obj as Critter
-            if (attackType === 0) {return (critter as any).rightHand ?? 0}
-            if (attackType === 1) {return (critter as any).leftHand ?? 0}
-            return 0
-        }
-
-        // sfall 0x822F — get_tile_pid_at_sfall(tileNum, elevation):
-        // Return the PID of the scenery object on a tile at the given elevation.
-        // Returns 0 when no scenery is found (simplified; does not iterate all objects).
-        get_tile_pid_at_sfall(tileNum: number, elevation: number): number {
-            if (!globalState.gMap) {return 0}
-            const tilePos = fromTileNum(tileNum)
-            if (!tilePos) {return 0}
-            const objects = globalState.gMap.getObjects ? globalState.gMap.getObjects(elevation) : []
-            for (const obj of objects) {
-                if (obj.position &&
-                    obj.position.x === tilePos.x &&
-                    obj.position.y === tilePos.y) {
-                    return (obj as any).pid ?? 0
-                }
-            }
-            return 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 66 — sfall extended opcodes 0x8230–0x8237
         // -----------------------------------------------------------------------
-
-        // sfall 0x8230 — get_object_name_sfall(obj):
-        // Return the display name of any game object (critter, item, scenery, …).
-        // Falls through to the vanilla obj_name / critter name path.
-        // Returns '' when obj is not a valid game object or has no name.
-        get_object_name_sfall(obj: Obj): string {
-            if (!isGameObject(obj)) {return ''}
-            return (obj as any).name ?? ''
-        }
-
-        // sfall 0x8231 — get_critter_gender_sfall(obj):
-        // Return the gender of a critter (0 = male, 1 = female).
-        // Uses the critter's .gender property when available; defaults to 0 (male).
-        get_critter_gender_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_gender_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const gender: string | undefined = (obj as any).gender
-            return gender === 'female' ? 1 : 0
-        }
-
-        // sfall 0x8232 — get_combat_round_sfall():
-        // Return the current combat round number (1-based).
-        // Returns 0 when not in combat.
-        get_combat_round_sfall(): number {
-            if (!globalState.inCombat || !globalState.combat) {return 0}
-            return (globalState.combat as any).round ?? 0
-        }
 
         // sfall 0x8233 — get_critter_action_points_sfall(obj):
         // Return a critter's current action points during combat (alias of
@@ -5411,187 +4042,13 @@ export namespace Scripting {
             if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
         }
 
-        // sfall 0x8235 — get_critter_max_ap_sfall(obj):
-        // Return a critter's maximum action points per turn.
-        // Derived from Agility: max_ap = 5 + floor(AGI / 2).
-        get_critter_max_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_max_ap_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
-            return Math.max(1, 5 + Math.floor(agi / 2))
-        }
-
-        // sfall 0x8236 — get_critter_carry_weight_sfall(obj):
-        // Return a critter's carry-weight capacity in pounds.
-        // Derived from Strength: carry_weight = 25 + ST * 25.
-        get_critter_carry_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_carry_weight_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const str = typeof critter.getStat === 'function' ? (critter.getStat('STR') ?? 5) : 5
-            return 25 + str * 25
-        }
-
-        // sfall 0x8237 — get_critter_current_weight_sfall(obj):
-        // Return the total weight currently carried by a critter in pounds.
-        // Derived from proto extra.weight (tenths of a pound → pounds).
-        get_critter_current_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_current_weight_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            if (!Array.isArray(critter.inventory)) {return 0}
-            let total = 0
-            for (const item of critter.inventory) {
-                const w: number = (item as any).pro?.extra?.weight ?? 0
-                const amt: number = (item as any).amount ?? 1
-                total += Math.floor(w / 10) * amt
-            }
-            return total
-        }
-
         // -----------------------------------------------------------------------
         // Phase 67 — sfall extended opcodes 0x8238–0x823F
         // -----------------------------------------------------------------------
 
-        // sfall 0x8238 — get_critter_radiation_sfall(obj):
-        // Return the critter's current radiation level.  Alias of get_radiation().
-        get_critter_radiation_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_radiation_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).stats.getBase('Radiation Level') ?? 0
-        }
-
-        // sfall 0x8239 — set_critter_radiation_sfall(obj, val):
-        // Set the critter's radiation level to the given absolute value.
-        // Unlike radiation_add/radiation_dec which adjust relatively, this sets
-        // it directly.  Clamps to [0, 1000].
-        set_critter_radiation_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_radiation_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const clamped = Math.max(0, Math.min(1000, Math.floor(val)))
-            const critter = obj as Critter
-            const current = critter.stats.getBase('Radiation Level') ?? 0
-            critter.stats.modifyBase('Radiation Level', clamped - current)
-        }
-
-        // sfall 0x823A — get_critter_poison_sfall(obj):
-        // Return the critter's current poison level.  Alias of get_poison().
-        get_critter_poison_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_poison_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).stats.getBase('Poison Level') ?? 0
-        }
-
-        // sfall 0x823B — set_critter_poison_sfall(obj, val):
-        // Set the critter's poison level to the given absolute value.
-        // Unlike poison() which adjusts relatively, this sets it directly.
-        // Clamps to [0, 1000].
-        set_critter_poison_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_poison_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const clamped = Math.max(0, Math.min(1000, Math.floor(val)))
-            const critter = obj as Critter
-            const current = critter.stats.getBase('Poison Level') ?? 0
-            critter.stats.modifyBase('Poison Level', clamped - current)
-        }
-
-        // sfall 0x823C — critter_in_party_sfall(obj):
-        // Return 1 if the given critter is currently in the player's party,
-        // 0 otherwise.  Checks globalState.gParty membership.
-        critter_in_party_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('critter_in_party_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            const party = globalState.gParty
-            if (!party) {return 0}
-            const members = (party as any).members
-            if (!Array.isArray(members)) {return 0}
-            return members.some((m: any) => m === obj || m?.pid === (obj as any).pid) ? 1 : 0
-        }
-
-        // sfall 0x823D — get_critter_proto_flags_sfall(obj):
-        // Return the proto flags bitmask for a critter.  Reads obj.flags if
-        // present; falls back to 0 (partial — no full proto-flag table).
-        get_critter_proto_flags_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_critter_proto_flags_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).flags ?? 0
-        }
-
-        // sfall 0x823E — set_critter_proto_flags_sfall(obj, flags):
-        // Set proto flags on a critter object.  Partial — stores flags on obj
-        // for subsequent get_critter_proto_flags_sfall / get_flags_sfall reads.
-        set_critter_proto_flags_sfall(obj: Obj, flags: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_critter_proto_flags_sfall: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).flags = flags >>> 0
-        }
-
-        // sfall 0x823F — get_party_count_sfall():
-        // Return the current number of critters in the player's party (not
-        // counting the player).  Returns 0 when no party exists.
-        get_party_count_sfall(): number {
-            const party = globalState.gParty
-            if (!party) {return 0}
-            const members = (party as any).members
-            return Array.isArray(members) ? members.length : 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 68 — sfall extended opcodes 0x8240–0x8247
         // -----------------------------------------------------------------------
-
-        // sfall 0x8240 — get_critter_damage_type_sfall(obj):
-        // Return the default melee damage type for a critter.
-        // Fallout 2 damage types: 0=normal, 1=laser, 2=fire, 3=plasma, 4=electrical,
-        // 5=EMP, 6=explosion.  Browser build returns 0 (normal) for all critters;
-        // full per-critter damage-type tracking is not modelled.
-        get_critter_damage_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_damage_type_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).damageType ?? 0
-        }
-
-        // sfall 0x8241 — set_critter_damage_type_sfall(obj, type):
-        // Set the default melee damage type for a critter.
-        // Stores the value on the object for subsequent reads.
-        set_critter_damage_type_sfall(obj: Obj, type: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_damage_type_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).damageType = Math.max(0, Math.min(6, Math.floor(type)))
-        }
-
-        // sfall 0x8242 — get_combat_free_move_sfall():
-        // Return the number of free tile-moves available this combat turn
-        // (the "free move" AP bonus from some perks/traits).
-        // Tracks per-critter via combatFreeMove on the script object.
-        get_combat_free_move_sfall(): number {
-            return (<any>this).combatFreeMove ?? 0
-        }
 
         // sfall 0x8243 — set_combat_free_move_sfall(obj, tiles):
         // Set the number of free tile-moves available to a critter this turn.
@@ -5602,217 +4059,13 @@ export namespace Scripting {
             ;(obj as any).combatFreeMove = isFinite(tiles) ? Math.max(0, Math.floor(tiles)) : 0
         }
 
-        // sfall 0x8244 — get_base_stat_sfall(obj, stat_id):
-        // Return the base (unmodified) value of a SPECIAL stat for any critter.
-        // Uses the same stat-name mapping as get_critter_stat_sfall but reads the
-        // base value instead of the derived value.  Returns 0 for unknown stats
-        // or non-critters.
-        get_base_stat_sfall(obj: Obj, stat_id: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_base_stat_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const name = statMap[stat_id]
-            if (!name) {
-                log('get_base_stat_sfall: unknown stat id ' + stat_id + ' — returning 0', arguments)
-                return 0
-            }
-            return typeof critter.stats?.getBase === 'function' ? (critter.stats.getBase(name) ?? 0) : 0
-        }
-
-        // sfall 0x8245 — set_base_stat_sfall(obj, stat_id, value):
-        // Set the base (unmodified) value of a SPECIAL stat on a critter.
-        // Uses the same stat-name mapping as get_base_stat_sfall.
-        set_base_stat_sfall(obj: Obj, stat_id: number, value: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_base_stat_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            const name = statMap[stat_id]
-            if (!name) {
-                warn('set_base_stat_sfall: unknown stat id ' + stat_id + ' — ignoring', undefined, this)
-                return
-            }
-            if (typeof critter.stats?.modifyBase === 'function') {
-                const current = typeof critter.stats?.getBase === 'function' ? (critter.stats.getBase(name) ?? 0) : 0
-                critter.stats.modifyBase(name, Math.floor(value) - current)
-            }
-        }
-
-        // sfall 0x8246 — get_game_difficulty_sfall():
-        // Return the current game difficulty setting.
-        // 0=easy, 1=normal, 2=hard.
-        // Phase 89: upgraded from hardcoded 1 to read globalState.gameDifficulty,
-        // which is also written by set_game_difficulty_sfall (0x82D3).
-        get_game_difficulty_sfall(): number {
-            return globalState.gameDifficulty
-        }
-
-        // sfall 0x8247 — get_violence_level_sfall():
-        // Return the current violence level setting (0=minimal, 1=normal, 2=maximum blood).
-        get_violence_level_sfall(): number {
-            return globalState.violenceLevel
-        }
-
         // ---------------------------------------------------------------------------
         // Phase 69 — sfall extended opcodes 0x8248–0x824F
         // ---------------------------------------------------------------------------
 
-        // sfall 0x8248 — get_map_limits_sfall(which):
-        // Return map dimension in tiles.  which=0 → width, which=1 → height.
-        // Fallout 2 maps are always 200×200 tiles.
-        get_map_limits_sfall(which: number): number {
-            // 0 = width, 1 = height — both are 200 in the Fallout 2 tile grid.
-            return 200
-        }
-
-        // sfall 0x8249 — obj_is_valid_sfall(obj):
-        // Return 1 if `obj` is a valid game object, 0 otherwise.
-        // Scripts use this to defend against stale/deleted object references before
-        // calling procedures that would crash on a non-object argument.
-        obj_is_valid_sfall(obj: any): number {
-            return isGameObject(obj) ? 1 : 0
-        }
-
-        // sfall 0x824A — get_string_length_sfall(str):
-        // Return the length of a string.  Returns 0 for non-string arguments.
-        get_string_length_sfall(str: any): number {
-            if (typeof str !== 'string') {return 0}
-            return str.length
-        }
-
-        // sfall 0x824B — get_char_code_sfall(str, pos):
-        // Return the character code (UTF-16 code unit) of `str` at zero-based index
-        // `pos`.  Returns -1 when `str` is not a string or `pos` is out of range.
-        get_char_code_sfall(str: any, pos: number): number {
-            if (typeof str !== 'string') {return -1}
-            if (pos < 0 || pos >= str.length) {return -1}
-            return str.charCodeAt(pos)
-        }
-
-        // sfall 0x824C — string_contains_sfall(haystack, needle):
-        // Return 1 if `haystack` contains `needle` (case-sensitive), 0 otherwise.
-        // Returns 0 for non-string inputs.
-        string_contains_sfall(haystack: any, needle: any): number {
-            if (typeof haystack !== 'string' || typeof needle !== 'string') {return 0}
-            return haystack.includes(needle) ? 1 : 0
-        }
-
-        // sfall 0x824D — string_index_of_sfall(haystack, needle):
-        // Return the first zero-based index of `needle` in `haystack`, or -1 if not
-        // found.  Returns -1 for non-string inputs.
-        string_index_of_sfall(haystack: any, needle: any): number {
-            if (typeof haystack !== 'string' || typeof needle !== 'string') {return -1}
-            return haystack.indexOf(needle)
-        }
-
-        // sfall 0x824E — get_object_script_id_sfall(obj):
-        // Return the integer script SID attached to an object, or -1 when the object
-        // has no script.  Used by scripts that want to verify or compare script
-        // attachments before calling scripted procedures.
-        get_object_script_id_sfall(obj: any): number {
-            if (!isGameObject(obj)) {return -1}
-            const script = (obj as Obj)._script
-            if (!script) {return -1}
-            // sid is the numeric script identifier loaded from the map data.
-            const sid: number | undefined = (script as any).sid ?? (script as any)._sid
-            return typeof sid === 'number' ? sid : -1
-        }
-
-        // sfall 0x824F — get_script_field_sfall(field):
-        // Read a named field from the current script execution context.
-        // Supports known string field names (case-insensitive):
-        //   "self_obj", "source_obj", "target_obj", "action_being_used",
-        //   "fixed_param", "game_time_hour", "cur_map_index",
-        //   "combat_is_initialized", "game_time", "dude_obj"
-        // Returns 0 for unknown fields or when the field value is falsy.
-        get_script_field_sfall(field: any): number {
-            if (typeof field !== 'string') {
-                warn('get_script_field_sfall: field must be a string, got ' + typeof field, undefined, this)
-                return 0
-            }
-            const key = field.toLowerCase()
-            const script = this
-            switch (key) {
-                case 'self_obj':
-                    return isGameObject(script.self_obj) ? 1 : 0
-                case 'source_obj':
-                    return isGameObject(script.source_obj) ? 1 : 0
-                case 'target_obj':
-                    return isGameObject(script.target_obj) ? 1 : 0
-                case 'action_being_used':
-                    return script.action_being_used ?? 0
-                case 'fixed_param':
-                    return script.fixed_param ?? 0
-                case 'game_time_hour':
-                    return script.game_time_hour ?? 0
-                case 'cur_map_index':
-                    return script.cur_map_index ?? 0
-                case 'combat_is_initialized':
-                    return script.combat_is_initialized ?? 0
-                case 'game_time':
-                    return script.game_time ?? 0
-                case 'dude_obj':
-                    return isGameObject(globalState.player) ? 1 : 0
-                default:
-                    log('get_script_field_sfall: unknown field "' + field + '"', arguments)
-                    return 0
-            }
-        }
-
         // ---------------------------------------------------------------------------
         // Phase 70 — sfall extended opcodes 0x8250–0x8257
         // ---------------------------------------------------------------------------
-
-        // sfall 0x8250 — get_object_art_fid_sfall(obj):
-        // Return the art FID (Fallout Resource Image identifier) of any game object.
-        // Alias for get_object_art_fid(); used by appearance and disguise scripts.
-        get_object_art_fid_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_art_fid_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            const frmType = (obj as any).frmType ?? 0
-            const frmPID = (obj as any).frmPID ?? (obj as any).fid ?? 0
-            return (frmType << 24) | (frmPID & 0xffffff)
-        }
-
-        // sfall 0x8251 — set_object_art_fid_sfall(obj, fid):
-        // Override the art FID of a game object.
-        // Alias for set_object_art_fid(); used by appearance-change and disguise scripts.
-        set_object_art_fid_sfall(obj: Obj, fid: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_object_art_fid_sfall: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).frmType = (fid >> 24) & 0xff
-            ;(obj as any).frmPID = fid & 0xffffff
-            ;(obj as any).fid = fid & 0xffffff
-            log('set_object_art_fid_sfall: fid=0x' + fid.toString(16), arguments)
-        }
-
-        // sfall 0x8252 — get_item_subtype_sfall(obj):
-        // Return the numeric subtype index of an item object (weapon=3, ammo=4,
-        // armor=2, container=1, drug=0, misc=5, key=6).
-        // Returns -1 for non-item objects.
-        get_item_subtype_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return -1}
-            if (obj.type !== 'item') {return -1}
-            const subtypeMap: Record<string, number> = {
-                armor: 0,
-                container: 1,
-                drug: 2,
-                weapon: 3,
-                ammo: 4,
-                misc: 5,
-                key: 6,
-            }
-            const sub = (obj as any).subtype as string
-            if (typeof sub === 'string' && sub in subtypeMap) {return subtypeMap[sub]}
-            return -1
-        }
 
         // sfall 0x8253 — get_combat_target_sfall(obj):
         // Return the current combat target of a critter, or 0 when not in combat /
@@ -5829,13 +4082,6 @@ export namespace Scripting {
             if (!isGameObject(obj) || obj.type !== 'critter') {return
             ;}(obj as any).combatTarget = isGameObject(target) ? target : null
             log('set_combat_target_sfall', arguments)
-        }
-
-        // sfall 0x8255 — combat_is_initialized_sfall():
-        // Return 1 if the combat system is currently active (i.e. we are in a combat
-        // turn), 0 otherwise.
-        combat_is_initialized_sfall(): number {
-            return globalState.inCombat ? 1 : 0
         }
 
         // sfall 0x8256 — get_attack_type_sfall(obj, slot):
@@ -5855,106 +4101,9 @@ export namespace Scripting {
             return attackMode & 0x0f
         }
 
-        // sfall 0x8257 — get_map_script_idx_sfall():
-        // Return the index of the currently-executing map script.
-        // Reads cur_map_index from the Script instance (set by the script
-        // execution context). Returns -1 when no map is active.
-        get_map_script_idx_sfall(): number {
-            const idx = this.cur_map_index
-            return idx !== null && idx !== undefined ? idx : -1
-        }
-
         // -----------------------------------------------------------------------
         // Phase 71 — sfall extended opcodes 0x8258–0x825F
         // -----------------------------------------------------------------------
-
-        // sfall 0x8258 — get_critter_hurt_state_sfall(obj):
-        // Return the Fallout 2 critter-state bitmask (dead/stunned/knockedDown/
-        // crippled/fleeing) for the given critter.  Mirrors the critter_state()
-        // opcode (0x8101) but exposed as a sfall-namespaced call so scripts that
-        // query it via the sfall dispatch table still get a value.
-        get_critter_hurt_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            let state = 0
-            if ((obj as any).dead === true) {state |= 0x01}
-            if ((obj as any).knockedOut === true) {state |= 0x02}
-            if ((obj as any).knockedDown === true) {state |= 0x04}
-            const hasCrippledLimb =
-                (obj as any).crippledLeftLeg ||
-                (obj as any).crippledRightLeg ||
-                (obj as any).crippledLeftArm ||
-                (obj as any).crippledRightArm
-            if (hasCrippledLimb) {state |= 0x08}
-            if ((obj as any).isFleeing === true) {state |= 0x10}
-            return state
-        }
-
-        // sfall 0x8259 — set_critter_hurt_state_sfall(obj, state):
-        // Write the Fallout 2 critter-state bitmask.  Each bit maps to a boolean
-        // property on the Critter object (same mapping as critter_state above).
-        // Bit 0 (dead) is intentionally ignored — use kill_critter for that.
-        set_critter_hurt_state_sfall(obj: Obj, state: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return
-            ;}(obj as any).knockedOut = !!(state & 0x02)
-            ;(obj as any).knockedDown = !!(state & 0x04)
-            const crippled = !!(state & 0x08)
-            ;(obj as any).crippledLeftLeg = crippled
-            ;(obj as any).crippledRightLeg = crippled
-            ;(obj as any).crippledLeftArm = crippled
-            ;(obj as any).crippledRightArm = crippled
-            ;(obj as any).isFleeing = !!(state & 0x10)
-        }
-
-        // sfall 0x825A — get_critter_is_fleeing_sfall(obj):
-        // Return 1 if the critter is currently fleeing combat, 0 otherwise.
-        // Convenience wrapper around the isFleeing property.
-        get_critter_is_fleeing_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).isFleeing ? 1 : 0
-        }
-
-        // sfall 0x825B — set_critter_is_fleeing_sfall(obj, flag):
-        // Set or clear the fleeing state on the given critter.
-        set_critter_is_fleeing_sfall(obj: Obj, flag: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return
-            ;}(obj as any).isFleeing = flag !== 0
-        }
-
-        // sfall 0x825C — get_tile_blocked_sfall(tileNum, elev):
-        // Return 1 if any blocking object occupies the given tile on the given
-        // elevation, 0 otherwise.  Uses the map object list; returns 0 when the
-        // map is not loaded.
-        get_tile_blocked_sfall(tileNum: number, _elev: number): number {
-            if (!globalState.gMap) {return 0}
-            const pos = fromTileNum(tileNum)
-            const objs = globalState.gMap.objectsAtPosition(pos)
-            return objs.some((o) => o.blocks()) ? 1 : 0
-        }
-
-        // sfall 0x825D — get_critter_hit_pts_sfall(obj):
-        // Return the critter's current maximum HP (Max HP stat).  Returns 0 for
-        // non-critters or null objects.
-        get_critter_hit_pts_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as Critter).getStat('Max HP')
-        }
-
-        // sfall 0x825E — critter_add_trait_sfall(obj, traitType, trait, amount):
-        // Modify a trait/perk/skill value on a critter.
-        // BLK-158: Previously a no-op; now delegates to critter_add_trait() so that
-        // sfall-scripted calls receive the same TRAIT_PERK/TRAIT_OBJECT/TRAIT_SKILL/
-        // TRAIT_CHAR handling as vanilla opcode calls.  Fixes New Reno scripts that
-        // use the sfall variant to grant temporary boxing skill boosts.
-        critter_add_trait_sfall(obj: Obj, traitType: number, trait: number, amount: number): void {
-            this.critter_add_trait(obj, traitType, trait, amount)
-        }
-
-        // sfall 0x825F — get_num_new_obj_sfall():
-        // Return the count of game objects created by script since the last map
-        // load.  Tracks via globalState.newObjCounter, incremented in create_object_sid.
-        get_num_new_obj_sfall(): number {
-            return globalState.newObjCounter
-        }
 
         // -----------------------------------------------------------------------
         // Phase 72 — sfall extended opcodes 0x8260–0x8267
@@ -5965,20 +4114,6 @@ export namespace Scripting {
         // (search for 0x81BE, method get_critter_weapon).  vm_bridge.ts maps both
         // opcodes to the same method; no separate definition is needed here.
 
-        // sfall 0x8261 — set_critter_weapon_sfall(obj, slot, weapon):
-        // Equip a weapon in the given slot (0=right, 1=left).
-        // Browser build: partial — writes the slot directly; no animation triggered.
-        set_critter_weapon_sfall(obj: Obj, slot: number, weapon: Obj | number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_weapon_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const c = obj as Critter
-            const item = isGameObject(weapon) ? (weapon as any) : null
-            if (slot === 0) {c.rightHand = item}
-            else if (slot === 1) {c.leftHand = item}
-        }
-
         // sfall 0x8262 — get_object_type_sfall (second opcode alias):
         // Opcode alias — implementation is in the Phase-58 section (search for 0x81F6).
 
@@ -5988,514 +4123,35 @@ export namespace Scripting {
         // sfall 0x8264 — set_critter_team (second opcode alias):
         // Opcode alias — implementation is in the Phase-52 section (search for 0x81C5).
 
-        // sfall 0x8265 — get_ambient_light_sfall():
-        // Return the current ambient light level (0=dark, 65536=maximum brightness).
-        // Browser build: returns the value from globalState.ambientLightLevel, defaulting
-        // to 65536 (full brightness) when no explicit light level has been set.
-        get_ambient_light_sfall(): number {
-            return globalState.ambientLightLevel ?? 65536
-        }
-
-        // sfall 0x8266 — set_ambient_light_sfall(level):
-        // Set the ambient light level.  Browser build: writes globalState.ambientLightLevel.
-        // Refreshes the lightmap tile baseline via Lightmap.applyAmbientLight().
-        set_ambient_light_sfall(level: number): void {
-            globalState.ambientLightLevel = typeof level === 'number' ? Math.max(0, Math.min(65536, level)) : 65536
-            Lightmap.applyAmbientLight()
-        }
-
-        // sfall 0x8267 — get_map_local_var_sfall(idx):
-        // Return a map-local variable by index.  Delegates to the existing map_var()
-        // implementation so sfall callers get the same value as native map_var() calls.
-        get_map_local_var_sfall(idx: number): any {
-            return this.map_var(typeof idx === 'number' ? idx : 0)
-        }
-
         // -----------------------------------------------------------------------
         // Phase 73 — sfall extended opcodes 0x8268–0x826F
         // -----------------------------------------------------------------------
-
-        // sfall 0x8268 — get_critter_ap_sfall(obj):
-        // Return the current combat AP available for a critter.
-        // In combat: reads the AP.combat field; out of combat returns the max AP stat.
-        get_critter_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_ap_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            return critter.AP ? critter.AP.combat : critter.getStat('AP')
-        }
-
-        // sfall 0x8269 — set_critter_ap_sfall(obj, ap):
-        // Set the current combat AP for a critter.
-        // No-op when AP.combat is not initialized (out-of-combat critters).
-        set_critter_ap_sfall(obj: Obj, ap: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_ap_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            if (critter.AP) {critter.AP.combat = Math.max(0, ap)}
-        }
-
-        // sfall 0x826A — get_object_flags_sfall(obj):
-        // Return the Fallout 2 flags bitmask for an object.
-        // Reads obj.flags (the proto-sourced flags field stored on the Obj).
-        get_object_flags_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_object_flags_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).flags ?? 0
-        }
-
-        // sfall 0x826B — set_object_flags_sfall(obj, flags):
-        // Write the flags bitmask for an object.  Stores on obj.flags so that
-        // subsequent get_object_flags_sfall / get_flags_sfall reads are consistent.
-        set_object_flags_sfall(obj: Obj, flags: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_object_flags_sfall: not a game object: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).flags = flags >>> 0
-        }
-
-        // sfall 0x826C — critter_is_dead_sfall(obj):
-        // Return 1 if the given object is a dead critter, 0 otherwise.
-        // Non-critters always return 0 (they cannot be "dead" in the FO2 sense).
-        critter_is_dead_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as Critter).dead ? 1 : 0
-        }
-
-        // sfall 0x826D — get_obj_light_level_sfall(obj):
-        // Return the light emission level of an object (0–65536).
-        // Browser build: reads obj.lightLevel if set; defaults to 0 (no emission).
-        get_obj_light_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
-                return 0
-            }
-            const o = obj as Obj
-            return o.lightIntensity ?? o.lightLevel ?? 0
-        }
-
-        // sfall 0x826E — set_obj_light_level_sfall(obj, level):
-        // Set the light emission level of an object (0–65536).
-        set_obj_light_level_sfall(obj: Obj, level: number): void {
-            if (!isGameObject(obj)) {
-                warn('set_obj_light_level_sfall: not a game object: ' + obj, undefined, this)
-                return
-            }
-            const safe = (typeof level === 'number' && isFinite(level))
-                ? Math.max(0, Math.min(65536, level)) : 0
-            Lightmap.syncObjectEmitterLight(obj, safe)
-        }
-
-        // sfall 0x826F — get_elevation_sfall():
-        // Return the current map elevation (0–2).  Equivalent to native elevation()
-        // but exposed as a sfall opcode for mods that call it via the sfall table.
-        get_elevation_sfall(): number {
-            return globalState.currentElevation ?? 0
-        }
 
         // -----------------------------------------------------------------------
         // Phase 74 — sfall extended opcodes 0x8270–0x8277
         // -----------------------------------------------------------------------
 
-        // sfall 0x8270 — get_tile_at_object_sfall(obj):
-        // Return the tile number (tileNum) of the object's current map position.
-        // Returns -1 when the object has no position (e.g. is in inventory or is
-        // being destroyed) so callers can detect and handle the unplaced state.
-        get_tile_at_object_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_tile_at_object_sfall: not a game object: ' + obj, undefined, this)
-                return -1
-            }
-            if ((obj as any).position == null) {return -1}
-            return toTileNum((obj as any).position)
-        }
-
-        // sfall 0x8271 — critter_get_flee_state_sfall(obj):
-        // Return 1 if the critter is currently fleeing, 0 otherwise.
-        // Alias of the isFleeing flag used by critter_state().
-        critter_get_flee_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).isFleeing === true ? 1 : 0
-        }
-
-        // sfall 0x8272 — critter_set_flee_state_sfall(obj, fleeing):
-        // Set the critter's fleeing flag.  1 = fleeing, 0 = not fleeing.
-        critter_set_flee_state_sfall(obj: Obj, fleeing: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_set_flee_state_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as any).isFleeing = fleeing !== 0
-        }
-
         // sfall 0x8273 is an alias of get_combat_difficulty_sfall() (0x81EC) —
         // see the vm_bridge.ts registration; no new method body is needed here.
-
-        // sfall 0x8274 — get_object_proto_sfall(obj):
-        // Return the proto data object for obj.  Browser build: returns 0 (stub) —
-        // the full in-memory proto table is not yet accessible from the script VM.
-        get_object_proto_sfall(_obj: Obj): number {
-            return 0
-        }
-
-        // sfall 0x8275 — get_critter_hit_chance_sfall(attacker, target):
-        // Return the computed hit chance (0–100) for attacker against target.
-        // Browser build: partial — delegates to getHitChance when combat module
-        // is available; returns 0 if not in combat or combat is not initialized.
-        get_critter_hit_chance_sfall(attacker: Obj, target: Obj): number {
-            if (!isGameObject(attacker) || !isGameObject(target)) {return 0}
-            if (!globalState.combat) {return 0}
-            try {
-                return (globalState.combat as any).getHitChance?.(attacker as Critter, target as Critter) ?? 0
-            } catch (_e) {
-                return 0
-            }
-        }
-
-        // sfall 0x8276 — get_tile_distance_sfall(tile1, tile2):
-        // Return the hex distance between two tile numbers.
-        // Fully implemented: converts both tiles via fromTileNum and calls hexDistance.
-        get_tile_distance_sfall(tile1: number, tile2: number): number {
-            const pos1 = fromTileNum(tile1)
-            const pos2 = fromTileNum(tile2)
-            if (!pos1 || !pos2) {return 0}
-            return hexDistance(pos1, pos2)
-        }
-
-        // sfall 0x8277 — get_tile_in_direction_sfall(tile, dir, count):
-        // Return the tile count steps in direction dir from tile.
-        // Alias of tile_num_in_direction().
-        get_tile_in_direction_sfall(tile: number, dir: number, count: number): number {
-            return this.tile_num_in_direction(tile, dir, count)
-        }
 
         // -----------------------------------------------------------------------
         // Phase 75 — sfall extended opcodes 0x8278–0x827F
         // -----------------------------------------------------------------------
 
-        // sfall 0x8278 — get_critter_knockout_sfall(obj):
-        // Returns 1 if the critter is currently knocked out (unconscious), 0 otherwise.
-        get_critter_knockout_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).knockedOut ? 1 : 0
-        }
-
-        // sfall 0x8279 — get_critter_knockdown_sfall(obj):
-        // Returns 1 if the critter is currently knocked down (prone), 0 otherwise.
-        get_critter_knockdown_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).knockedDown ? 1 : 0
-        }
-
-        // sfall 0x827A — get_critter_crippled_legs_sfall(obj):
-        // Returns a bitmask: bit 0 (0x01) = left leg crippled, bit 1 (0x02) = right leg.
-        get_critter_crippled_legs_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            let mask = 0
-            if ((obj as any).crippledLeftLeg)  {mask |= 0x01}
-            if ((obj as any).crippledRightLeg) {mask |= 0x02}
-            return mask
-        }
-
-        // sfall 0x827B — get_critter_crippled_arms_sfall(obj):
-        // Returns a bitmask: bit 0 (0x01) = left arm crippled, bit 1 (0x02) = right arm.
-        get_critter_crippled_arms_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            let mask = 0
-            if ((obj as any).crippledLeftArm)  {mask |= 0x01}
-            if ((obj as any).crippledRightArm) {mask |= 0x02}
-            return mask
-        }
-
-        // sfall 0x827C — get_critter_dead_sfall(obj):
-        // Returns 1 if the critter is dead, 0 otherwise.  Safe for non-critter objects.
-        get_critter_dead_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            return (obj as any).dead ? 1 : 0
-        }
-
-        // sfall 0x827D — get_map_loaded_sfall():
-        // Returns 1 if the current map was entered via a save/load (alias of game_loaded).
-        // BLK-111: reads the real globalState.mapLoadedFromSave flag.
-        get_map_loaded_sfall(): number {
-            return globalState.mapLoadedFromSave ? 1 : 0
-        }
-
-        // sfall 0x827E — get_critter_poison_level_sfall(obj):
-        // Returns the current poison level of the critter (same as get_poison).
-        get_critter_poison_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as Critter).stats?.getBase('Poison Level') ?? 0
-        }
-
-        // sfall 0x827F — get_critter_radiation_level_sfall(obj):
-        // Returns the current radiation level of the critter (same as get_radiation).
-        get_critter_radiation_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as Critter).stats?.getBase('Radiation Level') ?? 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 76 — sfall extended opcodes 0x8280–0x8287
         // -----------------------------------------------------------------------
 
-        // sfall 0x8280 — get_last_target_sfall(obj): BLK-117
-        // Returns the last combat target of the given critter, or 0 if unset.
-        get_last_target_sfall(obj: Obj): Obj | 0 {
-            if (!obj || typeof obj !== 'object') {return 0}
-            return (obj as any).lastCombatTarget ?? 0
-        }
-
-        // sfall 0x8281 — get_last_attacker_sfall(obj): BLK-117
-        // Returns the last combat attacker of the given critter, or 0 if unset.
-        get_last_attacker_sfall(obj: Obj): Obj | 0 {
-            if (!obj || typeof obj !== 'object') {return 0}
-            return (obj as any).lastCombatAttacker ?? 0
-        }
-
-        // sfall 0x8282 — get_critter_level_sfall(obj):
-        // Returns the critter's current level.  For the player, reads player.level;
-        // for NPCs, returns 1 (partial — NPC level tracking is not yet implemented).
-        get_critter_level_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            // Player has a real level property; NPCs default to 1.
-            return (obj as any).level ?? 1
-        }
-
-        // sfall 0x8283 — get_critter_current_xp_sfall(obj):
-        // Returns the critter's current accumulated XP.  For the player, reads
-        // player.xp; for NPCs, returns 0 (no XP tracking for non-player critters).
-        // NOTE: distinct from get_critter_xp_sfall (0x81F0) which reads proto XPValue.
-        get_critter_current_xp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).xp ?? 0
-        }
-
-        // sfall 0x8284 — set_critter_level_sfall(obj, level):
-        // Set the critter's level.  Browser build: partial — sets the level property
-        // directly on the critter object; no stat recalculation is performed.
-        set_critter_level_sfall(obj: Obj, level: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_level_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof level !== 'number' || !isFinite(level) || level < 1) {
-                warn('set_critter_level_sfall: invalid level ' + level + ' — no-op', undefined, this)
-                return
-            }
-            (obj as any).level = Math.floor(level)
-        }
-
-        // sfall 0x8285 — get_critter_base_stat_sfall(obj, stat):
-        // Returns the critter's base stat value (before modifiers/bonuses).
-        // Mirrors critter_get_stat_sfall (0x8182) but reads the base, not derived.
-        get_critter_base_stat_sfall(obj: Obj, stat: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const statName = statMap[stat]
-            if (!statName) {
-                warn('get_critter_base_stat_sfall: unknown stat ' + stat + ' — returning 0', undefined, this)
-                return 0
-            }
-            return (obj as Critter).stats?.getBase(statName) ?? 0
-        }
-
-        // sfall 0x8286 — set_critter_base_stat_sfall(obj, stat, value):
-        // Set the critter's base stat value directly.  Mirrors set_critter_stat.
-        set_critter_base_stat_sfall(obj: Obj, stat: number, value: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_base_stat_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const statName = statMap[stat]
-            if (!statName) {
-                warn('set_critter_base_stat_sfall: unknown stat ' + stat + ' — no-op', undefined, this)
-                return
-            }
-            if (typeof value !== 'number' || !isFinite(value)) {
-                warn('set_critter_base_stat_sfall: non-finite value ' + value + ' — no-op', undefined, this)
-                return
-            }
-            (obj as Critter).stats?.setBase(statName, Math.round(value))
-        }
-
-        // sfall 0x8287 — get_obj_weight_sfall(obj):
-        // Return the object's weight in lbs from its proto data.  Returns 0 for
-        // non-game-objects or when no weight data is available.
-        get_obj_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            return (obj as any).pro?.extra?.weight ?? (obj as any).weight ?? 0
-        }
-
         // Phase 77 — sfall extended opcodes 0x8288–0x828F
         // -----------------------------------------------------------------------
-
-        // sfall 0x8288 — get_critter_flags_sfall(obj):
-        // Returns the engine-level critter flags bitmask.  Alias of get_critter_flags().
-        get_critter_flags_sfall(obj: Obj): number {
-            return this.get_critter_flags(obj)
-        }
-
-        // sfall 0x8289 — set_critter_flags_sfall(obj, flags):
-        // Sets the engine-level critter flags in bulk.  Alias of set_critter_flags().
-        set_critter_flags_sfall(obj: Obj, flags: number): void {
-            this.set_critter_flags(obj, flags)
-        }
-
-        // sfall 0x828A — get_critter_worn_armor_sfall(obj):
-        // Returns the armor item currently equipped by the critter, or 0 if none.
-        get_critter_worn_armor_sfall(obj: Obj): Obj | 0 {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).equippedArmor ?? 0
-        }
-
-        // sfall 0x828B — get_critter_weapon_sfall(obj, hand):
-        // Returns the weapon in the given hand (0 = right, 1 = left), or 0 if empty.
-        get_critter_weapon_sfall(obj: Obj, hand: number): Obj | 0 {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            if (hand === 1) {return (obj as any).leftHand ?? 0}
-            return (obj as any).rightHand ?? 0
-        }
-
-        // sfall 0x828C — get_tile_x_sfall(tile):
-        // Returns the x hex coordinate of a tile number.
-        get_tile_x_sfall(tile: number): number {
-            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) {return 0}
-            return fromTileNum(tile).x
-        }
-
-        // sfall 0x828D — get_tile_y_sfall(tile):
-        // Returns the y hex coordinate of a tile number.
-        get_tile_y_sfall(tile: number): number {
-            if (typeof tile !== 'number' || !isFinite(tile) || tile < 0) {return 0}
-            return fromTileNum(tile).y
-        }
-
-        // sfall 0x828E — tile_from_coords_sfall(x, y):
-        // Returns the tile number for the given (x, y) hex coordinates.
-        tile_from_coords_sfall(x: number, y: number): number {
-            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) {return 0}
-            return toTileNum({ x: Math.round(x), y: Math.round(y) })
-        }
-
-        // sfall 0x828F — get_critter_max_hp_sfall_82(obj):
-        // Returns the maximum HP of a critter from its stats or proto data.
-        // Returns 0 for non-critters.  Delegates to the canonical
-        // get_critter_max_hp_sfall() (0x81F8) which now includes proto fallback.
-        get_critter_max_hp_sfall_82(obj: Obj): number {
-            return this.get_critter_max_hp_sfall(obj)
-        }
 
         // -----------------------------------------------------------------------
         // Phase 80 — sfall extended opcodes 0x8290–0x8297
         // -----------------------------------------------------------------------
 
-        // sfall 0x8290 — set_critter_current_hp_sfall(obj, hp):
-        // Set the current HP of a critter to the given value, clamped to [0, maxHP].
-        // Used by New Reno and other mid-game scripts that directly manage NPC health.
-        set_critter_current_hp_sfall(obj: Obj, hp: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_current_hp_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof hp !== 'number' || !isFinite(hp)) {
-                warn('set_critter_current_hp_sfall: non-finite hp (' + hp + ') — no-op', undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            const maxHP: number = (typeof (critter as any).getStat === 'function')
-                ? ((critter as any).getStat('Max HP') ?? 100)
-                : ((critter as any).pro?.extra?.maxHP ?? 100)
-            const clampedHP = Math.max(0, Math.min(Math.round(hp), maxHP))
-            if (critter.stats && typeof critter.stats.setBase === 'function') {
-                critter.stats.setBase('HP', clampedHP)
-            } else {
-                (critter as any).HP = clampedHP
-            }
-        }
-
-        // sfall 0x8291 — get_local_var_sfall(idx):
-        // Return the local script variable at index idx.
-        // Equivalent to local_var() exposed as a dedicated sfall opcode.
-        get_local_var_sfall(idx: number): number {
-            if (!this.lvars) {return 0}
-            if (this.lvars[idx] === undefined) {return 0}
-            return typeof this.lvars[idx] === 'number' ? this.lvars[idx] : 0
-        }
-
-        // sfall 0x8292 — set_local_var_sfall(idx, val):
-        // Set the local script variable at index idx to val.
-        // Equivalent to set_local_var() exposed as a dedicated sfall opcode.
-        set_local_var_sfall(idx: number, val: number): void {
-            if (!this.lvars) {this.lvars = {}}
-            if (typeof val === 'number' && !isFinite(val)) {
-                warn('set_local_var_sfall: non-finite value (' + val + ') for lvar ' + idx + ' — storing 0', 'lvars')
-                val = 0
-            }
-            this.lvars[idx] = typeof val === 'number' ? val : 0
-        }
-
-        // sfall 0x8293 — get_game_time_sfall():
-        // Return the current game time in ticks.
-        // Alias of game_time(); exposed as a dedicated sfall opcode for scripts that
-        // want to avoid caching the vanilla procedure.
-        get_game_time_sfall(): number {
-            return Math.max(1, globalState.gameTickTime ?? 1)
-        }
-
-        // sfall 0x8294 — get_area_known_sfall(areaID):
-        // Return 1 if the world-map area with the given ID is known (visible) to
-        // the player, 0 otherwise.
-        // Reads from globalState.mapAreas when available.
-        get_area_known_sfall(areaID: number): number {
-            if (globalState.mapAreas && (globalState.mapAreas as any)[areaID] !== undefined) {
-                return (globalState.mapAreas as any)[areaID] ? 1 : 0
-            }
-            return 0
-        }
-
-        // sfall 0x8295 — get_kill_counter_sfall(critterType):
-        // Return the number of kills of the given critter type.
-        get_kill_counter_sfall(critterType: number): number {
-            return this.get_critter_kills(critterType)
-        }
-
-        // sfall 0x8296 — add_kill_counter_sfall(critterType, count):
-        // Increment the kill counter for the given critter type by count.
-        add_kill_counter_sfall(critterType: number, count: number): void {
-            const current = this.get_critter_kills(critterType)
-            this.set_critter_kills(critterType, current + count)
-        }
-
-        // sfall 0x8297 — get_player_elevation_sfall():
-        // Return the player's current elevation (0–2).
-        // Alias of get_elevation_sfall(); exposed separately for clarity.
-        get_player_elevation_sfall(): number {
-            return globalState.currentElevation ?? 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 81 — sfall extended opcodes 0x8298–0x829F
         // -----------------------------------------------------------------------
-
-        // sfall 0x8298 — get_critter_stat_sfall2(obj, stat):
-        // Safe alias of get_critter_stat that applies an additional null guard for
-        // the obj parameter.  New Reno scripts call this frequently on objects that
-        // may be 0 (FO2 null convention); the base get_critter_stat already handles
-        // that, but this exposes the same path as a dedicated sfall opcode.
-        get_critter_stat_sfall2(obj: Obj, stat: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return this.get_critter_stat(obj as Critter, stat)
-        }
 
         // sfall 0x8299 / 0x831B — set_critter_extra_stat_sfall(obj, statId, val):
         // Set a temporary extra-stat modifier on a critter. Stores the value in both
@@ -6521,260 +4177,16 @@ export namespace Scripting {
             }
         }
 
-        // sfall 0x829A — get_active_hand_sfall():
-        // Return the player's currently active weapon hand: 0 = primary (leftHand),
-        // 1 = secondary (rightHand).  Alias of active_hand(); exposed as a dedicated
-        // sfall opcode for weapon-swapping combat scripts.
-        get_active_hand_sfall(): number {
-            return (globalState.player as any)?.activeHand ?? 0
-        }
-
-        // sfall 0x829B — set_active_hand_sfall(hand):
-        // Switch the player's active weapon hand: 0 = primary, 1 = secondary.
-        // Clamps out-of-range values to the valid set {0, 1}.
-        set_active_hand_sfall(hand: number): void {
-            if (!globalState.player) {return
-            ;}(globalState.player as any).activeHand = (hand === 1) ? 1 : 0
-        }
-
-        // sfall 0x829C — get_item_type_sfall(item):
-        // Return the numeric item-type index of an item object:
-        //   0=drug, 1=container, 2=armor, 3=weapon, 4=ammo, 5=misc, 6=key
-        // Returns -1 for non-item objects.
-        // Distinct from get_item_subtype_sfall (0x8252) in that it returns -1 for
-        // non-items rather than a subtype enum — some sfall scripts test for -1 to
-        // detect non-item objects.
-        get_item_type_sfall(item: Obj): number {
-            if (!isGameObject(item) || item.type !== 'item') {return -1}
-            const subtypeMap: Record<string, number> = {
-                armor: 0,
-                container: 1,
-                drug: 2,
-                weapon: 3,
-                ammo: 4,
-                misc: 5,
-                key: 6,
-            }
-            const sub = (item as any).subtype as string
-            if (typeof sub === 'string' && sub in subtypeMap) {return subtypeMap[sub]}
-            return -1
-        }
-
-        // sfall 0x829D — get_critter_perk_level_sfall(obj, perkId):
-        // Return the rank of a specific perk for a critter.
-        // Reads from critter.perkRanks (same source as get_critter_perk_sfall / 0x8212).
-        // Used by New Reno prize/reward scripts that check perk prerequisites.
-        get_critter_perk_level_sfall(obj: Obj, perkId: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_perk_level_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).perkRanks?.[perkId] ?? 0
-        }
-
-        // sfall 0x829E — set_critter_perk_sfall(obj, perkId, level):
-        // Set a specific perk rank on a critter.
-        // For player critters this writes to player.perkRanks; for NPCs it writes to
-        // critter.perkRanks.  Negative levels are clamped to 0 (remove perk).
-        set_critter_perk_sfall(obj: Obj, perkId: number, level: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_perk_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof level !== 'number' || !isFinite(level)) {
-                warn('set_critter_perk_sfall: non-finite level (' + level + ') — clamping to 0', undefined, this)
-                level = 0
-            }
-            const critter = obj as Critter
-            if (!critter.perkRanks) {(critter as any).perkRanks = {}}
-            critter.perkRanks[perkId] = Math.max(0, Math.round(level))
-        }
-
-        // sfall 0x829F — get_distance_sfall(obj1, obj2):
-        // Return the hex grid distance between two game objects.
-        // Returns -1 when either object has no position (e.g. in inventory) or is
-        // not a valid game object.  Uses the same hexDistance() path as normal LOS.
-        get_distance_sfall(obj1: Obj, obj2: Obj): number {
-            if (!isGameObject(obj1) || !obj1.position) {return -1}
-            if (!isGameObject(obj2) || !obj2.position) {return -1}
-            return hexDistance(obj1.position, obj2.position)
-        }
-
         // -----------------------------------------------------------------------
         // Phase 82 — sfall extended opcodes 0x82A0–0x82A7
         // -----------------------------------------------------------------------
 
-        // sfall 0x82A0 — get_worldmap_free_move_sfall():
-        // Returns 1 if "free movement" (no AP cost on world map) is enabled.
-        // The browser build does not implement this flag — returns 0.
-        get_worldmap_free_move_sfall(): number {
-            return 0
-        }
-
-        // sfall 0x82A1 — set_worldmap_free_move_sfall(v):
-        // Sets world-map free-movement state.  No-op in the browser build.
-        set_worldmap_free_move_sfall(_v: number): void {
-            // no-op
-        }
-
-        // sfall 0x82A2 — get_car_current_town_sfall():
-        // Returns the area ID of the car's current location, or -1 if the car has
-        // not been acquired / placed.  Reads from globalState.carAreaID when set.
-        get_car_current_town_sfall(): number {
-            const areaID = (globalState as any).carAreaID
-            return typeof areaID === 'number' ? areaID : -1
-        }
-
-        // sfall 0x82A3 — get_dude_obj_sfall():
-        // Returns the player (dude) game object, or 0 when no player exists.
-        // This is the sfall equivalent of the built-in dude_obj() variable.
-        get_dude_obj_sfall(): Obj | 0 {
-            return globalState.player ?? 0
-        }
-
-        // sfall 0x82A4 — set_dude_obj_sfall(obj):
-        // Override which object is treated as the player.  Stub — the browser
-        // build does not support player-object substitution.
-        set_dude_obj_sfall(_obj: Obj): void {
-            // no-op stub
-        }
-
         // sfall 0x82A5 — alias of 0x8235 get_critter_max_ap_sfall (already defined above).
         // The vm_bridge maps both 0x8235 and 0x82A5 to the same method.
-
-        // sfall 0x82A6 — get_tile_light_level_sfall(tile):
-        // Returns the light level (0–65536) at the given tile.  The browser build
-        // does not expose per-tile light readback; returns 0.
-        get_tile_light_level_sfall(tile: number): number {
-            return Lightmap.getTileLightLevel(tile)
-        }
-
-        // sfall 0x82A7 — set_tile_light_level_sfall(tile, level):
-        // Sets the light level at a specific tile (may be overwritten on rebuildLight).
-        set_tile_light_level_sfall(tile: number, level: number): void {
-            Lightmap.setTileLightLevel(tile, level)
-        }
 
         // -----------------------------------------------------------------------
         // Phase 83 — sfall extended opcodes 0x82A8–0x82AF
         // -----------------------------------------------------------------------
-
-        // sfall 0x82A8 — get_critter_experience_sfall(obj):
-        // Return the total experience points accumulated by a critter.
-        // Reads critter.xp for any critter (player or NPC).  Falls back to
-        // critter.experience for NPCs that store XP in that field instead.
-        get_critter_experience_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_experience_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as any
-            if (typeof critter.xp === 'number') {return critter.xp}
-            return typeof critter.experience === 'number' ? critter.experience : 0
-        }
-
-        // sfall 0x82A9 — set_critter_experience_sfall(obj, val):
-        // Set the total experience points for a critter.
-        // Writes to critter.xp (and critter.experience for NPCs that use that field).
-        // Values are clamped to [0, 2_147_483_647].
-        set_critter_experience_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_experience_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof val !== 'number' || !isFinite(val)) {
-                warn('set_critter_experience_sfall: non-finite val (' + val + ') — no-op', undefined, this)
-                return
-            }
-            const clamped = Math.max(0, Math.min(Math.round(val), 2_147_483_647))
-            const critter = obj as any
-            critter.xp = clamped
-            critter.experience = clamped
-        }
-
-        // sfall 0x82AA — get_critter_crit_chance_sfall(obj):
-        // Return the critter's critical-hit modifier (percent, signed).
-        // Reads from critter.critChanceMod if set; otherwise returns 0.
-        // Affects the chance that any given attack becomes a critical hit.
-        get_critter_crit_chance_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_crit_chance_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).critChanceMod ?? 0
-        }
-
-        // sfall 0x82AB — set_critter_crit_chance_sfall(obj, val):
-        // Set the critter's critical-hit modifier.  Stored in critter.critChanceMod.
-        // Clamped to [-100, 100] to prevent unreachable probabilities.
-        set_critter_crit_chance_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_crit_chance_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof val !== 'number' || !isFinite(val)) {
-                warn('set_critter_crit_chance_sfall: non-finite val (' + val + ') — no-op', undefined, this)
-                return
-            }
-            (obj as any).critChanceMod = Math.max(-100, Math.min(100, Math.round(val)))
-        }
-
-        // sfall 0x82AC — get_critter_npc_flag_sfall(obj, flag):
-        // Return the value of a specific NPC flags bit (0 or 1).
-        // flag is a bit index (0–31); reads from critter.npcFlags bitfield.
-        // Used by New Reno side-quest scripts that track critter disposition bits.
-        get_critter_npc_flag_sfall(obj: Obj, flag: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            if (typeof flag !== 'number' || flag < 0 || flag > 31) {return 0}
-            const bits: number = (obj as any).npcFlags ?? 0
-            return (bits >>> flag) & 1
-        }
-
-        // sfall 0x82AD — set_critter_npc_flag_sfall(obj, flag, val):
-        // Set or clear a single NPC flags bit.  flag is a bit index (0–31);
-        // a truthy val sets the bit, a falsy val clears it.
-        // Writes to critter.npcFlags; initialises to 0 if not present.
-        set_critter_npc_flag_sfall(obj: Obj, flag: number, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_npc_flag_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof flag !== 'number' || flag < 0 || flag > 31) {return}
-            const critter = obj as any
-            const bits: number = critter.npcFlags ?? 0
-            critter.npcFlags = val ? (bits | (1 << flag)) : (bits & ~(1 << flag))
-        }
-
-        // sfall 0x82AE — get_critter_outline_color_sfall(obj):
-        // Return the current highlight/outline colour index for a critter.
-        // 0 = no outline.  Reads from critter.sfallOutlineColor.
-        // Used by some quest scripts to check if a critter is already highlighted.
-        get_critter_outline_color_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_outline_color_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).sfallOutlineColor ?? 0
-        }
-
-        // sfall 0x82AF — set_critter_outline_color_sfall(obj, color):
-        // Set the highlight/outline colour for a critter.  0 = remove outline.
-        // Writes to critter.sfallOutlineColor and, when a renderer is attached,
-        // triggers a re-render by calling obj.invalidate() when available.
-        set_critter_outline_color_sfall(obj: Obj, color: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_outline_color_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as any
-            critter.sfallOutlineColor = typeof color === 'number' && color >= 0 ? Math.floor(color) : 0
-            if (typeof critter.invalidate === 'function') {
-                try { critter.invalidate() } catch (_) { /* ignore renderer errors */ }
-            }
-        }
 
         // -----------------------------------------------------------------------
         // Phase 84 — sfall extended opcodes 0x82B0–0x82B7
@@ -6782,453 +4194,26 @@ export namespace Scripting {
         // knockout state, and combat turn tracking.
         // -----------------------------------------------------------------------
 
-        // sfall 0x82B0 — get_inven_count_sfall(critter):
-        // Return the number of distinct item stacks in the critter's inventory.
-        // Returns the array length of obj.inventory; 0 for non-critters or empty.
-        // Used by New Reno merchant and reward scripts that need to know how many
-        // item types the player is carrying before deciding what to offer/sell.
-        get_inven_count_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).inventory?.length ?? 0
-        }
-
-        // sfall 0x82B1 — get_critter_base_ap_sfall(obj):
-        // Return the critter's base Action Points before any modifiers (drugs,
-        // equipment, temporary effects).  Reads stats.getBase('Max AP') when
-        // available; falls back to the Fallout 2 formula (5 + ceil(Agility/2)).
-        // Used by New Reno boxing scripts that track the fighter's unmodified AP.
-        get_critter_base_ap_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.getBase === 'function') {
-                const base = critter.stats.getBase('Max AP')
-                if (typeof base === 'number' && isFinite(base)) {return base}
-            }
-            const agi = typeof critter.getStat === 'function' ? (critter.getStat('AGI') ?? 5) : 5
-            return 5 + Math.floor(agi / 2)
-        }
-
-        // sfall 0x82B2 — get_critter_inventory_weight_sfall(obj):
-        // Return the total weight currently carried by the critter in lbs.
-        // Sums item.weight * item.amount for each inventory entry (using the
-        // runtime weight field rather than proto extra.weight/10 used by 0x8237).
-        // Returns 0 for non-critters or when inventory is empty.
-        // Used by New Reno shop/barter scripts that check encumbrance.
-        get_critter_inventory_weight_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const inv: any[] = (obj as any).inventory ?? []
-            let total = 0
-            for (const entry of inv) {
-                const w = (entry.weight ?? 0)
-                const a = typeof entry.amount === 'number' ? entry.amount : 1
-                total += w * a
-            }
-            return total
-        }
-
-        // sfall 0x82B3 — get_critter_carry_limit_sfall(obj):
-        // Return the critter's maximum carry weight in lbs.
-        // Reads the Carry stat (incl. Strong Back / Small Frame); falls back to
-        // the Fallout 2 formula (25 + STR*25) when the stat is unavailable or zero.
-        // Used by New Reno shop scripts to check whether the player can carry loot.
-        get_critter_carry_limit_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return getCritterCarryLimitLbs(obj as Critter)
-        }
-
-        // sfall 0x82B4 — get_obj_script_name_sfall(obj):
-        // Return the script name string for an object, or 0 if none.
-        // Browser build returns 0 — no SID→name registry is available at runtime.
-        // Scripts that probe script names for branching always get 0, which is a
-        // safe no-script sentinel in vanilla Fallout 2.
-        get_obj_script_name_sfall(_obj: Obj): number {
-            return 0
-        }
-
-        // sfall 0x82B5 — get_critter_knockout_state_sfall(obj):
-        // Return 1 if the critter is currently knocked out, 0 otherwise.
-        // Reads critter.knockedOut; returns 0 for non-critters or when not set.
-        // Used by New Reno boxing scripts to determine whether a fighter is down.
-        get_critter_knockout_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            return (obj as any).knockedOut ? 1 : 0
-        }
-
-        // sfall 0x82B6 — set_critter_knockout_state_sfall(obj, state):
-        // Set or clear the knocked-out flag for a critter.
-        // Writes critter.knockedOut (truthy → knocked out, falsy → standing).
-        // No-op for non-critters.  Does not trigger an animation change in the
-        // browser build (full engine integration would be required for that).
-        set_critter_knockout_state_sfall(obj: Obj, state: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return
-            ;}(obj as any).knockedOut = state ? true : false
-        }
-
-        // sfall 0x82B7 — get_combat_turn_sfall():
-        // Return the current combat turn number (1-based) when in combat,
-        // or 0 when not in combat.
-        // Used by New Reno encounter scripts that grant bonuses on specific turns.
-        get_combat_turn_sfall(): number {
-            if (!globalState.inCombat) {return 0}
-            return typeof (globalState as any).combatTurn === 'number'
-                ? Math.max(0, (globalState as any).combatTurn)
-                : 0
-        }
-
         // -----------------------------------------------------------------------
         // Phase 86 — sfall extended opcodes 0x82B8–0x82BF
         // -----------------------------------------------------------------------
 
-        // sfall 0x82B8 — get_critter_trait_typed_sfall(obj, traitType, trait):
-        // Read back a trait/perk/skill value from a critter by traitType.
-        // Unlike the pre-existing get_critter_trait_sfall (0x8208, TRAIT_CHAR-only),
-        // this variant accepts all traitTypes: TRAIT_PERK=0, TRAIT_OBJECT=1,
-        // TRAIT_CHAR=2, TRAIT_SKILL=3.  Delegates to has_trait().
-        // Used by New Reno boxing scripts to verify skill boosts were applied.
-        get_critter_trait_typed_sfall(obj: Obj, traitType: number, trait: number): number {
-            return this.has_trait(traitType, obj, trait)
-        }
-
-        // sfall 0x82B9 — critter_mod_skill_sfall(obj, skillId, amount):
-        // Add amount to a critter's base skill value (signed delta).
-        // Alias of critter_mod_skill — provides the sfall calling convention.
-        // Used by New Reno scripts that prefer the sfall opcode path.
-        critter_mod_skill_sfall(obj: Obj, skillId: number, amount: number): number {
-            return this.critter_mod_skill(obj, skillId, amount) as number
-        }
-
-        // sfall 0x82BA — get_npc_stat_sfall(obj, stat):
-        // Return the effective stat value of an NPC critter.
-        // Alias of get_critter_stat — used by New Reno family-quest scripts that
-        // probe NPC stats via the sfall extended opcode range.
-        get_npc_stat_sfall(obj: Obj, stat: number): number {
-            return this.get_critter_stat(obj as Critter, stat) as number
-        }
-
-        // sfall 0x82BB — set_npc_stat_sfall(obj, stat, val):
-        // Set the base stat of an NPC critter.
-        // Alias of set_critter_stat — used by New Reno scripts that need to
-        // adjust NPC stats via the sfall extended opcode range.
-        set_npc_stat_sfall(obj: Obj, stat: number, val: number): void {
-            this.set_critter_stat(obj, stat, val)
-        }
-
-        // sfall 0x82BC — get_obj_name_sfall(obj):
-        // Return the display name of an object as a string, or 0 for invalid objects.
-        // Used by New Reno merchant and faction scripts to identify objects by name.
-        get_obj_name_sfall(obj: Obj): string | number {
-            if (!isGameObject(obj)) {return 0}
-            return this.obj_name(obj) ?? 0
-        }
-
-        // sfall 0x82BD — get_critter_ai_num_sfall(obj):
-        // Return the aiNum (AI packet number) of a critter, or -1 for non-critters.
-        // Distinct from the pre-existing get_critter_ai_packet_sfall (0x822B) which
-        // reads aiPacket; this reads aiNum (the same field set by OBJECT_AI_PACKET).
-        // Used by New Reno encounter scripts to branch on combatant AI behaviour.
-        get_critter_ai_num_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return -1}
-            return (obj as Critter).aiNum
-        }
-
-        // sfall 0x82BE — get_num_critters_on_tile_sfall(tile):
-        // Return the number of critters currently standing on a given tile.
-        // Counts living critters from gMap's object list on the given tile.
-        get_num_critters_on_tile_sfall(tile: number): number {
-            if (!globalState.gMap || !isFinite(tile)) {return 0}
-            const pos = fromTileNum(tile)
-            if (!isFinite(pos.x) || !isFinite(pos.y)) {return 0}
-            let count = 0
-            for (const obj of globalState.gMap.getObjects()) {
-                if (obj instanceof Critter && !obj.dead && obj.position) {
-                    if (obj.position.x === pos.x && obj.position.y === pos.y) {count++}
-                }
-            }
-            return count
-        }
-
-        // sfall 0x82BF — get_critter_combat_data_sfall(obj):
-        // Return combat-session data for a critter.  Returns a bitmask:
-        //   bit 0: critter is in combat
-        //   bit 1: critter is hostile
-        //   bit 2: critter is fleeing
-        //   bit 3: critter is the current turn owner
-        get_critter_combat_data_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
-            let data = 0
-            // bit 0: in combat
-            if (globalState.inCombat && globalState.combat) {
-                data |= 1
-                // bit 1: hostile
-                if ((obj as any).hostile) {data |= 2}
-                // bit 2: fleeing
-                if ((obj as any).isFleeing) {data |= 4}
-                // bit 3: current turn owner
-                const idx = globalState.combat.combatants.indexOf(obj as Critter)
-                if (idx !== -1 && idx === globalState.combat.whoseTurn) {data |= 8}
-            }
-            return data
-        }
-
         // -----------------------------------------------------------------------
         // Phase 87 — sfall extended opcodes 0x82C0–0x82C7
         // -----------------------------------------------------------------------
-
-        // sfall 0x82C0 — get_critter_active_weapon_sfall(obj):
-        // Return the game object that represents the weapon currently held in the
-        // critter's active hand slot, or 0 if no weapon is equipped.
-        // For NPCs, the active slot is always rightHand.  For the player, the
-        // active slot is determined by Player.activeHand (0=left, 1=right).
-        // New Reno boxing setup scripts check what weapon a fighter has before
-        // deciding which combat animations to use.
-        get_critter_active_weapon_sfall(obj: Obj): Obj | number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const critter = obj as Critter
-            if (critter.isPlayer) {
-                const activeHand = (critter as any).activeHand ?? 0
-                return (activeHand === 1 ? critter.rightHand : critter.leftHand) ?? 0
-            }
-            return critter.rightHand ?? 0
-        }
-
-        // sfall 0x82C1 — get_critter_base_skill_sfall(obj, skillId):
-        // Return the raw base skill allocation for a critter (without SPECIAL
-        // modifier contribution).  Delegates to has_trait(TRAIT_SKILL, …).
-        // New Reno scripts read pre-fight base skill values to verify that
-        // skill boosts applied by critter_add_trait have taken effect.
-        get_critter_base_skill_sfall(obj: Obj, skillId: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            const skillName = skillNumToName[skillId]
-            return skillName ? ((obj as Critter).skills?.getBase(skillName) ?? 0) : 0
-        }
-
-        // sfall 0x82C2 — set_critter_base_skill_sfall(obj, skillId, val):
-        // Set the base skill point allocation for a critter directly.
-        // Delegates to set_critter_skill_points() so the same non-finite
-        // guard (BLK-159) and skill-name validation apply.
-        // Used by New Reno boxing scripts to reset skill state after a fight.
-        set_critter_base_skill_sfall(obj: Obj, skillId: number, val: number): void {
-            this.set_critter_skill_points(obj, skillId, val)
-        }
-
-        // sfall 0x82C3 — get_critter_in_combat_sfall(obj):
-        // Return 1 if the given critter is currently a participant in the
-        // active combat session, 0 otherwise.  Delegates to the same combat-
-        // roster check used by metarule3(103).
-        // New Reno faction-combat scripts query this to skip AI updates for
-        // critters that are already engaged.
-        get_critter_in_combat_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
-            if (!globalState.inCombat) {return 0}
-            const active = (globalState.combat as any)?.combatants
-            if (!active) {return 1} // combat active but roster unavailable — assume in combat
-            return (active as Critter[]).includes(obj as Critter) ? 1 : 0
-        }
-
-        // sfall 0x82C4 — get_map_var_sfall(mvar):
-        // Read a map variable by index via the sfall opcode path.
-        // Delegates to map_var() so the same _mapScript guard and mapVars
-        // state tracking apply.  Used by New Reno district scripts that
-        // read faction-control variables via the sfall calling convention.
-        get_map_var_sfall(mvar: number): number {
-            return this.map_var(mvar) as number
-        }
-
-        // sfall 0x82C5 — set_map_var_sfall(mvar, val):
-        // Write a map variable by index via the sfall opcode path.
-        // Delegates to set_map_var() so the no-map-script guard and mapVars
-        // state tracking apply.  Used by New Reno district scripts that
-        // update faction-control variables via the sfall calling convention.
-        set_map_var_sfall(mvar: number, val: number): void {
-            this.set_map_var(mvar, val)
-        }
-
-        // sfall 0x82C6 — get_critter_attack_type_sfall(obj, slot):
-        // Return the attack type for slot 0 (primary) or 1 (secondary).
-        // Delegates to get_attack_type_sfall (0x8256) which reads from weapon proto.
-        get_critter_attack_type_sfall(obj: Obj, slot: number): number {
-            return this.get_attack_type_sfall(obj, slot)
-        }
-
-        // sfall 0x82C7 — get_critter_min_str_sfall(obj):
-        // Return the minimum Strength required for the critter's equipped
-        // weapon.  Reads minST from the weapon proto (data_member 20).
-        get_critter_min_str_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || (obj as any).type !== 'critter') {return 0}
-            const critter = obj as Critter
-            const weaponObj = critter.equippedWeapon
-            if (!weaponObj || !weaponObj.pro || !weaponObj.pro.extra) {return 0}
-            return weaponObj.pro.extra.minST ?? 0
-        }
-
-        // sfall 0x82C8 — get_weapon_min_dam_sfall(obj):
-        // Return the weapon item's minimum damage roll from the proto data.
-        // Reads from obj.pro.extra directly (same pattern used by other item
-        // accessors) before falling back to proto_data(pid, 14).
-        // Used by combat scripts that compute expected damage ranges for AI decisions.
-        get_weapon_min_dam_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.minDmg
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 14) as number) ?? 0
-        }
-
-        // sfall 0x82C9 — get_weapon_max_dam_sfall(obj):
-        // Return the weapon item's maximum damage roll from the proto data.
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 15).
-        // Used by combat scripts that compute expected damage ranges for AI decisions.
-        get_weapon_max_dam_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.maxDmg
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 15) as number) ?? 0
-        }
-
-        // sfall 0x82CA — get_weapon_dmg_type_sfall(obj):
-        // Return the weapon's damage type index from the proto (WEAPON_DATA_DMG_TYPE).
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 16).
-        // 0=Normal, 1=Laser, 2=Fire, …
-        get_weapon_dmg_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.dmgType
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 16) as number) ?? 0
-        }
-
-        // sfall 0x82CB — get_weapon_ap_cost1_sfall(obj):
-        // Return the primary-attack AP cost from the weapon proto (WEAPON_DATA_AP_COST_1).
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 21).
-        get_weapon_ap_cost1_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.APCost1
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 21) as number) ?? 0
-        }
-
-        // sfall 0x82CC — get_weapon_ap_cost2_sfall(obj):
-        // Return the secondary-attack AP cost from the weapon proto (WEAPON_DATA_AP_COST_2).
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 22).
-        get_weapon_ap_cost2_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.APCost2
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 22) as number) ?? 0
-        }
-
-        // sfall 0x82CD — get_weapon_max_range1_sfall(obj):
-        // Return the primary-attack maximum range from the weapon proto.
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 23).
-        get_weapon_max_range1_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.maxRange1
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 23) as number) ?? 0
-        }
-
-        // sfall 0x82CE — get_weapon_max_range2_sfall(obj):
-        // Return the secondary-attack maximum range from the weapon proto.
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 24).
-        get_weapon_max_range2_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.maxRange2
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 24) as number) ?? 0
-        }
-
-        // sfall 0x82CF — get_weapon_ammo_pid_sfall(obj):
-        // Return the ammo proto PID required by the weapon (WEAPON_DATA_AMMO_PID).
-        // Reads from obj.pro.extra directly before falling back to proto_data(pid, 26).
-        // 0 if no ammo required (melee/unarmed).
-        get_weapon_ammo_pid_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {return 0}
-            const direct = (obj as any).pro?.extra?.ammoPID
-            if (direct !== undefined) {return direct}
-            return (this.proto_data((obj as any).pid ?? 0, 26) as number) ?? 0
-        }
 
         // -----------------------------------------------------------------------
         // Phase 89 — sfall extended opcodes 0x82D0–0x82D7
         // Arroyo / Temple of Trials end-sequence polish.
         // -----------------------------------------------------------------------
 
-        // sfall 0x82D0 — get_critter_reaction_sfall(npc, pc):
-        // Returns the reaction value (0–100) of npc toward pc.  Arroyo and Temple
-        // scripts query reaction to adjust dialogue tone and barter prices.
-        // Default to 50 (neutral) when no stored value is present.
-        get_critter_reaction_sfall(npc: Obj, _pc: Obj): number {
-            if (!isGameObject(npc) || npc.type !== 'critter') {
-                warn('get_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
-                return 50
-            }
-            const base = (npc as any)._reactionValue ?? 50
-            // P1-7: bias reaction by current map's town reputation tier.
-            let bias = 0
-            const mapName = (globalState.gMap as any)?.name as string | undefined
-            const townId = resolveTownIdFromMapName(mapName)
-            if (townId && globalState.reputation) {
-                const tier = townRepTier(getTownRepValue(globalState.reputation, townId))
-                bias = reactionBiasForTier(tier)
-            }
-            return Math.max(0, Math.min(100, base + bias))
-        }
-
-        // sfall 0x82D1 — set_critter_reaction_sfall(npc, pc, val):
-        // Stores the reaction value on the NPC object for later reads.
-        // Clamped to [0, 100] to match Fallout 2 reaction-value range.
-        set_critter_reaction_sfall(npc: Obj, _pc: Obj, val: number): void {
-            if (!isGameObject(npc) || npc.type !== 'critter') {
-                warn('set_critter_reaction_sfall: not a critter: ' + npc, undefined, this)
-                return
-            }
-            const clamped = typeof val === 'number' ? Math.max(0, Math.min(100, val)) : 50
-            ;(npc as any)._reactionValue = clamped
-        }
-
         // sfall 0x82D2 — get_game_difficulty_sfall():
         // Alias: delegates to the upgraded get_game_difficulty_sfall() implementation
         // already registered at 0x8246.  Both opcodes read globalState.gameDifficulty.
 
-        // sfall 0x82D3 — set_game_difficulty_sfall(level):
-        // Sets the game difficulty.  Partial: accepted and stored but the engine
-        // does not yet cascade the value through encounter/XP formula branches.
-        set_game_difficulty_sfall(level: number): void {
-            if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            patchSettings({ gameDifficulty: level as 0 | 1 | 2 }, false)
-        }
-
         // sfall 0x82D4 — get_combat_difficulty_sfall():
         // Alias: delegates to the upgraded get_combat_difficulty_sfall() implementation
         // already registered at 0x81EC.  Both opcodes read globalState.combatDifficulty.
-
-        // sfall 0x82D5 — set_combat_difficulty_sfall(level):
-        // Sets the combat difficulty.  Partial: accepted and stored; full cascade
-        // through the damage formula is not yet wired.
-        set_combat_difficulty_sfall(level: number): void {
-            if (typeof level !== 'number' || level < 0 || level > 2) {return}
-            patchSettings({ combatDifficulty: level as 0 | 1 | 2 }, false)
-        }
-
-        // sfall 0x82D6 — get_critter_team_sfall(obj):
-        // Returns the critter's team/faction number used by combat AI to determine
-        // friend-or-foe relationships in Temple and Arroyo encounters.  0 = neutral.
-        get_critter_team_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_team_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).teamNum ?? 0
-        }
-
-        // sfall 0x82D7 — set_critter_team_sfall(obj, team):
-        // Sets the critter's team number.  Used by arroyo.int to re-assign villager
-        // faction when the Elder's intro script fires after temple completion.
-        set_critter_team_sfall(obj: Obj, team: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_team_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            ;(obj as any).teamNum = typeof team === 'number' ? team : 0
-        }
 
         // -----------------------------------------------------------------------
         // Phase 90 — sfall extended opcodes 0x82D8–0x82DF (critter body/weapon/
@@ -7237,83 +4222,6 @@ export namespace Scripting {
         // (get_critter_gender_sfall) reuse existing implementations from
         // opcodes 0x8206 and 0x8231 respectively — no new method needed.
         // -----------------------------------------------------------------------
-
-        // sfall 0x82D9 — set_critter_body_type_sfall(obj, type):
-        // Set the critter's body type.  Persists in pro.extra.bodyType so that the
-        // existing get_critter_body_type_sfall (0x8206/0x82D8) reads it back correctly.
-        set_critter_body_type_sfall(obj: Obj, type: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_body_type_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const safeType = typeof type === 'number' ? type : 0
-            if (!(obj as any).pro) {;(obj as any).pro = {}}
-            if (!(obj as any).pro.extra) {;(obj as any).pro.extra = {}}
-            ;(obj as any).pro.extra.bodyType = safeType
-        }
-
-        // sfall 0x82DA — get_critter_weapon_type_sfall(obj):
-        // Return the weapon-type code of the critter's currently equipped weapon.
-        // 0=unarmed, 1=melee, 2=ranged, 3=thrown, 4=energy, 5=explosive.
-        get_critter_weapon_type_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_weapon_type_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const weapon = critter.rightHand ?? critter.leftHand
-            if (!weapon) {return 0}
-            return (weapon as any)._weaponType ?? 0
-        }
-
-        // sfall 0x82DB — set_critter_weapon_type_sfall(obj, type):
-        // Override the weapon-type for the critter's active weapon slot.
-        set_critter_weapon_type_sfall(obj: Obj, type: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_weapon_type_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            const weapon = critter.rightHand ?? critter.leftHand
-            if (!weapon) {return}
-            ;(weapon as any)._weaponType = typeof type === 'number' ? type : 0
-        }
-
-        // sfall 0x82DC — get_critter_kills_sfall(obj):
-        // Return the number of kills attributed to this critter.
-        // Used by Arroyo elder script to check how many temple rats the player killed.
-        get_critter_kills_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_kills_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any)._kills ?? 0
-        }
-
-        // sfall 0x82DD — set_critter_kills_sfall(obj, count):
-        // Set the kill count on a critter.
-        set_critter_kills_sfall(obj: Obj, count: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_kills_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            ;(obj as any)._kills = typeof count === 'number' && count >= 0 ? count : 0
-        }
-
-        // sfall 0x82DF — set_critter_gender_sfall(obj, gender):
-        // Set the critter's gender (0=male, 1=female).  Used by character-creation
-        // scripts in the Arroyo opening sequence to persist the gender choice on the
-        // player object before the temple run begins.  The companion getter
-        // (0x82DE / 0x8231: get_critter_gender_sfall) reads the .gender property,
-        // so this setter writes to the same field for consistency.
-        set_critter_gender_sfall(obj: Obj, gender: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_gender_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const safeGender = typeof gender === 'number' ? gender : 0
-            ;(obj as any).gender = safeGender === 1 ? 'female' : 'male'
-        }
 
         // -----------------------------------------------------------------------
         // Phase 91 — sfall extended opcodes 0x82E0–0x82E7 (critter heal-rate
@@ -7324,409 +4232,26 @@ export namespace Scripting {
         // reuse existing implementations from opcodes 0x8238/0x8239.
         // -----------------------------------------------------------------------
 
-        // sfall 0x82E4 — get_critter_heal_rate_sfall(obj):
-        // Return the critter's Healing Rate stat.
-        // The arroyo-to-world-map rest mechanic uses Healing Rate to compute
-        // how much HP the player recovers during travel downtime.
-        get_critter_heal_rate_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_heal_rate_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Healing Rate') ?? 0
-        }
-
-        // sfall 0x82E5 — set_critter_heal_rate_sfall(obj, val):
-        // Set the critter's Healing Rate stat.
-        set_critter_heal_rate_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_heal_rate_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const safeVal = typeof val === 'number' && isFinite(val) ? Math.max(0, val) : 0
-            ;(obj as Critter).stats.setBase('Healing Rate', safeVal)
-        }
-
-        // sfall 0x82E6 — get_critter_sequence_sfall(obj):
-        // Return the critter's Sequence stat (initiative in combat).
-        // The temple of trials final encounter uses sequence to determine turn order
-        // for the last wave of rats and the boss critter.
-        get_critter_sequence_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_sequence_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Sequence') ?? 0
-        }
-
-        // sfall 0x82E7 — set_critter_sequence_sfall(obj, val):
-        // Set the critter's Sequence stat.
-        set_critter_sequence_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_sequence_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const safeVal = typeof val === 'number' && isFinite(val) ? Math.max(0, val) : 0
-            ;(obj as Critter).stats.setBase('Sequence', safeVal)
-        }
-
         // -----------------------------------------------------------------------
         // Phase 92 — sfall extended opcodes 0x82E8–0x82EF (critter level alias,
         // age, kill-type, party count and max-level queries for arroyo end-sequence).
         // -----------------------------------------------------------------------
-
-        // sfall 0x82EA — get_critter_age_sfall(obj):
-        // Return the critter's age.  No age field in this build; returns 0.
-        get_critter_age_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_age_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).age ?? 0
-        }
-
-        // sfall 0x82EB — set_critter_age_sfall(obj, val):
-        // Set the critter's age.  Stored for future use; no gameplay effect.
-        set_critter_age_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_age_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            ;(obj as any).age = typeof val === 'number' && isFinite(val) ? Math.max(0, Math.trunc(val)) : 0
-        }
-
-        // sfall 0x82EC — get_critter_kill_type_sfall(obj):
-        // Alias of the existing 0x81F4 / 0x821C — return the kill-type index.
-        get_critter_kill_type_sfall2(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_kill_type_sfall2: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as any).killType ?? 0
-        }
-
-        // sfall 0x82ED — set_critter_kill_type_sfall(obj, val):
-        // Set the kill-type index on a critter.
-        set_critter_kill_type_sfall2(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_kill_type_sfall2: not a critter: ' + obj, undefined, this)
-                return
-            }
-            ;(obj as any).killType = typeof val === 'number' && isFinite(val) ? Math.max(0, Math.trunc(val)) : 0
-        }
-
-        // sfall 0x82EE — get_party_size_sfall():
-        // Return the current number of NPCs in the player's party.
-        // Delegates to gParty (same as metarule(24) / METARULE_PARTY_COUNT).
-        get_party_size_sfall(): number {
-            return globalState.gParty ? globalState.gParty.getPartyMembers().length : 0
-        }
-
-        // sfall 0x82EF — get_max_level_sfall():
-        // Return the engine's maximum player level cap (99 in Fallout 2).
-        get_max_level_sfall(): number {
-            return 99
-        }
 
         // -------------------------------------------------------------------------
         // Phase 93 — sfall extended opcodes 0x82F0–0x82F7 (HP aliases, melee dmg,
         // critical chance).
         // -------------------------------------------------------------------------
 
-        // sfall 0x82F0 — get_critter_hp_sfall2(obj): current HP (alias of existing
-        // get_critter_hp).  Arroyo and temple encounter scripts compiled against
-        // sfall 4.3+ may use this alternate slot to read critter health.
-        get_critter_hp_sfall2(obj: Obj): number {
-            return this.get_critter_hp(obj)
-        }
-
-        // sfall 0x82F1 — set_critter_hp_sfall2(obj, hp): set current HP.
-        // Alias of set_critter_hp (0x8297).  Clamps to [0, Max HP].
-        set_critter_hp_sfall2(obj: Obj, hp: number): void {
-            this.set_critter_hp(obj, hp)
-        }
-
-        // sfall 0x82F2 — get_critter_max_hp_sfall2(obj): maximum HP.
-        // Alias of get_critter_max_hp_sfall (0x81F8 / 0x828F).
-        get_critter_max_hp_sfall2(obj: Obj): number {
-            return this.get_critter_max_hp_sfall(obj)
-        }
-
-        // sfall 0x82F3 — set_critter_max_hp_sfall2(obj, hp): set maximum HP.
-        // Alias of set_critter_max_hp_sfall (0x81F9).
-        set_critter_max_hp_sfall2(obj: Obj, hp: number): void {
-            this.set_critter_max_hp_sfall(obj, hp)
-        }
-
-        // sfall 0x82F4 — get_critter_melee_dmg_sfall(obj): critter Melee Damage stat.
-        // Returns the critter's base Melee Damage value (used for unarmed/melee
-        // attacks).  Returns 0 for non-critters or if the stat is unavailable.
-        get_critter_melee_dmg_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_melee_dmg_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Melee Damage') ?? 0
-        }
-
-        // sfall 0x82F5 — set_critter_melee_dmg_sfall(obj, val): set Melee Damage stat.
-        // Clamps to [0, ∞) and coerces non-finite to 0.
-        set_critter_melee_dmg_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_melee_dmg_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            ;(obj as Critter).stats.setBase('Melee Damage', v)
-        }
-
-        // sfall 0x82F6 — get_critter_critical_chance_sfall(obj): Critical Chance stat.
-        // Returns the critter's base Critical Chance value.  Returns 0 for
-        // non-critters or if the stat is unavailable.
-        get_critter_critical_chance_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_critical_chance_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Critical Chance') ?? 0
-        }
-
-        // sfall 0x82F7 — set_critter_critical_chance_sfall(obj, val): set Critical Chance.
-        // Clamps to [0, 100] and coerces non-finite to 0.
-        set_critter_critical_chance_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_critical_chance_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(0, Math.min(100, Math.trunc(val))) : 0
-            ;(obj as Critter).stats.setBase('Critical Chance', v)
-        }
-
         // -------------------------------------------------------------------------
         // Phase 94 — sfall extended opcodes 0x82F8–0x82FF (armor class, damage
         // resist/thresh, action points).
         // -------------------------------------------------------------------------
-
-        // sfall 0x82F8 — get_critter_armor_class_sfall(obj): Armor Class stat.
-        // Returns the critter's base Armor Class value used by combat to-hit
-        // calculations.  Arroyo guard and temple encounter scripts read AC to
-        // scale difficulty.  Returns 0 for non-critters.
-        get_critter_armor_class_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_armor_class_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Armor Class') ?? 0
-        }
-
-        // sfall 0x82F9 — set_critter_armor_class_sfall(obj, val): set Armor Class.
-        // Clamps to [0, ∞) and coerces non-finite to 0.
-        set_critter_armor_class_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_armor_class_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            ;(obj as Critter).stats.setBase('Armor Class', v)
-        }
-
-        // sfall 0x82FA — get_critter_damage_resist_sfall(obj, damType): Damage Resistance.
-        // Returns the critter's DR value for the given damage type index (0 = Normal,
-        // 1 = Laser, 2 = Fire, 3 = Plasma, 4 = Electrical, 5 = EMP, 6 = Explosion).
-        // Used by Temple of Trials dart-trap and boss scripts.  Returns 0 for invalid
-        // inputs.
-        get_critter_damage_resist_sfall(obj: Obj, damType: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_damage_resist_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            // DR stat names follow the pattern "Damage Resistance: Normal", etc.
-            const typeName = damageTypeNames[damType]
-            if (!typeName) {
-                warn('get_critter_damage_resist_sfall: unknown damage type: ' + damType, undefined, this)
-                return 0
-            }
-            return critter.getStat('Damage Resistance: ' + typeName) ?? 0
-        }
-
-        // sfall 0x82FB — set_critter_damage_resist_sfall(obj, damType, val): set DR.
-        // Clamps to [0, 100] and coerces non-finite to 0.
-        set_critter_damage_resist_sfall(obj: Obj, damType: number, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_damage_resist_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const typeName = damageTypeNames[damType]
-            if (!typeName) {
-                warn('set_critter_damage_resist_sfall: unknown damage type: ' + damType, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(0, Math.min(100, Math.trunc(val))) : 0
-            ;(obj as Critter).stats.setBase('Damage Resistance: ' + typeName, v)
-        }
-
-        // sfall 0x82FC — get_critter_damage_thresh_sfall(obj, damType): Damage Threshold.
-        // Returns the critter's DT value for the given damage type index.
-        // Returns 0 for invalid inputs or non-critters.
-        get_critter_damage_thresh_sfall(obj: Obj, damType: number): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_damage_thresh_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            const typeName = damageTypeNames[damType]
-            if (!typeName) {
-                warn('get_critter_damage_thresh_sfall: unknown damage type: ' + damType, undefined, this)
-                return 0
-            }
-            return critter.getStat('Damage Threshold: ' + typeName) ?? 0
-        }
-
-        // sfall 0x82FD — set_critter_damage_thresh_sfall(obj, damType, val): set DT.
-        // Clamps to [0, ∞) and coerces non-finite to 0.
-        set_critter_damage_thresh_sfall(obj: Obj, damType: number, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_damage_thresh_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const typeName = damageTypeNames[damType]
-            if (!typeName) {
-                warn('set_critter_damage_thresh_sfall: unknown damage type: ' + damType, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            ;(obj as Critter).stats.setBase('Damage Threshold: ' + typeName, v)
-        }
-
-        // sfall 0x82FE — get_critter_action_points_sfall2(obj): current AP (alias).
-        // Returns the critter's current Action Points in combat.  Arroyo combat
-        // scripts read AP to determine if an NPC can take an extra action at the
-        // end of the turn.  Returns 0 outside combat or for non-critters.
-        get_critter_action_points_sfall2(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_action_points_sfall2: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return this.get_critter_action_points_sfall(obj)
-        }
-
-        // sfall 0x82FF — set_critter_action_points_sfall2(obj, val): set current AP (alias).
-        // Sets the critter's current Action Points for the active combat turn.
-        // Clamped to [0, ∞) and coerces non-finite to 0.
-        set_critter_action_points_sfall2(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_action_points_sfall2: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            this.set_critter_action_points_sfall(obj, v)
-        }
 
         // -------------------------------------------------------------------------
         // Phase 95 — sfall extended opcodes 0x8300–0x8307 (critter SPECIAL stats:
         // Perception, Luck, Agility, Charisma — used by Arroyo guard-AI detection
         // scripts and character-creation validation at game start).
         // -------------------------------------------------------------------------
-
-        // sfall 0x8300 — get_critter_perception_sfall(obj): Perception stat.
-        // Returns the critter's Perception value used by guard scripts to scale
-        // detection range and awareness.  Arroyo guard and Elder scripts read PE
-        // to determine whether the player is spotted during the opening sequence.
-        // Returns 0 for non-critters.
-        get_critter_perception_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_perception_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Perception') ?? 0
-        }
-
-        // sfall 0x8301 — set_critter_perception_sfall(obj, val): set Perception.
-        // Clamps to [1, 10] and coerces non-finite to 1 (minimum valid SPECIAL stat).
-        set_critter_perception_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_perception_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Perception', v)
-        }
-
-        // sfall 0x8302 — get_critter_luck_sfall(obj): Luck stat.
-        // Returns the critter's Luck stat used by critical-hit and random-event
-        // scripts during Arroyo's opening and Temple of Trials encounters.
-        // Returns 0 for non-critters.
-        get_critter_luck_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_luck_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Luck') ?? 0
-        }
-
-        // sfall 0x8303 — set_critter_luck_sfall(obj, val): set Luck.
-        // Clamps to [1, 10].
-        set_critter_luck_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_luck_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Luck', v)
-        }
-
-        // sfall 0x8304 — get_critter_agility_sfall(obj): Agility stat.
-        // Returns the critter's Agility stat used for AP calculation and dodge
-        // chance during Arroyo's NPC init and Temple combat sequences.
-        // Returns 0 for non-critters.
-        get_critter_agility_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_agility_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Agility') ?? 0
-        }
-
-        // sfall 0x8305 — set_critter_agility_sfall(obj, val): set Agility.
-        // Clamps to [1, 10].
-        set_critter_agility_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_agility_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Agility', v)
-        }
-
-        // sfall 0x8306 — get_critter_charisma_sfall(obj): Charisma stat.
-        // Returns the critter's Charisma stat used by party-size and NPC-reaction
-        // scripts in Arroyo village dialogue (Elder, tribesman greeting).
-        // Returns 0 for non-critters.
-        get_critter_charisma_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_charisma_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Charisma') ?? 0
-        }
-
-        // sfall 0x8307 — set_critter_charisma_sfall(obj, val): set Charisma.
-        // Clamps to [1, 10].
-        set_critter_charisma_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_charisma_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Charisma', v)
-        }
 
         // -------------------------------------------------------------------------
         // Phase 96 — sfall extended opcodes 0x8308–0x830F (critter SPECIAL stats:
@@ -7735,247 +4260,12 @@ export namespace Scripting {
         // level-scaling and Temple of Trials encounter-balance scripts).
         // -------------------------------------------------------------------------
 
-        // sfall 0x8308 — get_critter_strength_sfall(obj): Strength stat.
-        // Returns the critter's Strength value used by carry-weight, melee-damage,
-        // and weapon-strength-requirement scripts in Arroyo tribal equipment
-        // distribution.  Returns 0 for non-critters.
-        get_critter_strength_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_strength_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Strength') ?? 0
-        }
-
-        // sfall 0x8309 — set_critter_strength_sfall(obj, val): set Strength.
-        // Clamps to [1, 10]; non-finite values are coerced to 1.
-        set_critter_strength_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_strength_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Strength', v)
-        }
-
-        // sfall 0x830A — get_critter_endurance_sfall(obj): Endurance stat.
-        // Returns the critter's Endurance value used by HP-maximum, hit-point-per-
-        // level, and poison/radiation-resistance scripts in Arroyo NPC initialisation
-        // and Temple of Trials survival checks.  Returns 0 for non-critters.
-        get_critter_endurance_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_endurance_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('Endurance') ?? 0
-        }
-
-        // sfall 0x830B — set_critter_endurance_sfall(obj, val): set Endurance.
-        // Clamps to [1, 10]; non-finite values are coerced to 1.
-        set_critter_endurance_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_endurance_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('Endurance', v)
-        }
-
-        // sfall 0x830C — get_critter_intelligence_sfall(obj): Intelligence stat.
-        // Returns the critter's Intelligence value used by dialogue-option filtering
-        // (giq_option IQ gates), skill-point-per-level calculation, and Arroyo
-        // Elder conversation branching.  Returns 0 for non-critters.
-        get_critter_intelligence_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_intelligence_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).getStat('INT') ?? 0
-        }
-
-        // sfall 0x830D — set_critter_intelligence_sfall(obj, val): set Intelligence.
-        // Clamps to [1, 10]; non-finite values are coerced to 1.
-        set_critter_intelligence_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_intelligence_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val))
-                ? Math.max(1, Math.min(10, Math.trunc(val))) : 1
-            ;(obj as Critter).stats.setBase('INT', v)
-        }
-
-        // get_critter_sneak_state_sfall / set_critter_sneak_state_sfall: the
-        // player's sneak state (DUDE_STATE_SNEAKING, state bit 0).
-        get_critter_sneak_state_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return playerInSneakMode(obj) ? 1 : 0
-        }
-
-        set_critter_sneak_state_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_sneak_state_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            setPlayerSneakMode(obj, !!val)
-        }
-
         // -------------------------------------------------------------------------
         // Phase 97 — sfall extended opcodes 0x8310–0x8317 (critter orientation,
         // tile/elevation queries, base-AP setter, XP-level formula, and base-HP
         // get/set — used by Arroyo NPC placement, end-sequence reward scripts, and
         // the Temple of Trials encounter-balance calculations).
         // -------------------------------------------------------------------------
-
-        // sfall 0x8310 — get_critter_orientation_sfall(obj): critter facing direction.
-        // Returns the critter's current facing direction in [0, 5], where
-        // 0=north-east, 1=east, 2=south-east, 3=south-west, 4=west, 5=north-west.
-        // Used by Arroyo guard-placement scripts to verify or override NPC facing
-        // after map_enter_p_proc positions them at their starting tiles.
-        // Returns 0 for non-critter objects (matches sfall convention).
-        get_critter_orientation_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_orientation_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const dir = (obj as any).orientation
-            return (typeof dir === 'number' && isFinite(dir)) ? ((Math.trunc(dir) % 6 + 6) % 6) : 0
-        }
-
-        // sfall 0x8311 — set_critter_orientation_sfall(obj, dir): set facing direction.
-        // Sets the critter's orientation to dir [0, 5]; values outside this range are
-        // wrapped with modulo-6 arithmetic, matching the behaviour of set_obj_rotation.
-        set_critter_orientation_sfall(obj: Obj, dir: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_orientation_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (typeof dir !== 'number' || !isFinite(dir)) {
-                warn('set_critter_orientation_sfall: non-finite dir (' + dir + ') — no-op', undefined, this)
-                return
-            }
-            ;(obj as any).orientation = ((Math.trunc(dir) % 6) + 6) % 6
-        }
-
-        // sfall 0x8312 — get_critter_tile_num_sfall(obj): per-critter tile number.
-        // Returns the critter's current tile number, or -1 when the critter has no
-        // position (e.g. in inventory or mid-map-transition).  Distinct from the
-        // general-purpose get_tile_at_object_sfall (0x8270) which returns 0 on
-        // failure; this variant returns -1 to match the Fallout 2 engine convention
-        // for "no tile" used by placement-validation scripts.
-        get_critter_tile_num_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_critter_tile_num_sfall: not a game object: ' + obj, undefined, this)
-                return -1
-            }
-            const pos = (obj as any).position
-            if (!pos || typeof pos.x !== 'number' || !isFinite(pos.x) ||
-                typeof pos.y !== 'number' || !isFinite(pos.y)) {return -1}
-            return pos.y * 200 + pos.x
-        }
-
-        // sfall 0x8313 — get_critter_elevation_sfall(obj): critter's current elevation.
-        // Returns the critter's current elevation index (0–2).  Arroyo multi-level
-        // scripts use this to verify that an NPC is on the correct elevation before
-        // performing tile-distance or LOS calculations.  Falls back to the global
-        // current elevation when the critter does not carry its own elevation field.
-        get_critter_elevation_sfall(obj: Obj): number {
-            if (!isGameObject(obj)) {
-                warn('get_critter_elevation_sfall: not a game object: ' + obj, undefined, this)
-                return globalState.currentElevation ?? 0
-            }
-            const elev = (obj as any).elevation
-            if (typeof elev === 'number' && isFinite(elev)) {return Math.max(0, Math.min(2, Math.trunc(elev)))}
-            return globalState.currentElevation ?? 0
-        }
-
-        // sfall 0x8314 — set_critter_base_ap_sfall(obj, val): set critter base AP.
-        // Setter companion to get_critter_base_ap_sfall (0x82B1).  Sets the critter's
-        // base Action Points stat directly via stats.setBase so the change persists
-        // across level-ups and drug wears-off.  Non-finite or negative values are
-        // clamped to 0.  Used by Arroyo elder end-sequence scripts that scale NPC
-        // combat AP with player progress.
-        set_critter_base_ap_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_base_ap_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.setBase === 'function') {
-                critter.stats.setBase('AP', v)
-            } else {
-                critter.AP = v
-            }
-        }
-
-        // sfall 0x8315 — get_critter_xp_for_level_sfall(level): XP threshold.
-        // Returns the total accumulated XP required to reach the given player level
-        // using the Fallout 2 formula: XP(n) = 500 × n × (n − 1).
-        //   Level 1 →       0 XP
-        //   Level 2 →    1000 XP
-        //   Level 3 →    3000 XP
-        //   Level 4 →    6000 XP
-        // Returns 0 for levels ≤ 1 or non-finite inputs.  Used by end-of-arroyo
-        // reward scripts that award the player enough XP to reach level 2.
-        get_critter_xp_for_level_sfall(level: number): number {
-            if (typeof level !== 'number' || !isFinite(level) || level <= 1) {return 0}
-            const n = Math.trunc(level)
-            return 500 * n * (n - 1)
-        }
-
-        // sfall 0x8316 — get_critter_base_hp_sfall(obj): critter's base Max HP.
-        // Returns the critter's base Max HP stat before any equipment or drug
-        // modifiers are applied.  Reads stats.getBase('Max HP') when available;
-        // falls back to the proto XPValue-derived default (10) used by Arroyo
-        // tribesman template objects.
-        get_critter_base_hp_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_base_hp_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.getBase === 'function') {
-                const base = critter.stats.getBase('Max HP')
-                if (typeof base === 'number' && isFinite(base)) {return base}
-            }
-            return critter.maxHP ?? 10
-        }
-
-        // sfall 0x8317 — set_critter_base_hp_sfall(obj, val): set base Max HP.
-        // Setter companion to get_critter_base_hp_sfall (0x8316).  Writes the
-        // critter's base Max HP directly via stats.setBase so the value persists
-        // across healing and level-up recalculations.  Non-finite or negative
-        // values are clamped to 1 (minimum viable HP).  Used by Arroyo temple
-        // scripts that set boss HP based on difficulty configuration.
-        set_critter_base_hp_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_base_hp_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(1, Math.trunc(val)) : 1
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.setBase === 'function') {
-                critter.stats.setBase('Max HP', v)
-            } else {
-                critter.maxHP = v
-            }
-        }
-
-        // sfall 0x8318 — get_critter_current_ap_sfall(obj): returns current combat AP.
-        get_critter_current_ap_sfall(obj: Obj): number {
-            return this.get_critter_combat_ap(obj)
-        }
-
-        // sfall 0x8319 — set_critter_current_ap_sfall(obj, val): sets current AP clamped to base Max AP.
-        set_critter_current_ap_sfall(obj: Obj, val: number): void {
-            this.set_critter_combat_ap(obj, val)
-        }
 
         // sfall 0x831A — get_critter_extra_stat_sfall(obj, statId): returns derived stat modifier.
         get_critter_extra_stat_sfall(obj: Obj, statId: number): number {
@@ -7988,43 +4278,8 @@ export namespace Scripting {
             return (obj as any)._extraStats?.[statName] ?? 0
         }
 
-        // sfall 0x831C — get_critter_base_ac_sfall(obj): returns base AC.
-        get_critter_base_ac_sfall(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_critter_base_ac_sfall: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.getBase === 'function') {
-                return critter.stats.getBase('AC') ?? 0
-            }
-            return 0
-        }
-
-        // sfall 0x831D — set_critter_base_ac_sfall(obj, val): sets base AC.
-        set_critter_base_ac_sfall(obj: Obj, val: number): void {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_base_ac_sfall: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const v = (typeof val === 'number' && isFinite(val)) ? Math.max(0, Math.trunc(val)) : 0
-            const critter = obj as any
-            if (critter.stats && typeof critter.stats.setBase === 'function') {
-                critter.stats.setBase('AC', v)
-            }
-        }
 
 
-
-
-        // BLK-122 / P2-2 — gfade CSS helpers delegate to fade.ts (kept for tests).
-        gfade_out_css(_time: number): void {
-            fadeOut(typeof _time === 'number' ? _time : 5)
-        }
-
-        gfade_in_css(_time: number): void {
-            fadeIn(typeof _time === 'number' ? _time : 5)
-        }
 
         _serialize(): SerializedScript {
             return { name: this.scriptName, lvars: Object.assign({}, this.lvars) }

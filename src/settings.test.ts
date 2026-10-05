@@ -128,10 +128,4 @@ describe('settings overlay get_ini_setting / metarules', () => {
         expect(script.metarule(47, 0)).toBe(1)
     })
 
-    it('get_violence_level_sfall follows the Options setting', () => {
-        expect(script.get_violence_level_sfall()).toBe(2)
-        patchSettings({ violenceLevel: 0 })
-        expect(script.get_violence_level_sfall()).toBe(0)
-        expect(script.metarule(48, 0)).toBe(0)
-    })
 })

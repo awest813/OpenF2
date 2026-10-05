@@ -273,36 +273,6 @@ describe('Phase 25-G — metarule3() IDs >= 116 silent default', () => {
     }
 })
 
-// ---------------------------------------------------------------------------
-// I–M. sfall opcodes 0x818B–0x818F via Scripting.Script methods
-// ---------------------------------------------------------------------------
-
-describe('Phase 25-I — get_object_art_fid() returns a number', () => {
-    it('returns combined fid for object with frmType and frmPID', () => {
-        const script = new (Scripting as any).Script()
-        const obj = makeObj({ frmType: 1, frmPID: 5 })
-        const fid = script.get_object_art_fid(obj)
-        expect(typeof fid).toBe('number')
-        expect(fid).toBe((1 << 24) | 5)
-    })
-
-    it('returns 0 for non-game-object', () => {
-        const script = new (Scripting as any).Script()
-        const result = script.get_object_art_fid(null)
-        expect(result).toBe(0)
-    })
-})
-
-describe('Phase 25-J — set_object_art_fid() sets fid without throwing', () => {
-    it('sets frmType, frmPID and fid fields', () => {
-        const script = new (Scripting as any).Script()
-        const obj = makeObj()
-        expect(() => script.set_object_art_fid(obj, (2 << 24) | 42)).not.toThrow()
-        expect(obj.frmType).toBe(2)
-        expect(obj.frmPID).toBe(42)
-    })
-})
-
 describe('Phase 25-K — get_critter_combat_ap() returns AP.combat', () => {
     it('returns AP.combat for a critter', () => {
         const script = new (Scripting as any).Script()
@@ -330,13 +300,6 @@ describe('Phase 25-L — set_critter_combat_ap() sets AP.combat', () => {
         const c = makeCritter({ AP: { current: 7, combat: 7, max: 8 } })
         script.set_critter_combat_ap(c, -5)
         expect(c.AP.combat).toBe(0)
-    })
-})
-
-describe('Phase 25-M — get_script_return_value() returns 0 (partial)', () => {
-    it('returns 0', () => {
-        const script = new (Scripting as any).Script()
-        expect(script.get_script_return_value()).toBe(0)
     })
 })
 

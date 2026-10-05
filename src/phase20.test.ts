@@ -157,24 +157,6 @@ describe('Phase 20-E — sfall opcodes 0x817D–0x817F', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('get_critter_name returns the name of a game object', () => {
-        const c = makeCritter({ name: 'Marcus' })
-        expect(script.get_critter_name(c)).toBe('Marcus')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_name returns empty string for a null argument', () => {
-        expect(script.get_critter_name(null)).toBe('')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_name returns empty string when obj has no name', () => {
-        const obj = makeObj()
-        delete obj.name
-        expect(script.get_critter_name(obj)).toBe('')
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('get_game_mode returns 0 (no mode-flags in engine)', () => {
         expect(script.get_game_mode()).toBe(0)
         expect(stubHitCount()).toBe(0)
@@ -185,16 +167,6 @@ describe('Phase 20-E — sfall opcodes 0x817D–0x817F', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('get_critter_name returns empty string for item with no name', () => {
-        const item = makeObj()
-        delete item.name
-        expect(script.get_critter_name(item)).toBe('')
-    })
-
-    it('get_critter_name works for item with a name', () => {
-        const item = makeObj({ name: 'Combat Knife' })
-        expect(script.get_critter_name(item)).toBe('Combat Knife')
-    })
 })
 
 // ---------------------------------------------------------------------------

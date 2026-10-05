@@ -21,50 +21,6 @@ import { opMap } from './vm_opcodes.js'
 // ===========================================================================
 
 describe('Phase 53-A — BLK-039: Weapon slot serialization (leftHandPID/rightHandPID)', () => {
-    it('get_critter_weapon (slot 0) still returns rightHand with pid', () => {
-        Scripting.init('test_phase53')
-        const script = new (Scripting as any).Script()
-        drainStubHits()
-        const weapon = { type: 'item', subtype: 'weapon', pid: 100 }
-        const mockCritter = {
-            type: 'critter',
-            position: { x: 1, y: 1 },
-            rightHand: weapon,
-            leftHand: undefined,
-            inventory: [weapon],
-        }
-        expect(script.get_critter_weapon(mockCritter, 0)).toBe(weapon)
-    })
-
-    it('get_critter_weapon (slot 1) still returns leftHand with pid', () => {
-        Scripting.init('test_phase53')
-        const script = new (Scripting as any).Script()
-        drainStubHits()
-        const weapon = { type: 'item', subtype: 'weapon', pid: 101 }
-        const mockCritter = {
-            type: 'critter',
-            position: { x: 1, y: 1 },
-            rightHand: undefined,
-            leftHand: weapon,
-            inventory: [weapon],
-        }
-        expect(script.get_critter_weapon(mockCritter, 1)).toBe(weapon)
-    })
-
-    it('get_critter_weapon returns 0 when weapon has no pid (punch stub)', () => {
-        Scripting.init('test_phase53')
-        const script = new (Scripting as any).Script()
-        drainStubHits()
-        const mockCritter = {
-            type: 'critter',
-            position: { x: 0, y: 0 },
-            rightHand: { type: 'item', subtype: 'weapon' }, // no pid — punch stub
-            leftHand: undefined,
-            inventory: [],
-        }
-        expect(script.get_critter_weapon(mockCritter, 0)).toBe(0)
-    })
-
     it('weapon slot restoration: leftHand re-assigned when leftHandPID matches inventory', () => {
         // Simulate the fromMapObject BLK-039 logic in isolation
         const weaponInInventory = { type: 'item', subtype: 'weapon', pid: 200 }
@@ -268,94 +224,6 @@ describe('Phase 53-D — set_critter_base_stat scripting function', () => {
     })
 })
 
-describe('Phase 53-D — critter_mod_skill_points scripting function', () => {
-    let script: any
-
-    beforeEach(() => {
-        Scripting.init('test_phase53')
-        script = new (Scripting as any).Script()
-        drainStubHits()
-    })
-
-    it('critter_mod_skill_points does not throw for null', () => {
-        expect(() => script.critter_mod_skill_points(null, 5)).not.toThrow()
-    })
-
-    it('critter_mod_skill_points does not throw for non-player critter', () => {
-        const mockCritter = {
-            type: 'critter',
-            position: { x: 0, y: 0 },
-            inventory: [],
-            isPlayer: false,
-        }
-        expect(() => script.critter_mod_skill_points(mockCritter, 5)).not.toThrow()
-    })
-
-    it('critter_mod_skill_points does not emit a stub hit', () => {
-        drainStubHits()
-        script.critter_mod_skill_points({}, 5)
-        expect(drainStubHits().length).toBe(0)
-    })
-})
-
-describe('Phase 53-D — get_combat_target and set_combat_target', () => {
-    let script: any
-
-    beforeEach(() => {
-        Scripting.init('test_phase53')
-        script = new (Scripting as any).Script()
-        drainStubHits()
-    })
-
-    it('get_combat_target returns 0 (no per-critter tracking)', () => {
-        const mockCritter = { type: 'critter', position: { x: 0, y: 0 }, inventory: [] }
-        expect(script.get_combat_target(mockCritter)).toBe(0)
-    })
-
-    it('get_combat_target does not throw for null', () => {
-        expect(() => script.get_combat_target(null)).not.toThrow()
-    })
-
-    it('set_combat_target does not throw', () => {
-        const mockCritter = { type: 'critter', position: { x: 0, y: 0 }, inventory: [] }
-        const mockTarget = { type: 'critter', position: { x: 5, y: 5 }, inventory: [] }
-        expect(() => script.set_combat_target(mockCritter, mockTarget)).not.toThrow()
-    })
-
-    it('set_combat_target does not throw for null args', () => {
-        expect(() => script.set_combat_target(null, null)).not.toThrow()
-    })
-})
-
-describe('Phase 53-D — get_game_time_in_seconds', () => {
-    let script: any
-
-    beforeEach(() => {
-        Scripting.init('test_phase53')
-        script = new (Scripting as any).Script()
-        drainStubHits()
-    })
-
-    it('get_game_time_in_seconds returns a number', () => {
-        const result = script.get_game_time_in_seconds()
-        expect(typeof result).toBe('number')
-    })
-
-    it('get_game_time_in_seconds does not throw', () => {
-        expect(() => script.get_game_time_in_seconds()).not.toThrow()
-    })
-
-    it('get_game_time_in_seconds returns non-negative value', () => {
-        const result = script.get_game_time_in_seconds()
-        expect(result).toBeGreaterThanOrEqual(0)
-    })
-
-    it('get_game_time_in_seconds returns integer', () => {
-        const result = script.get_game_time_in_seconds()
-        expect(result).toBe(Math.floor(result))
-    })
-})
-
 describe('Phase 53-D — get_light_level and set_light_level_sfall', () => {
     let script: any
 
@@ -376,30 +244,6 @@ describe('Phase 53-D — get_light_level and set_light_level_sfall', () => {
         expect(result).toBeLessThanOrEqual(65536)
     })
 
-    it('set_light_level_sfall does not throw', () => {
-        expect(() => script.set_light_level_sfall(32768, 1)).not.toThrow()
-    })
-
-    it('set_light_level_sfall does not throw for null', () => {
-        expect(() => script.set_light_level_sfall(null, 0)).not.toThrow()
-    })
-
-    it('set_light_level_sfall clamps values to 0–65536', () => {
-        expect(() => script.set_light_level_sfall(-100, 0)).not.toThrow()
-        expect(() => script.set_light_level_sfall(99999, 0)).not.toThrow()
-    })
-
-    it('set_light_level_sfall then get_light_level returns set value', () => {
-        script.set_light_level_sfall(40000, 0)
-        const result = script.get_light_level()
-        expect(result).toBe(40000)
-    })
-
-    it('set_light_level_sfall does not emit a stub hit', () => {
-        drainStubHits()
-        script.set_light_level_sfall(65536, 1)
-        expect(drainStubHits().length).toBe(0)
-    })
 })
 
 // ===========================================================================

@@ -111,90 +111,12 @@ describe('Phase 61-C — sfall opcodes 0x8208–0x820F', () => {
     })
 
     // ---- 0x8209 set_critter_trait_sfall ----
-    it('set_critter_trait_sfall (0x8209) does not throw for non-critter', () => {
-        expect(() => script.set_critter_trait_sfall(null as any, 5, 1)).not.toThrow()
-    })
-
-    it('set_critter_trait_sfall (0x8209) adds a trait', () => {
-        const critter = makeObj()
-        script.set_critter_trait_sfall(critter, 11, 1)
-        expect(critter.charTraits.has(11)).toBe(true)
-    })
-
-    it('set_critter_trait_sfall (0x8209) removes a trait', () => {
-        const traits = new Set([11])
-        const critter = makeObj({ charTraits: traits })
-        script.set_critter_trait_sfall(critter, 11, 0)
-        expect(critter.charTraits.has(11)).toBe(false)
-    })
-
     // ---- 0x820A get_critter_race_sfall ----
-    it('get_critter_race_sfall (0x820A) returns 0 for non-critter', () => {
-        expect(script.get_critter_race_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_race_sfall (0x820A) returns race from proto', () => {
-        const critter = makeObj({ pro: { extra: { race: 2 } } })
-        expect(script.get_critter_race_sfall(critter)).toBe(2)
-    })
-
-    it('get_critter_race_sfall (0x820A) defaults to 0 when no proto', () => {
-        const critter = makeObj({ pro: null })
-        expect(script.get_critter_race_sfall(critter)).toBe(0)
-    })
-
     // ---- 0x820B obj_has_trait_sfall ----
-    it('obj_has_trait_sfall (0x820B) is an alias of get_critter_trait_sfall', () => {
-        const critter = makeObj({ charTraits: new Set([5]) })
-        expect(script.obj_has_trait_sfall(critter, 5)).toBe(1)
-        expect(script.obj_has_trait_sfall(critter, 6)).toBe(0)
-    })
-
     // ---- 0x820C get_critter_move_ap_sfall ----
-    it('get_critter_move_ap_sfall (0x820C) returns 0 for non-critter', () => {
-        expect(script.get_critter_move_ap_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_move_ap_sfall (0x820C) returns 0 when AP not initialized', () => {
-        const critter = makeObj({ AP: null })
-        expect(script.get_critter_move_ap_sfall(critter)).toBe(0)
-    })
-
-    it('get_critter_move_ap_sfall (0x820C) returns value from AP.getAvailableMoveAP()', () => {
-        const critter = makeObj({ AP: { getAvailableMoveAP: () => 7, getAvailableCombatAP: () => 3 } })
-        expect(script.get_critter_move_ap_sfall(critter)).toBe(7)
-    })
-
     // ---- 0x820D get_critter_combat_ap_sfall ----
-    it('get_critter_combat_ap_sfall (0x820D) returns 0 for non-critter', () => {
-        expect(script.get_critter_combat_ap_sfall(null as any)).toBe(0)
-    })
-
-    it('get_critter_combat_ap_sfall (0x820D) returns value from AP.getAvailableCombatAP()', () => {
-        const critter = makeObj({ AP: { getAvailableMoveAP: () => 7, getAvailableCombatAP: () => 3 } })
-        expect(script.get_critter_combat_ap_sfall(critter)).toBe(3)
-    })
-
     // ---- 0x820E critter_knockout_sfall ----
-    it('critter_knockout_sfall (0x820E) returns 0 for non-critter', () => {
-        expect(script.critter_knockout_sfall(null as any)).toBe(0)
-    })
-
-    it('critter_knockout_sfall (0x820E) returns 0 for non-KO critter', () => {
-        const critter = makeObj({ knockedOut: false })
-        expect(script.critter_knockout_sfall(critter)).toBe(0)
-    })
-
-    it('critter_knockout_sfall (0x820E) returns 1 for KO critter', () => {
-        const critter = makeObj({ knockedOut: true })
-        expect(script.critter_knockout_sfall(critter)).toBe(1)
-    })
-
     // ---- 0x820F get_map_script_id_sfall ----
-    it('get_map_script_id_sfall (0x820F) returns a number', () => {
-        const result = script.get_map_script_id_sfall()
-        expect(typeof result).toBe('number')
-    })
 })
 
 // ===========================================================================

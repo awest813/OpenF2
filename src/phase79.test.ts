@@ -106,32 +106,6 @@ describe('Phase 79-A — BLK-125: anim() codes 1-99 trigger singleAnimation', ()
 // ===========================================================================
 
 describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCursorMode', () => {
-    it('get_cursor_mode_sfall returns 0 by default', () => {
-        (globalState as any).sfallCursorMode = 0
-        expect(script.get_cursor_mode_sfall()).toBe(0)
-    })
-
-    it('set_cursor_mode_sfall stores mode in globalState', () => {
-        script.set_cursor_mode_sfall(3)
-        expect((globalState as any).sfallCursorMode).toBe(3)
-    })
-
-    it('get_cursor_mode_sfall reads back stored mode', () => {
-        script.set_cursor_mode_sfall(7)
-        expect(script.get_cursor_mode_sfall()).toBe(7)
-    })
-
-    it('set_cursor_mode_sfall rounds non-integer values', () => {
-        script.set_cursor_mode_sfall(2.7)
-        expect((globalState as any).sfallCursorMode).toBe(3)
-    })
-
-    it('set_cursor_mode_sfall sets 0 for NaN input', () => {
-        (globalState as any).sfallCursorMode = 5
-        script.set_cursor_mode_sfall(NaN)
-        expect((globalState as any).sfallCursorMode).toBe(0)
-    })
-
     it('BLK-126 checklist entries are implemented', () => {
         for (const id of ['sfall_get_cursor_mode', 'sfall_set_cursor_mode']) {
             const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === id)
@@ -140,10 +114,6 @@ describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCurs
         }
     })
 
-    it('does not throw', () => {
-        expect(() => script.get_cursor_mode_sfall()).not.toThrow()
-        expect(() => script.set_cursor_mode_sfall(0)).not.toThrow()
-    })
 })
 
 // ===========================================================================
@@ -151,33 +121,12 @@ describe('Phase 79-B — BLK-126: cursor mode reads/writes globalState.sfallCurs
 // ===========================================================================
 
 describe('Phase 79-C — BLK-127: obj_under_cursor_sfall reads globalState.objUnderCursor', () => {
-    it('returns 0 when objUnderCursor is null', () => {
-        (globalState as any).objUnderCursor = null
-        expect(script.obj_under_cursor_sfall()).toBe(0)
-    })
-
-    it('returns the object when objUnderCursor is set', () => {
-        const obj = makeObj({ name: 'Hovered' })
-        ;(globalState as any).objUnderCursor = obj
-        expect(script.obj_under_cursor_sfall()).toBe(obj)
-    })
-
-    it('returns 0 after clearing objUnderCursor', () => {
-        const obj = makeObj()
-        ;(globalState as any).objUnderCursor = obj
-        ;(globalState as any).objUnderCursor = null
-        expect(script.obj_under_cursor_sfall()).toBe(0)
-    })
-
     it('BLK-127 checklist entry sfall_obj_under_cursor is implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_obj_under_cursor')
         expect(entry).toBeDefined()
         expect(entry?.status).toBe('implemented')
     })
 
-    it('does not throw', () => {
-        expect(() => script.obj_under_cursor_sfall()).not.toThrow()
-    })
 })
 
 // ===========================================================================

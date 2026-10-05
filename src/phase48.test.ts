@@ -236,60 +236,6 @@ describe('Phase 48-F — Critter.serialize persists equippedArmorPID', () => {
 })
 
 // ===========================================================================
-// Phase 48-G — sfall 0x81A8 get_combat_free_move
-// ===========================================================================
-
-describe('Phase 48-G — get_combat_free_move (0x81A8)', () => {
-    it('returns freeMoveAP field of the given game object', () => {
-        const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter', freeMoveAP: 3 })
-        expect(script.get_combat_free_move(critter)).toBe(3)
-    })
-
-    it('returns 0 when freeMoveAP is not set', () => {
-        const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter' })
-        expect(script.get_combat_free_move(critter)).toBe(0)
-    })
-
-    it('returns 0 and warns for a non-game-object', () => {
-        const script = new Scripting.Script()
-        // scripting.ts warn() calls console.log with "WARNING:" prefix
-        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-        expect(script.get_combat_free_move(null as any)).toBe(0)
-        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('get_combat_free_move'))
-    })
-})
-
-// ===========================================================================
-// Phase 48-H — sfall 0x81A9 set_combat_free_move
-// ===========================================================================
-
-describe('Phase 48-H — set_combat_free_move (0x81A9)', () => {
-    it('sets freeMoveAP on the given game object', () => {
-        const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter' })
-        script.set_combat_free_move(critter, 5)
-        expect((critter as any).freeMoveAP).toBe(5)
-    })
-
-    it('clamps negative values to 0', () => {
-        const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter' })
-        script.set_combat_free_move(critter, -10)
-        expect((critter as any).freeMoveAP).toBe(0)
-    })
-
-    it('warns and returns early for a non-game-object', () => {
-        const script = new Scripting.Script()
-        // scripting.ts warn() calls console.log with "WARNING:" prefix
-        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-        expect(() => script.set_combat_free_move(null as any, 5)).not.toThrow()
-        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('set_combat_free_move'))
-    })
-})
-
-// ===========================================================================
 // Phase 48-I — give_karma (0x8142) increments GVAR_0
 // ===========================================================================
 

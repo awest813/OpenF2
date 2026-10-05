@@ -396,165 +396,6 @@ describe('Phase 95-E — BLK-204: giq_option() empty-string message guard', () =
 })
 
 // ---------------------------------------------------------------------------
-// F. sfall opcodes 0x8300–0x8307 — critter SPECIAL stats
-// ---------------------------------------------------------------------------
-
-describe('Phase 95-F — sfall 0x8300–0x8307: critter SPECIAL stat opcodes', () => {
-
-    // 0x8300 — get_critter_perception_sfall
-    it('0x8300 get_critter_perception_sfall: returns Perception stat', () => {
-        const critter = makeCritter({ stats: { 'Perception': 8 } })
-        expect(script.get_critter_perception_sfall(critter)).toBe(8)
-    })
-
-    it('0x8300 get_critter_perception_sfall: returns 0 for non-critter', () => {
-        expect(script.get_critter_perception_sfall(NULL_OBJ)).toBe(0)
-    })
-
-    it('0x8300 get_critter_perception_sfall: returns 0 for item', () => {
-        const item = makeItem()
-        expect(script.get_critter_perception_sfall(item)).toBe(0)
-    })
-
-    // 0x8301 — set_critter_perception_sfall
-    it('0x8301 set_critter_perception_sfall: sets Perception stat', () => {
-        const critter = makeCritter()
-        script.set_critter_perception_sfall(critter, 9)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Perception', 9)
-    })
-
-    it('0x8301 set_critter_perception_sfall: clamps to 1 minimum', () => {
-        const critter = makeCritter()
-        script.set_critter_perception_sfall(critter, 0)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Perception', 1)
-    })
-
-    it('0x8301 set_critter_perception_sfall: clamps to 10 maximum', () => {
-        const critter = makeCritter()
-        script.set_critter_perception_sfall(critter, 15)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Perception', 10)
-    })
-
-    it('0x8301 set_critter_perception_sfall: coerces NaN to 1', () => {
-        const critter = makeCritter()
-        script.set_critter_perception_sfall(critter, NaN)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Perception', 1)
-    })
-
-    it('0x8301 set_critter_perception_sfall: no-op for non-critter', () => {
-        expect(() => script.set_critter_perception_sfall(NULL_OBJ, 5)).not.toThrow()
-    })
-
-    // 0x8302 — get_critter_luck_sfall
-    it('0x8302 get_critter_luck_sfall: returns Luck stat', () => {
-        const critter = makeCritter({ stats: { 'Luck': 7 } })
-        expect(script.get_critter_luck_sfall(critter)).toBe(7)
-    })
-
-    it('0x8302 get_critter_luck_sfall: returns 0 for non-critter', () => {
-        expect(script.get_critter_luck_sfall(NULL_OBJ)).toBe(0)
-    })
-
-    // 0x8303 — set_critter_luck_sfall
-    it('0x8303 set_critter_luck_sfall: sets Luck stat', () => {
-        const critter = makeCritter()
-        script.set_critter_luck_sfall(critter, 6)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Luck', 6)
-    })
-
-    it('0x8303 set_critter_luck_sfall: clamps to [1, 10]', () => {
-        const critter1 = makeCritter()
-        script.set_critter_luck_sfall(critter1, -5)
-        expect(critter1.stats.setBase).toHaveBeenCalledWith('Luck', 1)
-
-        const critter2 = makeCritter()
-        script.set_critter_luck_sfall(critter2, 100)
-        expect(critter2.stats.setBase).toHaveBeenCalledWith('Luck', 10)
-    })
-
-    it('0x8303 set_critter_luck_sfall: coerces NaN to 1', () => {
-        const critter = makeCritter()
-        script.set_critter_luck_sfall(critter, NaN)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Luck', 1)
-    })
-
-    // 0x8304 — get_critter_agility_sfall
-    it('0x8304 get_critter_agility_sfall: returns Agility stat', () => {
-        const critter = makeCritter({ stats: { 'Agility': 9 } })
-        expect(script.get_critter_agility_sfall(critter)).toBe(9)
-    })
-
-    it('0x8304 get_critter_agility_sfall: returns 0 for non-critter', () => {
-        expect(script.get_critter_agility_sfall(NULL_OBJ)).toBe(0)
-    })
-
-    // 0x8305 — set_critter_agility_sfall
-    it('0x8305 set_critter_agility_sfall: sets Agility stat', () => {
-        const critter = makeCritter()
-        script.set_critter_agility_sfall(critter, 8)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Agility', 8)
-    })
-
-    it('0x8305 set_critter_agility_sfall: clamps to [1, 10]', () => {
-        const critter1 = makeCritter()
-        script.set_critter_agility_sfall(critter1, 0)
-        expect(critter1.stats.setBase).toHaveBeenCalledWith('Agility', 1)
-
-        const critter2 = makeCritter()
-        script.set_critter_agility_sfall(critter2, 11)
-        expect(critter2.stats.setBase).toHaveBeenCalledWith('Agility', 10)
-    })
-
-    it('0x8305 set_critter_agility_sfall: coerces Infinity to 1', () => {
-        const critter = makeCritter()
-        script.set_critter_agility_sfall(critter, Infinity)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Agility', 1)
-    })
-
-    // 0x8306 — get_critter_charisma_sfall
-    it('0x8306 get_critter_charisma_sfall: returns Charisma stat', () => {
-        const critter = makeCritter({ stats: { 'Charisma': 3 } })
-        expect(script.get_critter_charisma_sfall(critter)).toBe(3)
-    })
-
-    it('0x8306 get_critter_charisma_sfall: returns 0 for non-critter', () => {
-        expect(script.get_critter_charisma_sfall(NULL_OBJ)).toBe(0)
-    })
-
-    it('0x8306 get_critter_charisma_sfall: returns 0 for item', () => {
-        const item = makeItem()
-        expect(script.get_critter_charisma_sfall(item)).toBe(0)
-    })
-
-    // 0x8307 — set_critter_charisma_sfall
-    it('0x8307 set_critter_charisma_sfall: sets Charisma stat', () => {
-        const critter = makeCritter()
-        script.set_critter_charisma_sfall(critter, 5)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Charisma', 5)
-    })
-
-    it('0x8307 set_critter_charisma_sfall: clamps to [1, 10]', () => {
-        const critter1 = makeCritter()
-        script.set_critter_charisma_sfall(critter1, -3)
-        expect(critter1.stats.setBase).toHaveBeenCalledWith('Charisma', 1)
-
-        const critter2 = makeCritter()
-        script.set_critter_charisma_sfall(critter2, 50)
-        expect(critter2.stats.setBase).toHaveBeenCalledWith('Charisma', 10)
-    })
-
-    it('0x8307 set_critter_charisma_sfall: coerces NaN to 1', () => {
-        const critter = makeCritter()
-        script.set_critter_charisma_sfall(critter, NaN)
-        expect(critter.stats.setBase).toHaveBeenCalledWith('Charisma', 1)
-    })
-
-    it('0x8307 set_critter_charisma_sfall: no-op for non-critter', () => {
-        expect(() => script.set_critter_charisma_sfall(NULL_OBJ, 5)).not.toThrow()
-    })
-})
-
-// ---------------------------------------------------------------------------
 // G. Arroyo start-to-end smoke tests
 // ---------------------------------------------------------------------------
 
@@ -624,13 +465,6 @@ describe('Phase 95-G — Arroyo start-to-end smoke tests', () => {
      * Simulates an Arroyo guard AI script reading and modifying the
      * guard's Perception to scale detection range.
      */
-    it('Guard perception check: sfall perception read/write round-trips correctly', () => {
-        const guard = makeCritter({ stats: { 'Perception': 6 } })
-        expect(script.get_critter_perception_sfall(guard)).toBe(6)
-        script.set_critter_perception_sfall(guard, 8)
-        expect(guard.stats.setBase).toHaveBeenCalledWith('Perception', 8)
-    })
-
     /**
      * Full start-to-end SPECIAL stat sequence:
      * 1. Read Perception (guard detection range)
@@ -639,26 +473,6 @@ describe('Phase 95-G — Arroyo start-to-end smoke tests', () => {
      * 4. Read Charisma (party size / reaction)
      * All should return valid values without crashing.
      */
-    it('Full SPECIAL stat sequence: read PE/AG/LK/CH for an arroyo tribesman', () => {
-        const tribesman = makeCritter({
-            stats: {
-                'Perception': 7,
-                'Agility': 6,
-                'Luck': 5,
-                'Charisma': 3,
-            },
-        })
-        expect(() => {
-            const pe = script.get_critter_perception_sfall(tribesman)
-            const ag = script.get_critter_agility_sfall(tribesman)
-            const lk = script.get_critter_luck_sfall(tribesman)
-            const ch = script.get_critter_charisma_sfall(tribesman)
-            expect(pe).toBe(7)
-            expect(ag).toBe(6)
-            expect(lk).toBe(5)
-            expect(ch).toBe(3)
-        }).not.toThrow()
-    })
 })
 
 // ---------------------------------------------------------------------------

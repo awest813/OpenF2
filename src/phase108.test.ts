@@ -43,33 +43,6 @@ describe('Phase 108-A — get_object_lighting reads lightmap', () => {
 
 })
 
-describe('Phase 108-B — tile light level sfall opcodes', () => {
-    it('set/get round-trip on a tile', () => {
-        script.set_tile_light_level_sfall(500, 22000)
-        expect(script.get_tile_light_level_sfall(500)).toBeCloseTo(22000, -2)
-    })
-
-    it('returns 0 for invalid tile numbers', () => {
-        expect(script.get_tile_light_level_sfall(-1)).toBe(0)
-        expect(script.get_tile_light_level_sfall(NaN)).toBe(0)
-    })
-
-    it('clamps overflow on set', () => {
-        script.set_tile_light_level_sfall(501, 99999)
-        expect(script.get_tile_light_level_sfall(501)).toBe(65536)
-    })
-})
-
-describe('Phase 108-C — obj emission light level bridge', () => {
-    it('set_obj_light_level_sfall syncs lightIntensity and lightLevel', () => {
-        const obj: any = { type: 'scenery', position: { x: 1, y: 1 } }
-        script.set_obj_light_level_sfall(obj, 18000)
-        expect(script.get_obj_light_level_sfall(obj)).toBe(18000)
-        expect(obj.lightIntensity).toBe(18000)
-        expect(obj.lightLevel).toBe(18000)
-    })
-})
-
 describe('Phase 108-D — checklist status', () => {
     it('sfall_get_object_lighting is implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find((e) => e.id === 'sfall_get_object_lighting')
@@ -78,12 +51,6 @@ describe('Phase 108-D — checklist status', () => {
 })
 
 describe('Phase 108-E — ambient and emitter rebuild', () => {
-    it('set_light_level darkens tile readback after applyAmbientLight', () => {
-        script.set_light_level(8192)
-        Lightmap.applyAmbientLight()
-        expect(script.get_tile_light_level_sfall(10)).toBeLessThan(65536)
-    })
-
     it('obj_set_light_level updates get_object_lighting when gMap is present', () => {
         const obj: any = { type: 'scenery', position: { x: 5, y: 5 }, lightIntensity: 655, lightRadius: 3 }
         const origMap = globalState.gMap

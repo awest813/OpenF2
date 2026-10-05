@@ -284,21 +284,6 @@ describe('Phase 19-E — sfall opcodes 0x8178–0x817C', () => {
         expect(script.get_weapon_ammo_count(weapon)).toBe(0)
     })
 
-    it('get_mouse_tile_num returns -1 (no live DOM/mouse context in VM)', () => {
-        expect(script.get_mouse_tile_num()).toBe(-1)
-    })
-
-    it('sfall ammo opcodes do not emit stub hits', () => {
-        const weapon = makeWeapon()
-        drainStubHits()
-        script.get_weapon_ammo_pid(weapon)
-        script.set_weapon_ammo_pid(weapon, 10)
-        script.get_weapon_ammo_count(weapon)
-        script.set_weapon_ammo_count(weapon, 5)
-        script.get_mouse_tile_num()
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('get_weapon_ammo_pid returns -1 and no stub for non-game-object', () => {
         drainStubHits()
         const result = script.get_weapon_ammo_pid(null)

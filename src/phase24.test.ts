@@ -367,41 +367,6 @@ describe('Phase 24-H — sfall 0x8189 tile_num_in_direction', () => {
 })
 
 // ---------------------------------------------------------------------------
-// I. sfall 0x818A — get_obj_elevation
-// ---------------------------------------------------------------------------
-
-describe('Phase 24-I — sfall 0x818A get_obj_elevation', () => {
-    let script: Scripting.Script
-
-    beforeEach(() => {
-        drainStubHits()
-        script = new (Scripting as any).Script()
-    })
-
-    it('returns a number for a valid game object', () => {
-        const obj = makeObj()
-        expect(typeof script.get_obj_elevation(obj)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('returns 0 for a valid game object when no globalState.currentElevation', () => {
-        const obj = makeObj()
-        expect(script.get_obj_elevation(obj)).toBe(0)
-    })
-
-    it('returns 0 for a non-game-object (warning, no stub)', () => {
-        expect(script.get_obj_elevation(null as any)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('does not emit a stub hit', () => {
-        drainStubHits()
-        script.get_obj_elevation(makeObj())
-        expect(stubHitCount()).toBe(0)
-    })
-})
-
-// ---------------------------------------------------------------------------
 // J. Checklist entries for Phase 24 features
 // ---------------------------------------------------------------------------
 

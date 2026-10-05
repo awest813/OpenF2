@@ -233,40 +233,6 @@ describe('Phase 22-D — sfall opcodes 0x8183-0x8185', () => {
     })
 
     // get_critter_max_ap (0x8185)
-    it('get_critter_max_ap returns a number', () => {
-        const c = makeCritter()
-        expect(typeof script.get_critter_max_ap(c)).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_max_ap returns derived AP stat', () => {
-        const c = makeCritter()
-        c.stats.derived['AP'] = 10
-        c.getStat = (name: string) => c.stats.derived[name] ?? c.stats.base[name] ?? 0
-        expect(script.get_critter_max_ap(c)).toBe(10)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_max_ap returns 0 for non-critter', () => {
-        const item = makeObj()
-        expect(script.get_critter_max_ap(item)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('get_critter_max_ap does not emit a stub hit', () => {
-        drainStubHits()
-        script.get_critter_max_ap(makeCritter())
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('none of the Phase 22 sfall opcodes emit stub hits', () => {
-        const c = makeCritter()
-        drainStubHits()
-        script.get_critter_hp(c)
-        script.set_critter_hp(c, 50)
-        script.get_critter_max_ap(c)
-        expect(stubHitCount()).toBe(0)
-    })
 })
 
 // ---------------------------------------------------------------------------
