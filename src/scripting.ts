@@ -35,7 +35,7 @@ import {
 import { Spatial } from './map.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
-import { actionExplode, Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
+import { actionExplode, Critter, createObjectWithPID, Obj, objectGetDamageType, setObjectOpen } from './object.js'
 import { Player } from './player.js'
 import { lookupArt, makePID, loadPRO } from './pro.js'
 import { centerCamera, centerTile, objectOnScreen } from './renderer.js'
@@ -83,7 +83,7 @@ import { equipItem, isRealItem, removeItem } from './equipment.js'
 import { hasDrugEvent } from './character/timedEffects.js'
 import {
     ANIM_COUNT, ANIM_FALL_BACK, ANIM_FALL_BACK_SF, ANIM_FALL_FRONT, ANIM_FALL_FRONT_BLOOD, ANIM_FALL_FRONT_SF,
-    ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, isProne, resetAnimSequences,
+    ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, isProne, resetAnimSequences, weaponAnimationCode,
     regAnimAnimate, regAnimAnimateForever, regAnimAnimateReversed, regAnimBegin, regAnimClear, regAnimEnd,
     regAnimMoveToObject, regAnimMoveToTile, regAnimPlaySfx, regAnimRunToObject, regAnimRunToTile, regAnimSetArt,
 } from './animSequence.js'
@@ -1751,28 +1751,27 @@ export namespace Scripting {
                     return 0
             }
         }
+        /**
+         * opCritterInjure: cripples limbs or blinds (the DAM_CRIP bits only);
+         * with DAM_PERFORM_REVERSE (0x800000) those injuries are healed instead.
+         */
         critter_injure(obj: Obj, how: number) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_injure: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            if (how & 1) {critter.knockedOut = true}
-            if (how & 2) {critter.knockedDown = true}
-            if (how & 4) {critter.crippledLeftLeg = true}
-            if (how & 8) {critter.crippledRightLeg = true}
-            if (how & 16) {critter.crippledLeftArm = true}
-            if (how & 32) {critter.crippledRightArm = true}
-            if (how & 64) {critter.blinded = true}
-            if (how & 128) {critterKill(critter)}
-            if (how & 256) {critter.onFire = true}
+            if (!isGameObject(obj) || obj.type !== 'critter') {return}
+            const flags = typeof how === 'number' ? how : 0
+            const value = (flags & 0x800000) === 0
+            const c = obj as any
+            if (flags & 0x04) {c.crippledLeftLeg = value}
+            if (flags & 0x08) {c.crippledRightLeg = value}
+            if (flags & 0x10) {c.crippledLeftArm = value}
+            if (flags & 0x20) {c.crippledRightArm = value}
+            if (flags & 0x40) {c.blinded = value}
+            if (c === globalState.player) {syncPlayerEntityFromCritter()}
         }
+        /** opCritterIsFleeing: the CRITTER_MANUEVER_FLEEING bit the AI reads. */
         critter_is_fleeing(obj: Obj) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_is_fleeing: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            return (obj as Critter).isFleeing ? 1 : 0
+            if (!isGameObject(obj)) {return 0}
+            const c = obj as any
+            return ((c.combatManeuver ?? 0) & 0x04) !== 0 || c.isFleeing === true ? 1 : 0
         }
         /**
          * opWieldItem (_inven_wield): armor is worn; anything else goes in a hand,
@@ -1983,12 +1982,12 @@ export namespace Scripting {
             }
             if (globalState.combat) {globalState.combat.end()}
         }
-        critter_set_flee_state(obj: Obj, isFleeing: number) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_set_flee_state: not a critter: ' + obj, undefined, this)
-                return
-            }
-            (obj as Critter).isFleeing = isFleeing !== 0
+        /** opCritterSetFleeState: set or clear the fleeing maneuver bit. */
+        critter_set_flee_state(obj: Obj, fleeing: number) {
+            if (!isGameObject(obj)) {return}
+            const c = obj as any
+            c.combatManeuver = fleeing ? (c.combatManeuver ?? 0) | 0x04 : (c.combatManeuver ?? 0) & ~0x04
+            c.isFleeing = !!fleeing
         }
 
         // ---------------------------------------------------------------------------
@@ -2104,21 +2103,12 @@ export namespace Scripting {
             }
             return obj.locked ? 1 : 0
         }
+        /** opObjectLock: only items (containers) and scenery (doors) can be locked. */
         obj_lock(obj: Obj) {
-            log('obj_lock', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_lock: not game object: ' + obj, undefined, this)
-                return
-            }
-            obj.locked = true
+            if (isGameObject(obj) && (obj.type === 'item' || obj.type === 'scenery')) {obj.locked = true}
         }
         obj_unlock(obj: Obj) {
-            log('obj_unlock', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_unlock: not game object: ' + obj, undefined, this)
-                return
-            }
-            obj.locked = false
+            if (isGameObject(obj) && (obj.type === 'item' || obj.type === 'scenery')) {obj.locked = false}
         }
         obj_is_open(obj: Obj) {
             log('obj_is_open', arguments)
@@ -2128,41 +2118,20 @@ export namespace Scripting {
             }
             return obj.open ? 1 : 0
         }
+        /** opObjectClose (objectClose): an open, unlocked door or container closes. */
         obj_close(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_close: not game object: ' + obj)
-                return
-            }
-            info('obj_close')
-            if (!obj.open) {return}
-            // BLK-166: Guard against objects that don't implement the use() method.
-            // Temple doors/grates opened by map_enter_p_proc may not have a use()
-            // handler in the browser build; fall back to setting open directly.
-            if (typeof (obj as any).use !== 'function') {
-                warn('obj_close: object has no use() method — setting open=false directly', undefined, this)
-                obj.open = false
-                return
-            }
-            obj.use(this.self_obj as Critter, false)
-            //stub("obj_close", arguments)
+            if (!isGameObject(obj) || !obj.open || obj.locked) {return}
+            ;(obj as any).lockJammed = false
+            setObjectOpen(obj, false, false)
         }
+        /**
+         * opObjectOpen (objectOpen): a closed, unlocked door or container swings
+         * open (its jam cleared); no use_p_proc and no loot screen.
+         */
         obj_open(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_open: not game object: ' + obj)
-                return
-            }
-            info('obj_open')
-            if (obj.open) {return}
-            // BLK-166: Guard against objects that don't implement the use() method.
-            // Temple doors/grates opened by script may not have a use() handler
-            // in the browser build; fall back to setting open directly.
-            if (typeof (obj as any).use !== 'function') {
-                warn('obj_open: object has no use() method — setting open=true directly', undefined, this)
-                obj.open = true
-                return
-            }
-            obj.use(this.self_obj as Critter, false)
-            //stub("obj_open", arguments)
+            if (!isGameObject(obj) || obj.open || obj.locked) {return}
+            ;(obj as any).lockJammed = false
+            setObjectOpen(obj, true, false)
         }
         /** opGetProtoData (protoGetDataMember): the members depend on the proto's type. */
         proto_data(pid: number, data_member: number): any {
@@ -2337,12 +2306,14 @@ export namespace Scripting {
             if (animationIsBusy(obj) !== 0) {return -1}
             return (obj as any).path ? -1 : 0
         }
+        /** opGetObjectFid: type << 24 | animation << 16 | weapon code << 12 | art index. */
         obj_art_fid(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_art_fid: not a game object: ' + obj)
-                return 0
-            }
-            return obj.frmPID ?? 0
+            if (!isGameObject(obj)) {return 0}
+            const o = obj as any
+            const type = o.type === 'critter' ? 1 : (o.pro?.frmType ?? o.frmType ?? ((o.pid ?? 0) >>> 24) ?? 0)
+            const index = (o.frmPID ?? o.pro?.frmPID ?? 0) & 0xfff
+            if (o.type !== 'critter') {return ((type & 0xf) << 24) | index}
+            return ((type & 0xf) << 24) | (((o.animCode ?? 0) & 0xff) << 16) | ((weaponAnimationCode(o) & 0xf) << 12) | index
         }
         art_anim(fid: number): number {
             // Extract the animation-type field (bits 23–16) from a Fallout FID.
@@ -2470,12 +2441,9 @@ export namespace Scripting {
             }
             obj.orientation = ((rotation % 6) + 6) % 6
         }
+        /** opObjectOnScreen: on the current level and inside the view. */
         obj_on_screen(obj: Obj) {
-            log('obj_on_screen', arguments)
-            if (!isGameObject(obj)) {
-                warn('obj_on_screen: not a game object: ' + obj)
-                return 0
-            }
+            if (!isGameObject(obj) || elevationOf(obj) !== globalState.currentElevation) {return 0}
             return objectOnScreen(obj) ? 1 : 0
         }
         /** opGetObjectType: the art type of the object, or -1. */
@@ -3078,7 +3046,9 @@ export namespace Scripting {
             signalEndGame(0, globalVars, { play: true })
         }
         /** endgame_movie: the credits roll (endgamePlayMovie). */
+        /** endgamePlayMovie: the credits roll over the "akiss" music. */
         endgame_movie() {
+            globalState.audioEngine?.playMusic?.('akiss')
             EventBus.emit('ui:openPanel', { panelName: 'credits' })
         }
         /** jam_lock(obj): a jammed lock stays shut until it is reset. */
@@ -3112,14 +3082,13 @@ export namespace Scripting {
             actionExplode(fromTileNum(tile), maxDamage === 0 ? 0 : 1, maxDamage, null)
         }
 
-        gfade_out(time: number) {
-            // P2-2: logical fade + CSS opacity via fade.ts
-            log('gfade_out', arguments)
-            fadeOut(typeof time === 'number' ? time : 5)
+        /** opGameFadeOut: any non-zero argument fades to black at the engine's fixed speed. */
+        gfade_out(value: number) {
+            if (value) {fadeOut()}
         }
-        gfade_in(time: number) {
-            log('gfade_in', arguments)
-            fadeIn(typeof time === 'number' ? time : 5)
+        /** opGameFadeIn: any non-zero argument fades back in at the engine's fixed speed. */
+        gfade_in(value: number) {
+            if (value) {fadeIn()}
         }
 
         // timing

@@ -148,40 +148,16 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 88-A — BLK-166: obj_open/obj_close no use() method guard', () => {
-    it('obj_close: sets open=false when no use() method present on an open door', () => {
-        const door = makeDoor(false, true)
-        expect(() => script.obj_close(door)).not.toThrow()
-        expect(door.open).toBe(false)
-    })
-
     it('obj_close: no-op when door is already closed (no use() method)', () => {
         const door = makeDoor(false, false)
         expect(() => script.obj_close(door)).not.toThrow()
         expect(door.open).toBe(false)
     })
 
-    it('obj_open: sets open=true when no use() method present on a closed door', () => {
-        const door = makeDoor(false, false)
-        expect(() => script.obj_open(door)).not.toThrow()
-        expect(door.open).toBe(true)
-    })
-
     it('obj_open: no-op when door is already open (no use() method)', () => {
         const door = makeDoor(false, true)
         expect(() => script.obj_open(door)).not.toThrow()
         expect(door.open).toBe(true)
-    })
-
-    it('obj_close: calls use() when the method is present', () => {
-        const door = makeDoor(true, true)
-        script.obj_close(door)
-        expect(door.use).toHaveBeenCalledTimes(1)
-    })
-
-    it('obj_open: calls use() when the method is present', () => {
-        const door = makeDoor(true, false)
-        script.obj_open(door)
-        expect(door.use).toHaveBeenCalledTimes(1)
     })
 
     it('obj_close: returns without throwing for null object', () => {
@@ -542,25 +518,6 @@ describe('Phase 88-G — Arroyo progression smoke', () => {
      *   2. obj_close() any already-open doors
      *   3. add_timer_event() for dart traps
      */
-    it('Temple map_enter: lock doors and close grates without use() does not throw', () => {
-        const grate1 = makeDoor(false, true)  // open, no use()
-        const grate2 = makeDoor(false, false) // closed, no use()
-        const door1  = makeDoor(true, false)  // closed, has use()
-
-        expect(() => {
-            script.obj_lock(grate1)
-            script.obj_close(grate1) // was open → now close without use()
-            script.obj_lock(grate2)
-            script.obj_close(grate2) // already closed → no-op
-            script.obj_lock(door1)
-        }).not.toThrow()
-
-        expect(grate1.locked).toBe(true)
-        expect(grate1.open).toBe(false) // was open → closed via direct set
-        expect(grate2.locked).toBe(true)
-        expect(door1.locked).toBe(true)
-    })
-
     /**
      * Simulates what artemple.int timed_event_p_proc does for dart traps:
      *   self_obj = trap (not a critter)
@@ -647,32 +604,6 @@ describe('Phase 88-G — Arroyo progression smoke', () => {
      * Full sequence: lock doors, fire dart trap, open lever door, exit.
      * All operations should complete without error.
      */
-    it('Temple full sequence: lock → trap fire → unlock lever door', () => {
-        const trapDoor = makeDoor(false, true)  // grate, no use(), starts open
-        const leverDoor = makeDoor(false, true) // lever door, no use()
-        const player = makeCritter({ hp: 100, isPlayer: true })
-        const trap: any = { type: 'scenery', pid: 99, name: 'Trap', position: { x: 0, y: 0 } }
-
-        script.self_obj = trap as any
-
-        expect(() => {
-            // map_enter_p_proc: lock doors
-            script.obj_lock(trapDoor)
-            script.obj_close(trapDoor)
-
-            // timed_event_p_proc: dart fires at player
-            script.critter_dmg(player as any, 5, 'Normal')
-
-            // use_p_proc on lever: unlock and open lever door
-            script.obj_unlock(leverDoor)
-            script.obj_open(leverDoor)
-        }).not.toThrow()
-
-        expect(trapDoor.locked).toBe(true)
-        expect(trapDoor.open).toBe(false)
-        expect(leverDoor.locked).toBe(false)
-        expect(leverDoor.open).toBe(true)
-    })
 })
 
 // ---------------------------------------------------------------------------

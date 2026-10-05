@@ -270,7 +270,7 @@ export function actionExplode(center: Point, minDamage: number, maxDamage: numbe
 }
 
 // Set the object (door/container) open/closed; returns true if possible, false if not (e.g. locked)
-function setObjectOpen(obj: Obj, open: boolean, loot = true, signalEvent = true): boolean {
+export function setObjectOpen(obj: Obj, open: boolean, loot = true, signalEvent = true): boolean {
     if (!obj.isDoor && !obj.isContainer) {
         return false
     }

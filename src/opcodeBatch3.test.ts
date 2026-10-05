@@ -150,3 +150,33 @@ describe('messages, lights, floating text, dialogue entry', () => {
     })
 })
 
+
+describe('injure / open / close / flee / fid', () => {
+    it('critter_injure only cripples or blinds, and the reverse flag heals', () => {
+        const script: any = new (Scripting as any).Script()
+        const c: any = { _type: 'obj', type: 'critter' }
+        script.critter_injure(c, 0x04 | 0x40 | 0x01 | 0x80)
+        expect(c.crippledLeftLeg).toBe(true)
+        expect(c.blinded).toBe(true)
+        expect(c.knockedOut).toBeUndefined()
+        expect(c.dead).toBeUndefined()
+        script.critter_injure(c, 0x04 | 0x800000)
+        expect(c.crippledLeftLeg).toBe(false)
+    })
+
+    it('obj_open / obj_close do nothing to a locked object', () => {
+        const script: any = new (Scripting as any).Script()
+        const door: any = { _type: 'obj', type: 'scenery', open: true, locked: true }
+        script.obj_close(door)
+        expect(door.open).toBe(true)
+    })
+
+    it('flee state lives in the maneuver bits; obj_art_fid includes the type', () => {
+        const script: any = new (Scripting as any).Script()
+        const c: any = { _type: 'obj', type: 'critter', combatManeuver: 0, frmPID: 0x0123, animCode: 20 }
+        script.critter_set_flee_state(c, 1)
+        expect(c.combatManeuver & 0x04).toBe(0x04)
+        expect(script.critter_is_fleeing(c)).toBe(1)
+        expect(script.obj_art_fid(c)).toBe(0x01140123)
+    })
+})
