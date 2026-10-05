@@ -506,6 +506,7 @@ export class GamePanel extends UIPanel {
             if (result.loaded > 0) {
                 EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })
                 if (typeof action.cycleMode === 'function') {action.cycleMode(player)}
+                globalState.combat?.afterPlayerAction?.()
             } else if (result.reason === 'no-ap') {
                 const cost = reloadApCost(weapon?.pro?.extra?.perk ?? -1)
                 EventBus.emit('ui:message', { text: `You need ${cost} action points.` })

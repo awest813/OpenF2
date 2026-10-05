@@ -507,7 +507,7 @@ describe('movement and full attacks', () => {
 
     it('a critical "instant death" kills the target through attack()', () => {
         const shooter = makeCritter({ skill: 95, weapon: club(), stats: { 'Better Criticals': 20 } })
-        const target = makeCritter({ position: { x: 11, y: 10 }, stats: { HP: 500, 'Max HP': 500 } })
+        const target = makeCritter({ team: 2, position: { x: 11, y: 10 }, stats: { HP: 500, 'Max HP': 500 } })
         const combat = makeCombat(shooter, target)
         // hit, crit, table 115 → effect 5 (dead), then damage roll
         combat.rng = seq(1, 1, 95, 10)
@@ -517,7 +517,7 @@ describe('movement and full attacks', () => {
 
     it('a knockdown critical makes the target lose 3 AP standing up next turn', () => {
         const shooter = makeCritter({ skill: 95, weapon: club() })
-        const target = makeCritter({ position: { x: 11, y: 10 }, stats: { HP: 500, 'Max HP': 500 } })
+        const target = makeCritter({ team: 2, position: { x: 11, y: 10 }, stats: { HP: 500, 'Max HP': 500 } })
         const combat = makeCombat(shooter, target)
         // man / torso effect 3: knocked down (no stat check)
         combat.rng = seq(1, 1, 80, 10)

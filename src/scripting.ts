@@ -2150,28 +2150,21 @@ export namespace Scripting {
             /*stub("critter_state", arguments);*/
             if (!isGameObject(obj)) {
                 warn('critter_state: not game object: ' + obj)
-                return 0
+                return 1
             }
 
-            // critter_state() returns a bitmask encoding the critter's current
-            // condition.  Bit positions match the Fallout 2 CRITTER_IS_* constants:
-            //   bit 0 (0x01): dead
-            //   bit 1 (0x02): stunned / knocked out (unconscious)
-            //   bit 2 (0x04): knocked down (prone)
-            //   bit 3 (0x08): any crippled body part
-            //   bit 4 (0x10): fleeing
+            // interpreter_extra.cc opGetCritterState: CRITTER_STATE_DEAD (1) for a
+            // dead or non-critter object; otherwise CRITTER_STATE_PRONE (2) when
+            // knocked down or out, plus the crippled-limb and blinded damage bits.
+            if (obj.type !== 'critter' || obj.dead === true) {return 1}
+            const c = obj as any
             let state = 0
-            if (obj.dead === true) {state |= 0x01}
-            if ((obj as any).knockedOut === true) {state |= 0x02}
-            if ((obj as any).knockedDown === true) {state |= 0x04}
-            const hasCrippledLimb =
-                (obj as any).crippledLeftLeg ||
-                (obj as any).crippledRightLeg ||
-                (obj as any).crippledLeftArm ||
-                (obj as any).crippledRightArm
-            if (hasCrippledLimb) {state |= 0x08}
-            if ((obj as any).isFleeing === true) {state |= 0x10}
-
+            if (c.knockedOut === true || c.knockedDown === true) {state |= 0x02}
+            if (c.crippledLeftLeg) {state |= 0x04}
+            if (c.crippledRightLeg) {state |= 0x08}
+            if (c.crippledLeftArm) {state |= 0x10}
+            if (c.crippledRightArm) {state |= 0x20}
+            if (c.blinded) {state |= 0x40}
             return state
         }
         kill_critter(obj: Critter, deathFrame: number) {
@@ -2419,6 +2412,13 @@ export namespace Scripting {
         }
         terminate_combat() {
             info('[terminate_combat]')
+            // opTerminateCombat: the calling critter drops out of the fight, then combat ends.
+            const self: any = this.self_obj
+            if (globalState.combat && self && self.type === 'critter') {
+                self.combatManeuver = (self.combatManeuver ?? 0) | 0x02
+                self.whoHitMe = null
+                self.aiLastTarget = null
+            }
             if (globalState.combat) {globalState.combat.end()}
         }
         critter_set_flee_state(obj: Obj, isFleeing: number) {
@@ -9010,36 +9010,27 @@ export namespace Scripting {
 
     export function combatEvent(
         obj: Obj,
-        event: 'turnBegin' | 'combatStart' | 'combatOver' | 'onAttack' | 'onDeath',
+        event: 'turnBegin' | 'hitSucceeded' | 'joinCheck',
         targetObj?: Obj,
         sourceObj?: Obj,
     ): boolean {
         if (!obj._script) {return false} // no script — not a bug; many map objects lack one
 
-        // FO2 combat_p_proc fixed_param values (COMBAT_SUBTYPE):
-        //   0 = COMBAT_SUBTYPE_INITIATE  — combat just started
-        //   1 = COMBAT_SUBTYPE_ATTACK    — this critter is attacking
-        //   2 = COMBAT_SUBTYPE_HIT       — this critter was hit (not yet implemented)
-        //   3 = COMBAT_SUBTYPE_ENDCOMBAT — combat is ending
-        //   4 = COMBAT_SUBTYPE_TURN      — start of critter's turn
-        //   5 = COMBAT_SUBTYPE_DEATH     — this critter died in combat
+        // combat_p_proc fixed_param values the engine sends (combat.cc, combat_ai.cc):
+        //   2 = COMBAT_SUBTYPE_HIT_SUCCEEDED — this critter's attack hit (target_obj = defender)
+        //   4 = COMBAT_SUBTYPE_TURN          — start of this critter's turn
+        //   5 — a critter outside the fight is asked whether it wants in (_combatai_want_to_join)
         let fixed_param: number
         switch (event) {
-            case 'combatStart':
-                fixed_param = 0
-                break // COMBAT_SUBTYPE_INITIATE
-            case 'onAttack':
-                fixed_param = 1
-                break // COMBAT_SUBTYPE_ATTACK
-            case 'combatOver':
-                fixed_param = 3
-                break // COMBAT_SUBTYPE_ENDCOMBAT
+            case 'hitSucceeded':
+                fixed_param = 2
+                break
             case 'turnBegin':
                 fixed_param = 4
-                break // COMBAT_SUBTYPE_TURN
-            case 'onDeath':
+                break
+            case 'joinCheck':
                 fixed_param = 5
-                break // COMBAT_SUBTYPE_DEATH
+                break
             default:
                 console.warn('combatEvent: unknown event ' + event + ' — ignoring')
                 return false

@@ -19,73 +19,6 @@ afterEach(() => {
     EventBus.clear('calledShot:regionSelected')
 })
 
-describe('combat edge-case hardening', () => {
-    it('walkUpTo spends exactly path-length minus one AP (walk-then-attack AP sync)', () => {
-        const ap = {
-            subtractMoveAP: vi.fn().mockReturnValue(true),
-            getAvailableMoveAP: vi.fn().mockReturnValue(3),
-        }
-        const critter: any = {
-            AP: ap,
-            path: { path: [0, 1, 2, 3] },
-            walkTo: vi.fn().mockReturnValue(true),
-        }
-
-        const combat = Object.create(Combat.prototype) as Combat
-        const ok = combat.walkUpTo(critter, 0, { x: 10, y: 10 }, 3, () => {})
-
-        expect(ok).toBe(true)
-        expect(ap.subtractMoveAP).toHaveBeenCalledWith(3)
-    })
-
-    it('AI attack path bails safely when combat AP subtraction fails (desync guard)', () => {
-        const AP = {
-            getAvailableMoveAP: vi.fn().mockReturnValue(8),
-            getAvailableCombatAP: vi.fn().mockReturnValue(4),
-            subtractCombatAP: vi.fn().mockReturnValue(false),
-        }
-
-        const obj: any = {
-            AP,
-            ai: { info: { chance: 0, min_hp: -1 } },
-            position: { x: 0, y: 0 },
-            equippedWeapon: { weapon: { getMaximumRange: () => 10 } },
-            getStat: vi.fn().mockReturnValue(100),
-            clearAnim: vi.fn(),
-            art: 'hmjmps',
-        }
-        const target: any = { position: { x: 0, y: 1 } }
-
-        const combat = Object.create(Combat.prototype) as Combat
-        combat.log = vi.fn()
-        combat.findTarget = vi.fn().mockReturnValue(target)
-        combat.attack = vi.fn()
-        combat.nextTurn = vi.fn()
-        combat.maybeTaunt = vi.fn()
-
-        combat.doAITurn(obj, 0, 1)
-
-        expect(AP.subtractCombatAP).toHaveBeenCalledWith(4)
-        expect(combat.attack).not.toHaveBeenCalled()
-        expect(combat.nextTurn).toHaveBeenCalledTimes(1)
-    })
-
-    it('AI recursion depth bailout advances turn instead of getting stuck', () => {
-        const combat = Object.create(Combat.prototype) as Combat
-        combat.nextTurn = vi.fn()
-
-        const originalDepth = Config.combat.maxAIDepth
-        Config.combat.maxAIDepth = 2
-        try {
-            combat.doAITurn({} as any, 0, 3)
-        } finally {
-            Config.combat.maxAIDepth = originalDepth
-        }
-
-        expect(combat.nextTurn).toHaveBeenCalledTimes(1)
-    })
-})
-
 describe('called-shot combat + UI integration', () => {
     function makeShooterAndTarget() {
         const shooter: any = {
@@ -333,80 +266,6 @@ describe('hit-chance fidelity regression tests', () => {
 })
 
 describe('AP spend correctness regression tests', () => {
-    it('AI turn spends AP for movement when out of range, then combat AP once in range', () => {
-        const AP = {
-            getAvailableMoveAP: vi.fn().mockReturnValue(10),
-            getAvailableCombatAP: vi.fn().mockReturnValue(10),
-            subtractMoveAP: vi.fn().mockReturnValue(true),
-            subtractCombatAP: vi.fn().mockReturnValue(true),
-        }
-
-        const obj: any = {
-            AP,
-            ai: { info: { chance: 0, min_hp: -1 } },
-            position: { x: 0, y: 0 },
-            equippedWeapon: { weapon: { getMaximumRange: () => 1 } },
-            getStat: vi.fn().mockReturnValue(100),
-            clearAnim: vi.fn(),
-            walkTo: vi.fn().mockImplementation((_to: any, _a: boolean, _cb: () => void) => true),
-            path: { path: [0, 1, 2] },
-            art: 'hmjmps',
-        }
-
-        const target: any = { position: { x: 0, y: 3 } }
-        const combat = Object.create(Combat.prototype) as Combat
-        combat.log = vi.fn()
-        combat.findTarget = vi.fn().mockReturnValue(target)
-        combat.attack = vi.fn()
-        combat.nextTurn = vi.fn()
-        combat.maybeTaunt = vi.fn()
-
-        // Out of range: creep movement should consume move AP.
-        combat.doAITurn(obj, 0, 1)
-        expect(AP.subtractMoveAP).toHaveBeenCalledWith(2)
-
-        // In range: attack should consume combat AP.
-        obj.position = { x: 0, y: 2 }
-        combat.doAITurn(obj, 0, 1)
-        expect(AP.subtractCombatAP).toHaveBeenCalledWith(4)
-    })
-
-    it('advances turn when AI cannot find a movement path (invalid action cancellation)', () => {
-        const AP = {
-            getAvailableMoveAP: vi.fn().mockReturnValue(6),
-            getAvailableCombatAP: vi.fn().mockReturnValue(6),
-        }
-
-        const obj: any = {
-            AP,
-            ai: { info: { chance: 0, min_hp: -1 } },
-            position: { x: 0, y: 0 },
-            equippedWeapon: { weapon: { getMaximumRange: () => 1 } },
-            getStat: vi.fn().mockReturnValue(100),
-            clearAnim: vi.fn(),
-            walkTo: vi.fn().mockReturnValue(false),
-            art: 'hmjmps',
-        }
-
-        const combat = Object.create(Combat.prototype) as Combat
-        combat.log = vi.fn()
-        combat.findTarget = vi.fn().mockReturnValue({ position: { x: 0, y: 3 } })
-        combat.attack = vi.fn()
-        combat.nextTurn = vi.fn()
-        combat.maybeTaunt = vi.fn()
-
-        const originalDepth = Config.combat.maxAIDepth
-        Config.combat.maxAIDepth = 1
-        try {
-            combat.doAITurn(obj, 0, 1)
-        } finally {
-            Config.combat.maxAIDepth = originalDepth
-        }
-
-        expect(combat.attack).not.toHaveBeenCalled()
-        expect(combat.nextTurn).toHaveBeenCalledTimes(1)
-    })
-
     it('end-of-turn unused AP grants AC bonus that reduces attacker hit chance (FO2 parity)', () => {
         // H5 FIX: In Fallout 2, each unused AP at end of turn grants +1 AC.
         // StatSet.get('AC') returns baseAC + acBonus; getHitChance reads getStat('AC'),
@@ -436,7 +295,7 @@ describe('AP spend correctness regression tests', () => {
 })
 
 describe('combat turn scripting hooks (FO2 parity)', () => {
-    it('combatEvent supports combatStart event with fixed_param = 0', async () => {
+    it('combatEvent joinCheck sends fixed_param = 5 (_combatai_want_to_join)', async () => {
         const { Scripting } = await import('./scripting.js')
         const script: any = {
             combat_p_proc: vi.fn(),
@@ -444,13 +303,13 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
             _didOverride: false,
         }
         const obj: any = { _script: script }
-        const result = Scripting.combatEvent(obj, 'combatStart')
+        const result = Scripting.combatEvent(obj, 'joinCheck')
         expect(script.combat_p_proc).toHaveBeenCalled()
-        expect(script.fixed_param).toBe(0) // COMBAT_SUBTYPE_INITIATE
+        expect(script.fixed_param).toBe(5)
         expect(result).toBe(false) // no terminate, no override
     })
 
-    it('combatEvent supports combatOver event with fixed_param = 3', async () => {
+    it('combatEvent turnBegin sends fixed_param = 4 (COMBAT_SUBTYPE_TURN)', async () => {
         const { Scripting } = await import('./scripting.js')
         const script: any = {
             combat_p_proc: vi.fn(),
@@ -458,13 +317,13 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
             _didOverride: false,
         }
         const obj: any = { _script: script }
-        const result = Scripting.combatEvent(obj, 'combatOver')
+        const result = Scripting.combatEvent(obj, 'turnBegin')
         expect(script.combat_p_proc).toHaveBeenCalled()
-        expect(script.fixed_param).toBe(3) // COMBAT_SUBTYPE_ENDCOMBAT
+        expect(script.fixed_param).toBe(4)
         expect(result).toBe(false)
     })
 
-    it('combatEvent sets combat_is_initialized = 1 on combatStart', async () => {
+    it('combatEvent sets combat_is_initialized = 1', async () => {
         const { Scripting } = await import('./scripting.js')
         const script: any = {
             combat_p_proc: vi.fn(),
@@ -472,11 +331,11 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
             _didOverride: false,
         }
         const obj: any = { _script: script }
-        Scripting.combatEvent(obj, 'combatStart')
+        Scripting.combatEvent(obj, 'turnBegin')
         expect(script.combat_is_initialized).toBe(1)
     })
 
-    it('combatEvent supports onAttack event with fixed_param = 1', async () => {
+    it('combatEvent hitSucceeded sends fixed_param = 2 with the defender as target_obj', async () => {
         const { Scripting } = await import('./scripting.js')
         const script: any = {
             combat_p_proc: vi.fn(),
@@ -485,30 +344,14 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
         }
         const attacker: any = { _script: script, name: 'Attacker' }
         const target: any = { _script: null, name: 'Target' }
-        const result = Scripting.combatEvent(attacker, 'onAttack', target)
+        const result = Scripting.combatEvent(attacker, 'hitSucceeded', target)
         expect(script.combat_p_proc).toHaveBeenCalled()
-        expect(script.fixed_param).toBe(1) // COMBAT_SUBTYPE_ATTACK
+        expect(script.fixed_param).toBe(2) // COMBAT_SUBTYPE_HIT_SUCCEEDED
         expect(script.target_obj).toBe(target)
         expect(result).toBe(false)
     })
 
-    it('combatEvent supports onDeath event with fixed_param = 5', async () => {
-        const { Scripting } = await import('./scripting.js')
-        const script: any = {
-            combat_p_proc: vi.fn(),
-            scriptName: 'test_on_death',
-            _didOverride: false,
-        }
-        const victim: any = { _script: script, name: 'Victim' }
-        const killer: any = { _script: null, name: 'Killer' }
-        const result = Scripting.combatEvent(victim, 'onDeath', undefined, killer)
-        expect(script.combat_p_proc).toHaveBeenCalled()
-        expect(script.fixed_param).toBe(5) // COMBAT_SUBTYPE_DEATH
-        expect(script.source_obj).toBe(killer)
-        expect(result).toBe(false)
-    })
-
-    it('combatEvent sets target_obj on onAttack when provided', async () => {
+    it('combatEvent sets target_obj on hitSucceeded when provided', async () => {
         const { Scripting } = await import('./scripting.js')
         const script: any = {
             combat_p_proc: vi.fn(),
@@ -517,7 +360,7 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
         }
         const attacker: any = { _script: script }
         const target: any = { _script: null, name: 'SomeTarget' }
-        Scripting.combatEvent(attacker, 'onAttack', target)
+        Scripting.combatEvent(attacker, 'hitSucceeded', target)
         expect(script.target_obj).toBe(target)
     })
 
@@ -530,8 +373,8 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
         }
         const obj: any = { _script: script }
         script.target_obj = 'previousValue'
-        Scripting.combatEvent(obj, 'combatStart')
-        // combatStart does not pass targetObj, so target_obj should remain unchanged
+        Scripting.combatEvent(obj, 'turnBegin')
+        // turnBegin does not pass targetObj, so target_obj should remain unchanged
         expect(script.target_obj).toBe('previousValue')
     })
 
@@ -654,118 +497,6 @@ describe('combat turn scripting hooks (FO2 parity)', () => {
     })
 })
 
-describe('Phase 102: Combat Mechanics Polish', () => {
-    it('AI Flee logic finds the closest map edge', () => {
-        const combat = Object.create(Combat.prototype) as Combat
-        combat.log = vi.fn()
-        combat.maybeTaunt = vi.fn()
-        combat.findTarget = vi.fn().mockReturnValue({ position: { x: 50, y: 50 } })
-        combat.walkUpTo = vi.fn().mockImplementation((obj, idx, targetPos) => {
-            obj._lastWalkPos = targetPos
-            return true
-        })
-
-        const makeCritterAt = (x: number, y: number): any => ({
-            getStat: (n: string) => n === 'HP' ? 5 : 0,
-            ai: { info: { min_hp: 10 } }, // Force flee
-            position: { x, y },
-            clearAnim: vi.fn(),
-            AP: { getAvailableMoveAP: () => 10, subtractMoveAP: vi.fn() }
-        })
-
-        const nearLeft = makeCritterAt(10, 100)
-        combat.doAITurn(nearLeft, 0, 1)
-        expect(nearLeft._lastWalkPos).toEqual({ x: 0, y: 100 })
-
-        const nearRight = makeCritterAt(180, 50)
-        combat.doAITurn(nearRight, 0, 1)
-        expect(nearRight._lastWalkPos).toEqual({ x: 200, y: 50 })
-
-        const nearTop = makeCritterAt(100, 10)
-        combat.doAITurn(nearTop, 0, 1)
-        expect(nearTop._lastWalkPos).toEqual({ x: 100, y: 0 })
-
-        const nearBottom = makeCritterAt(50, 180)
-        combat.doAITurn(nearBottom, 0, 1)
-        expect(nearBottom._lastWalkPos).toEqual({ x: 50, y: 200 })
-    })
-
-    it('AI findTarget heuristic targets heavily injured enemies over slightly closer healthy ones', () => {
-        const combat = Object.create(Combat.prototype) as Combat
-        const obj: any = { position: { x: 0, y: 0 }, teamNum: 1 }
-
-        const healthyNearTarget: any = {
-            dead: false, teamNum: 2, position: { x: 5, y: 0 }, // dist = 5
-            getStat: (n: string) => n === 'HP' ? 50 : n === 'Max HP' ? 50 : 0
-        }
-
-        const dyingFarTarget: any = {
-            dead: false, teamNum: 2, position: { x: 7, y: 0 }, // dist = 7
-            getStat: (n: string) => n === 'HP' ? 5 : n === 'Max HP' ? 50 : 0 // 10% health -> discount by 3 -> effective dist 4
-        }
-
-        combat.combatants = [healthyNearTarget, dyingFarTarget]
-        const target = combat.findTarget(obj)
-        
-        // Dying target's effective distance is 4 (7 - 3), so it is preferred over healthy target (dist 5)
-        expect(target).toBe(dyingFarTarget)
-    })
-})
-
-describe('Phase 104: Combat Scripting Hooks and AI Turns', () => {
-    it('fires turnBegin combatEvent on NPCs and skips turn if script overrides', async () => {
-        const combat = Object.create(Combat.prototype) as Combat
-        const player = { isPlayer: true, AP: { getAvailableCombatAP: () => 0, resetAP: vi.fn() }, stats: { acBonus: 0 } }
-        
-        let override = true
-        const npc: any = { 
-            name: 'TestNPC',
-            isPlayer: false, 
-            dead: false,
-            hostile: true,
-            teamNum: 2,
-            position: { x: 0, y: 0 },
-            AP: { getAvailableCombatAP: () => 0, resetAP: vi.fn() },
-            stats: { acBonus: 0 },
-            _script: {} 
-        }
-
-        combat.combatants = [player, npc] as Critter[]
-        combat.playerIdx = 0
-        combat.player = player as Critter
-        combat.turnNum = 1
-        combat.whoseTurn = 0 // Player's turn is over, now it's NPC's turn
-        
-        vi.spyOn(Config.engine, 'doLoadScripts', 'get').mockReturnValue(true)
-        const { Scripting } = await import('./scripting.js')
-        const updateCritterSpy = vi.spyOn(Scripting, 'updateCritter').mockImplementation(() => {})
-        const combatEventSpy = vi.spyOn(Scripting, 'combatEvent').mockImplementation(() => override)
-        combat.doAITurn = vi.fn()
-        combat.end = vi.fn() // prevent infinite loop if nextTurn recurses too deep
-
-        // Case 1: Script overrides turn
-        combat.nextTurn()
-        // It should have fired updateCritter and combatEvent for NPC
-        expect(updateCritterSpy).toHaveBeenCalledWith(npc._script, npc)
-        expect(combatEventSpy).toHaveBeenCalledWith(npc, 'turnBegin')
-        // It should have skipped doAITurn!
-        expect(combat.doAITurn).not.toHaveBeenCalled()
-        
-        // Reset and Case 2: Script does NOT override turn
-        override = false
-        combat.whoseTurn = 0
-        combat.doAITurn = vi.fn()
-        updateCritterSpy.mockClear()
-        combatEventSpy.mockClear()
-
-        combat.nextTurn()
-        expect(updateCritterSpy).toHaveBeenCalledWith(npc._script, npc)
-        expect(combatEventSpy).toHaveBeenCalledWith(npc, 'turnBegin')
-        // It should NOT have skipped doAITurn!
-        expect(combat.doAITurn).toHaveBeenCalledWith(npc, 1, 1)
-    })
-})
-
 describe('Phase 105: Combat End Conditions and Flee Mechanics', () => {
     it('allows combat to end if only allied NPCs remain', async () => {
         const globalStateMod = await import('./globalState.js')
@@ -788,98 +519,11 @@ describe('Phase 105: Combat End Conditions and Flee Mechanics', () => {
         expect(combat.canEndCombat()).toBe(false)
     })
     
-    it('escapes from combat when fleeing AI reaches map edge', () => {
-        const combat = Object.create(Combat.prototype) as Combat
-        const obj = { 
-            name: 'FleeingNPC',
-            isPlayer: false, 
-            getStat: () => 10, // HP
-            ai: { info: { min_hp: 20 } }, // fleeing condition met
-            position: { x: 2, y: 100 }, // minEdgeDist = 2 (<= 2)
-            dead: false,
-            visible: true,
-            AP: { getAvailableMoveAP: () => 10 }
-        } as unknown as Critter
-
-        const enemy = {
-            isPlayer: false,
-            teamNum: 1,
-            dead: false,
-            hostile: true,
-            position: { x: 50, y: 50 },
-            getStat: () => 10,
-        } as unknown as Critter
-
-        combat.combatants = [obj, enemy]
-        combat.log = vi.fn()
-        combat.maybeTaunt = vi.fn()
-        combat.nextTurn = vi.fn()
-        
-        combat.doAITurn(obj, 0, 1)
-        
-        expect(combat.log).toHaveBeenCalledWith('[AI ESCAPED] FleeingNPC reached map edge')
-        expect(obj.dead).toBe(true)
-        expect(obj.visible).toBe(false)
-        expect(combat.nextTurn).toHaveBeenCalled()
-    })
 })
 
 describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee Walkability', () => {
     
     
-    it('fleeing AI scans inward for walkable destination when absolute edge is blocked', async () => {
-        const globalStateMod = await import('./globalState.js')
-        const globalState = globalStateMod.default
-        const combat = Object.create(Combat.prototype) as Combat
-        
-        // Mock map and pathfinding
-        const recalcPathSpy = vi.fn().mockImplementation((start: any, goal: any) => {
-            // If absolute edge (x = 0), return empty (blocked)
-            if (goal.x === 0) { return [] }
-            // If x = 3, return valid path
-            if (goal.x === 3) { return [[0,0], [1,0], [2,0], [3,0]] }
-            return []
-        })
-        globalState.gMap = { recalcPath: recalcPathSpy } as any
-        
-        const obj = { 
-            name: 'FleeingNPC',
-            isPlayer: false, 
-            getStat: () => 10, // HP
-            ai: { info: { min_hp: 20 } }, // flee condition
-            position: { x: 50, y: 100 },
-            dead: false,
-            visible: true,
-            AP: { getAvailableMoveAP: () => 10, subtractMoveAP: vi.fn() },
-            clearAnim: vi.fn(),
-            walkTo: vi.fn().mockReturnValue(true),
-            path: { path: [0, 1, 2, 3] }
-        } as any
-        
-        const enemy = {
-            isPlayer: false,
-            teamNum: 1,
-            dead: false,
-            hostile: true,
-            position: { x: 80, y: 100 },
-            getStat: () => 10,
-        } as any
-        
-        combat.combatants = [obj, enemy]
-        combat.log = vi.fn()
-        combat.maybeTaunt = vi.fn()
-        combat.nextTurn = vi.fn()
-        combat.walkUpTo = vi.fn()
-        
-        combat.doAITurn(obj, 0, 1)
-        
-        // Flee target pos was originally {x: 0, y: 100} (minEdgeDist = 50, left edge is closest)
-        // With inward scanning, it should scan x=0 (blocked), x=1, x=2, and find x=3 as walkable!
-        expect(recalcPathSpy).toHaveBeenCalled()
-        // walkableTarget should be passed to walkUpTo as {x: 3, y: 100}
-        expect(combat.walkUpTo).toHaveBeenCalledWith(obj, 0, { x: 3, y: 100 }, 10, expect.any(Function))
-    })
-
     describe('Combat rounds tracking and logs audit', () => {
         it('tracks and increments rounds upon turn wraparound without non-FO2 monitor lines', async () => {
             const { uiLog } = await import('./ui.js')
@@ -923,26 +567,27 @@ describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee
             enemyObj.ai = { info: { max_dist: 10 } } as any
             enemyObj.AP = new ActionPoints(enemyObj)
 
-            const combat = new Combat([playerObj, enemyObj])
-            // Override player idx
-            combat.playerIdx = combat.combatants.indexOf(playerObj)
-            combat.player = playerObj as any
-
-            // Initialize combat state manually
-            combat.round = 1
-            combat.turnNum = 1
-            combat.whoseTurn = -1
-
-            // Turn 1 starts (Player's turn)
-            combat.nextTurn()
+            ;(enemyObj as any).teamNum = 1
+            playerObj.getStat = (stat: string) => (stat === 'AGI' ? 6 : stat === 'HP' ? 30 : stat === 'AP' ? 8 : 0)
+            // The player attacked the enemy: both fight the first round.
+            const combat = new Combat([playerObj, enemyObj], playerObj, enemyObj)
+            const savedCombat = gs.combat
+            gs.combat = combat
+            combat.runAITurn = vi.fn().mockResolvedValue(undefined)
+            ;(combat as any).startRound()
             expect(combat.round).toBe(1)
             expect(combat.whoseTurn).toBe(0) // Player
+            expect(combat.inPlayerTurn).toBe(true)
 
-            // End player's turn. This starts the Enemy's turn, which automatically
-            // runs its AI and advances the turn loop back to the player.
+            // End the player's turn: the enemy acts, the round closes and the
+            // player is up again.
             combat.nextTurn()
+            await new Promise((r) => setTimeout(r, 0))
+            expect(combat.runAITurn).toHaveBeenCalledWith(enemyObj, null)
             expect(combat.round).toBe(2)
-            expect(combat.whoseTurn).toBe(0) // Back to Player
+            expect(combat.whoseTurn).toBe(0)
+            expect(combat.inPlayerTurn).toBe(true)
+            gs.combat = savedCombat
 
             try {
                 // End combat
@@ -1094,5 +739,47 @@ describe('Phase 108: Combat sfall opcode implementations', () => {
         script.set_combat_free_move_sfall(critter, NaN)
         expect(critter.combatFreeMove).toBe(0)
         expect(() => script.set_combat_free_move_sfall(null as any, 5)).not.toThrow()
+    })
+})
+
+describe('Phase 104: Combat Scripting Hooks and AI Turns', () => {
+    it('fires turnBegin on an NPC, skips its AI when the script overrides, and never runs critter_p_proc', async () => {
+        const gs = (await import('./globalState.js')).default
+        const savedCombat = gs.combat
+        const combat = Object.create(Combat.prototype) as Combat
+        const player: any = { isPlayer: true, teamNum: 0, dead: false, AP: { combat: 0, move: 0, getAvailableMoveAP: () => 0, getAvailableCombatAP: () => 0, resetAP: vi.fn() } }
+        const npc: any = {
+            name: 'TestNPC', isPlayer: false, dead: false, teamNum: 2, position: { x: 0, y: 0 },
+            AP: { combat: 0, move: 0, getAvailableMoveAP: () => 0, getAvailableCombatAP: () => 0, resetAP: vi.fn() },
+            _script: {},
+        }
+        combat.combatants = [player, npc] as Critter[]
+        combat.activeCount = 2
+        combat.player = player
+        combat.whoseTurn = 0
+        combat.turnNum = 1
+        gs.combat = combat
+
+        vi.spyOn(Config.engine, 'doLoadScripts', 'get').mockReturnValue(true)
+        const { Scripting } = await import('./scripting.js')
+        const updateCritterSpy = vi.spyOn(Scripting, 'updateCritter').mockImplementation(() => {})
+        let override = true
+        const combatEventSpy = vi.spyOn(Scripting, 'combatEvent').mockImplementation(() => override)
+        const runSpy = vi.spyOn(combat, 'runAITurn').mockResolvedValue()
+        ;(combat as any).endRound = vi.fn().mockResolvedValue(undefined)
+
+        try {
+            combat.nextTurn()
+            expect(combatEventSpy).toHaveBeenCalledWith(npc, 'turnBegin')
+            expect(runSpy).not.toHaveBeenCalled()
+            expect(updateCritterSpy).not.toHaveBeenCalled()
+
+            override = false
+            combat.whoseTurn = 0
+            combat.nextTurn()
+            expect(runSpy).toHaveBeenCalledWith(npc, null)
+        } finally {
+            gs.combat = savedCombat
+        }
     })
 })

@@ -19,7 +19,7 @@ import { loadAreas, lookupMapFromLookup } from './data.js'
 import { Encounters } from './encounters.js'
 import { Point, pointIntersectsCircle } from './geometry.js'
 import globalState from './globalState.js'
-import { createObjectWithPID, objectIsWeapon, type Obj } from './object.js'
+import { createObjectWithPID, objectIsWeapon, type Critter, type Obj } from './object.js'
 import { hidev, makeEl, showv } from './dom.js'
 import { uiCloseWorldMap, uiWorldMapShowArea } from './ui.js'
 import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js'
@@ -521,6 +521,7 @@ export namespace Worldmap {
             // set up critters' positions in their formations
             Encounters.positionCritters(enc.groups, globalState.player.position, lookupMapFromLookup(enc.mapLookupName))
 
+            let firstSpawned: Obj | null = null
             enc.groups.forEach(function (group) {
                 group.critters.forEach(function (critter) {
                     //console.log("critter: %o", critter)
@@ -533,11 +534,20 @@ export namespace Worldmap {
                     })
                     globalState.gMap.addObject(obj)
                     obj.move(critter.position)
+                    if (!firstSpawned) {firstSpawned = obj}
                 })
             })
 
-            // player was ambushed, so begin combat
-            if (enc.encounterType === 'ambush' && Config.engine.doCombat === true) {Combat.start()}
+            // Ambushed: the encounter's lead critter attacks the player and
+            // both sides are drawn in (worldmap.cc _caiSetupTeamCombat).
+            if (enc.encounterType === 'ambush' && Config.engine.doCombat === true) {
+                const lead = firstSpawned as Critter | null
+                if (lead && lead.type === 'critter') {
+                    Combat.start(lead, globalState.player, { teamCombat: true })
+                } else {
+                    Combat.start()
+                }
+            }
         })
     }
 

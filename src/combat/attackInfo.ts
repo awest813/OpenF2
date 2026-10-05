@@ -10,8 +10,11 @@ import { loadPRO } from '../pro.js'
 import { weaponAmmoPid } from './ammo.js'
 import { attackApCost, attackTypeForMode, type AttackType } from './fo2Formulas.js'
 
-/** Primary (1) or secondary (2) attack of the weapon in hand. */
-export type HitMode = 1 | 2
+/**
+ * Primary (1) or secondary (2) attack of the weapon in hand; 0 punches with
+ * bare fists whatever is held (HIT_MODE_PUNCH, used by the AI).
+ */
+export type HitMode = 0 | 1 | 2
 
 /** item.cc weapon proto extended flag: two-handed (byte 2, 0x02 → 0x200). */
 const WEAPON_FLAG_TWO_HANDED = 0x02
@@ -61,7 +64,7 @@ function protoExtra(weapon: any): any {
 export function getAttackWeaponInfo(critter: any, hitMode: HitMode = 1): AttackWeaponInfo {
     const weapon = critter?.equippedWeapon ?? null
     // Critters with empty hands carry a proto-less placeholder "punch" weapon.
-    const bareFists = !weapon || !weapon.weapon || (!weapon.pro && weapon.weapon.name === 'punch')
+    const bareFists = hitMode === 0 || !weapon || !weapon.weapon || (!weapon.pro && weapon.weapon.name === 'punch')
     if (bareFists) {
         // HIT_MODE_PUNCH: 1–2 damage + Melee Damage, 3 AP, 1 hex.
         return {

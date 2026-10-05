@@ -230,23 +230,28 @@ describe('Phase 24-D — critter_state prone flag', () => {
         expect(script.critter_state(c) & 1).toBe(1)
     })
 
-    it('returns 2 for a knocked-out (stunned) critter', () => {
+    it('returns CRITTER_STATE_PRONE (2) for a knocked-out critter', () => {
         const c = makeCritter({ dead: false, knockedDown: false, knockedOut: true })
-        expect(script.critter_state(c) & 0x02).toBe(0x02)
+        expect(script.critter_state(c)).toBe(0x02)
     })
 
-    it('returns 4 for a knocked-down (prone) critter', () => {
+    it('returns CRITTER_STATE_PRONE (2) for a knocked-down critter', () => {
         const c = makeCritter({ dead: false, knockedDown: true })
-        expect(script.critter_state(c) & 0x04).toBe(0x04)
+        expect(script.critter_state(c)).toBe(0x02)
     })
 
-    it('returns 5 for a dead AND knocked-down critter (both bits set)', () => {
+    it('adds the crippled-limb and blinded damage bits', () => {
+        const c = makeCritter({ dead: false, knockedDown: false, crippledLeftLeg: true, blinded: true })
+        expect(script.critter_state(c)).toBe(0x04 | 0x40)
+    })
+
+    it('a dead critter is just CRITTER_STATE_DEAD', () => {
         const c = makeCritter({ dead: true, knockedDown: true })
-        expect(script.critter_state(c)).toBe(5)
+        expect(script.critter_state(c)).toBe(1)
     })
 
-    it('returns 0 for a non-game-object', () => {
-        expect(script.critter_state(null as any)).toBe(0)
+    it('returns CRITTER_STATE_DEAD for a missing object', () => {
+        expect(script.critter_state(null as any)).toBe(1)
     })
 })
 

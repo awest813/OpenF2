@@ -6,12 +6,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { fadeOut, fadeIn, getFadeLevel, fadeTicksToMs, setFadeLevelImmediate } from './fade.js'
 import { EventBus } from './eventBus.js'
 import {
-    shouldAdvanceOnTarget,
-    allowAreaAttack,
-    normalizeDistance,
-    normalizeAreaAttack,
-} from './combatAi.js'
-import {
     setHasCar,
     parkCar,
     getCarPark,
@@ -56,28 +50,6 @@ describe('Parity P2-2 — screen fades', () => {
         expect(getFadeLevel()).toBe(1)
         script.gfade_in(3)
         expect(getFadeLevel()).toBe(0)
-    })
-})
-
-describe('Parity P1-1 — distance / area_attack helpers', () => {
-    it('normalizeDistance and shouldAdvanceOnTarget', () => {
-        expect(normalizeDistance('snipe')).toBe('snipe')
-        expect(shouldAdvanceOnTarget('stay', 20, 5)).toBe(false)
-        expect(shouldAdvanceOnTarget('charge', 20, 5)).toBe(true)
-        expect(shouldAdvanceOnTarget('snipe', 6, 5)).toBe(false) // barely out of range
-        expect(shouldAdvanceOnTarget('snipe', 20, 5)).toBe(true) // far out
-        expect(shouldAdvanceOnTarget('stay_close', 20, 5)).toBe(false) // beyond +8
-        expect(shouldAdvanceOnTarget('stay_close', 10, 5)).toBe(true)
-    })
-
-    it('allowAreaAttack gates burst by mode and hit%', () => {
-        expect(normalizeAreaAttack('be_sure')).toBe('be_sure')
-        expect(allowAreaAttack('always', 10)).toBe(true)
-        expect(allowAreaAttack('be_sure', 80)).toBe(true)
-        expect(allowAreaAttack('be_sure', 60)).toBe(false)
-        expect(allowAreaAttack('be_absolutely_sure', 90)).toBe(true)
-        expect(allowAreaAttack('sometimes', 50, () => 0.4)).toBe(true)
-        expect(allowAreaAttack('sometimes', 50, () => 0.6)).toBe(false)
     })
 })
 

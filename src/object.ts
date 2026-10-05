@@ -1150,7 +1150,19 @@ export class Critter extends Obj {
     crippledRightArm = false // Accuracy penalty
     blinded = false // Perception penalty
     onFire = false // Takes damage each turn
-    isFleeing = false // Currently fleeing combat
+    /** Combat AI state (CritterCombatData): whom to fight back, maneuver bits, damage taken this combat. */
+    whoHitMe: Critter | null = null
+    combatManeuver = 0
+    damageLastTurn = 0
+
+    /** CRITTER_MANUEVER_FLEEING (critter_set_flee_state / critter_is_fleeing). */
+    get isFleeing(): boolean {
+        return ((this.combatManeuver ?? 0) & 0x04) !== 0
+    }
+
+    set isFleeing(v: boolean) {
+        this.combatManeuver = v ? (this.combatManeuver ?? 0) | 0x04 : (this.combatManeuver ?? 0) & ~0x04
+    }
 
     /**
      * Perk ranks for this critter, keyed by Fallout 2 perk ID.

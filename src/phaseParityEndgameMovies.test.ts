@@ -16,11 +16,6 @@ import {
 import { playMovie, resolveMovie, FO2_MOVIE_CATALOG, getLastMovieId } from './movies.js'
 import { EventBus } from './eventBus.js'
 import { Scripting } from './scripting.js'
-import {
-    chemUseHpRatioThreshold,
-    bestWeaponSuppressesBurst,
-    normalizeChemUse,
-} from './combatAi.js'
 
 describe('Parity P1-8 — ENDGAME.TXT selection', () => {
     beforeEach(() => {
@@ -134,16 +129,3 @@ describe('Parity P1-9 — movie playback stub', () => {
     })
 })
 
-describe('Parity P1-1 — chem_use / best_weapon helpers', () => {
-    it('chemUseHpRatioThreshold maps modes', () => {
-        expect(chemUseHpRatioThreshold('clean')).toBeNull()
-        expect(chemUseHpRatioThreshold('stims_when_hurt_lots')).toBe(0.35)
-        expect(normalizeChemUse('ALWAYS')).toBe('always')
-    })
-
-    it('bestWeaponSuppressesBurst for melee prefs', () => {
-        expect(bestWeaponSuppressesBurst('melee')).toBe(true)
-        expect(bestWeaponSuppressesBurst('unarmed')).toBe(true)
-        expect(bestWeaponSuppressesBurst('ranged')).toBe(false)
-    })
-})

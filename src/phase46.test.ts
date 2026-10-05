@@ -276,37 +276,34 @@ describe('Phase 46-G — critter_state full bitmask coverage', () => {
         expect(script.critter_state(makeCritter({ dead: true })) & 0x01).toBe(0x01)
     })
 
-    it('sets bit 1 (0x02) for knockedOut (stunned)', () => {
+    it('CRITTER_STATE_PRONE (0x02) when knocked out or down (opGetCritterState)', () => {
         const script = makeScript()
-        expect(script.critter_state(makeCritter({ knockedOut: true })) & 0x02).toBe(0x02)
+        expect(script.critter_state(makeCritter({ knockedOut: true }))).toBe(0x02)
+        expect(script.critter_state(makeCritter({ knockedDown: true }))).toBe(0x02)
     })
 
-    it('sets bit 2 (0x04) for knockedDown (prone)', () => {
+    it('adds each crippled limb and blindness as its DAM_ bit', () => {
         const script = makeScript()
-        expect(script.critter_state(makeCritter({ knockedDown: true })) & 0x04).toBe(0x04)
+        expect(script.critter_state(makeCritter({ crippledLeftLeg: true }))).toBe(0x04)
+        expect(script.critter_state(makeCritter({ crippledRightLeg: true }))).toBe(0x08)
+        expect(script.critter_state(makeCritter({ crippledLeftArm: true }))).toBe(0x10)
+        expect(script.critter_state(makeCritter({ crippledRightArm: true }))).toBe(0x20)
+        expect(script.critter_state(makeCritter({ blinded: true }))).toBe(0x40)
     })
 
-    it('sets bit 3 (0x08) for any crippled limb', () => {
+    it('fleeing is not part of the state', () => {
         const script = makeScript()
-        // Left leg
-        expect(script.critter_state(makeCritter({ crippledLeftLeg: true })) & 0x08).toBe(0x08)
-        // Right arm
-        expect(script.critter_state(makeCritter({ crippledRightArm: true })) & 0x08).toBe(0x08)
+        expect(script.critter_state(makeCritter({ isFleeing: true }))).toBe(0)
     })
 
-    it('sets bit 4 (0x10) for isFleeing', () => {
+    it('a dead critter reads CRITTER_STATE_DEAD only', () => {
         const script = makeScript()
-        expect(script.critter_state(makeCritter({ isFleeing: true })) & 0x10).toBe(0x10)
+        expect(script.critter_state(makeCritter({ dead: true, knockedDown: true }))).toBe(0x01)
     })
 
-    it('combines multiple flags correctly (dead + knockedDown = 0x05)', () => {
+    it('a missing object reads CRITTER_STATE_DEAD', () => {
         const script = makeScript()
-        expect(script.critter_state(makeCritter({ dead: true, knockedDown: true }))).toBe(0x05)
-    })
-
-    it('returns 0 for non-game-object', () => {
-        const script = makeScript()
-        expect(script.critter_state(null as any)).toBe(0)
+        expect(script.critter_state(null as any)).toBe(0x01)
     })
 })
 

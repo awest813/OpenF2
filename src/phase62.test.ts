@@ -55,7 +55,7 @@ afterEach(() => {
 // ===========================================================================
 
 describe('Phase 62-A — BLK-062: Combat.attack() auto-end after last kill', () => {
-    it('canEndCombat is queried after a killing hit', () => {
+    it('a killing hit does not end the turn or combat (combat.cc ends combat only between rounds)', () => {
         const combat = Object.create(Combat.prototype) as Combat
         combat.log = vi.fn()
         combat.nextTurn = vi.fn()
@@ -92,8 +92,7 @@ describe('Phase 62-A — BLK-062: Combat.attack() auto-end after last kill', () 
 
         combat.attack(attacker, target, 'torso')
 
-        // canEndCombat must have been called (target.dead is true after mock damage).
-        expect(combat.canEndCombat).toHaveBeenCalled()
+        expect(combat.nextTurn).not.toHaveBeenCalled()
     })
 
     it('nextTurn NOT called when enemy survives attack (no auto-end)', () => {
@@ -157,8 +156,8 @@ describe('Phase 62-B — BLK-063: Combat.canEndCombat()', () => {
         const combat = Object.create(Combat.prototype) as Combat
         ;(combat as any).combatants = [
             { isPlayer: true, dead: false },
-            { isPlayer: false, dead: true },
-            { isPlayer: false, dead: false },
+            { isPlayer: false, dead: true, teamNum: 1 },
+            { isPlayer: false, dead: false, teamNum: 1 },
         ]
         expect(combat.canEndCombat()).toBe(false)
     })

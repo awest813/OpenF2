@@ -136,37 +136,6 @@ describe('Phase 57-A — BLK-051: Combat nextTurn null-player/null-ai guards', (
 // Phase 57-B — BLK-052: maybeTaunt null-ai guard
 // ===========================================================================
 
-describe('Phase 57-B — BLK-052: maybeTaunt null-ai guard', () => {
-    it('maybeTaunt does not throw when critter has null ai', async () => {
-        const { Combat } = await import('./combat.js')
-        const combat = new (Combat as any)([])
-
-        const critter: any = {
-            ai: null,
-            name: 'TestNPC',
-            position: { x: 0, y: 0 },
-        }
-
-        // roll=false means early return before ai access
-        expect(() => combat.maybeTaunt(critter, 'move', false)).not.toThrow()
-        // roll=true with null ai should also not throw (guard added in BLK-052)
-        expect(() => combat.maybeTaunt(critter, 'move', true)).not.toThrow()
-    })
-
-    it('maybeTaunt does not throw when critter has undefined ai', async () => {
-        const { Combat } = await import('./combat.js')
-        const combat = new (Combat as any)([])
-
-        const critter: any = {
-            ai: undefined,
-            name: 'TestNPC',
-            position: { x: 0, y: 0 },
-        }
-
-        expect(() => combat.maybeTaunt(critter, 'run', true)).not.toThrow()
-    })
-})
-
 // ===========================================================================
 // Phase 57-C — BLK-053: Unarmed combat fallback
 // ===========================================================================
