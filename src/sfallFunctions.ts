@@ -41,6 +41,8 @@ import { inventorySize, itemWeight } from './critterInventory.js'
 import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
 import { loadMessage, scriptListIndex } from './data.js'
+import { Lightmap } from './lightmap.js'
+import { lookupArt } from './pro.js'
 import { keyDown, mouseButtonsDown } from './inputState.js'
 import { markMoviePlayed } from './movies.js'
 import { IniSection, parseIniSetting, readIniFile, setIniString } from './iniFiles.js'
@@ -308,7 +310,22 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         audio.pause()
         sfallSounds.delete(id)
     },
-    create_spatial: noop, tile_light: () => -1,
+    /** tile_light(elevation, tile): the light level on a hex (light_get_tile), on the current elevation. */
+    tile_light(elevation: number, tile: number) {
+        if (elevation !== (globalState.currentElevation ?? 0)) {return 0}
+        return Lightmap.getTileLightLevel(Math.trunc(tile))
+    },
+    /** art_exists(fid): whether there is art for the fid. */
+    art_exists(fid: number) {
+        if (typeof fid !== 'number' || fid <= 0) {return 0}
+        try {
+            const art = lookupArt(fid)
+            const info: any = globalState.imageInfo
+            return art && (!info || info[art] !== undefined) ? 1 : 0
+        } catch {
+            return 0
+        }
+    },
 
     // ── version and state ──
     sfall_ver_major: () => VERSION[0],
@@ -729,7 +746,8 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         } catch {
             members = []
         }
-        if (!includeHidden) {members = members.filter((m) => m?.visible !== false && !m?.dead)}
+        // Without includeHidden: living critters that are not hidden (OBJECT_HIDDEN).
+        if (!includeHidden) {members = members.filter((m) => m?.type === 'critter' && !m.dead && m.visible !== false && ((m.flags ?? 0) & 0x1) === 0)}
         return arrayOf(members, 4)
     },
     tile_get_objs(tile: number, elevation: number) {
@@ -786,9 +804,6 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     /** get_proto_data / set_proto_data: a proto field by its byte offset (sfall PROTO_*). */
     get_proto_data: (pid: number, offset: number) => getProtoData(Number(pid), Number(offset)),
     set_proto_data(pid: number, offset: number, value: number) { setProtoData(Number(pid), Number(offset), Number(value)) },
-    art_exists(fid: number) {
-        return typeof fid === 'number' && fid > 0 ? 1 : 0
-    },
 
     /**
      * metarule2_explosions(mode, a, b) (Explosions.cpp): 5 sets the grenade and
@@ -1186,7 +1201,7 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
     set_worldmap_heal_time(v: number) { sfallSettings.worldmapHealTime = Math.trunc(v) },
     show_window: noop,
     signal_close_game: noop,
-    spatial_radius: (obj: any) => (isObject(obj) ? obj.radius ?? obj._script?.spatialRadius ?? 0 : 0),
+    spatial_radius: (obj: any) => (isObject(obj) ? obj.range ?? 0 : 0),
     /** string_compare(a, b[, codepage]): 1 when equal ignoring ASCII case. */
     string_compare: (a: string, b: string) => (falloutStringEquals(String(a ?? ''), String(b ?? '')) ? 1 : 0),
     string_find(haystack: string, needle: string, pos?: number) {

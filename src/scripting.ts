@@ -2822,6 +2822,27 @@ export namespace Scripting {
         }
 
         // ── sfall's reg_anim steps (Anims.cpp): skipped in combat unless reg_anim_combat_check(0). ──
+        /**
+         * create_spatial(script, tile, elevation, radius): a new spatial script
+         * (scripts.lst entry, counting from 1); its start runs now.
+         */
+        create_spatial(scriptIndex: number, tile: number, elevation: number, radius: number): any {
+            const map: any = globalState.gMap
+            const name = lookupScriptName(Math.trunc(scriptIndex))
+            if (!map || !name || !isValidTileNum(tile)) {return 0}
+            const elev = Math.max(0, Math.min(2, Math.trunc(elevation)))
+            const spatial: any = { script: name, tileNum: tile, position: fromTileNum(tile), range: Math.trunc(radius), isSpatial: true }
+            try {
+                spatial._script = loadScript(name)
+            } catch {
+                return 0
+            }
+            if (!map.spatials) {map.spatials = [[], [], []]}
+            if (!map.spatials[elev]) {map.spatials[elev] = []}
+            map.spatials[elev].push(spatial)
+            initScript(spatial._script, spatial)
+            return spatial
+        }
         /** reg_anim_combat_check(0): reg_anim_* work in combat too, until the frame ends. */
         reg_anim_combat_check(on: number) {
             setRegAnimCombatCheck(on > 0)
