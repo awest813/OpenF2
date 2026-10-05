@@ -305,3 +305,41 @@ describe('joining and ending (_combatai_want_to_join, _combat_should_end)', () =
         expect(combat.shouldEnd()).toBe(true)
     })
 })
+
+describe('script attacks (opAttackComplex)', () => {
+    it('mid-fight, a script attack only makes the attacker engage its target', async () => {
+        const { Scripting } = await import('../scripting.js')
+        const script: any = new (Scripting as any).Script()
+        const self = critter({ name: 'guard' })
+        const player = critter({ isPlayer: true, teamNum: 0 })
+        script.self_obj = self
+        const savedIn = globalState.inCombat
+        const fake = { end: vi.fn() } as any
+        globalState.combat = fake
+        globalState.inCombat = true
+        try {
+            script.attack_complex(player, 0, 1, 0, 0, 30000, 0, 0)
+            expect(self.combatManeuver & Maneuver.ENGAGING).toBeTruthy()
+            expect(self.whoHitMe).toBe(player)
+        } finally {
+            globalState.inCombat = savedIn
+        }
+    })
+
+    it('does nothing against a fleeing target', async () => {
+        const { Scripting } = await import('../scripting.js')
+        const script: any = new (Scripting as any).Script()
+        const self = critter({ name: 'guard' })
+        const target = critter({ combatManeuver: Maneuver.FLEEING })
+        script.self_obj = self
+        const savedIn = globalState.inCombat
+        globalState.inCombat = true
+        globalState.combat = {} as any
+        try {
+            script.attack_complex(target, 0, 1, 0, 0, 30000, 0, 0)
+            expect(self.combatManeuver ?? 0).toBe(0)
+        } finally {
+            globalState.inCombat = savedIn
+        }
+    })
+})

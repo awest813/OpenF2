@@ -2350,10 +2350,24 @@ export namespace Scripting {
                 return
             }
 
-            // begin combat, turn starting with us
+            // opAttackComplex: nothing happens when either side is out of action
+            // or the target is fleeing; mid-fight the attacker just engages.
+            const self: any = this.self_obj
+            const target: any = obj
+            const inactive = (c: any) => !c || c.dead || c.knockedOut || c.visible === false
+            if (inactive(self) || inactive(target)) {return}
+            if (((target.combatManeuver ?? 0) & 0x04) !== 0) {return}
+
             // Track the starting combatant for get_last_pers_obj (0x81D3).
             ;(globalState as any).lastPersistentObj = this.self_obj
-            if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter, obj instanceof Critter ? obj : undefined)}
+            if (globalState.inCombat && globalState.combat) {
+                if (((self.combatManeuver ?? 0) & 0x01) === 0) {
+                    self.combatManeuver = (self.combatManeuver ?? 0) | 0x01
+                    self.whoHitMe = target
+                }
+                return
+            }
+            if (Config.engine.doCombat) {Combat.start(self as Critter, obj instanceof Critter ? obj : undefined)}
         }
         terminate_combat() {
             info('[terminate_combat]')
@@ -3288,8 +3302,10 @@ export namespace Scripting {
             dialogueExit()
             if (Config.engine.doCombat && this.self_obj) {
                 const source = this.self_obj as Critter
-                if (source.isPlayer !== true) {
-                    source.hostile = true
+                if (source.isPlayer !== true && globalState.inCombat) {
+                    ;(source as any).combatManeuver = ((source as any).combatManeuver ?? 0) | 0x01
+                    ;(source as any).whoHitMe = globalState.player
+                } else if (source.isPlayer !== true) {
                     Combat.start(source, globalState.player as Critter)
                 }
             }

@@ -17,6 +17,7 @@
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_DARK_GRAY, FALLOUT_BLACK, FALLOUT_AMBER, FALLOUT_HOVER, UIColor, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EventBus } from '../eventBus.js'
+import globalState from '../globalState.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -79,6 +80,11 @@ export class InventoryPanel extends UIPanel {
         this._selectedIndex = -1
         this._hoveredIndex  = -1
         this._scrollOffset  = 0
+    }
+
+    /** Back in combat with no AP left, the player's turn is over (combat.cc _combat_input). */
+    protected override onHide(): void {
+        globalState.combat?.afterPlayerAction?.()
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
