@@ -19,6 +19,7 @@ import { CriticalEffects } from './criticalEffects.js'
 import { Events } from './events.js'
 import { Point } from './geometry.js'
 import globalState from './globalState.js'
+import { Scripting } from './scripting.js'
 import { NEW_GAME_TICKS } from './gameTime.js'
 import { GameMap } from './map.js'
 import { Player } from './player.js'
@@ -41,6 +42,7 @@ export function initGame(options: InitGameOptions = {}): void {
     globalState.gameTickTime = NEW_GAME_TICKS
     resetSkillUsage()
     globalState.metFrankHorrigan = false
+    Scripting.requestGlobalScriptsStart()
 
     if (shouldSkipMainMenu()) {
         // Dev shortcut: `?artemple` (or any map name) loads immediately.
@@ -84,6 +86,7 @@ export function initGame(options: InitGameOptions = {}): void {
 
 /** Load a map after chargen or an explicit enter-world request. */
 export function enterWorldMap(mapName: string): void {
+    Scripting.requestGlobalScriptsStart()
     if (!globalState.gMap) {
         globalState.gMap = new GameMap()
     }

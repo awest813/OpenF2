@@ -56,6 +56,7 @@ import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
+import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
@@ -3560,10 +3561,12 @@ export namespace Scripting {
             return mode
         }
 
-        // sfall extended opcode — set the repeat interval for the global map script (0x817F).
-        // Partial: the engine does not run a global script ticker; this is a no-op.
-        set_global_script_repeat(intervalMs: number): void {
-            log('set_global_script_repeat', arguments)
+        /** set_global_script_repeat(frames): how often this global script runs; -1 flips its type. */
+        set_global_script_repeat(frames: number): void {
+            setGlobalScriptRepeat(this, frames)
+        }
+        available_global_script_types(): number {
+            return AVAILABLE_GLOBAL_SCRIPT_TYPES
         }
 
         // sfall extended opcode — get a critter's derived skill value (0x8180).
@@ -4034,10 +4037,9 @@ export namespace Scripting {
             return ''
         }
 
-        // sfall extended opcode — set the global script type (0x81A4).
-        // 0=map-update script, 1=combat script. No-op in browser build (no global script ticker).
+        /** set_global_script_type(type): 0 main loop, 1 input loop, 2 world map, 3 main loop and world map. */
         set_global_script_type(type: number): void {
-            log('set_global_script_type', arguments)
+            setGlobalScriptType(this, type)
         }
 
         // sfall extended opcode — get in-game calendar year (0x81A5).
@@ -8436,6 +8438,7 @@ export namespace Scripting {
                 updated++
             }
         }
+        runGlobalScriptsAtProc('map_update_p_proc')
 
         // info("updated " + updated + " objects")
     }
@@ -8473,6 +8476,7 @@ export namespace Scripting {
                 flushUnsupportedVMOperations(script)
             }
         }
+        runGlobalScriptsAtProc('map_exit_p_proc')
     }
 
     export function enterMap(
@@ -8516,6 +8520,11 @@ export namespace Scripting {
         // from save); subsequent critter_p_proc calls see 0 (normal run).
         globalState.mapLoadedFromSave = false
 
+        // sfall: global scripts start once the new game's first map is in;
+        // after that they get map_enter_p_proc like the map script.
+        if (globalScriptsPending) {startGlobalScriptsNow()}
+        else {runGlobalScriptsAtProc('map_enter_p_proc')}
+
         if (overrideStartPos) {
             const r = overrideStartPos
             overrideStartPos = null
@@ -8527,6 +8536,25 @@ export namespace Scripting {
         // map_enter_p_proc.
 
         return null
+    }
+
+    let globalScriptsPending = false
+
+    /** A new game is starting: its global scripts start once its first map is in. */
+    export function requestGlobalScriptsStart(): void {
+        clearGlobalScripts()
+        globalScriptsPending = true
+    }
+
+    /** InitGlobalScripts: load the sfall global scripts and run their start procedures. */
+    export function startGlobalScriptsNow(): void {
+        globalScriptsPending = false
+        startGlobalScripts((name) => {
+            const script = loadScript(name)
+            script.self_obj = null as any
+            script.cur_map_index = currentMapID ?? 0
+            return script
+        })
     }
 
     export function objectEnterMap(obj: Obj, elevation: number, mapID: number) {

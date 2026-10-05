@@ -188,7 +188,6 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         this._gameLoadedSeen = true
         return 1
     },
-    available_global_script_types: () => 0,
     init_hook: noop,
     register_hook(this: any, id: number) { sfallSettings.hooks.set(id, this) },
     register_hook_proc(this: any, id: number, proc: unknown) { sfallSettings.hooks.set(id, proc) },
@@ -688,6 +687,8 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
     },
     /** get_map_enter_position: [tile, elevation, rotation] the player entered at. */
     get_map_enter_position() {
+        const entry = (globalState as any)._mapEntryPosition
+        if (entry) {return arrayOf([entry.tile, entry.elevation, entry.rotation])}
         const p: any = globalState.player
         return arrayOf([tileOf(p), globalState.currentElevation ?? 0, p?.orientation ?? 0])
     },

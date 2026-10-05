@@ -146,6 +146,30 @@ def extract_dats():
 
 	return True
 
+def list_sfall_scripts():
+	# sfall runs every scripts/gl*.int as a global script and scripts/hs_*.int
+	# as hook scripts. Mods ship them loose in the game's data/scripts folder;
+	# copy those over the extracted ones, then list what there is, since the
+	# browser cannot list a directory.
+	import shutil
+	dest = os.path.join("data", "scripts")
+	if not os.path.exists(dest):
+		os.makedirs(dest)
+	loose = os.path.join(SRC_DIR, "data", "scripts")
+	if os.path.isdir(loose):
+		for name in os.listdir(loose):
+			lower = name.lower()
+			if lower.endswith(".int") and (lower.startswith("gl") or lower.startswith("hs_")):
+				shutil.copyfile(os.path.join(loose, name), os.path.join(dest, lower))
+	names = sorted(os.path.splitext(n.lower())[0] for n in os.listdir(dest) if n.lower().endswith(".int"))
+	listing = {
+		"global": [n for n in names if n.startswith("gl")],
+		"hooks": [n for n in names if n.startswith("hs_")],
+	}
+	json.dump(listing, open(os.path.join(dest, "sfall_scripts.json"), "w"))
+	info("Found %d global and %d hook scripts." % (len(listing["global"]), len(listing["hooks"])))
+	return True
+
 def export_images():
 	# Export FRMs/FR[0-9]s
 
@@ -228,6 +252,7 @@ def main():
 	parse_crit_table()
 	parse_elevator_table()
 	extract_dats()
+	list_sfall_scripts()
 	if not NO_EXPORT_IMAGES:
 		export_images()
 	export_pros()

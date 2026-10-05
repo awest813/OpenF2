@@ -32,6 +32,7 @@ import { tickTimedEffects } from './character/timedEffects.js'
 import { processRadPoisonUpTo } from './character/radiationPoison.js'
 import { processChargedItemsUpTo } from './chargedItems.js'
 import { deleteTempArrays } from './sfallArrays.js'
+import { globalScriptList, runGlobalScripts } from './globalScripts.js'
 import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -562,6 +563,8 @@ function initUIManager(): void {
     })
 
     EventBus.on('game:loadComplete', () => {
+        // sfall restarts its global scripts after a saved game is loaded.
+        Scripting.startGlobalScriptsNow()
         EventBus.emit('ui:closePanel', { panelName: 'mainMenu' })
         EventBus.emit('ui:closePanel', { panelName: 'characterCreation' })
         EventBus.emit('ui:openPanel', { panelName: 'gamePanel' })
@@ -1048,10 +1051,18 @@ heart.update = function () {
         }
     }
 
+    // sfall global scripts: the input loop runs on every screen, the world
+    // map loop on the world map, the main loop below.
+    if (globalState.player && globalScriptList().length > 0) {
+        runGlobalScripts(1, 1)
+        if (globalState.uiMode === UIMode.worldMap) {runGlobalScripts(2, 3)}
+    }
+
     if (globalState.uiMode !== UIMode.none) {
         return
     }
     const time = window.performance.now()
+    if (globalScriptList().length > 0) {runGlobalScripts(0, 3)}
 
     if (time - globalState.lastFPSTime >= 500) {
         globalState.$fpsOverlay.textContent = 'fps: ' + heart.timer.getFPS()

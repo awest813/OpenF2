@@ -221,6 +221,19 @@ export function getLstId(lst: string, id: number): string | null {
     return lstFiles[lst][id]
 }
 
+/** Whether scripts.lst names this script (sfall IsGameScript). */
+export function isGameScript(name: string): boolean {
+    if (lstFiles['scripts/scripts'] === undefined) {
+        try {
+            lstFiles['scripts/scripts'] = loadLst('scripts/scripts')
+        } catch {
+            return false
+        }
+    }
+    const wanted = name.toLowerCase()
+    return lstFiles['scripts/scripts'].some((line) => line.split('.')[0].trim().toLowerCase() === wanted)
+}
+
 export function lookupScriptName(scriptID: number): string | null {
     console.log('SID: ' + scriptID)
     const lookupName = getLstId('scripts/scripts', scriptID - 1)
