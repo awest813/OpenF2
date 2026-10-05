@@ -59,3 +59,63 @@ describe('object and dialogue opcodes', () => {
         expect(() => script.start_gdialog(0, script.self_obj, 4, -1, -1)).not.toThrow()
     })
 })
+
+describe('kill / damage / destroy / timers', () => {
+    let savedImageInfo: any
+    afterEach(() => {
+        if (savedImageInfo !== undefined) {globalState.imageInfo = savedImageInfo}
+        Scripting.timeEventList.length = 0
+    })
+
+    function critter(extra: Record<string, unknown> = {}): any {
+        const stats: Record<string, number> = { HP: 30 }
+        return {
+            _type: 'obj', type: 'critter', pid: 0x01000005, art: 'art/critters/hmjmpsaa',
+            getBase() { return 'art/critters/hmjmps' },
+            stats: { setBase: (k: string, v: number) => { stats[k] = v }, getBase: (k: string) => stats[k] ?? 0, modifyBase: (k: string, d: number) => { stats[k] = (stats[k] ?? 0) + d } },
+            getStat: (k: string) => stats[k] ?? 0,
+            _script: {},
+            ...extra,
+        }
+    }
+
+    it('kill_critter shows the single-frame death at once and drops the script', () => {
+        savedImageInfo = globalState.imageInfo
+        globalState.imageInfo = new Proxy({}, { get: () => ({ numFrames: 1, fps: 10 }) }) as any
+        const script: any = new (Scripting as any).Script()
+        const c = critter()
+        script.kill_critter(c, 48)
+        expect(c.dead).toBe(true)
+        expect(c.art).toBe('art/critters/hmjmpsra')
+        expect(c._script).toBeNull()
+    })
+
+    it("critter_dmg applies the type's DT and DR unless armor is bypassed", () => {
+        const script: any = new (Scripting as any).Script()
+        const stats: Record<string, number> = { HP: 100, 'DT Laser': 4, 'DR Laser': 50 }
+        const c = critter({ getStat: (k: string) => stats[k] ?? 0 })
+        c.stats.modifyBase = (k: string, d: number) => { stats[k] = (stats[k] ?? 0) + d }
+        script.critter_dmg(c, 24, 1 | 0x200) // laser, no animation: (24-4) - 50% = 10
+        expect(stats.HP).toBe(90)
+        script.critter_dmg(c, 24, 1 | 0x100 | 0x200) // armor bypassed
+        expect(stats.HP).toBe(66)
+    })
+
+    it("destroy_object takes a carried item out of its owner's inventory; rm_timer_event is per object", () => {
+        const script: any = new (Scripting as any).Script()
+        const item: any = { _type: 'obj', type: 'item', pid: 9, amount: 1 }
+        const saved = globalState.player
+        const owner: any = { _type: 'obj', type: 'critter', inventory: [item], rightHand: item }
+        globalState.player = owner
+        script.destroy_object(item)
+        expect(owner.inventory).toEqual([])
+        expect(owner.rightHand).toBeUndefined()
+        globalState.player = saved
+
+        const a: any = { _type: 'obj', type: 'item', pid: 3 }
+        const b: any = { _type: 'obj', type: 'item', pid: 3 }
+        Scripting.timeEventList.push({ obj: a, ticks: 1, userdata: 0 } as any, { obj: b, ticks: 1, userdata: 0 } as any)
+        script.rm_timer_event(a)
+        expect(Scripting.timeEventList.map((e: any) => e.obj)).toEqual([b])
+    })
+})

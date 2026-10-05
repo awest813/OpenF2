@@ -306,6 +306,15 @@ export function lookupMapNameFromLookup(lookupName: string) {
     return null
 }
 
+/** wmSetMapMusic: change a map's music (by map index). False for an unknown map. */
+export function setMapMusic(mapID: number, music: string): boolean {
+    if (mapInfo === null) {parseMapInfo()}
+    const info = mapInfo?.[mapID]
+    if (!info || typeof music !== 'string') {return false}
+    info.music = music.trim().toLowerCase()
+    return true
+}
+
 export function lookupMapName(mapID: number): string | null {
     if (mapInfo === null) {parseMapInfo()}
 

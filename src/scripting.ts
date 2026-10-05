@@ -21,7 +21,7 @@ declare const __dirname: string
 
 import { Combat, CombatStartData } from './combat.js'
 import { critterDamage, critterKill } from './critter.js'
-import { areaContainingMap, lookupMapName, lookupScriptName } from './data.js'
+import { areaContainingMap, lookupMapName, lookupScriptName, setMapMusic } from './data.js'
 import {
     hexDirectionTo,
     hexDistance,
@@ -83,7 +83,7 @@ import { equipItem, isRealItem, removeItem } from './equipment.js'
 import { hasDrugEvent } from './character/timedEffects.js'
 import {
     ANIM_COUNT, ANIM_FALL_BACK, ANIM_FALL_BACK_SF, ANIM_FALL_FRONT, ANIM_FALL_FRONT_BLOOD, ANIM_FALL_FRONT_SF,
-    ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, resetAnimSequences,
+    ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, isProne, resetAnimSequences,
     regAnimAnimate, regAnimAnimateForever, regAnimAnimateReversed, regAnimBegin, regAnimClear, regAnimEnd,
     regAnimMoveToObject, regAnimMoveToTile, regAnimPlaySfx, regAnimRunToObject, regAnimRunToTile, regAnimSetArt,
 } from './animSequence.js'
@@ -250,6 +250,7 @@ export namespace Scripting {
     let scriptDebuggerSink: ScriptDebuggerSink | null = null
 
     const PERK_COUNT = 119
+    const GVAR_LOAD_MAP_INDEX = 27
     const TRAIT_COUNT = 16
 
     // opMetarule constants.
@@ -330,6 +331,54 @@ export namespace Scripting {
             if (levels[level]?.includes(obj)) {return level}
         }
         return globalState.currentElevation ?? 0
+    }
+
+    /** critterKill as opKillCritter calls it: straight to a single-frame death. */
+    function scriptKillCritter(critter: any, anim: number): void {
+        regAnimClear(critter)
+        globalState.gParty?.removePartyMember?.(critter)
+        let frame = anim
+        if (isProne(critter) && (critter.animCode === ANIM_FALL_BACK || critter.animCode === ANIM_FALL_FRONT)) {
+            frame = critter.animCode === ANIM_FALL_FRONT && critterArt(critter, ANIM_FALL_FRONT_SF) ? ANIM_FALL_FRONT_SF : ANIM_FALL_BACK_SF
+        } else {
+            if (frame < 0 || frame > 63) {frame = 63}
+            // _obj_fix_violence_settings: no gore below maximum blood.
+            if (frame > ANIM_FALL_FRONT_SF && violenceToIni(globalState.violenceLevel) < 3) {frame = ANIM_FALL_BACK_SF}
+            if (!critterArt(critter, frame)) {frame = 62}
+        }
+        const art = critterArt(critter, frame)
+        if (art) {
+            critter.art = art
+            critter.animCode = frame
+        }
+        critter.frame = 0
+        critter.anim = null
+        critter.animCallback = null
+        critter.path = null
+        critter.dead = true
+        critter.outline = null
+        if (critter.stats?.setBase) {critter.stats.setBase('HP', 0)}
+        if (critter.drugState) {critter.drugState.drugEvents = []}
+        critter._script = null
+        if (critter === globalState.player) {syncPlayerEntityFromCritter()}
+    }
+
+    /** objectGetOwner: whoever carries the object (inside containers too), or null. */
+    function findOwner(obj: any): any {
+        const holds = (holder: any): any => {
+            for (const item of holder?.inventory ?? []) {
+                if (item === obj) {return holder}
+                const inner = holds(item)
+                if (inner) {return inner}
+            }
+            return null
+        }
+        const candidates: any[] = [globalState.player, ...(globalState.gMap?.getObjects?.() ?? [])]
+        for (const c of candidates) {
+            const found = c && c !== obj ? holds(c) : null
+            if (found) {return found}
+        }
+        return null
     }
 
     function lookupMapNameSafe(mapID: number): string | null {
@@ -1646,17 +1695,14 @@ export namespace Scripting {
             if (c.blinded) {state |= 0x40}
             return state
         }
+        /**
+         * opKillCritter (critterKill): the critter drops dead on the spot showing
+         * the given death frame; no death animation, no experience, and its
+         * script is gone without a destroy_p_proc.
+         */
         kill_critter(obj: Critter, deathFrame: number) {
-            log('kill_critter', arguments)
-            // BLK-189: Guard against null/non-critter object — scripts in the Arroyo
-            // temple and end-sequence occasionally call kill_critter(0) or with a
-            // partially-initialised object reference; critterKill(null) would
-            // immediately throw 'Cannot set properties of null' on obj.dead = true.
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('kill_critter: not a critter: ' + obj, undefined, this)
-                return
-            }
-            critterKill(obj)
+            if (!isGameObject(obj) || obj.type !== 'critter') {return}
+            scriptKillCritter(obj, typeof deathFrame === 'number' ? deathFrame : -1)
         }
         get_poison(obj: Obj) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -1740,40 +1786,31 @@ export namespace Scripting {
             equipItem(critter, item, slot)
             if (critter === globalState.player) {syncPlayerEntityFromCritter()}
         }
-        critter_dmg(obj: Critter, damage: number, damageType: string) {
-            if (!isGameObject(obj)) {
-                warn('critter_dmg: not game object: ' + obj)
-                return
+        /**
+         * opCritterDamage (actionDamage): `amount` of a damage type to a critter.
+         * Flag 0x100 bypasses armor, 0x200 skips the hit animation; otherwise its
+         * DT then DR for that type apply. Nobody is credited with the hit.
+         */
+        critter_dmg(obj: Critter, amount: number, typeWithFlags: number) {
+            if (!isGameObject(obj) || obj.type !== 'critter' || !Number.isFinite(amount)) {return}
+            const flags = typeof typeWithFlags === 'number' ? typeWithFlags : 0
+            const animate = (flags & 0x200) === 0
+            const bypassArmor = (flags & 0x100) !== 0
+            const type = flags & ~(0x100 | 0x200)
+            const names = ['Normal', 'Laser', 'Fire', 'Plasma', 'Electrical', 'EMP', 'Explosive']
+            const name = names[type] ?? 'Normal'
+            let damage = Math.trunc(amount)
+            if (!bypassArmor) {
+                const stat = (s: string) => {
+                    const v = typeof obj.getStat === 'function' ? obj.getStat(s) : 0
+                    return Number.isFinite(v) ? v : 0
+                }
+                damage -= stat('DT ' + name)
+                if (damage > 0) {damage -= Math.trunc((stat('DR ' + name) * damage) / 100)}
+                if (damage < 0) {damage = 0}
             }
-            // BLK-130: Guard against non-finite damage values — division-by-zero in a
-            // damage formula or a script arithmetic error can produce NaN/Infinity.
-            // Passing these to critterDamage() corrupts HP stats silently; skip the
-            // call instead and emit a warning so the issue is traceable.
-            if (typeof damage !== 'number' || !isFinite(damage)) {
-                warn('critter_dmg: non-finite damage (' + damage + ') — no-op', undefined, this)
-                return
-            }
-            // BLK-148: Clamp negative damage values to 0 — New Reno boxing scripts
-            // compute net damage as (attack - defense) which can be negative when the
-            // defender's DR/DT absorbs all damage.  Fallout 2 treats negative damage
-            // as 0 (no healing from the damage pipeline); critterDamage() with a
-            // negative value would reduce HP below intended floor.
-            if (damage < 0) {
-                damage = 0
-            }
-            // Zero damage — nothing to apply; skip critterDamage() to avoid side-effects.
-            if (damage === 0) {return}
-            // BLK-167: Guard against non-critter self_obj (e.g. dart trap objects in the
-            // Temple of Trials).  critterDamage's source param is used for XP attribution
-            // via critterKill; passing a non-critter with no isPlayer property silently
-            // suppresses any XP award.  Detect this and pass null so the damage pipeline
-            // and kill proc both receive a well-typed absent-attacker sentinel.
-            const dmgSource = (isGameObject(this.self_obj) && (this.self_obj as any).type === 'critter')
-                ? this.self_obj as Critter
-                : null
-            // critterDamage's source parameter is typed as Critter but accepts null at
-            // runtime (critterKill guards with `if (source && source.isPlayer)`).
-            critterDamage(obj, damage, dmgSource as Critter, true, true, damageType)
+            regAnimClear(obj)
+            if (damage > 0) {critterDamage(obj, damage, null as any, true, animate, name)}
         }
         critter_heal(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -2324,6 +2361,8 @@ export namespace Scripting {
                 warn('set_obj_visibility: non-numeric visibility (' + visibility + ') — treating as 0 (visible)', undefined, this)
                 visibility = 0
             }
+            // opSetObjectVisibility: refused while a save is restored.
+            if (globalState.loadingGame) {return}
 
             obj.visible = !visibility
         }
@@ -2455,28 +2494,29 @@ export namespace Scripting {
             if (typeof obj.pid !== 'number') {return -1}
             return (obj.pid >>> 24) & 0xff
         }
+        /**
+         * opDestroyObject: an object somebody carries leaves that inventory (and
+         * any slot); one on the map is removed. Its pending timers go with it.
+         * A critter is not destroyed while a save is restored.
+         */
         destroy_object(obj: Obj) {
-            // destroy object from world
-            log('destroy_object', arguments)
-            // BLK-069: Guard against null gMap and null obj to prevent crashes when
-            // scripts destroy objects during map transitions or test runs.
-            if (!globalState.gMap || !obj) {
-                warn('destroy_object: gMap or obj is null — skipping', undefined, this)
+            if (!isGameObject(obj)) {return}
+            if (obj.type === 'critter' && globalState.loadingGame) {return}
+            regAnimClear(obj)
+            for (let i = timeEventList.length - 1; i >= 0; i--) {
+                if (timeEventList[i].obj === obj) {timeEventList.splice(i, 1)}
+            }
+            const owner = findOwner(obj)
+            if (owner) {
+                removeItem(owner, obj, (obj as any).amount ?? 1)
+                if (owner === globalState.player) {syncPlayerEntityFromCritter()}
                 return
             }
-            globalState.gMap.destroyObject(obj)
+            if (globalState.gMap) {globalState.gMap.destroyObject(obj)}
         }
-        set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, rotation: number) {
-            log('set_exit_grids', arguments)
-            // BLK-084: Guard against null gameObjects — called before a map is loaded
-            // (e.g. in startup scripts or test environments) gameObjects is null and the
-            // non-null assertion would crash.  Skip silently when there are no objects.
-            if (!gameObjects) {
-                warn('set_exit_grids: gameObjects is null — skipping', undefined, this)
-                return
-            }
-            for (let i = 0; i < gameObjects.length; i++) {
-                const obj = gameObjects[i]
+        /** opSetExitGrids: every exit grid on that elevation leads to the given map, elevation and tile. */
+        set_exit_grids(onElev: number, mapID: number, elevation: number, tileNum: number, _rotation: number) {
+            for (const obj of globalState.gMap?.getObjects(onElev) ?? []) {
                 if (obj.type === 'misc' && obj.extra && obj.extra.exitMapID !== undefined) {
                     obj.extra.exitMapID = mapID
                     obj.extra.startingPosition = tileNum
@@ -2925,13 +2965,34 @@ export namespace Scripting {
             return Math.floor(((globalState.gameTickTime ?? 0) - last) / 864000)
         }
         /** kill_critter_type(pid, deathFrame): kill every living, visible critter with that pid. */
-        kill_critter_type(pid: number, _deathFrame: number) {
+        /**
+         * opKillCritterType: every living, visible, standing critter with that pid.
+         * Death frame 0 removes them; 1 cycles through the engine's list of deaths;
+         * a single-frame death code uses that one; anything else falls back.
+         */
+        kill_critter_type(pid: number, deathFrame: number) {
+            if (globalState.loadingGame) {return}
+            const ftList = [62, 51, 52, 53, 63, 62, 54, 56, 59, 62, 63]
+            let ftIndex = 0
             const objects: Obj[] = globalState.gMap?.getObjects?.() ?? []
             for (const obj of objects.slice()) {
-                if (obj.type !== 'critter' || obj.pid !== pid) {continue}
-                const c = obj as Critter
-                if (c.dead || c.visible === false) {continue}
-                critterKill(c)
+                const c = obj as any
+                if (c.type !== 'critter' || c.pid !== pid || c.dead || c.visible === false) {continue}
+                if ((c.animCode ?? 0) >= ANIM_FALL_BACK_SF) {continue}
+                regAnimClear(c)
+                if (deathFrame === 0) {
+                    this.destroy_object(c)
+                } else if (deathFrame === 1) {
+                    let anim = correctDeath(c, ftList[ftIndex], true)
+                    if (anim === ANIM_FALL_BACK) {anim = ANIM_FALL_BACK_SF}
+                    else if (anim === ANIM_FALL_FRONT) {anim = ANIM_FALL_FRONT_SF}
+                    scriptKillCritter(c, anim)
+                    ftIndex = (ftIndex + 1) % ftList.length
+                } else if (deathFrame >= ANIM_FALL_BACK_SF && deathFrame <= 63) {
+                    scriptKillCritter(c, deathFrame)
+                } else {
+                    scriptKillCritter(c, ANIM_FALL_BACK_SF)
+                }
             }
         }
         /** critter_rm_trait(obj, kind, param, value): removes a perk entirely; returns −1. */
@@ -3002,7 +3063,20 @@ export namespace Scripting {
             EventBus.emit('ui:openPanel', { panelName: 'worldMap' })
         }
         dialogue_reaction(_reaction: number) {}
-        set_map_music(_map: number, _name: string) {}
+        /** opSetMapMusic (wmSetMapMusic): the map's music; restarted at once on the current map. */
+        set_map_music(mapID: number, name: string) {
+            if (mapID === -1 || typeof name !== 'string') {return}
+            let ok = false
+            try {
+                ok = setMapMusic(mapID, name)
+            } catch {
+                ok = false
+            }
+            if (ok && mapID === currentMapID && globalState.audioEngine) {
+                globalState.audioEngine.stopAll()
+                globalState.audioEngine.playMusic(name.trim().toLowerCase())
+            }
+        }
         /** opSfxBuild*Name: sound effect file names, built as game_sound.cc does. */
         sfx_build_open_name(obj: Obj, action: number) {
             return isGameObject(obj) ? sfxOpenName(obj, action) : 0
@@ -3144,14 +3218,15 @@ export namespace Scripting {
             // in reverse so splice indices stay valid after each removal.
             for (let i = timeEventList.length - 1; i >= 0; i--) {
                 const timedEvent = timeEventList[i]
-                if (timedEvent.obj && timedEvent.obj.pid === obj.pid) {
+                // queueRemoveEvents(object): that object's events, not every object with its pid.
+                if (timedEvent.obj === obj) {
                     info('removing timed event for obj')
                     timeEventList.splice(i, 1)
                 }
             }
         }
         game_ticks(seconds: number) {
-            return seconds * 10
+            return Math.max(0, seconds) * 10
         }
         game_time_advance(ticks: number) {
             log('game_time_advance', arguments)
@@ -3830,8 +3905,14 @@ export namespace Scripting {
                 warn('load_map: gMap is null — cannot load map ' + map, undefined, this)
                 return
             }
-            if (typeof map === 'string') {globalState.gMap.loadMap(map.split('.')[0].toLowerCase())}
-            else {globalState.gMap.loadMapByID(map)}
+            // opLoadMap: the entrance goes to GVAR_LOAD_MAP_INDEX for the new map's script.
+            if (typeof map === 'string') {
+                globalVars[GVAR_LOAD_MAP_INDEX] = startLocation
+                globalState.gMap.loadMap(map.split('.')[0].toLowerCase())
+            } else if (typeof map === 'number' && map >= 0) {
+                globalVars[GVAR_LOAD_MAP_INDEX] = startLocation
+                globalState.gMap.loadMapByID(map)
+            }
         }
         play_gmovie(movieID: number) {
             // P1-9: resolve FO2 movie ID, emit movie:play / optional cinematic placeholder.
@@ -3872,17 +3953,11 @@ export namespace Scripting {
                 log('mark_area_known: unknown areaType ' + areaType + ' — no-op', arguments)
             }
         }
+        /** opWorldmapCitySetPos (wmAreaSetWorldPos): move a town on the world map. */
         wm_area_set_pos(area: number, x: number, y: number) {
-            log('wm_area_set_pos', arguments)
-            // BLK-212: Guard against non-finite coordinates — end-of-Arroyo scripts
-            // compute world-map position offsets from arithmetic that can yield NaN
-            // when prerequisite values are uninitialised.  Passing NaN to a future
-            // implementation of wm_area_set_pos would corrupt the world-map area
-            // positions.  No-op silently for non-finite values.
-            if (typeof x !== 'number' || !isFinite(x) || typeof y !== 'number' || !isFinite(y)) {
-                warn('wm_area_set_pos: non-finite coordinate (x=' + x + ' y=' + y + ') — no-op', undefined, this)
-                return
-            }
+            const town = globalState.mapAreas?.[area]
+            if (!town || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0) {return}
+            town.worldPosition = { x, y }
         }
         game_ui_disable() {
             log('game_ui_disable', arguments)
