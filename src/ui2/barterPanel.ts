@@ -154,7 +154,13 @@ export class BarterPanel extends UIPanel {
         this._scrolls = { leftInv: 0, leftTbl: 0, rightTbl: 0, rightInv: 0 }
     }
 
+    /** Runs once when the panel closes (puts set-aside equipped items back). */
+    onClosed: (() => void) | null = null
+
     protected override onHide(): void {
+        const closed = this.onClosed
+        this.onClosed = null
+        closed?.()
         this._selected = null
         this._hovered = null
         this._pricing = null

@@ -32,6 +32,7 @@ import { SkillSet, StatSet } from './char.js'
 import { ActionPoints, AI, Combat } from './combat.js'
 import { markPlayerExplored } from './character/automap.js'
 import { canCritterCarryMore, getCritterInventoryWeightLbs } from './critterInventory.js'
+import { unequipItem } from './equipment.js'
 import { adrenalineRushBonus, gainPerkSpecialBonus, perkStatModifier, playerSkillModifier, traitStatModifier } from './character/statModifiers.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import { overloadApPenalty, Roll } from './combat/fo2Formulas.js'
@@ -1029,7 +1030,8 @@ export class Obj {
         for (let i = 0; i < source.inventory.length; i++) {
             if (source.inventory[i].pid === this.pid) {
                 removed = true
-                source.inventory.splice(i, 1) // remove from source
+                const [taken] = source.inventory.splice(i, 1) // remove from source
+                unequipItem(source, taken)
                 break
             }
         }

@@ -6,6 +6,7 @@
  */
 
 import globalState from './globalState.js'
+import { setAsideEquipped } from './equipment.js'
 import { Critter, deserializeObj, Obj, SerializedObj } from './object.js'
 import { LootPanel } from './ui2/lootPanel.js'
 import { UIMode } from './uiMode.js'
@@ -150,7 +151,9 @@ export function openCarTrunk(): boolean {
     const mgr = globalState.uiManager
     const panel = mgr?.get?.('loot') as LootPanel | undefined
     if (panel && typeof panel.openWithLive === 'function') {
+        const restore = setAsideEquipped(player)
         panel.openWithLive(player.inventory as Obj[], carTrunk)
+        panel.onClosed = restore
         globalState.uiMode = UIMode.loot
         return true
     }

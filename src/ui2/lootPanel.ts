@@ -121,7 +121,13 @@ export class LootPanel extends UIPanel {
     }
 
     /** All close paths funnel here so the loot:closed event fires exactly once. */
+    /** Runs once when the panel closes (puts set-aside equipped items back). */
+    onClosed: (() => void) | null = null
+
     protected override onHide(): void {
+        const closed = this.onClosed
+        this.onClosed = null
+        closed?.()
         const guard = this._guard
         this._guard = null
         EventBus.emit('loot:closed', {

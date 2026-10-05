@@ -106,21 +106,20 @@ function applyExtraSaveState(save: SaveGame): void {
     if (globalState.player && typeof save.playerSkillPoints === 'number') {
         globalState.player.skills.skillPoints = save.playerSkillPoints
     }
-    // BLK-042: Restore player equipped weapon slots from persisted PIDs.
-    // Weapons equipped via drag-drop are removed from inventory and must be
-    // re-equipped after the inventory is restored from the save.
+    // Restore the equipped slots from persisted PIDs. Equipped items stay in
+    // the inventory (as in the engine); the slots just point at them.
     if (globalState.player && typeof save.playerLeftHandPID === 'number') {
         const leftIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerLeftHandPID)
         if (leftIdx !== -1) {
             (globalState.player as any).leftHand = globalState.player.inventory[leftIdx]
-            globalState.player.inventory.splice(leftIdx, 1)
         }
     }
     if (globalState.player && typeof save.playerRightHandPID === 'number') {
-        const rightIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerRightHandPID)
+        const rightIdx = globalState.player.inventory.findIndex(
+            (i: any) => i.pid === save.playerRightHandPID && i !== (globalState.player as any).leftHand
+        )
         if (rightIdx !== -1) {
             (globalState.player as any).rightHand = globalState.player.inventory[rightIdx]
-            globalState.player.inventory.splice(rightIdx, 1)
         }
     }
     // BLK-045: Restore player equipped armor from persisted PID.
@@ -128,7 +127,6 @@ function applyExtraSaveState(save: SaveGame): void {
         const armorIdx = globalState.player.inventory.findIndex((i: any) => i.pid === save.playerArmorPID)
         if (armorIdx !== -1) {
             (globalState.player as any).equippedArmor = globalState.player.inventory[armorIdx]
-            globalState.player.inventory.splice(armorIdx, 1)
         }
     }
     // BLK-047: Restore pending perk-selection credits.
@@ -370,41 +368,12 @@ export function save(name: string, slot = -1, callback?: () => void): void {
         save.playerSkillPoints = globalState.player.skills.skillPoints
     }
 
-    // BLK-042: Snapshot player equipped weapon slots (leftHand / rightHand).
-    // When the player drags a weapon from inventory to an equipment slot, the item
-    // is removed from inventory and only accessible via player.leftHand / rightHand.
-    // Without this snapshot those weapons would be lost across save/load cycles.
-    const playerForWeapon = globalState.player as any
-    const leftHand = playerForWeapon.leftHand
-    const rightHand = playerForWeapon.rightHand
-    if (leftHand && typeof leftHand.pid === 'number' && leftHand.pid >= 1) {
-        save.playerLeftHandPID = leftHand.pid
-        // Include the serialized weapon in the inventory save so it can be found
-        // on load (equipped items are removed from inventory when dragged to slot).
-        const alreadyInLeft = save.player.inventory.some((i: any) => i.pid === leftHand.pid)
-        if (!alreadyInLeft && typeof leftHand.serialize === 'function') {
-            save.player.inventory.push(leftHand.serialize())
-        }
-    }
-    if (rightHand && typeof rightHand.pid === 'number' && rightHand.pid >= 1) {
-        save.playerRightHandPID = rightHand.pid
-        const alreadyInRight = save.player.inventory.some((i: any) => i.pid === rightHand.pid)
-        if (!alreadyInRight && typeof rightHand.serialize === 'function') {
-            save.player.inventory.push(rightHand.serialize())
-        }
-    }
-
-    // BLK-045: Snapshot player equipped armor.
-    // Like weapon slots, equipped armor is removed from inventory and stored only
-    // in player.equippedArmor, so it would be lost without an explicit snapshot.
-    const equippedArmor = (globalState.player as any).equippedArmor
-    if (equippedArmor && typeof equippedArmor.pid === 'number' && equippedArmor.pid >= 1) {
-        save.playerArmorPID = equippedArmor.pid
-        const alreadyInArmor = save.player.inventory.some((i: any) => i.pid === equippedArmor.pid)
-        if (!alreadyInArmor && typeof equippedArmor.serialize === 'function') {
-            save.player.inventory.push(equippedArmor.serialize())
-        }
-    }
+    // Snapshot the equipped slots by PID; the items themselves are saved
+    // with the rest of the inventory, where they stay while equipped.
+    const equipped = globalState.player as any
+    if (typeof equipped.leftHand?.pid === 'number') {save.playerLeftHandPID = equipped.leftHand.pid}
+    if (typeof equipped.rightHand?.pid === 'number') {save.playerRightHandPID = equipped.rightHand.pid}
+    if (typeof equipped.equippedArmor?.pid === 'number') {save.playerArmorPID = equipped.equippedArmor.pid}
 
     // BLK-047: Snapshot pending perk-selection credits.
     save.playerPerksOwed = globalState.playerPerksOwed ?? 0

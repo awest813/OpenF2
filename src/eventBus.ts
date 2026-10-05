@@ -67,6 +67,8 @@ export interface EngineEvents {
     /** Action menu → Use item on: use `item` (from the player's inventory) on `target`. */
     'inventory:useItemOn': { item: any; target: any }
     'inventory:dropItem': { index: number }
+    'inventory:equipItem': { index: number; slot: 'leftHand' | 'rightHand' | 'equippedArmor' }
+    'inventory:unequipSlot': { slot: 'leftHand' | 'rightHand' | 'equippedArmor' }
 
     // Audio
     'audio:playSound': { soundId: string; position?: { x: number; y: number } }

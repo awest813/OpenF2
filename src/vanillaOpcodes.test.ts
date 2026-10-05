@@ -116,8 +116,8 @@ describe('obj_type / obj_item_subtype / critter_inven_obj / inven_cmds / get_pc_
     })
 
     it('critter_inven_obj: the player\'s hands answer only for the hand in use', () => {
-        const left = { id: 'L' }
-        const right = { id: 'R' }
+        const left = { id: 'L', pid: 1 }
+        const right = { id: 'R', pid: 2 }
         const dude: any = { _type: 'obj', type: 'critter', isPlayer: true, leftHand: left, rightHand: right, activeHand: 0, inventory: [left, right] }
         expect(script.critter_inven_obj(dude, 2)).toBe(left)
         expect(script.critter_inven_obj(dude, 1)).toBe(0)
@@ -125,10 +125,12 @@ describe('obj_type / obj_item_subtype / critter_inven_obj / inven_cmds / get_pc_
         expect(script.critter_inven_obj(dude, 1)).toBe(right)
         expect(script.critter_inven_obj(dude, 2)).toBe(0)
         expect(script.critter_inven_obj(dude, -2)).toBe(2)
-        const npc: any = { _type: 'obj', type: 'critter', leftHand: left, rightHand: right }
+        const npc: any = { _type: 'obj', type: 'critter', leftHand: left, rightHand: right, inventory: [left, right] }
         expect(script.critter_inven_obj(npc, 1)).toBe(right)
         expect(script.critter_inven_obj(npc, 2)).toBe(left)
         expect(script.critter_inven_obj({ _type: 'obj', type: 'item' }, 0)).toBe(0)
+        // An empty hand's stand-in fist (no pid) is not an item.
+        expect(script.critter_inven_obj({ _type: 'obj', type: 'critter', rightHand: { type: 'item', subtype: 'weapon' } }, 1)).toBe(0)
     })
 
     it('inven_cmds only knows INVEN_CMD_INDEX_PTR (13), on any object', () => {
@@ -197,10 +199,10 @@ describe('inventory opcodes (interpreter_extra.cc / item.cc)', () => {
         _type: 'obj', type: 'item', pid, amount, inventory: [], approxEq(o: any) { return o.pid === this.pid }, ...extra,
     })
 
-    it('obj_is_carrying_obj_pid counts items, not stacks, including containers and equipped slots', () => {
+    it('obj_is_carrying_obj_pid counts items, not stacks, including containers', () => {
         const bag = item(9, 1, { subtype: 'container', inventory: [item(41, 30)] })
         const gun = item(8)
-        const c: any = { _type: 'obj', type: 'critter', inventory: [item(41, 50), bag], rightHand: gun }
+        const c: any = { _type: 'obj', type: 'critter', inventory: [item(41, 50), bag, gun], rightHand: gun }
         expect(script.obj_is_carrying_obj_pid(c, 41)).toBe(80)
         expect(script.obj_is_carrying_obj_pid(c, 8)).toBe(1)
         expect(script.obj_carrying_pid_obj(c, 8)).toBe(gun)

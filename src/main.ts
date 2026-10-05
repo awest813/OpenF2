@@ -20,6 +20,7 @@ import { heart } from './heart.js'
 import { hexDirectionTo, hexDistance, hexesInRadius, hexFromScreen, hexInDirectionDistance } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
+import { removeItem } from './equipment.js'
 import { IDBCache } from './idbcache.js'
 import { initGame, enterWorldMap } from './init.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
@@ -362,9 +363,7 @@ function useItemOn(item: Obj, target: Obj): void {
                 return
             }
             if (takeDrug(target, item) === 1) {
-                const inv = player.inventory
-                if (typeof (item as any).amount === 'number' && (item as any).amount > 1) {(item as any).amount--}
-                else if (inv.includes(item)) {inv.splice(inv.indexOf(item), 1)}
+                removeItem(player, item, 1)
                 if (target !== player) {
                     uiLog(protoMsg(581, 'You use the %s on %s.').replace('%s', item.name ?? '').replace('%s', target.name ?? ''))
                 }

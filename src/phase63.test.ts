@@ -66,24 +66,6 @@ describe('Phase 63-A — BLK-066: obj_carrying_pid_obj equipped-slot check', () 
         expect(script.obj_carrying_pid_obj(obj, 500)).toBe(0)
     })
 
-    it('finds item in leftHand slot (BLK-066)', () => {
-        const item = makeItem(999)
-        const obj = makeObj({ inventory: [], leftHand: item })
-        expect(script.obj_carrying_pid_obj(obj, 999)).toBe(item)
-    })
-
-    it('finds item in rightHand slot (BLK-066)', () => {
-        const item = makeItem(888)
-        const obj = makeObj({ inventory: [], rightHand: item })
-        expect(script.obj_carrying_pid_obj(obj, 888)).toBe(item)
-    })
-
-    it('finds item in equippedArmor slot (BLK-066)', () => {
-        const item = makeItem(777)
-        const obj = makeObj({ inventory: [], equippedArmor: item })
-        expect(script.obj_carrying_pid_obj(obj, 777)).toBe(item)
-    })
-
     it('returns 0 when PID does not match any equipped slot', () => {
         const obj = makeObj({ inventory: [], leftHand: makeItem(111), rightHand: makeItem(222) })
         expect(script.obj_carrying_pid_obj(obj, 999)).toBe(0)

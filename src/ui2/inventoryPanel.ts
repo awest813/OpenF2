@@ -4,13 +4,17 @@
  * Replaces the legacy DOM-based uiInventoryScreen with a ui2 panel rendered
  * entirely via the OffscreenCanvas pipeline.
  *
- * Displays the player's inventory as a scrollable list and shows the two
- * hand slots at the top.  Clicking an item opens a small context row with
- * USE / DROP / CANCEL actions.
+ * Displays the player's inventory as a scrollable list (equipped items are
+ * not listed) and the two hand slots and the armor slot at the top.
+ * Clicking an item opens a small context row with USE / DROP / CANCEL
+ * actions; with an item selected, clicking a slot equips it there, and
+ * clicking a filled slot takes its item off.
  *
  * EventBus events emitted:
  *   'inventory:useItem'  — { index } — player clicked USE on inventory item
  *   'inventory:dropItem' — { index } — player clicked DROP on inventory item
+ *   'inventory:equipItem'   — { index, slot } — put the selected item in a slot
+ *   'inventory:unequipSlot' — { slot } — take a slot's item off
  *
  * Panel name: 'inventory'
  */
@@ -37,6 +41,14 @@ const CLOSE_BTN_W  = 60
 const CLOSE_BTN_H  = 22
 const SLOT_W       = 120
 const SLOT_H       = 40
+const SLOT_Y       = 30
+
+/** The equipment slots across the top, left to right. */
+const SLOTS = [
+    { label: 'LEFT HAND',  field: 'leftHand',  slot: 'leftHand',      x: 16 },
+    { label: 'RIGHT HAND', field: 'rightHand', slot: 'rightHand',     x: 16 + SLOT_W + 8 },
+    { label: 'ARMOR',      field: 'armor',     slot: 'equippedArmor', x: 16 + 2 * (SLOT_W + 8) },
+] as const
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +73,8 @@ export class InventoryPanel extends UIPanel {
     leftHand: InventoryItem | null = null
     /** Item in the right hand slot (null = empty). */
     rightHand: InventoryItem | null = null
+    /** Worn armor (null = none). */
+    armor: InventoryItem | null = null
 
     private _scrollOffset = 0
     private _selectedIndex = -1  // -1 = none
@@ -100,8 +114,7 @@ export class InventoryPanel extends UIPanel {
         drawUIFontText(ctx, 'INVENTORY', width / 2, 18, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
         // Hand slots
-        drawSlot(ctx, 'LEFT HAND',  16,          30, SLOT_W, SLOT_H, this.leftHand)
-        drawSlot(ctx, 'RIGHT HAND', 16 + SLOT_W + 8, 30, SLOT_W, SLOT_H, this.rightHand)
+        for (const s of SLOTS) {drawSlot(ctx, s.label, s.x, SLOT_Y, SLOT_W, SLOT_H, this[s.field])}
 
         // Item list header
         drawUIFontText(ctx, 'ITEMS', LIST_X, LIST_Y - 4, FALLOUT_DARK_GRAY, 9)
@@ -166,6 +179,23 @@ export class InventoryPanel extends UIPanel {
         if (x >= closeBtnX && x < closeBtnX + CLOSE_BTN_W && y >= closeBtnY && y < closeBtnY + CLOSE_BTN_H) {
             this.hide()
             return true
+        }
+
+        // Equipment slots: with an item selected, a click puts it there;
+        // otherwise a click on a filled slot takes its item off.
+        if (y >= SLOT_Y && y < SLOT_Y + SLOT_H) {
+            const s = SLOTS.find((slot) => x >= slot.x && x < slot.x + SLOT_W)
+            if (s) {
+                if (this._selectedIndex >= 0 && this._selectedIndex < this.items.length) {
+                    EventBus.emit('inventory:equipItem', { index: this._selectedIndex, slot: s.slot })
+                    this._selectedIndex = -1
+                    this._afterListMutation()
+                } else if (this[s.field]) {
+                    EventBus.emit('inventory:unequipSlot', { slot: s.slot })
+                    this._afterListMutation()
+                }
+                return true
+            }
         }
 
         // Context buttons (when an item is selected)

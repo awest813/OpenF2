@@ -52,6 +52,8 @@ import { finishStealing, openStealing, type StealScreen } from './steal.js'
 import { isDrug, takeDrug } from './character/timedEffects.js'
 import { isBook, useBook } from './books.js'
 import { isChargedItem, useChargedItem } from './chargedItems.js'
+import { syncPlayerEntityFromCritter } from './playerProjection.js'
+import { EquipSlot, equipItem, isRealItem, listedItems, reconcileSlots, removeItem, setAsideEquipped, setAsideForBarter, unequipItem, unequipSlot } from './equipment.js'
 import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
 
@@ -75,7 +77,7 @@ function refreshInventoryPanel(): void {
     const weapon = player.equippedWeapon
     const ammoPid = weapon ? weaponAmmoPid(weapon) : -1
 
-    panel.items = (player.inventory ?? []).map((o) => {
+    panel.items = listedItems(player).map((o: Obj) => {
         const pid = typeof (o as any).pid === 'number' ? (o as any).pid as number : undefined
         return {
             name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
@@ -85,8 +87,14 @@ function refreshInventoryPanel(): void {
             pid,
         }
     })
-    panel.leftHand = invSlotItem(playerGetSlot('leftHand'))
-    panel.rightHand = invSlotItem(playerGetSlot('rightHand'))
+    panel.leftHand = invSlotItem(realSlot(playerGetSlot('leftHand')))
+    panel.rightHand = invSlotItem(realSlot(playerGetSlot('rightHand')))
+    panel.armor = invSlotItem(realSlot(playerGetSlot('equippedArmor')))
+}
+
+/** A slot's item, or null for an empty hand's stand-in fist. */
+function realSlot(obj: Obj | null): Obj | null {
+    return isRealItem(obj) ? obj : null
 }
 
 function invSlotItem(obj: Obj | null | undefined): { name: string; amount: number; canUse: boolean; pid?: number } | null {
@@ -438,12 +446,37 @@ export function initUI() {
         // exactly like the legacy barter screen's TALK button.
         uiStartDialogue(true)
     })
+    EventBus.on('inventory:dropItem', ({ index }) => {
+        // Drop: the whole stack lands on the player's hex.
+        const player = globalState.player
+        const item = player ? listedItems(player)[index] : undefined
+        if (!player || !item || !player.position) {return}
+        removeItem(player, item, (item as any).amount ?? 1)
+        item.position = { x: player.position.x, y: player.position.y }
+        globalState.gMap?.addObject?.(item)
+        syncPlayerEntityFromCritter()
+        refreshInventoryPanel()
+    })
+    EventBus.on('inventory:equipItem', ({ index, slot }) => {
+        const player = globalState.player
+        const item = player ? listedItems(player)[index] : undefined
+        if (!player || !item) {return}
+        equipItem(player, item, slot)
+        syncPlayerEntityFromCritter()
+        refreshInventoryPanel()
+    })
+    EventBus.on('inventory:unequipSlot', ({ slot }) => {
+        if (!globalState.player) {return}
+        unequipSlot(globalState.player, slot)
+        syncPlayerEntityFromCritter()
+        refreshInventoryPanel()
+    })
     EventBus.on('inventory:useItem', ({ index }) => {
         // USE on an ammo item reloads the equipped weapon (FO2 behavior);
         // anything else falls through to the generic item-use handler.
         const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
         const item = panel?.items[index]
-        const live = globalState.player?.inventory?.[index]
+        const live = globalState.player ? listedItems(globalState.player)[index] : undefined
         if (live && globalState.useItemOnTarget) {
             // inventoryOpenUseItemOn: the chosen item goes to the action-menu target.
             const target = globalState.useItemOnTarget
@@ -459,22 +492,14 @@ export function initUI() {
         }
         if (live && isBook(live)) {
             // _obj_use_item: a book that was read is used up.
-            if (useBook(live) === 1) {
-                const inv = globalState.player.inventory
-                if (typeof (live as any).amount === 'number' && (live as any).amount > 1) {(live as any).amount--}
-                else {inv.splice(inv.indexOf(live), 1)}
-            }
+            if (useBook(live) === 1) {removeItem(globalState.player, live, 1)}
             refreshInventoryPanel()
             return
         }
         if (live && isDrug(live)) {
             // inventory.cc USE on a drug: _item_d_take_drug on the player; a
             // dose that was taken is used up.
-            if (takeDrug(globalState.player, live) === 1) {
-                const inv = globalState.player.inventory
-                if (typeof (live as any).amount === 'number' && (live as any).amount > 1) {(live as any).amount--}
-                else {inv.splice(inv.indexOf(live), 1)}
-            }
+            if (takeDrug(globalState.player, live) === 1) {removeItem(globalState.player, live, 1)}
             refreshInventoryPanel()
             return
         }
@@ -488,7 +513,11 @@ export function initUI() {
     })
     EventBus.on('loot:closed', () => {
         // Live inventories were mutated in place by the panel (openWithLive);
-        // only the mode and legacy DOM cleanup remain.
+        // a looted critter loses the slots of what was taken.
+        reconcileSlots(globalState.player)
+        for (const o of globalState.gMap?.getObjects?.() ?? []) {
+            if (o?.type === 'critter') {reconcileSlots(o)}
+        }
         uiEndLoot()
     })
     EventBus.on('elevator:buttonPressed', ({ mapID, level, tileNum }) => {
@@ -886,46 +915,19 @@ function playerSetSlot(slot: string, obj: Obj | null): void {
 }
 
 function uiMoveSlot(data: string, target: string) {
-    let obj: Obj | null = null
-
-    if (data[0] === 'i') {
-        if (target === 'inventory') {
-            return
-        }
-
-        const idx = parseInt(data.slice(1))
-        console.log('idx: ' + idx)
-        // Guard against a stale drag payload (out-of-bounds index would push
-        // undefined into the inventory and crash the next redraw).
-        obj = globalState.player.inventory[idx]
-        if (obj === undefined) {
-            console.warn('uiMoveSlot: no inventory item at index ' + idx)
-            uiInventoryScreen()
-            return
-        }
-        globalState.player.inventory.splice(idx, 1)
-    } else {
-        obj = playerGetSlot(data)
-        playerSetSlot(data, null)
+    // Equipped items stay in the inventory; only the slots change.
+    const player = globalState.player
+    const obj: Obj | null = data[0] === 'i' ? (listedItems(player)[parseInt(data.slice(1))] ?? null) : playerGetSlot(data)
+    if (!obj) {
+        uiInventoryScreen()
+        return
     }
-
-    console.log('obj: ' + obj + ' (data: ' + data + ', target: ' + target + ')')
-
     if (target === 'inventory') {
-        globalState.player.inventory.push(obj)
+        if (data[0] !== 'i') {unequipSlot(player, data as EquipSlot)}
     } else {
-        const existing = playerGetSlot(target)
-        if (existing !== undefined && existing !== null) {
-            if (data[0] === 'i') {
-                globalState.player.inventory.push(existing)
-            } else {
-                playerSetSlot(data, existing)
-            }
-        }
-
-        playerSetSlot(target, obj)
+        equipItem(player, obj, target as EquipSlot)
     }
-
+    syncPlayerEntityFromCritter()
     uiInventoryScreen()
 }
 
@@ -1034,7 +1036,7 @@ function uiInventoryScreen() {
 
     showv($id('inventoryBox'))
     drawStatsInfo()
-    drawInventory($id('inventoryBoxList'), globalState.player.inventory, 'i', {
+    drawInventory($id('inventoryBoxList'), listedItems(globalState.player), 'i', {
         clickCallback: (obj, e) => makeItemContextMenu(e, obj, 'inventory'),
         extraClearEls: ['inventoryBoxItem1', 'inventoryBoxItem2'],
         onDragEnd: () => uiInventoryScreen(),
@@ -1050,25 +1052,8 @@ function uiInventoryScreen() {
                 break
             case 'drop':
                 console.log('dropping: ' + obj.art + ' with pid ' + obj.pid)
-                if (slot !== 'inventory') {
-                    // add into inventory to drop
-                    console.log('moving into inventory first')
-                    globalState.player.inventory.push(obj)
-                    // Clear the equipment slot we just pulled this from.
-                    // We map the drag-source slot id back to a Critter field;
-                    // any unrecognised slot id is logged and ignored.
-                    switch (slot) {
-                        case 'leftHand':
-                        case 'rightHand':
-                        case 'equippedArmor':
-                            (globalState.player as any)[slot] = null
-                            break
-                        default:
-                            console.warn('uiInventoryScreen drop: unrecognised slot "' + slot + '" — leaving it set')
-                            break
-                    }
-                }
-
+                // An equipped item comes off before it is dropped.
+                unequipItem(globalState.player, obj)
                 obj.drop(globalState.player)
                 uiInventoryScreen()
                 break
@@ -1423,6 +1408,8 @@ export function uiBarterMode(merchant: Critter) {
     if (barterPanel) {
         // inventoryOpenTrade: the dialogue's barter mod plus the merchant's mood.
         const barterMod = ((merchant as any)._script?._barterMod ?? 0) + reactionModifier(merchant)
+        const inParty = !!globalState.gParty?.isPartyMember?.(merchant)
+        const restore = setAsideForBarter(globalState.player, merchant, inParty)
         barterPanel.openWithLive(globalState.player.inventory, merchant.inventory, {
             offer: (items) => inventoryCost(items),
             ask: (items) => barterAskValue(items, merchant, barterMod),
@@ -1431,6 +1418,11 @@ export function uiBarterMode(merchant: Critter) {
                 return reason ? refusalText(reason) : null
             },
         })
+        barterPanel.onClosed = () => {
+            restore()
+            reconcileSlots(globalState.player)
+            reconcileSlots(merchant)
+        }
         return
     }
 
@@ -1584,7 +1576,9 @@ export function uiLoot(object: Obj) {
     // Escape routes back through the 'loot:closed' consumer (uiEndLoot).
     const lootPanel = globalState.uiManager?.get<LootPanel>('loot')
     if (lootPanel) {
+        const restore = setAsideEquipped(globalState.player)
         lootPanel.openWithLive(globalState.player.inventory, object.inventory)
+        lootPanel.onClosed = restore
         return
     }
 
@@ -1641,12 +1635,14 @@ const stealScreen: StealScreen = {
             return
         }
         globalState.uiMode = UIMode.loot
+        const restore = setAsideEquipped(globalState.player)
         lootPanel.openWithLive(globalState.player.inventory, target.inventory, {
             title: 'STEAL',
             beforeMove: (item, planting) => session.beforeMove(item, planting),
             afterMove: () => session.afterMove(),
             onClose: () => finishStealing(session, stealScreen),
         })
+        lootPanel.onClosed = restore
     },
     openLoot(target) {
         uiLoot(target)

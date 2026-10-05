@@ -6,6 +6,7 @@
  */
 
 import globalState from './globalState.js'
+import { setAsideEquipped } from './equipment.js'
 import { Critter, Obj } from './object.js'
 import { LootPanel } from './ui2/lootPanel.js'
 import { UIMode } from './uiMode.js'
@@ -31,7 +32,9 @@ export function openCompanionTrade(companion: Critter): boolean {
     const mgr = globalState.uiManager
     const panel = mgr?.get?.('loot') as LootPanel | undefined
     if (panel && typeof panel.openWithLive === 'function') {
+        const restore = setAsideEquipped(player)
         panel.openWithLive(player.inventory as Obj[], companion.inventory as Obj[])
+        panel.onClosed = restore
         globalState.uiMode = UIMode.loot
         return true
     }

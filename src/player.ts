@@ -73,7 +73,8 @@ export class Player extends Critter {
      */
     activeHand = 0
 
-    inventory = [createObjectWithPID(41).setAmount(1337)]
+    // The default weapon is held, and like every held item it is carried.
+    inventory = [createObjectWithPID(41).setAmount(1337), this.leftHand].filter(Boolean)
 
     lightRadius = 4
     lightIntensity = 65536

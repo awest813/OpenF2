@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Critter, createObjectWithPID } from './object.js'
+import { Critter } from './object.js'
 import globalState from './globalState.js'
 import { StatType } from './skills.js'
 import { getFileJSON, rollSkillCheck } from './util.js'
@@ -200,16 +200,13 @@ export namespace CriticalEffects {
         },
 
         destroyWeapon: function (target: Critter) {
-            console.log(target.name + ' has had their weapon blow up in their face!')
-            // Weapon is destroyed and user takes damage
+            // The weapon blows up: the wielder takes its damage and the weapon is gone.
             const weapon = target.equippedWeapon
             if (weapon && weapon.weapon) {
                 const damage = weapon.weapon.maxDmg || 5
                 critterDamage(target, damage, target, false, false)
             }
-            // Clear weapon slots
-            target.leftHand = undefined
-            target.rightHand = undefined
+            takeEquippedWeapon(target)
         },
     }
 
@@ -275,18 +272,12 @@ export namespace CriticalEffects {
         },
 
         droppedWeapon: function (target: Critter) {
-            console.log(target.name + ' dropped their weapon!')
-            // Drop the weapon to the ground at the critter's tile.
-            const weapon = target.equippedWeapon
+            // The weapon leaves the hand and the inventory and lands on the critter's hex.
+            const weapon = takeEquippedWeapon(target)
             if (weapon && target.position && globalState.gMap) {
-                const groundItem = createObjectWithPID(weapon.pid)
-                if (groundItem) {
-                    groundItem.position = { x: target.position.x, y: target.position.y }
-                    globalState.gMap.addObject(groundItem)
-                }
+                weapon.position = { x: target.position.x, y: target.position.y }
+                globalState.gMap.addObject(weapon)
             }
-            target.leftHand = undefined
-            target.rightHand = undefined
         },
 
         loseNextTurn: function (target: Critter) {

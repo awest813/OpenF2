@@ -77,6 +77,7 @@ import { playMovie } from './movies.js'
 import { fadeIn, fadeOut } from './fade.js'
 import { getSettings, iniOverride, violenceToIni, patchSettings } from './settings.js'
 import { itemDropAll } from './mapAging.js'
+import { equipItem, isRealItem, removeItem } from './equipment.js'
 import { hasDrugEvent } from './character/timedEffects.js'
 
 export namespace Scripting {
@@ -257,15 +258,6 @@ export namespace Scripting {
 
     const PID_MONEY = 41
 
-    /**
-     * Everything an object carries. The player's equipped items live only in
-     * the hand and armor slots, so those count as carried too.
-     */
-    function carriedItems(obj: any): any[] {
-        const inv: any[] = Array.isArray(obj?.inventory) ? obj.inventory : []
-        const slots = [obj?.leftHand, obj?.rightHand, obj?.equippedArmor].filter((x, i, a) => x && !inv.includes(x) && a.indexOf(x) === i)
-        return [...inv, ...slots]
-    }
 
     /** itemGetTotalCaps. */
     function totalCaps(obj: any): number {
@@ -1339,7 +1331,7 @@ export namespace Scripting {
         move_obj_inven_to_obj(obj: Obj, other: Obj) {
             if (!isGameObject(obj) || !isGameObject(other)) {return}
             if (!Array.isArray(other.inventory)) {other.inventory = []}
-            const items = carriedItems(obj)
+            const items = [...(Array.isArray(obj.inventory) ? obj.inventory : [])]
             obj.inventory = []
             const c = obj as any
             c.leftHand = undefined
@@ -1357,7 +1349,7 @@ export namespace Scripting {
             if (!isGameObject(obj)) {return 0}
             const count = (o: any): number => {
                 let n = 0
-                for (const item of carriedItems(o)) {
+                for (const item of (o?.inventory ?? [])) {
                     if (item.pid === pid) {n += typeof item.amount === 'number' ? item.amount : 1}
                     n += count(item)
                 }
@@ -1394,7 +1386,7 @@ export namespace Scripting {
         rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
             if (!isGameObject(obj) || !isGameObject(item)) {return 0}
             if (!Array.isArray(obj.inventory)) {obj.inventory = []}
-            const carried = carriedItems(obj)
+            const carried: Obj[] = obj.inventory
             const stack = carried.includes(item) ? item : carried.find((o: Obj) => o.approxEq(item))
             if (!stack) {return 0}
             const have = typeof stack.amount === 'number' ? stack.amount : 1
@@ -1422,7 +1414,7 @@ export namespace Scripting {
         obj_carrying_pid_obj(obj: Obj, pid: number) {
             if (!isGameObject(obj)) {return 0}
             const find = (o: any): any => {
-                for (const item of carriedItems(o)) {
+                for (const item of (o?.inventory ?? [])) {
                     if (item.pid === pid) {return item}
                     const inner = find(item)
                     if (inner) {return inner}
@@ -1562,10 +1554,10 @@ export namespace Scripting {
             const isDude = c === globalState.player || c.isPlayer === true
             const leftInUse = (c.activeHand ?? 0) === 0
             switch (where) {
-                case 0: return c.equippedArmor ?? 0
-                case 1: return isDude && leftInUse ? 0 : (c.rightHand ?? 0)
-                case 2: return isDude && !leftInUse ? 0 : (c.leftHand ?? 0)
-                case -2: return carriedItems(c).length
+                case 0: return isRealItem(c.equippedArmor) ? c.equippedArmor : 0
+                case 1: return isDude && leftInUse ? 0 : (isRealItem(c.rightHand) ? c.rightHand : 0)
+                case 2: return isDude && !leftInUse ? 0 : (isRealItem(c.leftHand) ? c.leftHand : 0)
+                case -2: return Array.isArray(c.inventory) ? c.inventory.length : 0
                 default: return 0
             }
         }
@@ -1693,23 +1685,21 @@ export namespace Scripting {
             }
             return (obj as Critter).isFleeing ? 1 : 0
         }
+        /**
+         * opWieldItem (_inven_wield): armor is worn; anything else goes in a hand,
+         * the player's hand in use or an NPC's right hand. The item stays in the
+         * inventory.
+         */
         wield_obj_critter(obj: Obj, item: Obj) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('wield_obj_critter: not a critter: ' + obj, undefined, this)
-                return
-            }
-            if (!isGameObject(item)) {
-                warn('wield_obj_critter: item not a game object: ' + item, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            if (item.subtype === 'weapon') {
-                critter.rightHand = item as any
-            } else if (item.subtype === 'armor') {
-                critter.equippedArmor = item
-            } else {
-                warn('wield_obj_critter: unhandled item subtype: ' + item.subtype, undefined, this)
-            }
+            if (!isGameObject(obj) || obj.type !== 'critter' || !isGameObject(item)) {return}
+            const critter = obj as any
+            if (!Array.isArray(critter.inventory)) {critter.inventory = []}
+            if (!critter.inventory.includes(item)) {critter.inventory.push(item)}
+            let slot: 'leftHand' | 'rightHand' | 'equippedArmor' = 'rightHand'
+            if (item.subtype === 'armor') {slot = 'equippedArmor'}
+            else if (critter === globalState.player && (critter.activeHand ?? 0) === 0) {slot = 'leftHand'}
+            equipItem(critter, item, slot)
+            if (critter === globalState.player) {syncPlayerEntityFromCritter()}
         }
         critter_dmg(obj: Critter, damage: number, damageType: string) {
             if (!isGameObject(obj)) {
@@ -2011,34 +2001,17 @@ export namespace Scripting {
         // critter in a scripted event).  Places the item at the critter's tile.
         // ---------------------------------------------------------------------------
         drop_obj(obj: Obj) {
-            log('drop_obj', arguments)
-            if (!isGameObject(obj)) {
-                warn('drop_obj: not a game object: ' + obj, undefined, this)
-                return
-            }
-            // Determine the source critter: prefer self_obj if it's a critter,
-            // otherwise fall back to the player.
-            const selfObj = this.self_obj
-            const source: Critter | null =
-                isGameObject(selfObj) && (selfObj as any).type === 'critter'
-                    ? (selfObj as Critter)
-                    : (globalState.player ?? null)
-            if (!source) {
-                warn('drop_obj: no source critter', undefined, this)
-                return
-            }
-            // BLK-193: Guard against null/undefined inventory on the source critter —
-            // Arroyo NPC critters spawned via create_object_sid() may have no inventory
-            // array until their map_enter_p_proc runs.  Calling indexOf on null/undefined
-            // throws TypeError; skip the inventory removal step safely.
-            if (Array.isArray(source.inventory)) {
-                const idx = source.inventory.indexOf(obj)
-                if (idx !== -1) {source.inventory.splice(idx, 1)}
-            }
+            if (!isGameObject(obj)) {return}
+            // The script's own critter drops it; otherwise the player.
+            const selfObj = this.self_obj as any
+            const source: any = isGameObject(selfObj) && selfObj.type === 'critter' ? selfObj : globalState.player
+            if (!source) {return}
+            removeItem(source, obj, (obj as any).amount ?? 1)
             if (globalState.gMap && source.position) {
                 obj.position = { ...source.position }
                 globalState.gMap.addObject(obj)
             }
+            if (source === globalState.player) {syncPlayerEntityFromCritter()}
         }
 
         // objects
