@@ -21,6 +21,7 @@
  * S Skilldex, Tab automap, Space end turn, Enter end combat.
  */
 
+import { inventoryApCost } from '../sfallSettings.js'
 import { UIPanel, FALLOUT_GREEN, FALLOUT_RED, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_BLACK, UIColor, fillRect, strokeRect, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
 import { EventBus } from '../eventBus.js'
@@ -418,7 +419,7 @@ export class GamePanel extends UIPanel {
             case 'A':
                 if (!globalState.inCombat && globalState.player) {
                     void import('../combat.js').then(({ Combat }) => {
-                        if (!globalState.inCombat) {Combat.start()}
+                        if (!globalState.inCombat) {Combat.playerStart()}
                     })
                     return true
                 }
@@ -541,7 +542,7 @@ export class GamePanel extends UIPanel {
         const player: any = globalState.player
         if (!player?.AP) {return true}
         if (!(globalState.combat?.inPlayerTurn ?? false)) {return false}
-        const required = Math.max(0, 4 - 2 * perkRank(player, PerkId.QUICK_POCKETS))
+        const required = inventoryApCost(perkRank(player, PerkId.QUICK_POCKETS))
         if (required > player.AP.getAvailableCombatAP()) {
             let text: string | null = null
             try {
@@ -607,7 +608,7 @@ export class GamePanel extends UIPanel {
         globalState.mouseMode = 'crosshair'
         if (!globalState.inCombat && player) {
             void import('../combat.js').then(({ Combat }) => {
-                if (!globalState.inCombat) {Combat.start()}
+                if (!globalState.inCombat) {Combat.playerStart()}
             })
         }
     }

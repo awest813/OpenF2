@@ -951,7 +951,7 @@ heart.keydown = (k: string) => {
             console.log('Wait your turn...')
         } else {
             console.log('[COMBAT BEGIN]')
-            Combat.start()
+            Combat.playerStart()
         }
     }
 

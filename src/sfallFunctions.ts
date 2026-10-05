@@ -34,38 +34,9 @@ import { CRITICAL_HIT_TABLES, HIT_LOCATION_ORDER, PLAYER_CRITICAL_HIT_TABLE } fr
 import { playerInSneakMode, playerIsSneaking } from './combat/aiPacket.js'
 import { getRandomInt } from './util.js'
 import { getProtoData, setProtoData } from './protoOffsets.js'
+import { sfallSettings } from './sfallSettings.js'
 
-/** sfall-tunable engine settings (read by the systems that honour them). */
-export const sfallSettings = {
-    xpMod: 100,
-    perkLevelMod: 0,
-    perkFreq: 0,
-    hitChanceMax: 95,
-    skillMax: 300,
-    pickpocketMax: 95,
-    inventoryApCost: 4,
-    unspentApBonus: 4,
-    unspentApPerkBonus: 4,
-    swiftLearnerMod: 5,
-    hpPerLevelMod: 0,
-    pyromaniacMod: 5,
-    mapTimeMulti: 1,
-    combatBlocked: false,
-    statMax: {} as Record<number, number>,
-    statMin: {} as Record<number, number>,
-    pcStatMax: {} as Record<number, number>,
-    pcStatMin: {} as Record<number, number>,
-    npcStatMax: {} as Record<number, number>,
-    npcStatMin: {} as Record<number, number>,
-    aimedShots: new Map<number, boolean>(),
-    ifaceTags: new Set<number>(),
-    fakePerks: new Map<string, { level: number; image: number; desc: string }>(),
-    fakeTraits: new Map<string, { level: number; image: number; desc: string }>(),
-    hooks: new Map<number, unknown>(),
-    forcedEncounter: null as null | { map: number; flags: number },
-    carTown: -1,
-    pipboyAvailable: 1,
-}
+export { sfallSettings }
 
 /** sfall version reported to scripts (fallout2-ce's). */
 const VERSION = [4, 3, 4]
@@ -119,6 +90,54 @@ function sfallRound(x: number): number {
 function extraStats(critter: any): Record<string, number> {
     if (!critter._extraStats) {critter._extraStats = {}}
     return critter._extraStats
+}
+
+/** set_*_stat_max/min: stats 0–34 only. */
+function setStatLimit(table: 'pcStatMax' | 'pcStatMin' | 'npcStatMax' | 'npcStatMin', stat: number, value: number): void {
+    if (stat >= 0 && stat < 35) {sfallSettings[table][stat] = Math.trunc(value)}
+}
+
+type FakeTable = typeof sfallSettings.fakePerks
+
+function fakeKey(owner: number, name: unknown): string {
+    return owner + ':' + String(name ?? '')
+}
+
+/** Perks::SetFakePerk / SetFakeTrait: level 0 removes; the level is capped. */
+function setFake(table: FakeTable, cap: number, owner: number, name: string, level: number, image: number, desc: string): void {
+    if (!(level >= 0)) {return}
+    const key = fakeKey(owner, name)
+    if (level === 0) {
+        table.delete(key)
+        return
+    }
+    table.set(key, { level: Math.min(cap, Math.trunc(level)), image, desc: String(desc ?? ''), owner })
+}
+
+let nextObjectId = 0x10000000
+const objectIds = new WeakMap<object, number>()
+
+/** An object's id (the player's is 18000, PLAYER_ID); others get one when first asked. */
+export function objectId(obj: any): number {
+    if (!isObject(obj)) {return 0}
+    if (obj === globalState.player) {return 18000}
+    if (typeof obj.id === 'number') {return obj.id}
+    let id = objectIds.get(obj)
+    if (id === undefined) {
+        id = nextObjectId++
+        objectIds.set(obj, id)
+    }
+    return id
+}
+
+function isCritter(o: unknown): o is any {
+    return isObject(o) && (o as any).type === 'critter'
+}
+
+/** A script integer clamped as sfall's cmovs/cmova pairs do. */
+function clampInt(v: number, min: number, max: number): number {
+    const n = Math.trunc(Number(v) || 0)
+    return n < min ? min : n > max ? max : n
 }
 
 function noop(): number {
@@ -187,30 +206,38 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     get_critter_extra_stat(this: any, obj: any, stat: number) {
         return this.get_critter_extra_stat_sfall?.(obj, stat) ?? 0
     },
-    set_stat_max(stat: number, v: number) { sfallSettings.statMax[stat] = v },
-    set_stat_min(stat: number, v: number) { sfallSettings.statMin[stat] = v },
-    set_pc_stat_max(stat: number, v: number) { sfallSettings.pcStatMax[stat] = v },
-    set_pc_stat_min(stat: number, v: number) { sfallSettings.pcStatMin[stat] = v },
-    set_npc_stat_max(stat: number, v: number) { sfallSettings.npcStatMax[stat] = v },
-    set_npc_stat_min(stat: number, v: number) { sfallSettings.npcStatMin[stat] = v },
+    /** set_stat_max / set_stat_min change the limits for the player and everyone else. */
+    set_stat_max(stat: number, v: number) { setStatLimit('pcStatMax', stat, v); setStatLimit('npcStatMax', stat, v) },
+    set_stat_min(stat: number, v: number) { setStatLimit('pcStatMin', stat, v); setStatLimit('npcStatMin', stat, v) },
+    set_pc_stat_max(stat: number, v: number) { setStatLimit('pcStatMax', stat, v) },
+    set_pc_stat_min(stat: number, v: number) { setStatLimit('pcStatMin', stat, v) },
+    set_npc_stat_max(stat: number, v: number) { setStatLimit('npcStatMax', stat, v) },
+    set_npc_stat_min(stat: number, v: number) { setStatLimit('npcStatMin', stat, v) },
     set_available_skill_points(v: number) {
         const skills = (globalState.player as any)?.skills
         if (skills) {skills.skillPoints = Math.max(0, Math.trunc(v))}
     },
     get_available_skill_points: () => (globalState.player as any)?.skills?.skillPoints ?? 0,
     mod_skill_points_per_level: noop,
-    set_skill_max(v: number) { sfallSettings.skillMax = v },
-    set_hit_chance_max(v: number) { sfallSettings.hitChanceMax = v },
-    set_pickpocket_max(v: number) { sfallSettings.pickpocketMax = v },
-    set_critter_hit_chance_mod: noop, set_base_hit_chance_mod: noop,
-    set_critter_skill_mod: noop, set_base_skill_mod: noop,
-    set_critter_pickpocket_mod: noop, set_base_pickpocket_mod: noop,
-    set_xp_mod(v: number) { sfallSettings.xpMod = v },
-    set_perk_level_mod(v: number) { sfallSettings.perkLevelMod = v },
-    set_perk_freq(v: number) { sfallSettings.perkFreq = v },
-    set_swiftlearner_mod(v: number) { sfallSettings.swiftLearnerMod = v },
-    set_hp_per_level_mod(v: number) { sfallSettings.hpPerLevelMod = v },
-    set_pyromaniac_mod(v: number) { sfallSettings.pyromaniacMod = v },
+    set_skill_max(v: number) { sfallSettings.skillMax.base = clampInt(v, 0, 300) },
+    set_base_skill_mod(v: number) { sfallSettings.skillMax.base = clampInt(v, 0, 300) },
+    set_critter_skill_mod(obj: any, max: number) { if (isCritter(obj)) {sfallSettings.skillMax.byCritter.set(obj, Math.trunc(max))} },
+    set_hit_chance_max(v: number) { sfallSettings.hitChance.base = { max: clampInt(v, 0, 999), mod: 0 } },
+    set_base_hit_chance_mod(max: number, mod: number) { sfallSettings.hitChance.base = { max: Math.trunc(max), mod: Math.trunc(mod) } },
+    set_critter_hit_chance_mod(obj: any, max: number, mod: number) {
+        if (isCritter(obj)) {sfallSettings.hitChance.byCritter.set(obj, { max: Math.trunc(max), mod: Math.trunc(mod) })}
+    },
+    set_pickpocket_max(v: number) { sfallSettings.pickpocket.base = { max: clampInt(v, 0, 999), mod: 0 } },
+    set_base_pickpocket_mod(max: number, mod: number) { sfallSettings.pickpocket.base = { max: Math.trunc(max), mod: Math.trunc(mod) } },
+    set_critter_pickpocket_mod(obj: any, max: number, mod: number) {
+        if (isCritter(obj)) {sfallSettings.pickpocket.byCritter.set(obj, { max: Math.trunc(max), mod: Math.trunc(mod) })}
+    },
+    set_xp_mod(v: number) { sfallSettings.xpMod = Math.trunc(v) & 0xffff },
+    set_perk_level_mod(v: number) { if (v >= -25 && v <= 25) {sfallSettings.perkLevelMod = Math.trunc(v)} },
+    set_perk_freq(v: number) { sfallSettings.perkFreq = Math.trunc(v) },
+    set_swiftlearner_mod(v: number) { sfallSettings.swiftLearnerMod = Math.trunc(v) },
+    set_hp_per_level_mod(v: number) { sfallSettings.hpPerLevelMod = (Math.trunc(v) << 24) >> 24 },
+    set_pyromaniac_mod(v: number) { sfallSettings.pyromaniacMod = (Math.trunc(v) << 24) >> 24 },
     apply_heaveho_fix: noop,
     remove_trait(trait: number) { (globalState.player as any)?.charTraits?.delete?.(trait) },
     inc_npc_level: noop,
@@ -226,20 +253,15 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_perk_skill1: noop, set_perk_skill1_mag: noop, set_perk_type: noop, set_perk_skill2: noop, set_perk_skill2_mag: noop,
     set_perk_str: noop, set_perk_per: noop, set_perk_end: noop, set_perk_chr: noop, set_perk_int: noop, set_perk_agl: noop,
     set_perk_lck: noop, set_perk_name: noop, set_perk_desc: noop,
-    set_fake_perk(name: string, level: number, image: number, desc: string) {
-        if (level > 0) {sfallSettings.fakePerks.set(String(name), { level, image, desc })}
-        else {sfallSettings.fakePerks.delete(String(name))}
-    },
-    set_fake_trait(name: string, level: number, image: number, desc: string) {
-        if (level > 0) {sfallSettings.fakeTraits.set(String(name), { level, image, desc })}
-        else {sfallSettings.fakeTraits.delete(String(name))}
-    },
+    set_fake_perk(name: string, level: number, image: number, desc: string) { setFake(sfallSettings.fakePerks, 100, 0, name, level, image, desc) },
+    set_fake_trait(name: string, active: number, image: number, desc: string) { setFake(sfallSettings.fakeTraits, 1, 0, name, active, image, desc) },
+    /** has_fake_perk(name), or by the number the perk box gives fake perks (119 and up). */
     has_fake_perk(name: unknown) {
-        if (typeof name === 'number') {return [...sfallSettings.fakePerks.values()][name]?.level ?? 0}
-        return sfallSettings.fakePerks.get(String(name))?.level ?? 0
+        if (typeof name === 'number') {return name >= 119 ? [...sfallSettings.fakePerks.values()][name - 119]?.level ?? 0 : 0}
+        return sfallSettings.fakePerks.get(fakeKey(0, name))?.level ?? 0
     },
     has_fake_trait(name: unknown) {
-        return sfallSettings.fakeTraits.get(String(name))?.level ?? 0
+        return sfallSettings.fakeTraits.has(fakeKey(0, name)) ? 1 : 0
     },
     set_selectable_perk: noop, set_perkbox_title: noop, hide_real_perks: noop, show_real_perks: noop,
     perk_add_mode: noop, clear_selectable_perks: noop,
@@ -279,7 +301,7 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_unspent_ap_perk_bonus(v: number) { sfallSettings.unspentApPerkBonus = v },
     get_unspent_ap_perk_bonus: () => sfallSettings.unspentApPerkBonus,
     gdialog_get_barter_mod(this: any) { return this._barterMod ?? 0 },
-    set_map_time_multi(v: number) { sfallSettings.mapTimeMulti = Number(v) || 1 },
+    set_map_time_multi(v: number) { sfallSettings.mapTimeMulti = Number(v) },
 
     // ── world map ──
     get_world_map_x_pos: () => globalState.worldPosition?.x ?? 0,

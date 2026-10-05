@@ -86,6 +86,8 @@ export interface ToHitInput {
     isPlayer: boolean
     /** The script-started combat's accuracy bonus (CombatStartData), for its first turn. */
     scriptAccuracyBonus?: number
+    /** The cap (95 unless a script changed it, sfall HitChanceMod) after any script bonus. */
+    hitChanceCap?: (chance: number) => number
     /** Weapon skill (or Unarmed skill when no weapon). */
     skill: number
     /** A weapon is in the attacking hand (brass knuckles count; bare fists do not). */
@@ -220,7 +222,7 @@ export function computeToHit(i: ToHitInput): number {
         else if (i.combatDifficulty === 2) {toHit += 20}
     }
 
-    return Math.min(95, toHit)
+    return i.hitChanceCap ? i.hitChanceCap(toHit) : Math.min(95, toHit)
 }
 
 /**

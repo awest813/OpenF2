@@ -10,6 +10,7 @@
  * The loop runs at 60 passes a second, as fallout2-ce's frame limiter does.
  */
 
+import { sfallSettings } from './sfallSettings.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import type { Rng } from './combat/fo2Formulas.js'
 
@@ -154,6 +155,13 @@ export function fuelPerPass(gvar: (n: number) => number): number {
 /** wmGameTimeIncrement's Pathfinder cut: 25% less time per rank, fractions carried. */
 export function travelTicks(s: TravelState, player: any): number {
     const rank = perkRank(player, PerkId.PATHFINDER)
+    if (sfallSettings.mapTimeMulti !== 1) {
+        // sfall PathfinderCalc: ticks × set_map_time_multi × (1 − rank/4), fractions carried.
+        const total = TRAVEL_TICKS_PER_PASS * sfallSettings.mapTimeMulti * Math.max(0, 1 - Math.min(rank, 3) * 0.25) + s.timeRemainder
+        const whole = Math.trunc(total)
+        s.timeRemainder = total - whole
+        return whole
+    }
     const bonus = TRAVEL_TICKS_PER_PASS * rank * 0.25 + s.timeRemainder
     const whole = Math.trunc(bonus)
     s.timeRemainder = bonus - whole

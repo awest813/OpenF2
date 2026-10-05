@@ -6,6 +6,7 @@
  * caught ends it. Using it on anyone else is plain looting.
  */
 
+import { capPickpocket } from './sfallSettings.js'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { getMessage, getRandomInt } from './util.js'
@@ -79,7 +80,7 @@ export function performStealing(thief: any, target: any, item: any, planting: bo
     }
     if (target?.knockedOut || target?.knockedDown) {stealModifier += 20}
 
-    const stealChance = Math.min(95, stealModifier + skillValue(thief, SKILL_STEAL))
+    const stealChance = capPickpocket(stealModifier + skillValue(thief, SKILL_STEAL), thief)
 
     let stealRoll: Roll
     if (isPlayer(thief) && isPartyMember(target)) {

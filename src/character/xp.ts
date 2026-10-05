@@ -5,6 +5,7 @@
  * ECS stats are projected via `syncPlayerEntityFromCritter()` after changes.
  */
 
+import { sfallSettings } from '../sfallSettings.js'
 import globalState from '../globalState.js'
 import type { Player } from '../player.js'
 import type { Critter } from '../object.js'
@@ -67,9 +68,11 @@ export function awardCritterXp(
     const applyPartyTiers = opts.applyPartyTiers !== false
     const startLevel = player.level ?? 1
 
-    // pcAddExperienceWithOptions: Swift Learner adds 5% per rank (integer math).
+    // pcAddExperienceWithOptions: Swift Learner adds 5% per rank (integer math);
+    // sfall's set_xp_mod scales the award first, set_swiftlearner_mod the 5.
+    if (sfallSettings.xpMod !== 100) {amount = Math.round(amount * sfallSettings.xpMod / 100)}
     const swiftLearner = perkRank(player as any, PerkId.SWIFT_LEARNER)
-    const gained = amount + Math.trunc(swiftLearner * 5 * amount / 100)
+    const gained = amount + Math.trunc(swiftLearner * sfallSettings.swiftLearnerMod * amount / 100)
     player.xp = (player.xp ?? 0) + gained
     opts.onGain?.(gained)
 
@@ -94,7 +97,7 @@ export function awardCritterXp(
         // stat.cc: +(END/2 + 2) Max HP per level (+4 per Lifegiver rank), healed by the same amount.
         if (player.stats && typeof player.stats.modifyBase === 'function') {
             const baseEnd = baseStat(player, 'END')
-            const hpPerLevel = Math.trunc(baseEnd / 2) + 2 + perkRank(player as any, PerkId.LIFEGIVER) * 4
+            const hpPerLevel = Math.trunc(baseEnd / 2) + sfallSettings.hpPerLevelMod + perkRank(player as any, PerkId.LIFEGIVER) * 4
             player.stats.modifyBase('Max HP', hpPerLevel)
             player.stats.modifyBase('HP', hpPerLevel)
         }
@@ -111,8 +114,8 @@ export function awardCritterXp(
             EventBus.emit('audio:playSound', { soundId: 'levelup' })
         }
         opts.onLevelUp?.(player.level)
-        // A perk every 3 levels (every 4 with Skilled).
-        const perkRate = hasSkilled ? 4 : 3
+        // A perk every 3 levels (every 4 with Skilled), unless set_perk_freq says otherwise.
+        const perkRate = sfallSettings.perkFreq || (hasSkilled ? 4 : 3)
         if ((player.level ?? 1) % perkRate === 0) {
             globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
         }

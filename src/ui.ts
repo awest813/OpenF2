@@ -620,7 +620,7 @@ export function initUI() {
             }
         } else {
             // begin combat
-            Combat.start()
+            Combat.playerStart()
         }
     }
 

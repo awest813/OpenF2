@@ -7,6 +7,7 @@
  * Reference: Fallout 2 PERKS.MSG, perks data in fallout2.exe.
  */
 
+import { sfallSettings } from '../sfallSettings.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { recomputeDerivedStats } from '../ecs/derivedStats.js'
 import { GAIN_STAT_PERKS, PERK_STAT_EFFECTS, PerkId, perkSkillBonusesFor } from './perkIds.js'
@@ -57,7 +58,7 @@ function checkPrereqs(
     stats: StatsComponent,
     skills: SkillsComponent,
 ): boolean {
-    if (p.minLevel !== undefined && stats.level < p.minLevel) {return false}
+    if (p.minLevel !== undefined && stats.level + sfallSettings.perkLevelMod < p.minLevel) {return false}
     const eff = {
         strength: stats.strength + stats.strengthMod,
         perception: stats.perception + stats.perceptionMod,

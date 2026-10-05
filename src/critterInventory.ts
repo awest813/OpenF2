@@ -7,7 +7,13 @@
 
 import type { Critter, Obj } from './object.js'
 
-function unitWeightLbs(item: Obj): number {
+import { loadPRO } from './pro.js'
+
+/** Power armors weigh half (item.cc itemGetWeight). */
+const HALF_WEIGHT_ARMOR = new Set([3, 232, 348, 349])
+const ITEM_HIDDEN = 0x08
+
+function protoWeight(item: Obj): number {
     const direct = (item as any).weight
     if (typeof direct === 'number' && Number.isFinite(direct)) {
         return Math.max(0, direct)
@@ -22,6 +28,54 @@ function unitWeightLbs(item: Obj): number {
         return Math.max(0, proto)
     }
     return 0
+}
+
+/**
+ * item.cc itemGetWeight: hidden items weigh nothing, power armors half, a
+ * container adds its contents and a weapon the packs of ammo it holds.
+ */
+function unitWeightLbs(item: Obj): number {
+    const extra = (item as any).pro?.extra ?? {}
+    let weight = (extra.itemFlags ?? 0) & ITEM_HIDDEN ? 0 : protoWeight(item)
+    switch (extra.subType) {
+        case 0: // armor
+            if (HALF_WEIGHT_ARMOR.has((item as any).pid & 0xffffff)) {weight = Math.trunc(weight / 2)}
+            break
+        case 1: // container
+            weight += getCritterInventoryWeightLbs(item as any)
+            break
+        case 3: { // weapon
+            const quantity = (item as any).extra?.ammoLoaded ?? 0
+            const ammoPid = (item as any).extra?.ammoType ?? extra.ammoPID ?? -1
+            if (quantity > 0 && ammoPid !== -1) {
+                let ammo: any = null
+                try {
+                    ammo = loadPRO(ammoPid, ammoPid & 0xffff)
+                } catch {
+                    ammo = null
+                }
+                const pack = ammo?.extra?.quantity || 1
+                if (ammo) {weight += (ammo.extra?.weight ?? 0) * (Math.trunc((quantity - 1) / pack) + 1)}
+            }
+            break
+        }
+    }
+    return weight
+}
+
+/** item_weight (sfall): one item's weight as item.cc itemGetWeight computes it. */
+export function itemWeight(item: Obj): number {
+    return unitWeightLbs(item)
+}
+
+/** item_total_size: the sizes of the items a critter or container holds. */
+export function inventorySize(holder: Obj): number {
+    let total = 0
+    for (const entry of ((holder as any)?.inventory ?? []) as any[]) {
+        const amount = typeof entry?.amount === 'number' ? entry.amount : 1
+        total += (entry?.pro?.extra?.size ?? 0) * amount
+    }
+    return total
 }
 
 /** Weight in lbs for `count` items (defaults to entry.amount when omitted). */

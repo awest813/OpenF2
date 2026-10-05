@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { apToAcBonus, capSkill, clampStatValue } from './sfallSettings.js'
 import { Weapon } from './critter.js'
 import { critterDamage } from './critter.js'
 import { getLstId, lookupScriptName } from './data.js'
@@ -38,7 +39,6 @@ import { PerkId, perkRank } from './character/perkIds.js'
 import { overloadApPenalty, Roll } from './combat/fo2Formulas.js'
 import { explode } from './explosion.js'
 import { skillRoll, SKILL_TRAPS } from './skillUse.js'
-import { statDependencies } from './skills.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { radiationPenalty } from './character/radiationPoison.js'
 import { drugBonus } from './character/timedEffects.js'
@@ -47,12 +47,6 @@ import { uiLog } from './ui.js'
 const SPECIAL_STATS = new Set(['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK'])
 
 /** Clamp to the stat's legal range, as critterGetStat does. */
-function clampStat(stat: string, value: number): number {
-    const dep = statDependencies[stat]
-    if (!dep) {return value}
-    return Math.max(dep.min, Math.min(dep.max, value))
-}
-
 /**
  * Stat bonuses from an armor proto's perk (perk.cc: Powered Armor, Combat
  * Armor, Advanced Power Armor I/II, Armor Charisma).
@@ -1612,7 +1606,7 @@ export class Critter extends Obj {
             const light = Lightmap.getObjectReceivedLight(this)
             value += playerSkillModifier(this, skill, globalState.gameDifficulty ?? 1, light)
         }
-        return Math.min(300, value)
+        return capSkill(Math.min(300, value), this)
     }
 
     /**
@@ -1638,7 +1632,7 @@ export class Critter extends Obj {
         if (includeTransient && stat === 'STR' && this.isPlayer) {
             value += adrenalineRushBonus(this, this.stats.get('HP'), this.getStat('Max HP'))
         }
-        return clampStat(stat, value)
+        return clampStatValue(stat, value, this.isPlayer)
     }
 
     getStat(stat: string) {
@@ -1680,17 +1674,17 @@ export class Critter extends Obj {
             // (twice over with HtH Evade and empty hands, plus Unarmed/12).
             const combat = globalState.combat as any
             if (globalState.inCombat && combat && this.AP && combat.combatants?.[combat.whoseTurn] !== this) {
-                let apMult = 1
+                let evadeLevel = 0
                 let evadeBonus = 0
                 if (this.isPlayer && perkRank(this, PerkId.HTH_EVADE) > 0 && !this.equippedWeapon) {
-                    apMult = 2
+                    evadeLevel = perkRank(this, PerkId.HTH_EVADE)
                     evadeBonus = Math.trunc(this.getSkill('Unarmed') / 12)
                 }
-                statValue += evadeBonus + this.AP.combat * apMult
+                statValue += evadeBonus + apToAcBonus(this.AP.combat, evadeLevel)
             }
         }
 
-        return clampStat(stat, statValue)
+        return clampStatValue(stat, statValue, this.isPlayer)
     }
 
     getBase(): string {

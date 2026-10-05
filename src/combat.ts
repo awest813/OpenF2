@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { capHitChance, sfallSettings } from './sfallSettings.js'
 import { Config } from './config.js'
 import { EventBus, DamageType } from './eventBus.js'
 import { CriticalEffects } from './criticalEffects.js'
@@ -509,6 +510,7 @@ export class Combat {
         const knocked = (target as any).knockedDown === true || (target as any).knockedOut === true
 
         let hitChance = computeToHit({
+            hitChanceCap: (chance) => capHitChance(chance, obj),
             isPlayer: obj.isPlayer === true,
             skill,
             hasWeapon: info.weapon !== null,
@@ -655,7 +657,7 @@ export class Combat {
             const kt = (target as any).killType
             if (kt !== KILL_TYPE_ROBOT && kt !== KILL_TYPE_ALIEN) {flatAfter += 5}
         }
-        if (isPlayer && perkRank(obj, PerkId.PYROMANIAC) > 0 && info.damageType === 'Fire') {flatAfter += 5}
+        if (isPlayer && perkRank(obj, PerkId.PYROMANIAC) > 0 && info.damageType === 'Fire') {flatAfter += sfallSettings.pyromaniacMod}
 
         if (maxDamage < minDamage) {maxDamage = minDamage}
 
@@ -1629,6 +1631,18 @@ export class Combat {
      * nearest member of the other (combat_ai.cc _caiSetupTeamCombat, used by
      * random-encounter ambushes).
      */
+    /**
+     * The player starting combat (the combat key or button, or attacking out
+     * of combat); refused with sfall's message while block_combat is on.
+     */
+    static playerStart(): void {
+        if (sfallSettings.combatBlocked) {
+            EventBus.emit('ui:message', { text: 'You cannot enter combat at this time.' })
+            return
+        }
+        Combat.start()
+    }
+
     static start(attacker?: Critter, defender?: Critter, opts: { teamCombat?: boolean; startData?: CombatStartData } = {}): void {
         const objects = globalState.gMap.getObjects()
         if (opts.teamCombat) {
