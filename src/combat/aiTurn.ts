@@ -9,7 +9,7 @@
  */
 
 import type { Combat } from '../combat.js'
-import { hexDirectionTo, hexDistance, hexInDirectionDistance, Point } from '../geometry.js'
+import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, Point } from '../geometry.js'
 import globalState from '../globalState.js'
 import { applyDrugToCritter, resolveDrugDef } from '../character/timedEffects.js'
 import { getMessage } from '../util.js'
@@ -270,7 +270,9 @@ export class AiTurn {
         if (dist(this.c, target) <= 1 || !target?.position) {return false}
         if (taunt) {this.taunt(AI_MESSAGE.MOVE)}
         const run = steps >= Math.trunc(statOf(this.c, 'AP') / 2) && this.c.canRun?.() !== false
-        return this.walk(target.position, steps, run, true)
+        const tile = this.retargetTile(target, target.position)
+        const onTarget = tile.x === target.position.x && tile.y === target.position.y
+        return this.walk(tile, steps, run, onTarget)
     }
 
     /** _ai_move_away: back off from `threat` while within `distance` hexes. */
@@ -990,6 +992,69 @@ export class AiTurn {
                 }
                 break
         }
+
+        // Step out of a stronger teammate's line of fire.
+        if (!c.position || this.stale) {return}
+        const tile = this.retargetTile(target, c.position)
+        if (tile.x !== c.position.x || tile.y !== c.position.y) {
+            await this.walk(tile, this.ap, false)
+        }
+    }
+
+    /**
+     * _cai_retargetTileFromFriendlyFire: if the nearest teammate (at least as
+     * strong, shooting at the same target) would hit this critter, return
+     * the free hex one step to either side of `tile` across that teammate's
+     * facing; otherwise `tile` itself.
+     */
+    retargetTile(target: AnyCritter | null, tile: Point): Point {
+        const c = this.c
+        if (!target || !tile || statOf(c, 'INT') <= 0) {return tile}
+        const myRating = combatRating(c)
+        const friends = this.crowd
+            .filter((x) => x && x !== c && !x.dead && teamOf(x) === teamOf(c)
+                && x.aiLastTarget === target && combatRating(x) >= myRating)
+            .sort((a, b) => dist(a, c) - dist(b, c))
+        const map: any = globalState.gMap
+        const blocked = (p: Point) => {
+            try {
+                const objs: AnyCritter[] = map?.objectsAtPosition?.(p) ?? []
+                return objs.some((o) => typeof o.blocks === 'function' && o.blocks())
+            } catch {
+                return false
+            }
+        }
+        for (const friend of friends) {
+            if (!this.wouldBeHitBy(friend, target)) {continue}
+            const options = [(friend.orientation ?? 0) + 1, (friend.orientation ?? 0) + 5]
+                .map((rot) => hexInDirectionDistance(tile, rot % 6, 1))
+                .filter((p): p is Point => !!p && !blocked(p))
+                .sort((a, b) => hexDistance(tile, a) - hexDistance(tile, b))
+            return options[0] ?? tile
+        }
+        return tile
+    }
+
+    /** _cai_attackWouldIntersect: is this critter first in `friend`'s line of fire, or in its blast or spray? */
+    private wouldBeHitBy(friend: AnyCritter, target: AnyCritter): boolean {
+        const c = this.c
+        const weapon = friend.equippedWeapon
+        if (!weapon?.pro || !friend.position || !target?.position || !c.position) {return false}
+        const info = getAttackWeaponInfo(friend, 1)
+        if (info.range < 1) {return false}
+        for (const hex of hexLine(friend.position, target.position).slice(1)) {
+            if (hex.x === target.position.x && hex.y === target.position.y) {break}
+            const occupant = this.crowd.find((x) => x && !x.dead && x.position && x.position.x === hex.x && x.position.y === hex.y)
+            if (occupant) {
+                if (occupant === c) {return true}
+                break
+            }
+        }
+        // _combatTestIncidentalHit: in the blast radius or the spray.
+        const radius = this.damageRadius(weapon, 1)
+        if (radius > 0) {return dist(target, c) < radius}
+        if (info.isBurst || info.mode === 8) {return this.combat.sprayVictims(friend, target, info).includes(c)}
+        return false
     }
 
     // ── drugs ───────────────────────────────────────────────────────────

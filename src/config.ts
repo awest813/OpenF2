@@ -53,7 +53,6 @@ export const Config = {
 
     combat: {
         allowWalkDuringAnyTurn: false, // Allows the player to walk AP-free out of their turn
-        maxAIDepth: 8, // Maximum number of turns the AI can consider (as a bail-out instead of infinitely recursing)
     },
 
     controls: {

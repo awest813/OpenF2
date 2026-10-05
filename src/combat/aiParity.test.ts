@@ -382,3 +382,25 @@ describe('floor items (_ai_search_environ / _ai_retrieve_object)', () => {
         expect(new AiTurn(combatWith([c]), c).searchEnviron('drug')).toBeNull()
     })
 })
+
+describe('friendly fire (_cai_retargetTileFromFriendlyFire)', () => {
+    it('steps aside from a stronger teammate shooting through it at the same target', () => {
+        const target = critter({ teamNum: 0, position: { x: 10, y: 20 } })
+        const me = critter({ position: { x: 10, y: 15 } })
+        const gun = { pro: { extra: { attackMode: 6, maxRange1: 30, maxDmg: 20 } }, weapon: { weaponSkillType: 'Small Guns' } }
+        const friend = critter({ position: { x: 10, y: 10 }, orientation: 2, equippedWeapon: gun, aiLastTarget: target })
+        ;(globalState as any).gMap = { objectsAtPosition: () => [] }
+        const combat = combatWith([me, friend, target])
+        const tile = new AiTurn(combat, me).retargetTile(target, me.position)
+        expect(tile).not.toEqual(me.position)
+    })
+
+    it('stays put when nobody is shooting through it', () => {
+        const target = critter({ teamNum: 0, position: { x: 10, y: 20 } })
+        const me = critter({ position: { x: 30, y: 15 } })
+        const gun = { pro: { extra: { attackMode: 6, maxRange1: 30 } }, weapon: { weaponSkillType: 'Small Guns' } }
+        const friend = critter({ position: { x: 10, y: 10 }, equippedWeapon: gun, aiLastTarget: target })
+        const combat = combatWith([me, friend, target])
+        expect(new AiTurn(combat, me).retargetTile(target, me.position)).toEqual(me.position)
+    })
+})
