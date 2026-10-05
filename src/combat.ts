@@ -45,6 +45,7 @@ import {
     type HitMode,
 } from './combat/attackInfo.js'
 import { PerkId, perkRank } from './character/perkIds.js'
+import { describeAttack, type AttackReport } from './combat/combatMessages.js'
 import { TraitId } from './character/statModifiers.js'
 import { Lightmap } from './lightmap.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
@@ -220,6 +221,15 @@ const KILL_TYPE_ALIEN = 16
 
 /** Pariah Dog: joining the party gives the player the Jinxed perk. */
 const PARIAH_DOG_PID = 16777413
+
+interface CriticalFailureResult {
+    /** DAM_CRITICAL was set (an effect applied); otherwise it reads as a plain miss. */
+    critical: boolean
+    damage: number
+    flags: number
+    victim: Critter | null
+    victimDamage: number
+}
 
 /** Result of resolving one attack (combat.cc Attack struct, simplified). */
 export interface AttackOutcome {
@@ -728,23 +738,25 @@ export class Combat {
      * weapon's critical-failure table, scaled by Luck. The player is immune
      * for the first 6 game days.
      */
-    private criticalFailure(obj: Critter, target: Critter, info: AttackWeaponInfo): void {
+    private criticalFailure(obj: Critter, target: Critter, info: AttackWeaponInfo): CriticalFailureResult {
+        const none: CriticalFailureResult = { critical: false, damage: 0, flags: 0, victim: null, victimDamage: 0 }
         const critterFlags = (obj as any).pro?.extra?.flags ?? 0
-        if (critterFlags & CRITTER_INVULNERABLE) {return}
-        if (obj.isPlayer && Math.floor((globalState.gameTickTime ?? 0) / TICKS_PER_DAY) < 6) {return}
+        if (critterFlags & CRITTER_INVULNERABLE) {return none}
+        if (obj.isPlayer && Math.floor((globalState.gameTickTime ?? 0) / TICKS_PER_DAY) < 6) {return none}
 
         const level = criticalFailureLevel(this.random(1, 100), obj.getStat('LUK'))
         let flags = CRITICAL_FAILURE_TABLE[info.critFailType]?.[level] ?? 0
-        if (flags === 0) {return}
+        if (flags === 0) {return none}
         if (critterFlags & CRITTER_NO_DROP) {flags &= ~Dam.DROP}
         if (flags & Dam.CRIP_RANDOM) {flags = this.randomCripple(flags)}
 
         const who = obj.isPlayer ? 'You' : obj.name
         this.log(`${who} critically failed (effect ${level})`)
 
+        let selfDamage = 0
         if (flags & (Dam.HIT_SELF | Dam.EXPLODE)) {
-            const damage = this.getDamageDone(obj, obj, 2, 0, 1, info.hitMode)
-            if (damage > 0) {critterDamage(obj, damage, obj)}
+            selfDamage = this.getDamageDone(obj, obj, 2, 0, 1, info.hitMode)
+            if (selfDamage > 0) {critterDamage(obj, selfDamage, obj)}
         }
         if (flags & Dam.LOSE_TURN) {
             if (obj.AP) {obj.AP.combat = 0}
@@ -756,14 +768,22 @@ export class Combat {
         else if (flags & Dam.DROP) {CriticalEffects.dropWeapon(obj)}
         this.applyResultFlags(obj, flags & (Dam.KNOCKED_DOWN | Dam.CRIP_LEG_LEFT | Dam.CRIP_LEG_RIGHT | Dam.CRIP_ARM_LEFT | Dam.CRIP_ARM_RIGHT), 0, obj, info)
 
+        let victim: Critter | null = null
+        let victimDamage = 0
         if (flags & Dam.RANDOM_HIT) {
-            const victim = this.randomTarget(obj, target)
+            victim = this.randomTarget(obj, target)
             if (victim) {
-                const damage = this.getDamageDone(obj, victim, 2, 0, 1, info.hitMode)
-                this.hitCritter(obj, victim, damage, 0, info)
+                victimDamage = this.getDamageDone(obj, victim, 2, 0, 1, info.hitMode)
+                this.hitCritter(obj, victim, victimDamage, 0, info)
             }
         }
         if (obj.dead) {this.perish(obj)}
+        return { critical: true, damage: selfDamage, flags, victim, victimDamage }
+    }
+
+    /** Print attack lines to the display monitor. */
+    private announce(lines: string[]): void {
+        for (const line of lines) {uiLog(line)}
     }
 
     /** _combat_ai_random_target: another living critter near the attacker. */
@@ -895,6 +915,23 @@ export class Combat {
         // combat can be ended automatically after the animation completes.
         let shouldAutoEnd = false
 
+        const report: AttackReport = {
+            attacker: obj,
+            defender: target,
+            hit: outcome.hit,
+            critical: outcome.crit,
+            region: normalizedRegion,
+            defenderDamage: 0,
+            defenderFlags: 0,
+            defenderDied: false,
+            criticalMessageId: outcome.msgID,
+            attackerDamage: 0,
+            attackerFlags: 0,
+            extras: [],
+            tooWeak: obj.isPlayer && info.weapon !== null
+                && info.minStrength - (perkRank(obj, PerkId.WEAPON_HANDLING) > 0 ? 3 : 0) > obj.getStat('STR'),
+        }
+
         if (outcome.hit) {
             let damageMultiplier = outcome.DM
             // Silent Death: sneaking player, hand-to-hand, from behind, not their attacker.
@@ -907,6 +944,9 @@ export class Combat {
             const extraMsg = outcome.crit && outcome.msgID ? this.getCombatMsg(outcome.msgID) || '' : ''
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage ' + extraMsg)
             this.hitCritter(obj, target, damage, outcome.flags, info)
+            report.defenderDamage = damage
+            report.defenderFlags = outcome.flags
+            report.defenderDied = target.dead === true
         } else {
             this.log(who + ' missed ' + targetName + (outcome.crit ? ' critically' : ''))
             EventBus.emit('combat:miss', {
@@ -914,16 +954,32 @@ export class Combat {
                 targetId: this.combatantId(target),
             })
             if (outcome.roll === Roll.CriticalFailure) {
-                this.criticalFailure(obj, target, info)
+                const failure = this.criticalFailure(obj, target, info)
+                report.critical = failure.critical
+                report.attackerDamage = failure.damage
+                report.attackerFlags = failure.flags & ~Dam.RANDOM_HIT
+                if (failure.victim) {
+                    // DAM_RANDOM_HIT: the attack lands on someone else instead.
+                    Object.assign(report, {
+                        hit: true, critical: false, defender: failure.victim, oops: target, region: 'torso',
+                        defenderDamage: failure.victimDamage, defenderFlags: 0, defenderDied: failure.victim.dead === true,
+                    })
+                }
             } else if (info.attackType === 'ranged' || info.attackType === 'throw') {
                 const stray = this.strayShot(obj, target, info)
                 if (stray) {
                     const damage = this.getDamageDone(obj, stray, 2, 0, 1, hitMode)
                     this.log(`  the shot hits ${stray.isPlayer ? 'you' : stray.name} for ${damage}`)
                     this.hitCritter(obj, stray, damage, 0, info)
+                    Object.assign(report, {
+                        hit: true, critical: false, defender: stray, oops: target, region: 'torso',
+                        defenderDamage: damage, defenderFlags: 0, defenderDied: stray.dead === true,
+                    })
                 }
             }
         }
+
+        this.announce(describeAttack(report))
 
         if (this.killedThisAttack) {
             shouldAutoEnd = this.canEndCombat()
@@ -999,9 +1055,18 @@ export class Combat {
         const roll = randomRoll(accuracy, obj.getStat('Critical Chance'), this.random, this.criticalsAllowed()).roll
         let shouldAutoEnd = false
 
+        const report: AttackReport = {
+            attacker: obj, defender: target, hit: false, critical: false, region: 'torso',
+            defenderDamage: 0, defenderFlags: 0, defenderDied: false,
+            attackerDamage: 0, attackerFlags: 0, extras: [],
+        }
+
         if (roll === Roll.CriticalFailure || (roll === Roll.Failure && this.jinxActive() && this.random(0, 1) === 1)) {
             EventBus.emit('combat:miss', { attackerId: this.combatantId(obj), targetId: this.combatantId(target) })
-            this.criticalFailure(obj, target, info)
+            const failure = this.criticalFailure(obj, target, info)
+            report.critical = failure.critical
+            report.attackerDamage = failure.damage
+            report.attackerFlags = failure.flags & ~Dam.RANDOM_HIT
         } else {
             if (roll === Roll.CriticalSuccess) {accuracy += 20}
 
@@ -1063,6 +1128,10 @@ export class Combat {
                 const damage = this.getDamageDone(obj, target, DM, flags, mainHits, 2)
                 this.log(`  → ${mainHits} round(s) hit ${targetName} for ${damage}` + (msgID ? ' ' + (this.getCombatMsg(msgID) || '') : ''))
                 this.hitCritter(obj, target, damage, flags, info)
+                Object.assign(report, {
+                    hit: true, critical: roll === Roll.CriticalSuccess, criticalMessageId: msgID,
+                    defenderDamage: damage, defenderFlags: flags, defenderDied: target.dead === true,
+                })
             } else {
                 EventBus.emit('combat:miss', { attackerId: this.combatantId(obj), targetId: this.combatantId(target) })
             }
@@ -1072,8 +1141,11 @@ export class Combat {
                 const damage = this.getDamageDone(obj, victim, 2, 0, hits, 2)
                 this.log(`  → ${hits} round(s) hit ${victim.isPlayer ? 'you' : victim.name} for ${damage}`)
                 this.hitCritter(obj, victim, damage, 0, info)
+                report.extras.push({ critter: victim, damage, flags: 0, died: victim.dead === true })
             }
         }
+
+        this.announce(describeAttack(report))
 
         if (this.killedThisAttack) {
             shouldAutoEnd = this.canEndCombat()
@@ -1105,6 +1177,30 @@ export class Combat {
             const attacker = (obj as any).lastCombatAttacker as Critter | undefined
             Scripting.combatEvent(obj, 'onDeath', undefined, attacker)
         }
+    }
+
+    /**
+     * END COMBAT (combat.cc combatAttemptEnd): refused while any hostile critter
+     * still wants to fight — it is conscious, not fleeing, and the player is
+     * within 5×PER hexes of it (_combatai_want_to_stop).
+     */
+    attemptEnd(): boolean {
+        const playerTeam = this.player?.teamNum ?? 0
+        for (const c of this.combatants) {
+            if (c.isPlayer || c.dead || c.teamNum === playerTeam) {continue}
+            const x = c as any
+            if (x.knockedOut || x.isFleeing) {continue}
+            const per = typeof c.getStat === 'function' ? c.getStat('PER') : 5
+            const near = c.position && this.player?.position
+                ? hexDistance(c.position, this.player.position) <= per * 5
+                : true
+            if (near) {
+                uiLog(this.getCombatMsg(103) || 'Too many enemies nearby to end combat.')
+                return false
+            }
+        }
+        this.end()
+        return true
     }
 
     // BLK-063: Return true when all non-player combatants are dead (i.e. combat

@@ -595,8 +595,8 @@ export function initUI() {
     }
 
     $id('endCombatButton').onclick = () => {
-        if (globalState.inCombat) {
-            globalState.combat!.end()
+        if (globalState.inCombat && globalState.combat!.inPlayerTurn) {
+            globalState.combat!.attemptEnd()
         }
     }
 
@@ -1599,13 +1599,15 @@ export function uiLoot(object: Obj) {
 }
 
 export function uiLog(msg: string) {
+    EventBus.emit('ui:message', { text: msg })
     if (typeof document === 'undefined') {
         console.log('[uiLog stub] ' + msg)
         return
     }
     const $log = $id('displayLog')
     if ($log) {
-        $log.insertAdjacentHTML('beforeend', `<li>${msg}</li>`)
+        const escaped = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        $log.insertAdjacentHTML('beforeend', `<li>${escaped}</li>`)
         $log.scrollTop = $log.scrollHeight
     }
 }

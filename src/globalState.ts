@@ -104,6 +104,7 @@ export default {
 
     combatDifficulty: 1, // Normal
     gameDifficulty: 1, // Normal
+    attackCursor: false,
     violenceLevel: 2, // Maximum blood
 
     mapAreas: null,
@@ -260,8 +261,13 @@ export default {
     /** Set of blocked tile numbers used by tile_add_blocking / tile_remove_blocking. */
     blockedTiles?: Set<number>
 
-    /** Combat difficulty: 0=Easy, 1=Normal, 2=Rough, 3=Hard. Controls NPC hit/damage multipliers. */
+    /** Combat difficulty: 0=Easy, 1=Normal, 2=Hard (combat_difficulty preference). */
     combatDifficulty: number
+    /**
+     * Attack (crosshair) cursor armed from the interface item button: the next
+     * critter clicked is attacked, starting combat if needed (game_mouse.cc).
+     */
+    attackCursor: boolean
     /** Game difficulty: 0=Easy, 1=Normal, 2=Hard. Controls encounter/XP formula branches. */
     gameDifficulty: number
     /** Violence level: 0=minimal, 1=normal, 2=maximum blood. */

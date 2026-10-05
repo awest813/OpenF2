@@ -130,6 +130,23 @@ export function playerUse(obj?: Obj) {
             return
         } // can't use yourself
 
+        // Attack cursor armed from the item button (game_mouse.cc crosshair):
+        // outside combat, clicking a critter starts combat with the player
+        // attacking it first (combat.cc _combat with gcsd attacker/defender).
+        if (globalState.attackCursor && !who.dead && !globalState.inCombat && Config.engine.doCombat) {
+            globalState.attackCursor = false
+            Combat.start(globalState.player, who)
+            if (globalState.combat?.inPlayerTurn) {
+                globalState.combat.playerAttack(who, (fire) => {
+                    uiCalledShot(who.hasAnimation('called-shot') ? who.getAnimation('called-shot') : 'art/critters/hmjmpsna', who, (region: string) => {
+                        fire(region)
+                        uiCloseCalledShot()
+                    })
+                })
+            }
+            return
+        }
+
         if (globalState.inCombat && !who.dead) {
             // attack a critter
             if (!globalState.combat!.inPlayerTurn || globalState.player.inAnim()) {

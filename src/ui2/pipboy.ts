@@ -133,6 +133,13 @@ export class PipBoyPanel extends UIPanel {
         this.zOrder = 20
     }
 
+    /** Open on a given tab (the interface bar's MAP button opens 'map'). */
+    openAs(tab: string): void {
+        const tabs: PipBoyTab[] = ['status', 'items', 'map', 'quests', 'rest', 'data']
+        if ((tabs as string[]).includes(tab)) {this.activeTab = tab as PipBoyTab}
+        this.show()
+    }
+
     /** Supply updated local-map data (called by the map subsystem). */
     setMapData(data: PipBoyMapData): void {
         this.mapData = data
