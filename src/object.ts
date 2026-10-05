@@ -304,6 +304,76 @@ function toggleObjectOpen(obj: Obj, loot = true, signalEvent = true): boolean {
     return setObjectOpen(obj, !obj.open, loot, signalEvent)
 }
 
+const PROTO_FLAG_USE = 0x0800
+const PROTO_FLAG_PICKUP = 0x8000
+
+/**
+ * The proto's extended flags as the engine holds them (one 32-bit word):
+ * proto.py splits an item's into itemFlags / actionFlags / weaponFlags /
+ * attackMode bytes and a scenery's into wallLightTypeFlags / actionFlags.
+ */
+export function protoExtendedFlags(obj: { type?: string; pro?: any }): number {
+    const extra = obj?.pro?.extra
+    if (!extra) {return 0}
+    if (obj.type === 'item') {
+        return (((extra.itemFlags ?? 0) & 0xff) << 24) | (((extra.actionFlags ?? 0) & 0xff) << 16)
+            | (((extra.weaponFlags ?? 0) & 0xff) << 8) | ((extra.attackMode ?? 0) & 0xff)
+    }
+    if (obj.type === 'scenery' || obj.type === 'wall') {
+        return (((extra.wallLightTypeFlags ?? 0) & 0xffff) << 16) | ((extra.actionFlags ?? 0) & 0xffff)
+    }
+    return extra.actionFlags ?? 0
+}
+
+function protoText(id: number, fallback: string): string {
+    let text: string | null = null
+    try {
+        text = getMessage('proto', id)
+    } catch {
+        text = null
+    }
+    return text ?? fallback
+}
+
+/**
+ * _obj_use_container: a locked container says so (proto.msg 487);
+ * otherwise it opens ("You search the %s.") or closes ("You close the
+ * %s."). Returns false when it stayed shut.
+ */
+function useContainer(obj: Obj, source: Critter | undefined): boolean {
+    if (obj.locked) {
+        if (source?.isPlayer) {uiLog(protoText(487, 'It is locked.'))}
+        return false
+    }
+    const opening = !obj.open
+    setObjectOpen(obj, opening, false, true)
+    if (source?.isPlayer) {
+        const template = opening ? protoText(486, 'You search the %s.') : protoText(485, 'You close the %s.')
+        uiLog(template.replace('%s', obj.name ?? ''))
+    }
+    return true
+}
+
+/**
+ * actionPickUp on a container that cannot be carried: open it first
+ * (use_p_proc may stop that), then loot it once it is open.
+ */
+export function useContainerAndLoot(obj: Obj, source: Critter): void {
+    if (!obj.open) {
+        if (obj._script && obj._script.use_p_proc !== undefined && Scripting.use(obj, source) === true) {return}
+        if (!useContainer(obj, source)) {return}
+    }
+    // inventoryOpenLooting: the container's pickup_p_proc may refuse.
+    if (Scripting.pickup(obj, source) === true) {return}
+    uiLoot(obj)
+}
+
+/** Something standing in the doorway keeps the door from closing (proto.msg 597). */
+function doorBlocked(door: Obj): boolean {
+    if (!door.position || !globalState.gMap) {return false}
+    return globalState.gMap.objectsAtPosition(door.position).some((o: Obj) => o.type === 'critter' && !(o as Critter).dead)
+}
+
 function objectFindIndex(obj: Obj): number {
     return globalState.gMap.getObjects().findIndex((object) => object === obj)
 }
@@ -860,11 +930,17 @@ export class Obj {
         } else if (this.type === 'item' || this.type === 'scenery') {
             if (this.isDoor || this.isStairs || this.isLadder) {
                 return true
-            } else {
-                return (this.pro.extra.actionFlags & 8) != 0
             }
+            // _proto_action_can_use: the Use flag, or any container.
+            return (protoExtendedFlags(this) & PROTO_FLAG_USE) !== 0 || this.isContainer
         }
         return false
+    }
+
+    /** _proto_action_can_pickup: any item but a container without the PickUp flag. */
+    get canPickUp(): boolean {
+        if (this.type !== 'item') {return false}
+        return !this.isContainer || (protoExtendedFlags(this) & PROTO_FLAG_PICKUP) !== 0
     }
 
     // Returns whether or not the object was used
@@ -891,8 +967,14 @@ export class Obj {
             return true
         }
 
-        if (this.isDoor || this.isContainer) {
-            toggleObjectOpen(this, true, true)
+        if (this.isContainer) {
+            useContainer(this, source)
+        } else if (this.isDoor) {
+            if (this.open && doorBlocked(this)) {
+                if (source?.isPlayer) {uiLog(protoText(597, 'Something is blocking the door.'))}
+                return true
+            }
+            toggleObjectOpen(this, false, true)
         } else if (this.isStairs) {
             const destTile = fromTileNum(this.extra.destination & 0xffff)
             const destElev = ((this.extra.destination >> 28) & 0xf) >> 1

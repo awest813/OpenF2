@@ -25,7 +25,7 @@ import { initGame, enterWorldMap } from './init.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
 import { tickTimedEffects } from './character/timedEffects.js'
 import { tickRadiationAndPoison } from './character/radiationPoison.js'
-import { Critter, Obj } from './object.js'
+import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
@@ -323,7 +323,11 @@ function arrowClick(): void {
     const who = obj as Critter
     switch (action) {
         case 'pickup':
-            actOnObject(obj, () => pickUpItem(obj))
+            if (obj.isContainer && !obj.canPickUp) {
+                actOnObject(obj, () => useContainerAndLoot(obj, globalState.player))
+            } else {
+                actOnObject(obj, () => pickUpItem(obj))
+            }
             return
         case 'rotate':
             globalState.player.orientation = ((globalState.player.orientation ?? 0) + 1) % 6
