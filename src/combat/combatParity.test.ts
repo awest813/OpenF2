@@ -529,3 +529,34 @@ describe('movement and full attacks', () => {
         expect((target as any).knockedDown).toBe(false)
     })
 })
+
+describe('kill experience (combat.cc _combat_give_exps)', () => {
+    it('pools XP for kills by the player\'s side and awards it when combat ends', async () => {
+        const { critterKill } = await import('../critter.js')
+        const player = makeCritter({ player: true }) as any
+        player.xp = 0
+        player.level = 1
+        globalState.player = player
+        const ally = makeCritter({ team: 0 })
+        const victim = makeCritter({ position: { x: 11, y: 10 } }) as any
+        victim.pro.extra.XPValue = 60
+        const victim2 = makeCritter({ position: { x: 12, y: 10 } }) as any
+        victim2.pro.extra.XPValue = 40
+        const combat = makeCombat(player, ally, victim, victim2)
+        globalState.inCombat = true
+        globalState.combat = combat
+        ;(globalState as any).gMap = { updateMap: () => {} }
+        try {
+            critterKill(victim, player, false)
+            critterKill(victim2, ally, false)
+            expect(player.xp).toBe(0)
+            expect(combat.pendingExperience).toBe(100)
+            combat.rng = () => 0
+            combat.end()
+            expect(player.xp).toBe(100)
+        } finally {
+            globalState.inCombat = false
+            globalState.combat = null
+        }
+    })
+})

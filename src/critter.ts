@@ -413,8 +413,15 @@ export function critterKill(
         // in the critter proto (CRITTER_DATA_EXPERIENCE / data_member 48) when a
         // critter is killed.  Without this, the player never gains XP from combat,
         // making level-up and skill development impossible.
-        if (source && source.isPlayer === true) {
-            const xpValue: number = (obj as any).pro?.extra?.XPValue ?? 0
+        const xpValue: number = (obj as any).pro?.extra?.XPValue ?? 0
+        const playerTeam = (globalState.player as any)?.teamNum ?? 0
+        const killedByPlayerSide = !!source && (source.isPlayer === true || source.teamNum === playerTeam)
+        const combat: any = globalState.inCombat ? globalState.combat : null
+        if (combat && killedByPlayerSide && xpValue > 0) {
+            // combat.cc: kills by the player's side are pooled and awarded when
+            // combat ends (_combat_give_exps).
+            combat.pendingExperience = (combat.pendingExperience ?? 0) + xpValue
+        } else if (source && source.isPlayer === true) {
             if (xpValue > 0) {
                 const player = source as any
                 const levelsGained = awardCritterXp(player, xpValue)

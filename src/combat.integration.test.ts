@@ -125,8 +125,8 @@ describe('called-shot combat + UI integration', () => {
         const picked: string[] = []
         EventBus.on('calledShot:regionSelected', ({ region }) => picked.push(region))
 
-        // Click row 1 => "head"
-        panel.onMouseDown(16 + 10, 46 + 28 + 10, 'l')
+        // Top-left cell => "head" (engine window order)
+        panel.onMouseDown(16 + 10, 46 + 10, 'l')
 
         expect(picked).toEqual(['head'])
         expect(panel.visible).toBe(false)
@@ -881,7 +881,7 @@ describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee
     })
 
     describe('Combat rounds tracking and logs audit', () => {
-        it('tracks and increments rounds upon turn wraparound, logging events to uiLog', async () => {
+        it('tracks and increments rounds upon turn wraparound without non-FO2 monitor lines', async () => {
             const { uiLog } = await import('./ui.js')
             const logSpy = vi.mocked(uiLog)
             logSpy.mockClear()
@@ -937,19 +937,19 @@ describe('Phase 106: Combat Parity Audits, Jinxed / Pariah Dog effects, and Flee
             combat.nextTurn()
             expect(combat.round).toBe(1)
             expect(combat.whoseTurn).toBe(0) // Player
-            expect(logSpy).toHaveBeenCalledWith("Combat Round 1")
 
             // End player's turn. This starts the Enemy's turn, which automatically
             // runs its AI and advances the turn loop back to the player.
             combat.nextTurn()
             expect(combat.round).toBe(2)
             expect(combat.whoseTurn).toBe(0) // Back to Player
-            expect(logSpy).toHaveBeenCalledWith("Combat Round 2")
 
             try {
                 // End combat
                 combat.end()
-                expect(logSpy).toHaveBeenCalledWith("Combat ended.")
+                // The engine's display monitor prints no round / start / end lines.
+                const lines = logSpy.mock.calls.map((c) => String(c[0]))
+                expect(lines.some((l) => /Combat (Round|ended|started)/.test(l))).toBe(false)
             } finally {
                 gs.gMap = origGMap
             }

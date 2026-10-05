@@ -1807,9 +1807,11 @@ export function uiCalledShot(art: string, target: Critter, callback?: (regionHit
     // attack callback), CANCEL / Escape as 'calledShot:cancelled'.
     const calledShotPanel = globalState.uiManager?.get<CalledShotPanel>('calledShot')
     if (calledShotPanel) {
+        // Percentages for the hit mode in use (combat.cc calledShotSelectHitLocation).
+        const hitMode = globalState.player?.equippedWeapon?.weapon?.hitMode?.() ?? 1
         const chances: Partial<Record<BodyRegion, number>> = {}
         for (const region of BODY_REGIONS) {
-            chances[region] = combat.getHitChance(globalState.player, target, region).hit
+            chances[region] = combat.getHitChance(globalState.player, target, region, hitMode).hit
         }
         uiCalledShotCallback = callback ?? null
         calledShotPanel.openWith(chances)

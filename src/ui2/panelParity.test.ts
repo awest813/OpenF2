@@ -214,7 +214,7 @@ describe('CalledShotPanel interaction parity', () => {
         const panel = new CalledShotPanel(800, 600)
         panel.openWith({ torso: 70 })
 
-        panel.onMouseDown(20, 50, 'l')
+        panel.onMouseDown(150, 50, 'l')
         expect(emitSpy).toHaveBeenCalledWith('calledShot:regionSelected', { region: 'torso' })
         expect(panel.visible).toBe(false)
     })

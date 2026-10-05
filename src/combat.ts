@@ -67,6 +67,7 @@ import {
     type AiAttackWho,
 } from './combatAi.js'
 import { applyDrugToCritter } from './character/timedEffects.js'
+import { awardCritterXp } from './character/xp.js'
 
 // Turn-based combat system
 
@@ -262,6 +263,9 @@ export class Combat {
 
     /** Set when the attack being resolved killed someone (auto-ends combat). */
     private killedThisAttack = false
+
+    /** XP from kills by the player's side, awarded when combat ends. */
+    pendingExperience = 0
 
     constructor(objects: Obj[], attacker?: Critter | null, defender?: Critter | null) {
         // Gather a list of combatants (critters meeting a certain criteria)
@@ -1651,7 +1655,6 @@ export class Combat {
         // target, then the player (combat.cc _combat_sequence_init).
         globalState.inCombat = true
         globalState.combat = new Combat(globalState.gMap.getObjects(), forceTurn ?? null, defender ?? null)
-        uiLog("Combat started.")
         EventBus.emit('combat:start', { combatants: globalState.combat.combatants.map((_, i) => i) })
 
         // FO2: fire combat_p_proc(COMBAT_SUBTYPE_INITIATE = 0) on all combatants
@@ -1691,13 +1694,41 @@ export class Combat {
         }
 
         console.log('[end combat]')
-        uiLog("Combat ended.")
+        // Kill experience is granted once combat is over (combat.cc _combat_give_exps).
+        this.giveExperience()
         globalState.combat = null
         globalState.inCombat = false
         EventBus.emit('combat:end')
 
         globalState.gMap.updateMap()
         uiEndCombat()
+    }
+
+    /**
+     * _combat_give_exps: "<prefix> you earn N exp. points." — the prefix is
+     * one of proto.msg 622–625, or 626 when unscratched (35% of the time).
+     */
+    private giveExperience(): void {
+        const xp = this.pendingExperience ?? 0
+        this.pendingExperience = 0
+        const player: any = this.player ?? globalState.player
+        if (xp <= 0 || !player || player.dead) {return}
+        const before = player.xp ?? 0
+        awardCritterXp(player, xp)
+        const gained = (player.xp ?? 0) - before
+        const proto = (id: number, fallback: string) => {
+            try {
+                return getMessage('proto', id) || fallback
+            } catch {
+                return fallback
+            }
+        }
+        let prefixId = 622 + this.random(0, 3)
+        const hp = player.getStat?.('HP') ?? 0
+        const maxHp = player.getStat?.('Max HP') ?? 0
+        if (hp === maxHp && this.random(0, 100) > 65) {prefixId = 626}
+        const prefix = proto(prefixId, 'For defeating your enemies,')
+        uiLog(proto(621, '%s you earn %d exp. points.').replace('%s', prefix).replace('%d', String(gained)))
     }
 
     forceTurn(obj: Critter) {
@@ -1781,11 +1812,7 @@ export class Combat {
             }
         }
 
-        if (this.round === 1 && this.whoseTurn === 0 && this.turnNum === 2) {
-            uiLog("Combat Round 1")
-        } else if (isNewRound) {
-            uiLog(`Combat Round ${this.round}`)
-        }
+        if (isNewRound) {console.log(`[combat] round ${this.round}`)}
 
         const currentCombatant = this.combatants[this.whoseTurn]
         EventBus.emit('combat:turnStart', {

@@ -2235,7 +2235,7 @@ describe('ElevatorPanel', () => {
 // CalledShotPanel
 // ---------------------------------------------------------------------------
 
-import { CalledShotPanel, BODY_REGIONS } from './calledShotPanel.js'
+import { CalledShotPanel, BODY_REGIONS, formatCalledShotChance } from './calledShotPanel.js'
 
 describe('CalledShotPanel', () => {
     it('has panel name "calledShot"', () => {
@@ -2298,22 +2298,38 @@ describe('CalledShotPanel', () => {
         panel.openWith({ torso: 65 })
         const spy = vi.fn()
         EventBus.on('calledShot:regionSelected', spy)
-        // REGIONS_X=16, REGIONS_Y=46, ROW_H=28 — click first row (torso)
-        panel.onMouseDown(16 + 10, 46 + 10, 'l')
+        // Engine layout: torso heads the right column (x=144, y=46)
+        panel.onMouseDown(144 + 10, 46 + 10, 'l')
         expect(spy).toHaveBeenCalledWith({ region: 'torso' })
         expect(panel.visible).toBe(false)
         EventBus.clear('calledShot:regionSelected')
     })
 
-    it('clicking second region fires calledShot:regionSelected with "head"', () => {
+    it('clicking the top-left cell fires calledShot:regionSelected with "head"', () => {
         const panel = new CalledShotPanel(800, 600)
         panel.openWith({ head: 30 })
         const spy = vi.fn()
         EventBus.on('calledShot:regionSelected', spy)
-        // Row 1 (head): REGIONS_Y + 1 * ROW_H = 46 + 28 = 74
-        panel.onMouseDown(16 + 10, 74 + 10, 'l')
+        panel.onMouseDown(16 + 10, 46 + 10, 'l')
         expect(spy).toHaveBeenCalledWith({ region: 'head' })
         EventBus.clear('calledShot:regionSelected')
+    })
+
+    it('shows two-digit odds, "--" when negative, and negative odds stay selectable (engine)', () => {
+        expect(formatCalledShotChance(5)).toBe('05')
+        expect(formatCalledShotChance(95)).toBe('95')
+        expect(formatCalledShotChance(-12)).toBe('--')
+        const panel = new CalledShotPanel(800, 600)
+        panel.openWith({ eyes: -12 })
+        const spy = vi.fn()
+        EventBus.on('calledShot:regionSelected', spy)
+        panel.onMouseDown(16 + 10, 46 + 28 + 10, 'l')
+        expect(spy).toHaveBeenCalledWith({ region: 'eyes' })
+        EventBus.clear('calledShot:regionSelected')
+    })
+
+    it('lists regions in the engine window order', () => {
+        expect([...BODY_REGIONS]).toEqual(['head', 'eyes', 'rightArm', 'rightLeg', 'torso', 'groin', 'leftArm', 'leftLeg'])
     })
 
     it('render() does not throw', () => {

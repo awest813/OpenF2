@@ -21,24 +21,30 @@ import { EventBus } from '../eventBus.js'
 // ---------------------------------------------------------------------------
 
 const PANEL_WIDTH  = 280
-const PANEL_HEIGHT = 320
+const PANEL_HEIGHT = 220
 const ROW_H        = 28
-const REGIONS_X    = 16
 const REGIONS_Y    = 46
-const REGION_W     = 200
-const CHANCE_X_OFF = 170   // x offset within a row for the chance display
+const COLUMN_X     = [16, 144]
+const REGION_W     = 120
+const ROWS         = 4
 const BTN_W        = 60
 const BTN_H        = 22
 
+/**
+ * Body regions in the order of the engine's called-shot window
+ * (combat.cc _hit_loc_left / _hit_loc_right): the left column lists the
+ * target's head, eyes, right arm and right leg; the right column its torso,
+ * groin, left arm and left leg.
+ */
 export const BODY_REGIONS = [
-    'torso',
     'head',
     'eyes',
+    'rightArm',
+    'rightLeg',
+    'torso',
     'groin',
     'leftArm',
-    'rightArm',
     'leftLeg',
-    'rightLeg',
 ] as const
 
 export type BodyRegion = typeof BODY_REGIONS[number]
@@ -58,12 +64,30 @@ const REGION_LABELS: Record<BodyRegion, string> = {
 // CalledShotPanel
 // ---------------------------------------------------------------------------
 
+/** Cell of region `i`: column 0/1, row 0..3. */
+function cellRect(i: number): { x: number; y: number; w: number; h: number } {
+    const col = Math.floor(i / ROWS)
+    const row = i % ROWS
+    return { x: COLUMN_X[col], y: REGIONS_Y + row * ROW_H, w: REGION_W, h: ROW_H - 2 }
+}
+
+/** combat.cc _print_tohit: two digits, or "--" for a negative chance. */
+export function formatCalledShotChance(chance: number): string {
+    if (chance < 0) {return '--'}
+    return String(Math.min(99, Math.trunc(chance))).padStart(2, '0')
+}
+
 export class CalledShotPanel extends UIPanel {
-    /** Hit chance (0–100) per body region; -1 means "—" (impossible). */
+    /**
+     * Hit chance per body region (may be negative — shown as "--" but still
+     * selectable, like the engine); -1 for regions not supplied to openWith.
+     */
     hitChances: Record<BodyRegion, number> = {
         torso: -1, head: -1, eyes: -1, groin: -1,
         leftArm: -1, rightArm: -1, leftLeg: -1, rightLeg: -1,
     }
+    /** Regions supplied by openWith (selectable). */
+    private _available = new Set<BodyRegion>()
     /** Index of the currently keyboard-focused region (-1 = none). */
     private _focusedIndex = -1
     /** Index of the currently hovered region (-1 = none). */
@@ -81,11 +105,14 @@ export class CalledShotPanel extends UIPanel {
 
     /** Set hit chances and show the panel. */
     openWith(chances: Partial<Record<BodyRegion, number>>): void {
+        this._available.clear()
         for (const region of BODY_REGIONS) {
-            this.hitChances[region] = chances[region] ?? -1
+            const chance = chances[region]
+            this.hitChances[region] = chance ?? -1
+            if (typeof chance === 'number' && Number.isFinite(chance)) {this._available.add(region)}
         }
-        // Focus the first hittable region so keyboard nav works immediately.
-        this._focusedIndex = BODY_REGIONS.findIndex(r => this.hitChances[r] >= 0)
+        // Focus the first selectable region so keyboard nav works immediately.
+        this._focusedIndex = BODY_REGIONS.findIndex(r => this._available.has(r))
         this._hoveredIndex = -1
         this._openedViaOpenWith = true
         this.show()
@@ -104,8 +131,13 @@ export class CalledShotPanel extends UIPanel {
         for (const region of BODY_REGIONS) {
             this.hitChances[region] = -1
         }
+        this._available.clear()
         this._focusedIndex = -1
         this._hoveredIndex = -1
+    }
+
+    private isSelectable(region: BodyRegion): boolean {
+        return this._available.has(region)
     }
 
     render(ctx: OffscreenCanvasRenderingContext2D): void {
@@ -118,31 +150,24 @@ export class CalledShotPanel extends UIPanel {
         // Title
         drawUIFontText(ctx, 'CALLED SHOT', width / 2, 20, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
-        // Sub-header
-        drawUIFontText(ctx, 'TARGET REGION', REGIONS_X + 4, REGIONS_Y - 6, FALLOUT_DARK_GRAY, 9)
-        drawUIFontText(ctx, 'HIT%', REGIONS_X + CHANCE_X_OFF, REGIONS_Y - 6, FALLOUT_DARK_GRAY, 9)
-
-        // Body region rows
+        // Body regions, laid out like the engine window (two columns of four)
         for (let i = 0; i < BODY_REGIONS.length; i++) {
             const region = BODY_REGIONS[i]
-            const ry = REGIONS_Y + i * ROW_H
+            const cell = cellRect(i)
             const chance = this.hitChances[region]
-            const chanceText = chance < 0 ? '--' : `${chance}%`
-            const chanceColor = chance < 0 ? FALLOUT_DARK_GRAY : chance < 25 ? FALLOUT_RED : FALLOUT_AMBER
+            const selectable = this.isSelectable(region)
             const isHighlighted = i === this._focusedIndex || i === this._hoveredIndex
-            const isHittable = chance >= 0
 
-            // Highlight row when hovered/focused (only if region is targetable)
-            if (isHighlighted && isHittable) {
-                fillRect(ctx, REGIONS_X, ry, REGION_W, ROW_H - 2, FALLOUT_DARK_GRAY)
+            if (isHighlighted && selectable) {
+                fillRect(ctx, cell.x, cell.y, cell.w, cell.h, FALLOUT_DARK_GRAY)
             }
-            strokeRect(ctx, REGIONS_X, ry, REGION_W, ROW_H - 2, FALLOUT_DARK_GRAY, 1)
+            strokeRect(ctx, cell.x, cell.y, cell.w, cell.h, FALLOUT_DARK_GRAY, 1)
 
-            // Number hint (1-8) for keyboard selection
-            drawUIFontText(ctx, `${i + 1}. ${REGION_LABELS[region]}`, REGIONS_X + 6, ry + 17,
-                isHighlighted && isHittable ? FALLOUT_AMBER :
-                    isHittable ? FALLOUT_GREEN : FALLOUT_DARK_GRAY, 11)
-            drawUIFontText(ctx, chanceText, REGIONS_X + CHANCE_X_OFF + 4, ry + 17, chanceColor, 11)
+            const labelColor = isHighlighted && selectable ? FALLOUT_AMBER : selectable ? FALLOUT_GREEN : FALLOUT_DARK_GRAY
+            drawUIFontText(ctx, `${i + 1}. ${REGION_LABELS[region]}`, cell.x + 6, cell.y + 17, labelColor, 11)
+            const chanceText = selectable ? formatCalledShotChance(chance) : '--'
+            const chanceColor = !selectable ? FALLOUT_DARK_GRAY : chance < 25 ? FALLOUT_RED : FALLOUT_AMBER
+            drawUIFontText(ctx, chanceText, cell.x + cell.w - 6, cell.y + 17, chanceColor, 11, { align: 'right' })
         }
 
         // Cancel button
@@ -164,12 +189,12 @@ export class CalledShotPanel extends UIPanel {
             return true
         }
 
-        // Region rows
+        // Region cells
         for (let i = 0; i < BODY_REGIONS.length; i++) {
-            const ry = REGIONS_Y + i * ROW_H
-            if (x >= REGIONS_X && x < REGIONS_X + REGION_W && y >= ry && y < ry + ROW_H - 2) {
+            const c = cellRect(i)
+            if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
                 const region = BODY_REGIONS[i]
-                if (this.hitChances[region] < 0) {return true} // ignore impossible regions
+                if (!this.isSelectable(region)) {return true}
                 EventBus.emit('calledShot:regionSelected', { region })
                 this.hide()
                 return true
@@ -181,8 +206,8 @@ export class CalledShotPanel extends UIPanel {
 
     override onMouseMove(x: number, y: number): void {
         for (let i = 0; i < BODY_REGIONS.length; i++) {
-            const ry = REGIONS_Y + i * ROW_H
-            if (x >= REGIONS_X && x < REGIONS_X + REGION_W && y >= ry && y < ry + ROW_H - 2) {
+            const c = cellRect(i)
+            if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
                 this._hoveredIndex = i
                 return
             }
@@ -199,7 +224,7 @@ export class CalledShotPanel extends UIPanel {
         const digit = parseInt(key)
         if (!isNaN(digit) && digit >= 1 && digit <= BODY_REGIONS.length) {
             const region = BODY_REGIONS[digit - 1]
-            if (this.hitChances[region] >= 0) {
+            if (this.isSelectable(region)) {
                 EventBus.emit('calledShot:regionSelected', { region })
                 this.hide()
             }
@@ -209,7 +234,7 @@ export class CalledShotPanel extends UIPanel {
             const dir = key === 'ArrowDown' ? 1 : -1
             const hittable = BODY_REGIONS
                 .map((r, i) => ({ r, i }))
-                .filter(({ r }) => this.hitChances[r] >= 0)
+                .filter(({ r }) => this.isSelectable(r))
             if (hittable.length === 0) {return true}
             const currentPos = hittable.findIndex(({ i }) => i === this._focusedIndex)
             const nextPos = currentPos < 0
@@ -220,7 +245,7 @@ export class CalledShotPanel extends UIPanel {
         }
         if (key === 'Enter' && this._focusedIndex >= 0 && this._focusedIndex < BODY_REGIONS.length) {
             const region = BODY_REGIONS[this._focusedIndex]
-            if (this.hitChances[region] >= 0) {
+            if (this.isSelectable(region)) {
                 EventBus.emit('calledShot:regionSelected', { region })
                 this.hide()
             }
