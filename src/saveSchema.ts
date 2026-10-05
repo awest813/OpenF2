@@ -130,6 +130,8 @@ export interface SaveGame {
     playerPcFlags?: number
     /** skillsUsageSave: per skill, the game times of its last three uses. */
     skillUsage?: number[][]
+    /** wmGenData.didMeetFrankHorrigan. */
+    metFrankHorrigan?: boolean
 
     /**
      * Currently active weapon hand (added in v13 / BLK-034).

@@ -104,6 +104,7 @@ export default {
 
     combatDifficulty: 1, // Normal
     gameDifficulty: 1, // Normal
+    metFrankHorrigan: false,
     mouseMode: 'move',
     violenceLevel: 2, // Maximum blood
 
@@ -271,6 +272,8 @@ export default {
     mouseMode: 'move' | 'arrow' | 'crosshair'
     /** Game difficulty: 0=Easy, 1=Normal, 2=Hard. Controls encounter/XP formula branches. */
     gameDifficulty: number
+    /** wmGenData.didMeetFrankHorrigan: his world-map ambush has happened. */
+    metFrankHorrigan: boolean
     /** Violence level: 0=minimal, 1=normal, 2=maximum blood. */
     violenceLevel: number
 

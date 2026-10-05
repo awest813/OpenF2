@@ -122,6 +122,30 @@ function applyRestHealing(ticks: number): number {
 }
 
 /**
+ * _partyMemberRestingHeal: every party member (the player included) heals
+ * its Healing Rate once per three whole hours.
+ */
+export function partyRestingHeal(hours: number): void {
+    const periods = Math.trunc(hours / 3)
+    if (periods <= 0) return
+    const members: Critter[] = []
+    const player = globalState.player as Critter | null
+    if (player) members.push(player)
+    const party = globalState.gParty
+    if (party && typeof party.getPartyMembers === 'function') {
+        for (const member of party.getPartyMembers()) {
+            if (member && !members.includes(member as Critter)) members.push(member as Critter)
+        }
+    }
+    for (const member of members) {
+        if (!member?.stats || member.dead) continue
+        const rate = Math.max(0, member.getStat?.('Healing Rate') ?? 0)
+        healCritter(member, periods * rate)
+    }
+    if (player) syncPlayerEntityFromCritter()
+}
+
+/**
  * Simulate chem/rad/poison clocks across a large jump without stepping every tick.
  */
 function simulateEffectsAcrossAdvance(ticks: number): void {

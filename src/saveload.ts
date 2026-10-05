@@ -81,6 +81,7 @@ function applyExtraSaveState(save: SaveGame): void {
     }
     // skillsUsageLoad: the First Aid / Doctor / Repair uses of the last day.
     setSkillUsage(save.skillUsage)
+    globalState.metFrankHorrigan = save.metFrankHorrigan === true
     // Restore active hand selection (BLK-034).
     if (globalState.player && typeof save.playerActiveHand === 'number') {
         (globalState.player as any).activeHand = save.playerActiveHand
@@ -345,6 +346,7 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // sneak mode and other PC flags survive save/load cycles.
     save.playerPcFlags = globalState.player.pcFlags ?? 0
     save.skillUsage = getSkillUsage()
+    save.metFrankHorrigan = globalState.metFrankHorrigan === true
 
     // Snapshot active hand state (BLK-034) so the player's current weapon slot
     // selection survives across save/load cycles.

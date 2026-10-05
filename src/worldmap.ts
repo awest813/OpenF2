@@ -26,7 +26,28 @@ import { clamp, getFileText, getRandomInt, isNumeric, parseIni } from './util.js
 import { Config } from './config.js'
 import { worldGridConfig, encounterRateForFrequency } from './compat/fallout1.js'
 import { applyEncounterCritterLoadout } from './encounterLoadout.js'
-import { burnCarFuelOnTravel, worldmapTravelSpeed } from './car.js'
+import { getCarFuel, isCarFueled, setCarFuel } from './car.js'
+import { Scripting } from './scripting.js'
+import { advanceGameTime, partyRestingHeal } from './character/rest.js'
+import { awardCritterXp } from './character/xp.js'
+import { gameTimeHour, TICKS_PER_DAY } from './gameTime.js'
+import { partyBestInSkill, skillValue } from './skillUse.js'
+import { EventBus } from './eventBus.js'
+import { getMessage } from './util.js'
+import {
+    dayPart,
+    encounterCheckDue,
+    fuelPerPass,
+    initWalking,
+    newTravelState,
+    rollEncounter,
+    stepsPerPass,
+    travelTicks,
+    TRAVEL_HEAL_INTERVAL_MS,
+    TRAVEL_PASS_MS,
+    walkingStep,
+    type TravelState,
+} from './worldmapTravel.js'
 
 // World Map system
 
@@ -37,8 +58,10 @@ export namespace Worldmap {
     let $worldmapPlayer: HTMLElement | null = null
     let $worldmapTarget: HTMLElement | null = null
     let worldmapTimer = -1
-    let lastEncounterCheck = 0
     let isEncounterTransitionPending = false
+    /** The engine's walking state (worldmapTravel.ts). */
+    let travel: TravelState | null = null
+    let lastPassMs = 0
 
     enum WorldmapState {
         Undiscovered = 0,
@@ -53,14 +76,12 @@ export namespace Worldmap {
     const NUM_SQUARES_Y = 5 * 6
     const SQUARE_SIZE = 51
 
-    const WORLDMAP_SPEED = 2 // speed scalar
-    const WORLDMAP_ENCOUNTER_CHECK_RATE_F2 = 750 // ms
-    const WORLDMAP_ENCOUNTER_CHECK_RATE_F1 = 650 // ms
+    /** MAP_IN_GAME_MOVIE1: Frank Horrigan's first appearance. */
+    const MAP_HORRIGAN_MOVIE = 149
+    /** PROTO_ID_MOTION_SENSOR: +20 Outdoorsman for spotting encounters. */
+    const PID_MOTION_SENSOR = 59
+    const SKILL_OUTDOORSMAN = 17
 
-    /** Minimum adjusted encounter rate (prevents difficulty modifier from making encounters impossible). */
-    const MIN_ENCOUNTER_RATE = 1
-    /** Maximum adjusted encounter rate (prevents difficulty modifier from forcing encounters). */
-    const MAX_ENCOUNTER_RATE = 99
 
     function getGridConfig() {
         return worldGridConfig()
@@ -96,11 +117,6 @@ export namespace Worldmap {
         return clampPointToWorldBounds(fallback)
     }
 
-    function getEncounterCheckRateMs(): number {
-        const grid = worldGridConfig()
-        return grid.columns === 20 ? WORLDMAP_ENCOUNTER_CHECK_RATE_F1 : WORLDMAP_ENCOUNTER_CHECK_RATE_F2
-    }
-
     interface Square {
         terrainType: string //"mountain" | "ocean" | "desert" | "city" | "ocean"
         fillType: string //"no_fill" | "fill_w"
@@ -108,6 +124,8 @@ export namespace Worldmap {
         // but as noted on http://falloutmods.wikia.com/wiki/Worldmap.txt_File_Format
         // they don't appear to be used
         frequency: string //"forced" | "frequent" | "uncommon" | "common" | "rare" | "none"
+        /** The chance for morning, afternoon and night (wmRndEncounterOccurred). */
+        frequencies: string[]
         encounterType: string
         difficulty: number
         state: WorldmapState // WorldmapState.Undiscovered | .Discovered | .Seen
@@ -207,6 +225,7 @@ export namespace Worldmap {
                 terrainType: props[0],
                 fillType: props[1],
                 frequency: props[2],
+                frequencies: [props[2], props[3], props[4]].map((f) => (f ?? '').trim()),
                 encounterType: props[5],
                 difficulty: null,
                 state: null,
@@ -590,48 +609,6 @@ export namespace Worldmap {
         return true
     }
 
-    export function didEncounter(): boolean {
-        const squarePos = positionToSquare(worldmapPlayer)
-        if (!squarePos) {return false}
-        const grid = getGridConfig()
-        if (squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {return false}
-        const square = worldmap.squares[squarePos.x][squarePos.y]
-        if (!square) {return false}
-        const tableRate = worldmap.encounterRates[square.frequency]
-        let encRate = tableRate === undefined ? encounterRateForFrequency(square.frequency) : tableRate
-        if (!Number.isFinite(encRate)) {return false}
-
-        //console.log("square: %o, worldmap: %o, encRate: %d", square, worldmap, encRate)
-
-        if (encRate <= 0)
-            // 0% or negative encounter rate (none)
-            {return false}
-        else if (encRate === 100)
-            // 100% encounter rate (forced)
-            {return true}
-        else {
-            // Adjust for difficulty, then clamp to [1, 99] so the modifier can
-            // never force an encounter (100+) or make one impossible (<=0).
-            if (Config.engine.encounterDifficulty === 'easy')
-                {encRate -= Math.floor(encRate / 15)}
-            else if (Config.engine.encounterDifficulty === 'hard')
-                {encRate += Math.floor(encRate / 15)}
-
-            encRate = Math.max(MIN_ENCOUNTER_RATE, Math.min(MAX_ENCOUNTER_RATE, encRate))
-
-            const roll = getRandomInt(0, 100)
-            console.log('encounter: rolled %d vs %d (difficulty: %s)', roll, encRate, Config.engine.encounterDifficulty)
-
-            if (roll < encRate) {
-                // We rolled an encounter!
-                return true
-            }
-        }
-
-        return false
-    }
-
-
     function setWorldmapInteractionLocked(locked: boolean): void {
         if ($worldmap) {$worldmap.style.pointerEvents = locked ? 'none' : 'auto'}
         if ($worldmapTarget) {$worldmapTarget.style.pointerEvents = locked ? 'none' : 'auto'}
@@ -703,6 +680,10 @@ export namespace Worldmap {
 
             const clampedTarget = clampPointToWorldBounds({ x: ax, y: ay })
             worldmapPlayer.target = clampedTarget
+            if (!travel) {travel = newTravelState(Math.round(worldmapPlayer.x), Math.round(worldmapPlayer.y))}
+            travel.x = Math.round(worldmapPlayer.x)
+            travel.y = Math.round(worldmapPlayer.y)
+            initWalking(travel, clampedTarget.x, clampedTarget.y)
             showv($worldmapPlayer)
             $worldmapTarget.style.backgroundImage = "url('art/intrface/wmaptarg.png')"
             centerWorldmapTarget(clampedTarget.x, clampedTarget.y)
@@ -786,6 +767,7 @@ export namespace Worldmap {
             target: null,
         }
         globalState.worldPosition = { ...initialWorldPos }
+        travel = newTravelState(Math.round(initialWorldPos.x), Math.round(initialWorldPos.y))
         centerWorldmapTarget(worldmapPlayer.x, worldmapPlayer.y)
 
         setSquareStateAt(positionToSquare(worldmapPlayer), WORLDMAP_DISCOVERED)
@@ -821,93 +803,175 @@ export namespace Worldmap {
         return null
     }
 
-    function updateWorldmapPlayer() {
-        $worldmapPlayer.style.left = worldmapPlayer.x + 'px'
-        $worldmapPlayer.style.top = worldmapPlayer.y + 'px'
+    function squareAt(pos: Point): Square | null {
+        const squarePos = positionToSquare(pos)
+        const grid = getGridConfig()
+        if (!squarePos || squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {return null}
+        return worldmap.squares[squarePos.x]?.[squarePos.y] ?? null
+    }
 
-        // Keep persistent world-map position in sync for save/load continuity.
-        globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
+    function gvar(n: number): number {
+        try {
+            return Number(Scripting.getGlobalVar(n)) || 0
+        } catch {
+            return 0
+        }
+    }
 
-        if (worldmapPlayer.target) {
-            let dx = worldmapPlayer.target.x - worldmapPlayer.x
-            let dy = worldmapPlayer.target.y - worldmapPlayer.y
-            const len = Math.sqrt(dx * dx + dy * dy)
+    function message(file: string, id: number, fallback: string): string {
+        try {
+            return getMessage(file, id) ?? fallback
+        } catch {
+            return fallback
+        }
+    }
 
-            const squarePos = positionToSquare(worldmapPlayer)
-            // Guard: if the player is somehow out of the map bounds, skip movement
-            const grid = getGridConfig()
-            if (!squarePos || squarePos.x < 0 || squarePos.x >= grid.columns || squarePos.y < 0 || squarePos.y >= grid.rows) {
-                globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
-                worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
-                return
+    /** partyGetBestSkillValue(Outdoorsman), +20 for a motion sensor the player carries. */
+    function partyOutdoorsman(): number {
+        let value = skillValue(partyBestInSkill(SKILL_OUTDOORSMAN), SKILL_OUTDOORSMAN)
+        const inv: any[] = (globalState.player as any)?.inventory ?? []
+        if (inv.some((item) => item?.pid === PID_MOTION_SENSOR)) {value += 20}
+        return value
+    }
+
+    function beginEncounter(start: () => void): void {
+        $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmapfgt0.png')"
+        isEncounterTransitionPending = true
+        setWorldmapInteractionLocked(true)
+        setTimeout(function () {
+            try {
+                start()
+                uiCloseWorldMap()
+                $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmaploc.png')"
+            } finally {
+                isEncounterTransitionPending = false
+                setWorldmapInteractionLocked(false)
             }
-            const currentSquare = worldmap.squares[squarePos.x][squarePos.y]
-            let speed = WORLDMAP_SPEED / worldmap.terrainSpeed[currentSquare.terrainType]
-            // P1-6: Highwayman speed bonus + fuel burn while travelling.
-            speed = worldmapTravelSpeed(speed)
-            burnCarFuelOnTravel()
+        }, 1000)
+    }
 
-            if (len < speed) {
-                const destination = clampPointToWorldBounds(worldmapPlayer.target)
-                worldmapPlayer.x = destination.x
-                worldmapPlayer.y = destination.y
-                worldmapPlayer.target = null
-                globalState.worldPosition = { ...destination }
+    /** wmRndEncounterOccurred. Returns true when the party is pulled into an encounter. */
+    function checkRandomEncounter(nowMs: number, inCar: boolean): boolean {
+        if (!travel) {return false}
+        const pos = { x: travel.x, y: travel.y }
+        if (!encounterCheckDue(travel, nowMs, withinArea(pos) !== null)) {return false}
 
-                hidev($worldmapPlayer)
-                $worldmapTarget.style.backgroundImage = "url('art/intrface/hotspot1.png')"
-                centerWorldmapTarget(worldmapPlayer.x, worldmapPlayer.y)
-            } else {
-                // normalize direction
-                dx /= len
-                dy /= len
+        const ticks = globalState.gameTickTime ?? 0
+        if (!globalState.metFrankHorrigan && Math.floor(ticks / TICKS_PER_DAY) > 35) {
+            globalState.metFrankHorrigan = true
+            beginEncounter(() => globalState.gMap.loadMapByID(MAP_HORRIGAN_MOVIE))
+            return true
+        }
 
-                // head towards it
-                worldmapPlayer.x += dx * speed
-                worldmapPlayer.y += dy * speed
-            }
+        const square = squareAt(pos)
+        if (!square) {return false}
+        const part = dayPart(gameTimeHour(ticks))
+        const name = (square.frequencies?.[part] || square.frequency || '').toLowerCase()
+        const tableRate = worldmap.encounterRates[name]
+        const frequency = tableRate === undefined ? encounterRateForFrequency(name) : tableRate
+        if (!Number.isFinite(frequency)) {return false}
 
-            // center the worldmap to the player
-            const width = $worldmap.offsetWidth
-            const height = $worldmap.offsetHeight
-            const bounds = worldPixelBounds()
-            const sx = clamp(0, Math.max(0, bounds.maxX - width + 1), Math.floor(worldmapPlayer.x - width / 2))
-            const sy = clamp(0, Math.max(0, bounds.maxY - height + 1), Math.floor(worldmapPlayer.y - height / 2))
+        const roll = rollEncounter({
+            frequency,
+            dayPart: part,
+            gameDifficulty: globalState.gameDifficulty ?? 1,
+            inCar,
+            outdoorsman: partyOutdoorsman(),
+            tileModifier: square.difficulty || 0,
+        }, (min, max) => getRandomInt(min, max))
+        if (!roll.encounter) {return false}
 
-            $worldmap.scrollLeft = sx
-            $worldmap.scrollTop = sy
+        travel.oldX = travel.x
+        travel.oldY = travel.y
 
-            if (currentSquare.state !== WORLDMAP_DISCOVERED) {setSquareStateAt(squarePos, WORLDMAP_DISCOVERED)}
+        if (roll.xp > 0 && globalState.player) {
+            const before = globalState.player.xp ?? 0
+            awardCritterXp(globalState.player, roll.xp)
+            const gained = (globalState.player.xp ?? 0) - before
+            EventBus.emit('ui:message', {
+                text: message('misc', 8500, 'You gain %d experience points for successfully spotting the encounter.').replace('%d', String(gained)),
+            })
+        }
+        if (roll.detected && typeof confirm === 'function') {
+            const title = message('worldmap', 2999, 'Encounter!')
+            if (!confirm(title + '\n\nDo you wish to approach?')) {return false}
+        }
+        beginEncounter(() => doEncounter())
+        return true
+    }
 
-            // check for encounters
-            const time = window.performance.now()
-            if (!isEncounterTransitionPending && Config.engine.doEncounters === true && time >= lastEncounterCheck + getEncounterCheckRateMs()) {
-                lastEncounterCheck = time
-
-                const hadEncounter = didEncounter()
-                if (hadEncounter === true) {
-                    $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmapfgt0.png')"
-
-                    isEncounterTransitionPending = true
-                    setWorldmapInteractionLocked(true)
-
-                    setTimeout(function () {
-                        try {
-                            doEncounter()
-                            uiCloseWorldMap()
-                            $worldmapPlayer.style.backgroundImage = "url('art/intrface/wmaploc.png')"
-                        } finally {
-                            isEncounterTransitionPending = false
-                            setWorldmapInteractionLocked(false)
-                        }
-                    }, 1000)
-
-                    clearTimeout(worldmapTimer)
-                    return
-                }
+    /** One pass of the engine's travel loop. Returns true when an encounter ended the trip. */
+    function travelPass(nowMs: number): boolean {
+        if (!travel) {return false}
+        const inCar = isCarFueled()
+        const steps = stepsPerPass(inCar, gvar)
+        for (let i = 0; i < steps; i++) {
+            const square = squareAt({ x: travel.x, y: travel.y })
+            walkingStep(travel, square ? worldmap.terrainSpeed[square.terrainType] ?? 1 : 1)
+        }
+        if (inCar) {
+            setCarFuel(getCarFuel() - fuelPerPass(gvar))
+            if (getCarFuel() <= 0) {
+                travel.walking = false
+                travel.walkDistance = 0
             }
         }
 
-        worldmapTimer = setTimeout(updateWorldmapPlayer, 75)
+        worldmapPlayer.x = travel.x
+        worldmapPlayer.y = travel.y
+
+        if (nowMs - travel.lastHealMs > TRAVEL_HEAL_INTERVAL_MS) {
+            partyRestingHeal(3)
+            travel.lastHealMs = nowMs
+        }
+
+        const squarePos = positionToSquare(worldmapPlayer)
+        const square = squareAt(worldmapPlayer)
+        if (square && square.state !== WORLDMAP_DISCOVERED) {setSquareStateAt(squarePos, WORLDMAP_DISCOVERED)}
+
+        advanceGameTime(travelTicks(travel, globalState.player), { heal: false, tickEffects: true, requireOutOfCombat: false })
+
+        if (travel.walking && !isEncounterTransitionPending && Config.engine.doEncounters === true) {
+            if (checkRandomEncounter(nowMs, inCar)) {return true}
+        }
+        return false
+    }
+
+    function updateWorldmapPlayer() {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        if (!lastPassMs || now - lastPassMs > 250) {lastPassMs = now - TRAVEL_PASS_MS}
+        let passes = Math.min(8, Math.floor((now - lastPassMs) / TRAVEL_PASS_MS))
+        lastPassMs += passes * TRAVEL_PASS_MS
+
+        let encountered = false
+        while (passes-- > 0 && travel?.walking && !encountered) {
+            encountered = travelPass(now)
+        }
+
+        if (worldmapPlayer.target && travel && !travel.walking && !encountered) {
+            // Arrived (or stopped): the party marker becomes the hotspot.
+            worldmapPlayer.target = null
+            hidev($worldmapPlayer)
+            $worldmapTarget.style.backgroundImage = "url('art/intrface/hotspot1.png')"
+            centerWorldmapTarget(worldmapPlayer.x, worldmapPlayer.y)
+        }
+
+        $worldmapPlayer.style.left = worldmapPlayer.x + 'px'
+        $worldmapPlayer.style.top = worldmapPlayer.y + 'px'
+        globalState.worldPosition = clampPointToWorldBounds({ x: worldmapPlayer.x, y: worldmapPlayer.y })
+
+        if (travel?.walking) {
+            const width = $worldmap.offsetWidth
+            const height = $worldmap.offsetHeight
+            const bounds = worldPixelBounds()
+            $worldmap.scrollLeft = clamp(0, Math.max(0, bounds.maxX - width + 1), Math.floor(worldmapPlayer.x - width / 2))
+            $worldmap.scrollTop = clamp(0, Math.max(0, bounds.maxY - height + 1), Math.floor(worldmapPlayer.y - height / 2))
+        }
+
+        if (encountered) {
+            clearTimeout(worldmapTimer)
+            return
+        }
+        worldmapTimer = setTimeout(updateWorldmapPlayer, TRAVEL_PASS_MS)
     }
 }

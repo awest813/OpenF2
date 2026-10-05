@@ -40,6 +40,7 @@ export function initGame(options: InitGameOptions = {}): void {
     // scr_game_init: a new game starts at 8:24 in the morning on 25 July 2241.
     globalState.gameTickTime = NEW_GAME_TICKS
     resetSkillUsage()
+    globalState.metFrankHorrigan = false
 
     if (shouldSkipMainMenu()) {
         // Dev shortcut: `?artemple` (or any map name) loads immediately.
