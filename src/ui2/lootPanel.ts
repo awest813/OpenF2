@@ -42,6 +42,19 @@ export interface LootItem {
     amount: number
 }
 
+/**
+ * Steal mode (inventory.cc with _gIsSteal set): no TAKE ALL, and every
+ * move is checked first. A refused move (the thief was caught) closes the
+ * screen.
+ */
+export interface LootGuard {
+    title: string
+    /** `planting` is true for a move from the player's side. */
+    beforeMove(item: Obj, planting: boolean): boolean
+    afterMove(item: Obj, planting: boolean): void
+    onClose(): void
+}
+
 // ---------------------------------------------------------------------------
 // LootPanel
 // ---------------------------------------------------------------------------
@@ -62,6 +75,7 @@ export class LootPanel extends UIPanel {
     /** Live Critter inventories (companion trade) — mutated in lockstep with snapshots. */
     private _livePlayer: Obj[] | null = null
     private _liveContainer: Obj[] | null = null
+    private _guard: LootGuard | null = null
 
     constructor(screenWidth: number, screenHeight: number) {
         super('loot', {
@@ -87,7 +101,8 @@ export class LootPanel extends UIPanel {
      * Open against live Critter inventory arrays (companion trade / corpse loot).
      * Moves mutate the underlying Obj[] as well as the display snapshots.
      */
-    openWithLive(playerInventory: Obj[], containerInventory: Obj[]): void {
+    openWithLive(playerInventory: Obj[], containerInventory: Obj[], guard: LootGuard | null = null): void {
+        this._guard = guard
         this._livePlayer = playerInventory
         this._liveContainer = containerInventory
         this.playerInventory = snapshotLoot(playerInventory)
@@ -107,12 +122,20 @@ export class LootPanel extends UIPanel {
 
     /** All close paths funnel here so the loot:closed event fires exactly once. */
     protected override onHide(): void {
+        const guard = this._guard
+        this._guard = null
         EventBus.emit('loot:closed', {
             playerInventory:    this.playerInventory.slice(),
             containerInventory: this.containerInventory.slice(),
         })
         this._livePlayer = null
         this._liveContainer = null
+        guard?.onClose()
+    }
+
+    /** True while the screen is in steal mode. */
+    get stealing(): boolean {
+        return this._guard !== null
     }
 
     private _scrollOffsetFor(side: 'player' | 'container'): number {
@@ -145,7 +168,8 @@ export class LootPanel extends UIPanel {
         strokeRect(ctx, 0, 0, width, height, FALLOUT_GREEN, 2)
 
         // Title
-        drawUIFontText(ctx, this._liveContainer ? 'TRADE' : 'LOOT', width / 2, 18, FALLOUT_GREEN, 12, { align: 'center', bold: true })
+        const title = this._guard ? this._guard.title : this._liveContainer ? 'TRADE' : 'LOOT'
+        drawUIFontText(ctx, title, width / 2, 18, FALLOUT_GREEN, 12, { align: 'center', bold: true })
 
         // Column headers
         const playerX    = COL_PAD
@@ -160,12 +184,14 @@ export class LootPanel extends UIPanel {
         // Arrow hint
         drawUIFontText(ctx, '←  →', width / 2, COL_Y + COL_H / 2, FALLOUT_AMBER, 14, { align: 'center' })
 
-        // TAKE ALL button
+        // TAKE ALL button (not offered while stealing)
         const takeAllX = width / 2 - BTN_W - 4
         const btnY = height - 36
-        fillRect(ctx, takeAllX, btnY, BTN_W, BTN_H, FALLOUT_DARK_GRAY)
-        strokeRect(ctx, takeAllX, btnY, BTN_W, BTN_H, FALLOUT_GREEN, 1)
-        drawUIFontText(ctx, 'TAKE ALL', takeAllX + BTN_W / 2, btnY + 15, FALLOUT_GREEN, 10, { align: 'center' })
+        if (!this._guard) {
+            fillRect(ctx, takeAllX, btnY, BTN_W, BTN_H, FALLOUT_DARK_GRAY)
+            strokeRect(ctx, takeAllX, btnY, BTN_W, BTN_H, FALLOUT_GREEN, 1)
+            drawUIFontText(ctx, 'TAKE ALL', takeAllX + BTN_W / 2, btnY + 15, FALLOUT_GREEN, 10, { align: 'center' })
+        }
 
         // CLOSE button
         const closeX = width / 2 + 4
@@ -217,7 +243,7 @@ export class LootPanel extends UIPanel {
 
         // TAKE ALL
         const takeAllX = width / 2 - BTN_W - 4
-        if (x >= takeAllX && x < takeAllX + BTN_W && y >= btnY && y < btnY + BTN_H) {
+        if (!this._guard && x >= takeAllX && x < takeAllX + BTN_W && y >= btnY && y < btnY + BTN_H) {
             this._takeAll()
             return true
         }
@@ -408,6 +434,17 @@ export class LootPanel extends UIPanel {
         const item = from[fromIdx]
         if (!item) {return}
 
+        const planting = fromSide === 'player'
+        let liveObj: Obj | undefined
+        if (this._guard && this._livePlayer && this._liveContainer) {
+            const liveFrom = fromSide === 'player' ? this._livePlayer : this._liveContainer
+            liveObj = liveFrom.find((o) => lootItemKey(o) === item.name)
+            if (liveObj && !this._guard.beforeMove(liveObj, planting)) {
+                this.hide()
+                return
+            }
+        }
+
         from.splice(fromIdx, 1)
         const existing = to.find(i => i.name === item.name)
         if (existing) {
@@ -424,6 +461,7 @@ export class LootPanel extends UIPanel {
                 item.amount,
             )
         }
+        if (liveObj) {this._guard?.afterMove(liveObj, planting)}
     }
 
     private _takeAll(): void {

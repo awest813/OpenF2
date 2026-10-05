@@ -48,6 +48,8 @@ import { UIMode } from './uiMode.js'
 import { EventBus } from './eventBus.js'
 import { examineLines } from './examine.js'
 import { parkCarAtPlayer } from './car.js'
+import { finishStealing, openStealing, type StealScreen } from './steal.js'
+import { setStealHandler } from './skillUse.js'
 
 // UI system
 
@@ -409,6 +411,7 @@ function drawInventory($el: HTMLElement, objects: Obj[], prefix: string, options
 }
 
 export function initUI() {
+    setStealHandler((thief, target) => openStealing(thief, target, stealScreen))
     uiInit()
 
     // -------------------------------------------------------------------
@@ -1579,6 +1582,31 @@ export function uiLoot(object: Obj) {
 
     drawLoot()
 }
+
+/** The steal screen (inventoryOpenStealing) on the ui2 loot panel. */
+const stealScreen: StealScreen = {
+    openSteal(_thief, target, session) {
+        const lootPanel = globalState.uiManager?.get<LootPanel>('loot')
+        if (!lootPanel) {
+            finishStealing(session, stealScreen)
+            return
+        }
+        globalState.uiMode = UIMode.loot
+        lootPanel.openWithLive(globalState.player.inventory, target.inventory, {
+            title: 'STEAL',
+            beforeMove: (item, planting) => session.beforeMove(item, planting),
+            afterMove: () => session.afterMove(),
+            onClose: () => finishStealing(session, stealScreen),
+        })
+    },
+    openLoot(target) {
+        uiLoot(target)
+    },
+    runPickup(target, thief) {
+        return Scripting.pickup(target, thief)
+    },
+}
+
 
 export function uiLog(msg: string) {
     EventBus.emit('ui:message', { text: msg })
