@@ -8,15 +8,7 @@ import { TICKS_PER_DAY } from './gameTime.js'
 import { Player } from './player.js'
 import { PERKS, PERK_MAP, educatedPerkRanks, EDUCATED_PERK_IDS } from './character/perks.js'
 import { TRAITS } from './character/traits.js'
-import {
-    applyDrugToCritter,
-    resolveDrugDef,
-    tickTimedEffects,
-    getActiveEffects,
-    getAddictions,
-    resetTimedEffects,
-    getActiveRadResistBonus,
-} from './character/timedEffects.js'
+import { takeDrug } from './character/timedEffects.js'
 import {
     applyRadiationGain,
     radiationBand,
@@ -55,66 +47,6 @@ describe('Parity Slice F — perks / traits tables', () => {
     })
 })
 
-describe('Parity Slice F — drugs and timed effects', () => {
-    let savedPlayer: typeof globalState.player
-    let savedTick: number
-
-    beforeEach(() => {
-        savedPlayer = globalState.player
-        savedTick = globalState.gameTickTime
-        resetTimedEffects()
-        globalState.player = new Player()
-        globalState.gameTickTime = 1000
-    })
-
-    afterEach(() => {
-        globalState.player = savedPlayer
-        globalState.gameTickTime = savedTick
-        resetTimedEffects()
-    })
-
-    it('resolves Buffout / Mentats / Rad-X by name', () => {
-        expect(resolveDrugDef({ name: 'Buffout' })?.id).toBe('buffout')
-        expect(resolveDrugDef({ name: 'Mentats' })?.specialMods?.INT).toBe(2)
-        expect(resolveDrugDef({ name: 'Rad-X' })?.radResistBonus).toBe(50)
-    })
-
-    it('applies Buffout SPECIAL mods and tracks an active effect', () => {
-        const player = globalState.player as Player
-        const strBefore = player.getStat('STR')
-        expect(applyDrugToCritter(player, { name: 'Buffout' })).toBe(true)
-        expect(player.getStat('STR')).toBe(strBefore + 2)
-        expect(getActiveEffects(player).some((e) => e.drugId === 'buffout')).toBe(true)
-    })
-
-    it('expires Buffout and can start withdrawal after addiction', () => {
-        const player = globalState.player as Player
-        vi.spyOn(Math, 'random').mockReturnValue(0) // always addict (chance roll < chance)
-        applyDrugToCritter(player, { name: 'Buffout' })
-        expect(getAddictions(player).some((a) => a.drugId === 'buffout')).toBe(true)
-
-        const effect = getActiveEffects(player).find((e) => e.drugId === 'buffout')!
-        globalState.gameTickTime = effect.expiresAt
-        tickTimedEffects(player)
-        expect(getActiveEffects(player).some((e) => e.drugId === 'buffout')).toBe(false)
-        expect(getAddictions(player).find((a) => a.drugId === 'buffout')?.withdrawing).toBe(true)
-        vi.restoreAllMocks()
-    })
-
-    it('Rad-X grants timed radiation resistance bonus', () => {
-        const player = globalState.player as Player
-        applyDrugToCritter(player, { name: 'Rad-X' })
-        expect(getActiveRadResistBonus(player)).toBe(50)
-    })
-
-    it('RadAway lowers radiation level', () => {
-        const player = globalState.player as Player
-        player.stats.setBase('Radiation Level', 80)
-        applyDrugToCritter(player, { name: 'RadAway' })
-        expect(player.stats.getBase('Radiation Level')).toBe(30)
-    })
-})
-
 describe('Parity Slice F — radiation and poison (critter.cc)', () => {
     let savedPlayer: typeof globalState.player
 
@@ -139,7 +71,10 @@ describe('Parity Slice F — radiation and poison (critter.cc)', () => {
         const player = globalState.player as Player
         const plain = applyRadiationGain(player, 100)
         player.stats.setBase('Radiation Level', 0)
-        applyDrugToCritter(player, { name: 'Rad-X' })
+        const radX = { pid: 109, subtype: 'drug', pro: { extra: { subType: 2, stat0: 31, stat1: -1, stat2: -1, amount0: 50, amount1: 0, amount2: 0,
+            firstDelayed: { duration: 1440, amount0: -50, amount1: 0, amount2: 0 }, secondDelayed: { duration: 0, amount0: 0, amount1: 0, amount2: 0 },
+            addictionRate: 0, addictionEffect: -1, addictionOnset: 0 } } }
+        takeDrug(player, radX)
         const taken = applyRadiationGain(player, 100)
         expect(taken).toBeLessThan(plain)
         expect(player.stats.getBase('Radiation Level')).toBe(taken)

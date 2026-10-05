@@ -321,30 +321,12 @@ export interface SaveGame {
     }>
 
     /**
-     * Active drug / addiction clocks (added in v22 / Slice F+G).
-     * SPECIAL deltas are already in Critter stats; this restores expiry + addiction flags.
+     * Pending drug effects, withdrawal clocks and drug bonus stats
+     * (item.cc drug / withdrawal queue events), per critter.
      */
     timedEffects?: {
-        player?: {
-            effects: Array<{
-                drugId: string
-                expiresAt: number
-                appliedMods: Record<string, number>
-                radResistBonus: number
-            }>
-            addictions: Array<{ drugId: string; withdrawing: boolean }>
-            withdrawalApplied: string[]
-        }
-        members?: Record<string, {
-            effects: Array<{
-                drugId: string
-                expiresAt: number
-                appliedMods: Record<string, number>
-                radResistBonus: number
-            }>
-            addictions: Array<{ drugId: string; withdrawing: boolean }>
-            withdrawalApplied: string[]
-        }>
+        player?: unknown
+        members?: Record<string, unknown>
     }
 
     /**

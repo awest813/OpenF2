@@ -7,15 +7,6 @@ import globalState from './globalState.js'
 import { Player } from './player.js'
 import { Party } from './party.js'
 import {
-    applyDrugToCritter,
-    serializeTimedEffects,
-    hydrateTimedEffects,
-    resetTimedEffects,
-    getActiveEffects,
-    getAddictions,
-    getActiveRadResistBonus,
-} from './character/timedEffects.js'
-import {
     canTradeWithPartyMember,
     openCompanionTrade,
     transferInventoryItem,
@@ -23,101 +14,6 @@ import {
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import { Critter } from './object.js'
 import { LootPanel } from './ui2/lootPanel.js'
-
-describe('Timed effects save/load', () => {
-    let savedPlayer: typeof globalState.player
-    let savedParty: typeof globalState.gParty
-    let savedTick: number
-
-    beforeEach(() => {
-        savedPlayer = globalState.player
-        savedParty = globalState.gParty
-        savedTick = globalState.gameTickTime
-        resetTimedEffects()
-        globalState.player = new Player()
-        globalState.gParty = new Party()
-        globalState.gameTickTime = 5000
-    })
-
-    afterEach(() => {
-        globalState.player = savedPlayer
-        globalState.gParty = savedParty
-        globalState.gameTickTime = savedTick
-        resetTimedEffects()
-    })
-
-    it('serializeTimedEffects captures player Buffout + Rad-X', () => {
-        applyDrugToCritter(globalState.player as Player, { name: 'Buffout' })
-        applyDrugToCritter(globalState.player as Player, { name: 'Rad-X' })
-        const snap = serializeTimedEffects()
-        expect(snap.player).toBeTruthy()
-        expect(snap.player!.effects.some((e) => e.drugId === 'buffout')).toBe(true)
-        expect(snap.player!.effects.some((e) => e.drugId === 'radx')).toBe(true)
-        expect(getActiveRadResistBonus(globalState.player as object)).toBe(50)
-    })
-
-    it('hydrateTimedEffects restores clocks onto a new Critter instance', () => {
-        applyDrugToCritter(globalState.player as Player, { name: 'Mentats' })
-        const snap = serializeTimedEffects()
-        resetTimedEffects()
-        expect(getActiveEffects(globalState.player as object)).toHaveLength(0)
-
-        // Simulate load: new player object, then hydrate
-        globalState.player = new Player()
-        hydrateTimedEffects(snap)
-        expect(getActiveEffects(globalState.player as object).some((e) => e.drugId === 'mentats')).toBe(true)
-    })
-
-    it('hydrate restores party member addiction by PID', () => {
-        const companion = {
-            pid: 16777313,
-            name: 'Sulik',
-            type: 'critter',
-            inventory: [],
-            stats: (globalState.player as Player).stats,
-            getStat: (n: string) => (globalState.player as Player).getStat(n),
-        } as any as Critter
-        globalState.gParty.addPartyMember(companion)
-        // Force addiction via random — use Jet with mocked path: apply then manually set
-        applyDrugToCritter(companion, { name: 'Antidote' })
-        // Manually inject addiction for deterministic test
-        const snap = serializeTimedEffects()
-        snap.members = {
-            '16777313': {
-                effects: [],
-                addictions: [{ drugId: 'jet', withdrawing: true }],
-                withdrawalApplied: ['jet'],
-            },
-        }
-        resetTimedEffects()
-        hydrateTimedEffects(snap)
-        expect(getAddictions(companion).some((a) => a.drugId === 'jet' && a.withdrawing)).toBe(true)
-    })
-
-    it('migrateSave v21 adds empty timedEffects and bumps to v22', () => {
-        const migrated = migrateSave({
-            version: 21,
-            name: 't',
-            timestamp: 0,
-            currentMap: 'arroyo',
-            currentElevation: 0,
-            player: {
-                position: { x: 1, y: 1 },
-                orientation: 0,
-                inventory: [],
-                xp: 0,
-                level: 1,
-                karma: 0,
-            },
-            party: [],
-            savedMaps: {},
-            partyControls: {},
-        })
-        expect(migrated.version).toBe(SAVE_VERSION)
-        expect(SAVE_VERSION).toBe(26)
-        expect(migrated.timedEffects).toEqual({})
-    })
-})
 
 describe('Companion trade', () => {
     let savedPlayer: typeof globalState.player

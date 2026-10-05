@@ -49,6 +49,7 @@ import { EventBus } from './eventBus.js'
 import { examineLines } from './examine.js'
 import { parkCarAtPlayer } from './car.js'
 import { finishStealing, openStealing, type StealScreen } from './steal.js'
+import { isDrug, takeDrug } from './character/timedEffects.js'
 import { setStealHandler } from './skillUse.js'
 
 // UI system
@@ -76,7 +77,8 @@ function refreshInventoryPanel(): void {
         return {
             name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
             amount: (o as any).amount ?? 1,
-            canUse: pid !== undefined && pid === ammoPid,
+            // USE reloads with matching ammo and takes drugs (inventory.cc).
+            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o),
             pid,
         }
     })
@@ -438,6 +440,18 @@ export function initUI() {
         // anything else falls through to the generic item-use handler.
         const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
         const item = panel?.items[index]
+        const live = globalState.player?.inventory?.[index]
+        if (live && isDrug(live)) {
+            // inventory.cc USE on a drug: _item_d_take_drug on the player; a
+            // dose that was taken is used up.
+            if (takeDrug(globalState.player, live) === 1) {
+                const inv = globalState.player.inventory
+                if (typeof (live as any).amount === 'number' && (live as any).amount > 1) {(live as any).amount--}
+                else {inv.splice(inv.indexOf(live), 1)}
+            }
+            refreshInventoryPanel()
+            return
+        }
         if (item && reloadPlayerWeapon(item)) {return}
         playerUseHandler()
     })

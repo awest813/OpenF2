@@ -11,7 +11,7 @@
 import type { Combat } from '../combat.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, Point } from '../geometry.js'
 import globalState from '../globalState.js'
-import { applyDrugToCritter, resolveDrugDef } from '../character/timedEffects.js'
+import { isDrug, takeDrug } from '../character/timedEffects.js'
 import { getMessage } from '../util.js'
 import { getAttackWeaponInfo, attackApCostFor, canAimAttack, type HitMode } from './attackInfo.js'
 import { getLoadedAmmo, isRangedWeapon, reloadWeapon, weaponAmmoPid } from './ammo.js'
@@ -1066,7 +1066,7 @@ export class AiTurn {
         if (typeof drug.amount === 'number' && drug.amount > 1) {drug.amount--}
         else {inv.splice(idx, 1)}
         try {
-            applyDrugToCritter(this.c, drug, { skipHeal: false })
+            takeDrug(this.c, drug)
         } catch {
             // the drug is spent either way
         }
@@ -1108,7 +1108,7 @@ export class AiTurn {
                     break
             }
 
-            const drugs = () => (c.inventory as AnyCritter[]).filter((o) => o?.subtype === 'drug' || resolveDrugDef(o) !== null)
+            const drugs = () => (c.inventory as AnyCritter[]).filter((o) => isDrug(o))
             const minHp = Math.trunc(statOf(c, 'Max HP') * hpRatio / 100)
             while (statOf(c, 'HP') < minHp && this.ap >= 2) {
                 const heal = drugs().find((d) => HEALING_PIDS.has(d.pid))

@@ -58,7 +58,6 @@ import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
 import { getCritterCarryLimitLbs } from './critterInventory.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
-import { applyDrugToCritter } from './character/timedEffects.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
 import { setCarFuel, setHasCar } from './car.js'
 import {
@@ -8903,13 +8902,10 @@ export namespace Scripting {
     export function use(obj: Obj, source: Obj): boolean | null {
         if (!obj._script || obj._script.use_p_proc === undefined) {return null}
 
-        // If the item being used is a drug, mark the source critter as
-        // "on drugs" so that metarule(18) checks return the correct result
-        // for the duration of the drug effect, and apply timed SPECIAL/addiction.
+        // Mark the user as "on drugs" for metarule(18). The drug's own effect
+        // is the engine's default action (takeDrug), not part of the script call.
         if (isDrugItem(obj) && source && (source as any).type === 'critter') {
             markOnDrugs(source)
-            // skipHeal: use_p_proc typically applies stimpak healing.
-            applyDrugToCritter(source as Critter, obj, { skipHeal: true })
         }
 
         obj._script.source_obj = source
@@ -9075,13 +9071,11 @@ export namespace Scripting {
     export function useObjOn(obj: Obj, item: Obj): boolean | null {
         if (!obj._script || obj._script.use_obj_on_p_proc === undefined) {return null}
 
-        // If the item being used on this target is a drug, mark the target
-        // critter as "on drugs" so that metarule(44)/WHO_ON_DRUGS queries return
-        // the correct result (e.g. NPC healer scripts using stimpaks on companions),
-        // and apply timed SPECIAL/addiction effects.
+        // Mark the target as "on drugs" for metarule(44)/WHO_ON_DRUGS. The
+        // drug's effect is the engine's default action when the script does
+        // not override (_protinst_default_use_item → takeDrug).
         if (isDrugItem(item) && (obj as any).type === 'critter') {
             markOnDrugs(obj)
-            applyDrugToCritter(obj as Critter, item, { skipHeal: true })
         }
 
         obj._script.source_obj = item as Obj
