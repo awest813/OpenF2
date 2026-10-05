@@ -17,6 +17,7 @@ limitations under the License.
 import { Combat } from './combat.js'
 import { Area, Elevator, loadAreas, lookupMapNameFromLookup } from './data.js'
 import globalState from './globalState.js'
+import { attackApCostFor, getAttackWeaponInfo } from './combat/attackInfo.js'
 import { Critter, cloneItem, Obj } from './object.js'
 import { Player } from './player.js'
 import { lookupInterfaceArt } from './pro.js'
@@ -577,7 +578,7 @@ export function initUI() {
         if (!wep || !wep.weapon) {
             return false
         }
-        wep.weapon.cycleMode()
+        wep.weapon.cycleMode(globalState.player)
         uiDrawWeapon()
         return false
     }
@@ -808,10 +809,9 @@ function uiDrawWeapon() {
 
     // draw weapon AP
     const CHAR_W = 10
-    const apCost = weapon.weapon.getAPCost(1)
-    if (apCost === undefined) {
-        return
-    }
+    const apCost = globalState.combat
+        ? globalState.combat.getAttackAPCost(globalState.player, weapon.weapon.hitMode(), weapon.weapon.isCalled())
+        : attackApCostFor(globalState.player, getAttackWeaponInfo(globalState.player, weapon.weapon.hitMode()), weapon.weapon.isCalled())
 
     const apDigits = apCost.toString().split('')
     const $apDigit1 = $id('attackButtonAPDigit1')
@@ -840,7 +840,7 @@ function uiDrawWeapon() {
     $img('attackButtonType').src = `art/intrface/${type}.png`
 
     // hide or show called shot sigil?
-    if (weapon.weapon.mode === 'called') {
+    if (weapon.weapon.isCalled()) {
         show($id('attackButtonCalled'))
     } else {
         hide($id('attackButtonCalled'))

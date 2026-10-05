@@ -6,13 +6,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
+import { StatSet } from './char.js'
 import { ActionPoints, Combat } from './combat.js'
 
 describe('Phase 30-A — AP bonus integration', () => {
     it('ActionPoints.getMaxAP includes critter stat apBonus', () => {
+        const stats = new StatSet({ AGI: 8 }, true, 2)
         const critter: any = {
-            getStat: vi.fn((name: string) => (name === 'AGI' ? 8 : 0)),
-            stats: { apBonus: 2 },
+            getStat: vi.fn((name: string) => stats.get(name)),
+            stats,
         }
         const ap = new ActionPoints(critter)
         const max = ap.getMaxAP()

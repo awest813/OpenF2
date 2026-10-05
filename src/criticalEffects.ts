@@ -537,6 +537,33 @@ export namespace CriticalEffects {
         },
     }
 
+    /** Remove the critter's equipped weapon from its hand and inventory. */
+    function takeEquippedWeapon(target: Critter): any | null {
+        const weapon: any = target.equippedWeapon
+        if (!weapon || !weapon.pro) {return null}
+        if (target.leftHand === weapon) {target.leftHand = undefined}
+        if (target.rightHand === weapon) {target.rightHand = undefined}
+        const idx = Array.isArray(target.inventory) ? target.inventory.indexOf(weapon) : -1
+        if (idx >= 0) {target.inventory.splice(idx, 1)}
+        return weapon
+    }
+
+    /** DAM_DROP: the critter drops its weapon on its own hex. */
+    export function dropWeapon(target: Critter): void {
+        const weapon = takeEquippedWeapon(target)
+        if (!weapon) {return}
+        console.log(target.name + ' dropped their weapon!')
+        if (target.position && globalState.gMap) {
+            weapon.position = { x: target.position.x, y: target.position.y }
+            globalState.gMap.addObject(weapon)
+        }
+    }
+
+    /** DAM_DESTROY: the critter's weapon is destroyed. */
+    export function destroyWeapon(target: Critter): void {
+        if (takeEquippedWeapon(target)) {console.log(target.name + "'s weapon was destroyed!")}
+    }
+
     export function temporaryDoCritFail(critFail: EffectsFunction[], target: Critter) {
         for (let i = 0; i < critFail.length; i++) {
             critFail[i](target)

@@ -104,6 +104,11 @@ export interface ToHitInput {
     distance: number | null
     /** Critters standing on the line of fire (each −10%). */
     crittersInLineOfFire: number
+    /**
+     * Precomputed signed range modifier (what the range block adds to the
+     * to-hit). When set, replaces the distance calculation.
+     */
+    rangeModifierOverride?: number
     /** Defender AC, or null when the defender is not a critter. */
     targetAC: number | null
     /** Loaded ammo's AC modifier (added to the defender's AC). */
@@ -121,6 +126,47 @@ export interface ToHitInput {
     attackerIsHostileToPlayer: boolean
 }
 
+/**
+ * The signed range term of attackDetermineToHit for ranged/thrown attacks:
+ * −4% per hex beyond Perception×2 (×4 Long Range, ×5 Scope Range; the player
+ * counts Perception as 2 lower), up to +8×PER at point blank, −12% per hex
+ * when blind. Scoped weapons are penalised inside 8 hexes.
+ */
+export function rangeToHitModifier(i: Pick<ToHitInput, 'isPlayer' | 'weaponPerk' | 'perception' | 'sharpshooterRank' | 'distance' | 'attackerBlind'>): number {
+    let perceptionBonusMult = 2
+    let minEffectiveDist = 0
+    if (i.weaponPerk === PerkId.WEAPON_LONG_RANGE) {
+        perceptionBonusMult = 4
+    } else if (i.weaponPerk === PerkId.WEAPON_SCOPE_RANGE) {
+        perceptionBonusMult = 5
+        minEffectiveDist = 8
+    }
+
+    let perception = i.perception
+    if (i.isPlayer) {perception += 2 * i.sharpshooterRank}
+
+    const useDistance = i.distance !== null
+    let distanceMod = i.distance ?? 0
+    if (distanceMod >= minEffectiveDist) {
+        const perceptionBonus = i.isPlayer
+            ? perceptionBonusMult * (perception - 2)
+            : perceptionBonusMult * perception
+        distanceMod -= perceptionBonus
+    } else {
+        distanceMod += minEffectiveDist
+    }
+
+    if (distanceMod < -2 * perception) {distanceMod = -2 * perception}
+
+    if (distanceMod >= 0 && i.attackerBlind) {
+        distanceMod *= -12
+    } else {
+        distanceMod *= -4
+    }
+
+    return useDistance || distanceMod > 0 ? distanceMod : 0
+}
+
 export function computeToHit(i: ToHitInput): number {
     let toHit = i.skill
     let isRanged = false
@@ -129,40 +175,9 @@ export function computeToHit(i: ToHitInput): number {
         if (i.attackType === 'ranged' || i.attackType === 'throw') {
             isRanged = true
 
-            let perceptionBonusMult = 2
-            let minEffectiveDist = 0
-            if (i.weaponPerk === PerkId.WEAPON_LONG_RANGE) {
-                perceptionBonusMult = 4
-            } else if (i.weaponPerk === PerkId.WEAPON_SCOPE_RANGE) {
-                perceptionBonusMult = 5
-                minEffectiveDist = 8
-            }
+            toHit += i.rangeModifierOverride ?? rangeToHitModifier(i)
 
-            let perception = i.perception
-            if (i.isPlayer) {perception += 2 * i.sharpshooterRank}
-
-            const useDistance = i.distance !== null
-            let distanceMod = i.distance ?? 0
-            if (distanceMod >= minEffectiveDist) {
-                const perceptionBonus = i.isPlayer
-                    ? perceptionBonusMult * (perception - 2)
-                    : perceptionBonusMult * perception
-                distanceMod -= perceptionBonus
-            } else {
-                distanceMod += minEffectiveDist
-            }
-
-            if (distanceMod < -2 * perception) {distanceMod = -2 * perception}
-
-            if (distanceMod >= 0 && i.attackerBlind) {
-                distanceMod *= -12
-            } else {
-                distanceMod *= -4
-            }
-
-            if (useDistance || distanceMod > 0) {toHit += distanceMod}
-
-            toHit -= 10 * (useDistance ? i.crittersInLineOfFire : 0)
+            toHit -= 10 * (i.distance !== null ? i.crittersInLineOfFire : 0)
         }
 
         if (i.isPlayer && i.oneHanderTrait) {

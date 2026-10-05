@@ -2415,7 +2415,7 @@ export namespace Scripting {
             // begin combat, turn starting with us
             // Track the starting combatant for get_last_pers_obj (0x81D3).
             ;(globalState as any).lastPersistentObj = this.self_obj
-            if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter)}
+            if (Config.engine.doCombat) {Combat.start(this.self_obj as Critter, obj instanceof Critter ? obj : undefined)}
         }
         terminate_combat() {
             info('[terminate_combat]')
@@ -3345,7 +3345,7 @@ export namespace Scripting {
                 const source = this.self_obj as Critter
                 if (source.isPlayer !== true) {
                     source.hostile = true
-                    Combat.start(source)
+                    Combat.start(source, globalState.player as Critter)
                 }
             }
         }

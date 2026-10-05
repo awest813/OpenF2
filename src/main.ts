@@ -14,11 +14,10 @@
 
 import { HTMLAudioEngine, NullAudioEngine } from './audio.js'
 import { Combat } from './combat.js'
-import { weaponNeedsReload } from './combat/ammo.js'
 import { critterKill } from './critter.js'
 import { getElevator, lookupMapNameFromLookup } from './data.js'
 import { heart } from './heart.js'
-import { hexDistance, hexesInRadius, hexFromScreen, hexNeighbors } from './geometry.js'
+import { hexDistance, hexesInRadius, hexFromScreen } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
@@ -138,125 +137,19 @@ export function playerUse(obj?: Obj) {
                 return
             }
 
-            const weapon = globalState.player.equippedWeapon
-            if (weapon === null) {
-                console.log('You have no weapon equipped!')
-                return
-            }
-
-            const playerPos = globalState.player.position
-            const targetPos = (obj as Critter).position
-
-            const weaponRange = weapon.weapon?.getMaximumRange?.(1) ?? 1
-            const currentDist = (playerPos && targetPos) ? hexDistance(playerPos, targetPos) : 0
-
-            // C2 FIX: use weapon-specific AP cost (APCost1 = primary attack mode)
-            const attackCost: number = weapon.weapon?.getAPCost?.(1) ??
-                weapon.weapon?.weapon?.pro?.extra?.APCost1 ?? 4
-
-            const totalAP = globalState.player.AP!.getAvailableMoveAP()
-            if (totalAP < attackCost) {
-                uiLog(getProtoMsg(700)!)
-                return
-            }
-
-            const doAttack = (region: string) => {
-                // Dry click: refuse before spending AP when the weapon is empty.
-                if (weaponNeedsReload(weapon)) {
-                    uiLog('Click! Your weapon is out of ammo.')
-                    return
-                }
-                if (!globalState.player.AP!.subtractCombatAP(attackCost)) {
-                    uiLog(getProtoMsg(700)!)
-                    return
-                }
-                console.log('Attacking %s...', region)
-                globalState.combat!.attack(globalState.player, <Critter>obj, region)
-            }
-
-            if (currentDist > weaponRange) {
-                // Out of range — walk toward the target until within weapon range,
-                // then attack from the closest reachable hex.
-                const moveBudget = totalAP - attackCost
-                if (moveBudget <= 0) {
-                    uiLog(getProtoMsg(700)!)
-                    return
-                }
-
-                if (!playerPos || !targetPos) {
-                    console.log('Cannot determine path to target.')
-                    return
-                }
-
-                // Find the nearest hex to the target that is within weapon range.
-                // Prefer hexes closest to the player for shortest walk.
-                const candidates = hexNeighbors(targetPos)
-                    .map(n => ({ pos: n, dist: hexDistance(playerPos, n) }))
-                    .filter(c => c.dist <= weaponRange)
-                    .sort((a, b) => a.dist - b.dist)
-
-                // If no neighbor is within range, walk directly toward target
-                const dest = candidates.length > 0 ? candidates[0].pos : targetPos
-
-                const walkOk = globalState.player.walkTo(
-                    dest,
-                    Config.engine.doAlwaysRun,
-                    () => {
-                        globalState.player.clearAnim()
-                        const afterDist = (globalState.player.position && targetPos)
-                            ? hexDistance(globalState.player.position, targetPos)
-                            : 0
-                        if (afterDist > weaponRange) {
-                            console.log('Could not get close enough to attack.')
-                            return
-                        }
-                        if (weapon.weapon!.isCalled()) {
-                            let art = 'art/critters/hmjmpsna'
-                            if (who.hasAnimation('called-shot')) {
-                                art = who.getAnimation('called-shot')
-                            }
-                            uiCalledShot(art, who, (region: string) => {
-                                doAttack(region)
-                                uiCloseCalledShot()
-                            })
-                        } else {
-                            doAttack('torso')
-                        }
-                    },
-                    moveBudget
-                )
-
-                if (!walkOk) {
-                    console.log('Cannot reach target.')
-                    return
-                }
-
-                const moveCost = Math.max(0, globalState.player.path.path.length - 1)
-                if (!globalState.player.AP!.subtractMoveAP(moveCost)) {
-                    console.warn('walk-to-range: AP desync — forcing AP to 0')
-                    globalState.player.AP!.combat = 0
-                    globalState.player.AP!.move = 0
-                }
-                return
-            }
-
-            // Already in range — attack directly
-            if (weapon.weapon!.isCalled()) {
-                let art = 'art/critters/hmjmpsna' // default art
+            // combat.cc _combat_attack_this: the engine checks AP, range, ammo,
+            // crippled arms and line of fire and refuses with a message — it
+            // never walks the player into range.
+            globalState.combat!.playerAttack(who, (fire) => {
+                let art = 'art/critters/hmjmpsna'
                 if (who.hasAnimation('called-shot')) {
                     art = who.getAnimation('called-shot')
                 }
-
-                console.log('art: %s', art)
-
                 uiCalledShot(art, who, (region: string) => {
-                    doAttack(region)
+                    fire(region)
                     uiCloseCalledShot()
                 })
-            } else {
-                doAttack('torso')
-            }
-
+            })
             return
         }
     }
@@ -702,35 +595,18 @@ heart.keydown = (k: string) => {
             return
         }
 
-        // C2 FIX: use weapon-specific AP cost
-        const kbWeapon = globalState.player.equippedWeapon
-        const kbAttackCost: number = kbWeapon?.weapon?.getAPCost?.(1) ??
-            kbWeapon?.weapon?.weapon?.pro?.extra?.APCost1 ?? 4
-
-        if (globalState.player.AP.getAvailableCombatAP() < kbAttackCost) {
-            uiLog(getProtoMsg(700))
-            return
-        }
-
         for (let i = 0; i < globalState.combat!.combatants.length; i++) {
             // BLK-112: Guard against null position — combatants may lose their tile
             // assignment during a scripted move or map transition mid-combat.
-            // Without this check, the .x access would throw a TypeError and freeze
-            // the combat loop for the remainder of the turn.
             const combatant = globalState.combat.combatants[i]
             if (
                 combatant.position &&
                 combatant.position.x === mouseHex.x &&
                 combatant.position.y === mouseHex.y &&
-                !combatant.dead
+                !combatant.dead &&
+                !combatant.isPlayer
             ) {
-                if (weaponNeedsReload(globalState.player.equippedWeapon)) {
-                    uiLog('Click! Your weapon is out of ammo.')
-                    break
-                }
-                globalState.player.AP.subtractCombatAP(kbAttackCost)
-                console.log('Attacking...')
-                globalState.combat.attack(globalState.player, combatant)
+                globalState.combat.playerAttack(combatant)
                 break
             }
         }
@@ -921,7 +797,9 @@ heart.update = function () {
     const didTick = time - globalState.lastGameTick >= 1000 / 10 // 10 Hz game tick
     if (didTick) {
         globalState.lastGameTick = time
-        globalState.gameTickTime++
+        // The game clock stands still during combat; each round advances it
+        // by 5 seconds instead (combat.cc _combat_sequence).
+        if (!globalState.inCombat) {globalState.gameTickTime++}
 
         if (Config.engine.doTimedEvents && !globalState.inCombat) {
             // check and update timed events

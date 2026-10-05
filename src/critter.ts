@@ -148,11 +148,17 @@ function parseAttack(weapon: WeaponObj): { first: AttackInfo; second: AttackInfo
     return { first: attackOne, second: attackTwo }
 }
 
+/**
+ * Weapon item actions, in the order the interface cycles them
+ * (interface.cc interfaceCycleItemAction).
+ */
+export type WeaponMode = 'primary' | 'primary-aimed' | 'secondary' | 'secondary-aimed' | 'reload'
+const WEAPON_MODE_ORDER: WeaponMode[] = ['primary', 'primary-aimed', 'secondary', 'secondary-aimed', 'reload']
+
 export class Weapon {
     weapon: WeaponObj | { pro: { extra: WeaponProtoExtra } }
     name: string
-    modes: string[]
-    mode: string
+    mode: WeaponMode
     type: WeaponType
     minDmg: number
     maxDmg: number
@@ -167,7 +173,6 @@ export class Weapon {
 
     constructor(weapon: WeaponObj | null, critter?: any) {
         this.weapon = weapon!
-        this.modes = ['single', 'called']
 
         if (weapon === null) {
             this.type = 'melee'
@@ -215,15 +220,61 @@ export class Weapon {
             if (this.weaponSkillType === undefined) {console.log('unknown weapon type for ' + this.name + ' (animCode: ' + weapon.pro?.extra?.animCode + ')')}
         }
 
-        this.mode = this.modes[0]
+        this.mode = 'primary'
     }
 
-    cycleMode(): void {
-        this.mode = this.modes[(this.modes.indexOf(this.mode) + 1) % this.modes.length]
+    /**
+     * Item actions the interface offers for this weapon, held by `critter`:
+     * aimed modes only when the attack can aim, secondary only when the proto
+     * has a weapon (not punch/kick) secondary, reload when not full.
+     */
+    availableModes(critter?: any): WeaponMode[] {
+        const extra: any = this.protoExtra ?? {}
+        const modes = typeof extra.attackMode === 'number' ? extra.attackMode : 0
+        const secondary = (modes >> 4) & 0x0f
+        const isProto = this.weapon instanceof WeaponObj
+        const hasSecondary = isProto && secondary !== 0 && secondary !== 1 && secondary !== 2
+        const canAim = (mode: number) => {
+            if (critter?.isPlayer && critter?.charTraits?.has?.(7 /* Fast Shot */)) {return false}
+            if (mode === 7 || mode === 8) {return false}
+            const dmg = extra.dmgType
+            if (dmg === 6 /* explosion */ || dmg === 2 /* fire */ || dmg === 5 /* EMP */) {return false}
+            if (dmg === 3 /* plasma */ && mode === 5) {return false}
+            return true
+        }
+        const out: WeaponMode[] = ['primary']
+        if (canAim(modes & 0x0f)) {out.push('primary-aimed')}
+        if (hasSecondary) {
+            out.push('secondary')
+            if (canAim(secondary)) {out.push('secondary-aimed')}
+        }
+        const capacity = isProto ? (extra.maxAmmo ?? 0) : 0
+        const loaded = (this.weapon as any)?.extra?.ammoLoaded ?? 0
+        if (capacity > 0 && loaded !== capacity) {out.push('reload')}
+        return out
     }
 
+    cycleMode(critter?: any): void {
+        const available = this.availableModes(critter)
+        let idx = WEAPON_MODE_ORDER.indexOf(this.mode)
+        for (let n = 0; n < WEAPON_MODE_ORDER.length; n++) {
+            idx = (idx + 1) % WEAPON_MODE_ORDER.length
+            if (available.includes(WEAPON_MODE_ORDER[idx])) {
+                this.mode = WEAPON_MODE_ORDER[idx]
+                return
+            }
+        }
+        this.mode = 'primary'
+    }
+
+    /** Aimed (called) shot. */
     isCalled(): boolean {
-        return this.mode === 'called'
+        return this.mode === 'primary-aimed' || this.mode === 'secondary-aimed'
+    }
+
+    /** Hit mode of the current action: 1 primary, 2 secondary. */
+    hitMode(): 1 | 2 {
+        return this.mode === 'secondary' || this.mode === 'secondary-aimed' ? 2 : 1
     }
 
     getProjectilePID(): number {
@@ -283,7 +334,7 @@ export class Weapon {
             flame: 'l',
         }
 
-        const activeAttack = this.mode === 'called' && this.attackTwo.mode !== attackMode.toValue('none')
+        const activeAttack = this.hitMode() === 2 && this.attackTwo.mode !== attackMode.toValue('none')
             ? this.attackTwo
             : this.attackOne
 
