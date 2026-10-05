@@ -49,7 +49,7 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
 import { iniInt, iniString, parseIniSetting } from './iniFiles.js'
-import { clearHookScripts, runHookScriptsAtProc, startHookScripts } from './hookScripts.js'
+import { clearHookScripts, HOOK, hookReturn, runHook, runHookScriptsAtProc, startHookScripts } from './hookScripts.js'
 import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, listedHookNames, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
 import { PERK_MAP } from './character/perks.js'
@@ -399,10 +399,14 @@ export namespace Scripting {
         'combat_is_starting_p_proc', 'combat_is_over_p_proc',
     ]
 
+    /** The script whose procedure callProcedureSafe is about to run (set by trackScriptTrigger). */
+    let pendingProcScript: Script | null = null
+
     function trackScriptTrigger(script: Script, procName: string): void {
         // scriptExecProc: script->action = proc.
         const proc = SCRIPT_PROC_NAMES.indexOf(procName)
         ;(script as any)._action = proc < 0 ? 0 : proc
+        pendingProcScript = script
         pushScriptDebuggerMessage(`${script.scriptName}: ${procName}`)
     }
 
@@ -546,6 +550,19 @@ export namespace Scripting {
      * @param procName  Name of the procedure being called (e.g. 'talk_p_proc').
      */
     function callProcedureSafe(fn: () => void, scriptName: string, procName: string): void {
+        // sfall HOOK_STDPROCEDURE / _END: around every standard procedure but
+        // start and map_update_p_proc; -1 before it cancels the call.
+        const script = pendingProcScript
+        pendingProcScript = null
+        const proc = SCRIPT_PROC_NAMES.indexOf(procName)
+        const hooked = script !== null && proc > 1 && procName !== 'map_update_p_proc'
+        const hookArgs = (end: number): unknown[] => [
+            proc, script?.self_obj ?? 0, script?.source_obj ?? 0, end, script?.target_obj ?? 0, script?.fixed_param ?? 0,
+        ]
+        if (hooked) {
+            const before = runHook(HOOK.STDPROCEDURE, hookArgs(0))
+            if (before && hookReturn(before, 0, 0) === -1) {return}
+        }
         try {
             fn()
         } catch (e) {
@@ -554,6 +571,7 @@ export namespace Scripting {
                     String(e).slice(0, 300)
             )
         }
+        if (hooked) {runHook(HOOK.STDPROCEDURE_END, hookArgs(1))}
     }
 
     export function info(msg: string, type?: DebugLogShowType, script?: Script) {
@@ -878,6 +896,9 @@ export namespace Scripting {
                 warn('set_global_var: non-finite value (' + value + ') for gvar ' + gvar + ' — clamping to 0', 'gvars')
                 value = 0
             }
+            // sfall HOOK_SETGLOBALVAR: scripts may change the value (not from inside the hook).
+            const hook = runHook(HOOK.SETGLOBALVAR, [gvar, value], { noRecursion: true })
+            if (hook) {value = hookReturn(hook, 0, value)}
             globalVars[gvar] = value
             // GVAR_0 = GVAR_PLAYER_REPUTATION is Fallout 2's canonical karma store.
             // Sync the reputation system so getKarma() and the UI stay consistent.
@@ -3406,25 +3427,7 @@ export namespace Scripting {
         // Scripts use this to gate combat-only or dialogue-only code paths.
         /** get_game_mode: sfall's loop flags (LoadGameHook.h LoopFlag) for the screens open now. */
         get_game_mode(): number {
-            const ui: any = globalState.uiManager
-            const open = (name: string): boolean => ui?.tryGet?.(name)?.visible === true
-            let mode = 0
-            if (globalState.uiMode === UIMode.worldMap || open('worldMap')) {mode |= 0x1}
-            if (currentDialogueObject !== null || open('dialogue')) {mode |= 0x4}
-            if (open('options')) {mode |= 0x8}
-            if (open('saveLoad')) {mode |= ui.tryGet('saveLoad').isSave ? 0x10 : 0x20}
-            if (globalState.inCombat) {
-                mode |= 0x40
-                if (globalState.combat?.inPlayerTurn) {mode |= 0x800}
-            }
-            if (open('characterScreen')) {mode |= 0x200}
-            if (open('pipboy')) {mode |= 0x400}
-            if (open('inventory')) {mode |= 0x1000}
-            if (open('mapViewer')) {mode |= 0x2000}
-            if (open('skilldex')) {mode |= 0x4000}
-            if (open('loot')) {mode |= 0x10000}
-            if (open('barter')) {mode |= 0x20000}
-            return mode
+            return gameModeFlags()
         }
 
         /** set_global_script_repeat(frames): how often this global script runs; -1 flips its type. */
@@ -4809,6 +4812,29 @@ export namespace Scripting {
             script.cur_map_index = currentMapID ?? 0
             return script
         })
+    }
+
+    /** sfall's GetLoopFlags for the screens open now (get_game_mode, HOOK_GAMEMODECHANGE). */
+    export function gameModeFlags(): number {
+        const ui: any = globalState.uiManager
+        const open = (name: string): boolean => ui?.tryGet?.(name)?.visible === true
+        let mode = 0
+        if (globalState.uiMode === UIMode.worldMap || open('worldMap')) {mode |= 0x1}
+        if (currentDialogueObject !== null || open('dialogue')) {mode |= 0x4}
+        if (open('options')) {mode |= 0x8}
+        if (open('saveLoad')) {mode |= ui.tryGet('saveLoad').isSave ? 0x10 : 0x20}
+        if (globalState.inCombat) {
+            mode |= 0x40
+            if (globalState.combat?.inPlayerTurn) {mode |= 0x800}
+        }
+        if (open('characterScreen')) {mode |= 0x200}
+        if (open('pipboy')) {mode |= 0x400}
+        if (open('inventory')) {mode |= 0x1000}
+        if (open('mapViewer')) {mode |= 0x2000}
+        if (open('skilldex')) {mode |= 0x4000}
+        if (open('loot')) {mode |= 0x10000}
+        if (open('barter')) {mode |= 0x20000}
+        return mode
     }
 
     export function objectEnterMap(obj: Obj, elevation: number, mapID: number) {

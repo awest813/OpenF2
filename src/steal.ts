@@ -6,6 +6,7 @@
  * caught ends it. Using it on anyone else is plain looting.
  */
 
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import { capPickpocket } from './sfallSettings.js'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
@@ -73,6 +74,11 @@ function itemSize(item: any): number {
  * session, this one included.
  */
 export function performStealing(thief: any, target: any, item: any, planting: boolean, stealCount: number, rng: Rng = defaultRng): number {
+    // sfall HOOK_STEAL: 1 succeeds, 0 is caught, 2 fails but stays on the screen, -1 rolls as usual.
+    const quantity = typeof item?.amount === 'number' ? item.amount : 1
+    const hook = runHook(HOOK.STEAL, [thief, target, item, planting ? 1 : 0, quantity])
+    const forced = hook && hook.rets.length > 0 ? hookReturn(hook, 0, -1) : -1
+    if (forced === 0 || forced === 1 || forced === 2) {return forced}
     let stealModifier = -stealCount + 1
     if (!isPlayer(thief) || perkRank(thief, PerkId.PICKPOCKET) === 0) {
         stealModifier -= 4 * itemSize(item)
@@ -142,11 +148,13 @@ export class StealSession {
     /** Before a move: the Steal roll. False means caught (the move is refused). */
     beforeMove(item: any, planting: boolean): boolean {
         this.stealCount++
-        if (performStealing(this.thief, this.target, item, planting, this.stealCount, this.rng) === 0) {
+        const result = performStealing(this.thief, this.target, item, planting, this.stealCount, this.rng)
+        if (result === 0) {
             this.caught = true
             return false
         }
-        return true
+        // 2 (a hook script's choice): this move fails, but the screen stays open.
+        return result !== 2
     }
 
     /** After a move went through: each successful one is worth 10 XP more than the last. */

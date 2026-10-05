@@ -24,6 +24,7 @@ import { setRegAnimCombatCheck, tickAnimSequences } from './animSequence.js'
 
 /** When the animation sequences last ticked (performance.now ms). */
 let lastAnimSequenceTick = 0
+let lastGameMode = 0
 import { removeItem } from './equipment.js'
 import { IDBCache } from './idbcache.js'
 import { initGame, enterWorldMap } from './init.js'
@@ -33,6 +34,7 @@ import { processRadPoisonUpTo } from './character/radiationPoison.js'
 import { processChargedItemsUpTo } from './chargedItems.js'
 import { deleteTempArrays } from './sfallArrays.js'
 import { globalScriptList, runGlobalScripts } from './globalScripts.js'
+import { HOOK, hookHasScript, runHook } from './hookScripts.js'
 import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -1048,6 +1050,15 @@ heart.update = function () {
             }
         } else {
             return
+        }
+    }
+
+    // sfall HOOK_GAMEMODECHANGE: once each time the open screens change.
+    if (globalState.player && hookHasScript(HOOK.GAMEMODECHANGE)) {
+        const mode = Scripting.gameModeFlags()
+        if (mode !== lastGameMode) {
+            runHook(HOOK.GAMEMODECHANGE, [0, lastGameMode])
+            lastGameMode = mode
         }
     }
 

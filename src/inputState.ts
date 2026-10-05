@@ -4,6 +4,8 @@
  * (DIK_*); a key with bit 0x80000000 is a Windows virtual-key code.
  */
 
+import { HOOK, runHook } from './hookScripts.js'
+
 /** KeyboardEvent.code → DirectInput scan code. */
 const DIK: Record<string, number> = {
     Escape: 1, Minus: 12, Equal: 13, Backspace: 14, Tab: 15, BracketLeft: 26, BracketRight: 27, Enter: 28,
@@ -59,10 +61,23 @@ export function clearInputState(): void {
     mouseButtons = 0
 }
 
+/** sfall HOOK_KEYPRESS / HOOK_MOUSECLICK: scripts hear each press and release. */
+function keyEvent(e: KeyboardEvent, down: boolean): void {
+    if (e.repeat) {return}
+    noteKey(e.code, e.keyCode, down)
+    runHook(HOOK.KEYPRESS, [down ? 1 : 0, DIK[e.code] ?? 0, e.keyCode])
+}
+
+function mouseEvent(e: MouseEvent, down: boolean): void {
+    noteMouseButton(e.button, down)
+    // Button numbers as DirectInput counts them: 0 left, 1 right, 2 middle.
+    runHook(HOOK.MOUSECLICK, [down ? 1 : 0, e.button === 2 ? 1 : e.button === 1 ? 2 : e.button])
+}
+
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('keydown', (e) => noteKey(e.code, e.keyCode, true))
-    window.addEventListener('keyup', (e) => noteKey(e.code, e.keyCode, false))
-    window.addEventListener('mousedown', (e) => noteMouseButton(e.button, true))
-    window.addEventListener('mouseup', (e) => noteMouseButton(e.button, false))
+    window.addEventListener('keydown', (e) => keyEvent(e, true))
+    window.addEventListener('keyup', (e) => keyEvent(e, false))
+    window.addEventListener('mousedown', (e) => mouseEvent(e, true))
+    window.addEventListener('mouseup', (e) => mouseEvent(e, false))
     window.addEventListener('blur', clearInputState)
 }

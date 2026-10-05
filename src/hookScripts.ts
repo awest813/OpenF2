@@ -108,9 +108,13 @@ export function startHookScripts(names: readonly string[], load: (name: string) 
         if (script) {hooks[Number(id)].push({ script, callback: null, isGlobalScript: false })}
     }
     initing = 1
+    const started = new Set<any>()
     for (let id = 0; id < HOOK_COUNT; id++) {
         if (hooks[id].length === 0) {continue}
         hasHsScript[id] = true
+        // hs_stdprocedure serves two hooks; it starts once.
+        if (started.has(hooks[id][0].script)) {continue}
+        started.add(hooks[id][0].script)
         runEntry(hooks[id][0])
     }
     initing = 0

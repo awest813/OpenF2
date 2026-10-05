@@ -5,6 +5,7 @@
  * time it takes, the experience it earns and what the display monitor says.
  */
 
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { getMessage, getRandomInt } from './util.js'
@@ -176,7 +177,16 @@ export function skillRoll(critter: any, skill: number, modifier: number, rng: Rn
     if (isDude && skill === SKILL_STEAL && playerInSneakMode(critter) && playerIsSneaking(rng, critter)) {
         value += 30
     }
-    return randomRoll(value + modifier, statOf(critter, 'Critical Chance'), rng, criticalsAllowed())
+    const bonus = statOf(critter, 'Critical Chance')
+    const result = randomRoll(value + modifier, bonus, rng, criticalsAllowed())
+    // sfall HOOK_ROLLCHECK (3: a skill check; 4 Repair, 5 Doctor, 6 Steal).
+    const type = skill === SKILL_REPAIR ? 4 : skill === SKILL_DOCTOR ? 5 : skill === SKILL_STEAL ? 6 : 3
+    const hook = runHook(HOOK.ROLLCHECK, [type, result.roll, value + modifier, bonus, result.delta])
+    if (hook) {
+        const r = hookReturn(hook, 0, result.roll)
+        if (r >= 0 && r <= 3) {result.roll = r as Roll}
+    }
+    return result
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +383,9 @@ function treat(
  * -1 when the skill could not be used.
  */
 export function skillUse(obj: any, target: any, skill: number, criticalChanceModifier = 0, rng: Rng = defaultRng): number {
+    // sfall HOOK_USESKILL: anything but -1 replaces the engine's handling.
+    const hook = runHook(HOOK.USESKILL, [obj, target, skill, criticalChanceModifier])
+    if (hook && hook.rets.length > 0 && hookReturn(hook, 0, -1) !== -1) {return 0}
     let giveExp = true
     const currentHp = statOf(target, 'HP')
     const maximumHp = statOf(target, 'Max HP')

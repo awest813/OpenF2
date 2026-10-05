@@ -570,7 +570,14 @@ export class Combat {
         let normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
         const info = getAttackWeaponInfo(obj, hitMode)
         const hitChance = this.getHitChance(obj, target, normalizedRegion, hitMode)
-        let roll = randomRoll(hitChance.hit, hitChance.crit, this.random, this.criticalsAllowed()).roll
+        const rolled = randomRoll(hitChance.hit, hitChance.crit, this.random, this.criticalsAllowed())
+        let roll = rolled.roll
+        // sfall HOOK_ROLLCHECK (1: the attack's to-hit roll).
+        const rollHook = runHook(HOOK.ROLLCHECK, [1, roll, hitChance.hit, hitChance.crit, rolled.delta])
+        if (rollHook) {
+            const r = hookReturn(rollHook, 0, roll)
+            if (r >= 0 && r <= 3) {roll = r as Roll}
+        }
 
         if (roll === Roll.Failure && this.jinxActive()) {
             if (this.random(0, 1) === 1) {roll = Roll.CriticalFailure}

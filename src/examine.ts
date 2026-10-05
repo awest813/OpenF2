@@ -4,6 +4,7 @@
  * from proto.msg. English fallbacks cover a missing message file.
  */
 
+import { HOOK, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import { getLoadedAmmo, isRangedWeapon, weaponAmmoPid } from './combat/ammo.js'
@@ -107,7 +108,12 @@ export function examineLines(viewer: any, target: any, scriptOverrides = false):
     } catch {
         description = null
     }
-    if (scriptOverrides) {
+    // sfall HOOK_DESCRIPTIONOBJ: a script may give the text instead.
+    const hook = runHook(HOOK.DESCRIPTIONOBJ, [target], { allowNonIntReturn: true })
+    const hookText = hook?.rets[0]
+    if (typeof hookText === 'string' && hookText !== '') {
+        lines.push(hookText)
+    } else if (scriptOverrides) {
         // description_p_proc printed its own text.
     } else if (!description) {
         lines.push(proto(493))

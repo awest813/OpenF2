@@ -10,6 +10,7 @@
  * 25 off. Money counts at face value on both sides.
  */
 
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import { partyBestInSkill, skillValue } from './skillUse.js'
@@ -104,7 +105,19 @@ export function checkTrade(offer: readonly any[], wanted: readonly any[], mercha
     const carried = inventoryWeight(buyer?.inventory ?? [])
     if (inventoryWeight(wanted) > carry - carried) {return 'weight'}
     if (offer.length === 0) {return 'offer'}
-    if (barterAskValue(wanted, merchant, barterMod, buyer) > inventoryCost(offer)) {return 'offer'}
+    let ask = barterAskValue(wanted, merchant, barterMod, buyer)
+    let offered = inventoryCost(offer)
+    // sfall HOOK_BARTERPRICE: scripts may change what the goods are worth (-1 leaves it).
+    const hook = runHook(HOOK.BARTERPRICE, [
+        buyer, merchant, ask, 0, capsTotal(wanted), inventoryCost(wanted), 0, offered, 1,
+        globalState.gParty?.isPartyMember?.(merchant) ? 1 : 0,
+    ])
+    if (hook) {
+        const newAsk = hookReturn(hook, 0, -1)
+        if (newAsk !== -1) {ask = newAsk}
+        offered = hookReturn(hook, 1, offered)
+    }
+    if (ask > offered) {return 'offer'}
     return null
 }
 

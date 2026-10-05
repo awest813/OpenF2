@@ -13,6 +13,7 @@
  * Only the player is affected, as in the engine.
  */
 
+import { HOOK, hookReturn, runHook } from '../hookScripts.js'
 import globalState from '../globalState.js'
 import { Critter } from '../object.js'
 import { getMessage, getRandomInt } from '../util.js'
@@ -173,6 +174,9 @@ export function adjustPoison(critter: any, amount: number, now = globalState.gam
     } else if (current <= 0) {
         return
     }
+    // sfall HOOK_ADJUSTPOISON: scripts may change the amount.
+    const hook = runHook(HOOK.ADJUSTPOISON, [critter, amount, 0])
+    if (hook) {amount = hookReturn(hook, 0, amount)}
     const s = stateOf(critter)
     const next = current + amount
     if (next > 0) {
@@ -198,6 +202,9 @@ function poisonTick(critter: any, now: number): boolean {
 /** critterAdjustRadiation. Returns the amount actually taken. */
 export function adjustRadiation(critter: any, amount: number): number {
     if (!isPlayer(critter) || !critter.stats || !Number.isFinite(amount)) {return 0}
+    // sfall HOOK_ADJUSTRADS: scripts may change the dose.
+    const hook = runHook(HOOK.ADJUSTRADS, [critter, amount])
+    if (hook) {amount = hookReturn(hook, 0, amount)}
     if (amount > 0) {
         amount -= Math.trunc((stat(critter, 'DR Radiation') * amount) / 100)
     }
