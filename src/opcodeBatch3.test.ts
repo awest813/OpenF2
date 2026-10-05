@@ -180,3 +180,18 @@ describe('injure / open / close / flee / fid', () => {
         expect(script.obj_art_fid(c)).toBe(0x01140123)
     })
 })
+
+describe('use_obj_on_obj', () => {
+    it('the target script sees the user as source_obj and the item as obj_being_used_with', () => {
+        const script: any = new (Scripting as any).Script()
+        const seen: any = {}
+        const targetScript: any = { use_obj_on_p_proc() { seen.source = this.source_obj; seen.item = this.obj_being_used_with() }, obj_being_used_with() { return this.target_obj }, scriptName: 't' }
+        const target: any = { _type: 'obj', type: 'scenery', _script: targetScript }
+        const item: any = { _type: 'obj', type: 'item', pid: 1 }
+        const user: any = { _type: 'obj', type: 'critter' }
+        script.self_obj = user
+        script.use_obj_on_obj(item, target)
+        expect(seen.source).toBe(user)
+        expect(seen.item).toBe(item)
+    })
+})

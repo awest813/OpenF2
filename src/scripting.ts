@@ -80,7 +80,7 @@ import { getSettings, iniOverride, violenceToIni, patchSettings } from './settin
 import { itemDropAll } from './mapAging.js'
 import { sfxAmbientName, sfxCharName, sfxInterfaceName, sfxOpenName, sfxSceneryName, sfxWeaponName } from './sfxNames.js'
 import { equipItem, isRealItem, removeItem } from './equipment.js'
-import { hasDrugEvent } from './character/timedEffects.js'
+import { hasDrugEvent, isDrug, takeDrug } from './character/timedEffects.js'
 import {
     ANIM_COUNT, ANIM_FALL_BACK, ANIM_FALL_BACK_SF, ANIM_FALL_FRONT, ANIM_FALL_FRONT_BLOOD, ANIM_FALL_FRONT_SF,
     ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, isProne, resetAnimSequences, weaponAnimationCode,
@@ -2341,23 +2341,17 @@ export namespace Scripting {
 
             obj.visible = !visibility
         }
-        use_obj_on_obj(obj: Obj, who: Obj) {
-            if (!isGameObject(obj)) {
-                warn('use_obj_on_obj: source is not a game object: ' + obj, undefined, this)
-                return
-            }
-            if (!isGameObject(who)) {
-                warn('use_obj_on_obj: target is not a game object: ' + who, undefined, this)
-                return
-            }
-
-            // Prefer use_obj_on_p_proc (Fallout 2 standard for item-on-target
-            // interactions). Fall back to use_p_proc for scripts that implement
-            // key/lock and item-on-critter logic there.
-            if (who._script && who._script.use_obj_on_p_proc !== undefined) {
-                useObjOn(who, obj)
-            } else {
-                use(who, obj)
+        /**
+         * opUseObjectOnObject: the script's object uses the item on the target.
+         * The target's use_obj_on_p_proc decides; otherwise the default use
+         * applies (a drug given to a critter is taken).
+         */
+        use_obj_on_obj(item: Obj, target: Obj) {
+            if (!isGameObject(item) || !isGameObject(target)) {return}
+            const user: any = this.self_obj
+            if (useObjOn(target, item, user) === true) {return}
+            if (target.type === 'critter' && isDrug(item) && takeDrug(target, item) === 1 && user) {
+                removeItem(user, item, 1)
             }
         }
         /** opUseObject: the script's critter (or object) uses the object. */
@@ -8289,10 +8283,15 @@ export namespace Scripting {
         return obj._script._didOverride
     }
 
-    export function useObjOn(obj: Obj, item: Obj): boolean | null {
+    /**
+     * The target's use_obj_on_p_proc: as _protinst_use_item_on, source_obj is
+     * whoever uses the item and obj_being_used_with is the item.
+     */
+    export function useObjOn(obj: Obj, item: Obj, user: Obj | null = globalState.player): boolean | null {
         if (!obj._script || obj._script.use_obj_on_p_proc === undefined) {return null}
 
-        obj._script.source_obj = item as Obj
+        obj._script.source_obj = (user ?? item) as Obj
+        obj._script.target_obj = item as Obj
         obj._script.self_obj = obj as ScriptableObj
         obj._script.cur_map_index = currentMapID
         obj._script._didOverride = false
