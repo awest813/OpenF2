@@ -50,7 +50,7 @@ import { TraitId } from './character/statModifiers.js'
 import { Lightmap } from './lightmap.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, hexNeighbors, Point } from './geometry.js'
 import globalState from './globalState.js'
-import { Critter, Obj, WeaponObj } from './object.js'
+import { cloneItem, Critter, Obj, WeaponObj } from './object.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
@@ -762,6 +762,10 @@ export class Combat {
             selfDamage = this.getDamageDone(obj, obj, 2, 0, 1, info.hitMode)
             if (selfDamage > 0) {critterDamage(obj, selfDamage, obj)}
         }
+        if ((flags & Dam.EXPLODE) && obj.position) {
+            // The weapon blows up in the attacker's hands, catching anyone nearby.
+            this.explodeAt(obj, obj.position, isGrenadeAttack(info) ? 2 : 3, obj, info)
+        }
         if (flags & Dam.LOSE_TURN) {
             if (obj.AP) {obj.AP.combat = 0}
         }
@@ -783,6 +787,97 @@ export class Combat {
         }
         if (obj.dead) {this.perish(obj)}
         return { critical: true, damage: selfDamage, flags, victim, victimDamage }
+    }
+
+    /** Where a thrown grenade that missed comes down: 1..distance/2 hexes off the target. */
+    private grenadeLanding(obj: Critter, target: Critter): Point | null {
+        if (!obj.position || !target.position) {return target.position ?? null}
+        const distance = hexDistance(obj.position, target.position)
+        const offset = Math.max(1, this.random(1, Math.max(1, Math.trunc(distance / 2))))
+        return hexInDirectionDistance(target.position, this.random(0, 5), offset) ?? target.position
+    }
+
+    /** _tile_num_beyond: the hex a missed shot flies to, out to the weapon's range. */
+    private flightEnd(obj: Critter, target: Critter, range: number): Point | null {
+        if (!obj.position || !target.position) {return target.position ?? null}
+        const dir = hexDirectionTo(obj.position, target.position)
+        const beyond = Math.max(0, range - hexDistance(obj.position, target.position))
+        if (dir === null || dir === undefined || beyond === 0) {return target.position}
+        return hexInDirectionDistance(target.position, dir, beyond) ?? target.position
+    }
+
+    /**
+     * Explosion damage around `center`: up to 6 living critters within
+     * `radius` hexes with a clear line from the blast take one round of
+     * normal damage; the attacker caught in it takes the backwash.
+     */
+    private explodeAt(obj: Critter, center: Point, radius: number, exclude: Critter | null, info: AttackWeaponInfo) {
+        const out: Array<{ critter: Critter; damage: number; flags: number; died: boolean }> = []
+        const pool: Critter[] = []
+        const mapCritters: Critter[] = (globalState.gMap?.getObjects?.() ?? []).filter((o: Obj) => o instanceof Critter) as Critter[]
+        for (const c of [...(this.combatants ?? []), ...mapCritters]) {
+            if (!pool.includes(c)) {pool.push(c)}
+        }
+        const victims = pool
+            .filter((c) => c !== exclude && !c.dead && c.position && hexDistance(center, c.position) <= radius)
+            .filter((c) => !this.lineBlocked(center, c.position!))
+            .sort((a, b) => hexDistance(center, a.position!) - hexDistance(center, b.position!))
+        let extras = 0
+        for (const victim of victims) {
+            if (victim === obj) {
+                const damage = this.getDamageDone(obj, obj, 2, 0, 1, info.hitMode)
+                if (damage > 0) {critterDamage(obj, damage, obj)}
+                if (obj.dead) {this.perish(obj)}
+                out.push({ critter: obj, damage, flags: 0, died: obj.dead === true })
+                continue
+            }
+            if (extras >= 6) {continue}
+            extras++
+            const damage = this.getDamageDone(obj, victim, 2, 0, 1, info.hitMode)
+            this.hitCritter(obj, victim, damage, 0, info)
+            out.push({ critter: victim, damage, flags: 0, died: victim.dead === true })
+        }
+        return out
+    }
+
+    /** A wall or other shot-blocking object between two hexes. */
+    private lineBlocked(from: Point, to: Point): boolean {
+        if (!globalState.gMap) {return false}
+        for (const hex of hexLine(from, to).slice(1, -1)) {
+            const objs: Obj[] = (globalState.gMap as any).objectsAtPosition?.(hex) ?? []
+            for (const o of objs) {
+                if (o.type === 'critter' || ((o as any).flags & OBJECT_SHOOT_THRU) !== 0) {continue}
+                if (typeof (o as any).blocks === 'function' && (o as any).blocks()) {return true}
+            }
+        }
+        return false
+    }
+
+    /**
+     * Thrown weapons leave the thrower's hand: grenades are used up, anything
+     * else lands on the target's hex.
+     */
+    private consumeThrownWeapon(obj: Critter, landing: Point | null, destroy: boolean): void {
+        const weapon: any = obj.equippedWeapon
+        if (!weapon?.pro) {return}
+        if (typeof weapon.amount === 'number' && weapon.amount > 1) {
+            weapon.amount -= 1
+            if (!destroy && landing && globalState.gMap) {
+                const dropped: any = cloneItem(weapon)
+                dropped.amount = 1
+                dropped.position = { x: landing.x, y: landing.y }
+                globalState.gMap.addObject(dropped)
+            }
+            return
+        }
+        if (obj.leftHand === weapon) {obj.leftHand = undefined}
+        if (obj.rightHand === weapon) {obj.rightHand = undefined}
+        const idx = Array.isArray(obj.inventory) ? obj.inventory.indexOf(weapon) : -1
+        if (idx >= 0) {obj.inventory.splice(idx, 1)}
+        if (!destroy && landing && globalState.gMap) {
+            weapon.position = { x: landing.x, y: landing.y }
+            globalState.gMap.addObject(weapon)
+        }
     }
 
     /** Print attack lines to the display monitor. */
@@ -860,8 +955,9 @@ export class Combat {
             if (this.checkBadShot(player, target, hitMode, aiming) !== 'ok') {return}
             const cost = attackApCostFor(player, getAttackWeaponInfo(player, hitMode), aiming)
             if (!player.AP!.subtractCombatAP(cost)) {return}
-            if (getAttackWeaponInfo(player, hitMode).isBurst) {
-                this.burstAttack(player, target)
+            const sprayInfo = getAttackWeaponInfo(player, hitMode)
+            if (sprayInfo.isBurst || sprayInfo.mode === 8) {
+                this.burstAttack(player, target, undefined, hitMode)
             } else {
                 this.attack(player, target, region, undefined, hitMode)
             }
@@ -969,7 +1065,7 @@ export class Combat {
                         defenderDamage: failure.victimDamage, defenderFlags: 0, defenderDied: failure.victim.dead === true,
                     })
                 }
-            } else if (info.attackType === 'ranged' || info.attackType === 'throw') {
+            } else if ((info.attackType === 'ranged' || info.attackType === 'throw') && !isGrenadeAttack(info)) {
                 const stray = this.strayShot(obj, target, info)
                 if (stray) {
                     const damage = this.getDamageDone(obj, stray, 2, 0, 1, hitMode)
@@ -982,6 +1078,23 @@ export class Combat {
                 }
             }
         }
+
+        // Explosives burst on whoever was hit, or where the shot/throw landed
+        // (combat.cc _compute_explosion_on_extras).
+        const grenade = isGrenadeAttack(info)
+        const failedCritically = outcome.roll === Roll.CriticalFailure && report.critical && !report.hit
+        if ((info.damageType === 'Explosive' || grenade) && !failedCritically) {
+            const hitCritterPos = report.hit && report.defender ? (report.defender as Critter).position : null
+            const center = hitCritterPos ?? (grenade ? this.grenadeLanding(obj, target) : this.flightEnd(obj, target, info.range))
+            if (center) {
+                const exclude = report.hit ? report.defender as Critter : null
+                for (const extra of this.explodeAt(obj, center, grenade ? 2 : 3, exclude, info)) {
+                    report.extras.push(extra)
+                }
+            }
+        }
+
+        if (info.attackType === 'throw') {this.consumeThrownWeapon(obj, report.hit && report.defender ? (report.defender as Critter).position : target.position, grenade)}
 
         this.announce(describeAttack(report))
 
@@ -1017,7 +1130,7 @@ export class Combat {
      * rolled individually against the target, and every other round flies
      * down its line hitting whoever stands in it.
      */
-    burstAttack(obj: Critter, target: Critter, callback?: () => void) {
+    burstAttack(obj: Critter, target: Critter, callback?: () => void, hitMode: HitMode = 2) {
         // Empty ranged weapon: dry click, nothing fired.
         if (weaponNeedsReload(obj.equippedWeapon)) {
             this.log(`${obj.isPlayer ? 'You' : obj.name} pull${obj.isPlayer ? '' : 's'} the trigger — click. Out of ammo.`)
@@ -1041,7 +1154,10 @@ export class Combat {
         }
 
         this.killedThisAttack = false
-        const info = getAttackWeaponInfo(obj, 2)
+        const info = getAttackWeaponInfo(obj, hitMode)
+        // Flamers spray continuously: one round per line, every critter in a
+        // line gets its own chance to be hit (ANIM_FIRE_CONTINUOUS).
+        const continuous = info.mode === 8
         const who = obj.isPlayer ? 'You' : obj.name
         const targetName = target.isPlayer ? 'you' : target.name
 
@@ -1055,7 +1171,7 @@ export class Combat {
         }
         this.log(`${who} burst-fires ${rounds} rounds at ${targetName}`)
 
-        let accuracy = this.getHitChance(obj, target, 'torso', 2).hit
+        let accuracy = this.getHitChance(obj, target, 'torso', hitMode).hit
         const roll = randomRoll(accuracy, obj.getStat('Critical Chance'), this.random, this.criticalsAllowed()).roll
         let shouldAutoEnd = false
 
@@ -1074,7 +1190,9 @@ export class Combat {
         } else {
             if (roll === Roll.CriticalSuccess) {accuracy += 20}
 
-            const split = splitBurstRounds(rounds)
+            const split = continuous
+                ? { mainTargetRounds: 1, centerRounds: 1, leftRounds: 1, rightRounds: 1 }
+                : splitBurstRounds(rounds)
             let mainHits = 0
             for (let n = 0; n < split.mainTargetRounds; n++) {
                 if (randomRoll(accuracy, 0, this.random, false).roll >= Roll.Success) {mainHits++}
@@ -1095,19 +1213,24 @@ export class Combat {
                         ? target
                         : globalState.gMap?.critterAtPosition?.(hex) as Critter | undefined
                     if (!occupant || occupant === obj || occupant.dead) {continue}
-                    const acc = this.getHitChance(obj, occupant, 'torso', 2).hit
+                    const acc = this.getHitChance(obj, occupant, 'torso', hitMode).hit
+                    if (continuous) {remaining = 1}
                     let hits = 0
                     while (remaining > 0 && this.random(1, 100) <= acc) {
                         remaining--
                         hits++
                     }
                     if (hits === 0) {continue}
-                    if (occupant === target) {mainHits += hits}
-                    else {extraHits.set(occupant, (extraHits.get(occupant) ?? 0) + hits)}
+                    if (occupant === target) {
+                        // A continuous spray never adds to the main target's rounds.
+                        if (!continuous) {mainHits += hits}
+                    } else {
+                        extraHits.set(occupant, (extraHits.get(occupant) ?? 0) + hits)
+                    }
                 }
             }
 
-            shootLine(target.position ?? null, split.centerRounds - mainHits)
+            shootLine(target.position ?? null, continuous ? split.centerRounds : split.centerRounds - mainHits)
             if (obj.position && target.position) {
                 const center = hexDistance(obj.position, target.position) <= 3
                     ? (hexInDirectionDistance(obj.position, hexDirectionTo(obj.position, target.position)!, 3) ?? target.position)
@@ -1129,7 +1252,7 @@ export class Combat {
                     flags = crit.flags
                     msgID = crit.msgID
                 }
-                const damage = this.getDamageDone(obj, target, DM, flags, mainHits, 2)
+                const damage = this.getDamageDone(obj, target, DM, flags, mainHits, hitMode)
                 this.log(`  → ${mainHits} round(s) hit ${targetName} for ${damage}` + (msgID ? ' ' + (this.getCombatMsg(msgID) || '') : ''))
                 this.hitCritter(obj, target, damage, flags, info)
                 Object.assign(report, {
@@ -1142,7 +1265,7 @@ export class Combat {
 
             for (const [victim, hits] of extraHits) {
                 if (victim.dead) {continue}
-                const damage = this.getDamageDone(obj, victim, 2, 0, hits, 2)
+                const damage = this.getDamageDone(obj, victim, 2, 0, hits, hitMode)
                 this.log(`  → ${hits} round(s) hit ${victim.isPlayer ? 'you' : victim.name} for ${damage}`)
                 this.hitCritter(obj, victim, damage, 0, info)
                 report.extras.push({ critter: victim, damage, flags: 0, died: victim.dead === true })
@@ -1635,9 +1758,12 @@ export class Combat {
                 return this.doAITurn(obj, idx, depth + 1)
             }
 
+            const primarySprays = getAttackWeaponInfo(obj, 1).mode === 8
             const attackFn = canBurst
-                ? (cb: () => void) => this.burstAttack(obj, target, cb)
-                : (cb: () => void) => this.attack(obj, target, region, cb)
+                ? (cb: () => void) => this.burstAttack(obj, target, cb, 2)
+                : primarySprays
+                    ? (cb: () => void) => this.burstAttack(obj, target, cb, 1)
+                    : (cb: () => void) => this.attack(obj, target, region, cb)
 
             attackFn(() => {
                 obj.clearAnim()
@@ -1915,6 +2041,12 @@ function normalizeDamageType(damageType: string | null | undefined): DamageType 
         case 'emp': return 'emp'
         default: return 'normal'
     }
+}
+
+/** combat.cc isGrenade: a thrown explosive, plasma or EMP weapon. */
+function isGrenadeAttack(info: AttackWeaponInfo): boolean {
+    return info.attackType === 'throw'
+        && (info.damageType === 'Explosive' || info.damageType === 'Plasma' || info.damageType === 'EMP')
 }
 
 /** SPECIAL stat names by engine index (STAT_STRENGTH … STAT_LUCK). */

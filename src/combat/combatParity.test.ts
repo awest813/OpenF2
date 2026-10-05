@@ -560,3 +560,45 @@ describe('kill experience (combat.cc _combat_give_exps)', () => {
         }
     })
 })
+
+describe('explosives and flamers', () => {
+    function grenade(): any {
+        return {
+            type: 'item', subtype: 'weapon', pid: 26, amount: 2,
+            pro: { extra: { attackMode: 5, maxRange1: 15, APCost1: 4, minDmg: 20, maxDmg: 20, dmgType: 6, minST: 0, perk: -1, critFail: 4 } },
+            weapon: { weaponSkillType: 'Throwing', name: 'grenade' },
+            extra: {},
+        }
+    }
+
+    it('a grenade hit damages everyone within 2 hexes and uses up one grenade', () => {
+        const thrower = makeCritter({ skill: 95, weapon: grenade(), position: { x: 10, y: 10 } })
+        const target = makeCritter({ position: { x: 10, y: 14 }, stats: { HP: 500, 'Max HP': 500 } })
+        const near = makeCritter({ position: { x: 10, y: 15 }, stats: { HP: 500, 'Max HP': 500 } })
+        const far = makeCritter({ position: { x: 10, y: 20 }, stats: { HP: 500, 'Max HP': 500 } })
+        const combat = makeCombat(thrower, target, near, far)
+        combat.rng = (min, max) => (max === 100 ? 1 : max >= 20 ? 20 : min)
+        combat.attack(thrower, target, 'torso')
+        expect(target.getStat('HP')).toBeLessThan(500)
+        expect(near.getStat('HP')).toBe(500 - 20)
+        expect(far.getStat('HP')).toBe(500)
+        expect((thrower.leftHand as any).amount).toBe(1)
+    })
+
+    it('a flamer sprays one round at the target and at everyone in its lines', () => {
+        const flamer: any = {
+            type: 'item', subtype: 'weapon', pid: 11,
+            pro: { extra: { attackMode: 8, maxRange1: 5, APCost1: 6, minDmg: 10, maxDmg: 10, dmgType: 2, rounds: 5, maxAmmo: 10, critFail: 6, perk: -1 } },
+            weapon: { weaponSkillType: 'Big Guns', name: 'flamer' },
+            extra: { ammoLoaded: 10 },
+        }
+        const shooter = makeCritter({ skill: 95, weapon: flamer, position: { x: 10, y: 10 } })
+        const target = makeCritter({ position: { x: 10, y: 12 }, stats: { HP: 500, 'Max HP': 500 } })
+        const combat = makeCombat(shooter, target)
+        globalState.gameTickTime = 0 // no criticals on day one
+        combat.rng = (min) => min
+        combat.burstAttack(shooter, target, undefined, 1)
+        expect(target.getStat('HP')).toBe(500 - 10)
+        expect(flamer.extra.ammoLoaded).toBe(5)
+    })
+})
