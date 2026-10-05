@@ -120,7 +120,6 @@ export interface EngineEvents {
     'game:quitRequested': Record<string, never>
 
     /** Pip-Boy / rest clock interrupted by a potential encounter. */
-    'rest:interrupted': { hoursCompleted: number; hoursRequested: number; danger: string }
 
     /** Ending slideshow (P1-8). */
     'endgame:start': { reason: number; slideCount: number; narrIds: string[] }

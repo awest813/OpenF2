@@ -7,9 +7,6 @@ import globalState from './globalState.js'
 import { Player } from './player.js'
 import {
     restForHours,
-    rollRestInterrupt,
-    setRestDangerOverride,
-    getRestDanger,
     bindTimedEventList,
     advanceGameTime,
     TICKS_PER_HOUR,
@@ -32,37 +29,9 @@ import {
     tickRadiationAndPoison,
     readPlayerPoisonLevel,
 } from './character/radiationPoison.js'
-import {
-    resolveRestEncounterTable,
-    triggerRestEncounter,
-} from './restEncounter.js'
 import { Worldmap } from './worldmap.js'
 
-describe('Parity — rest encounter spawn', () => {
-    it('resolveRestEncounterTable maps danger to outdoor tables', () => {
-        expect(resolveRestEncounterTable('low', null)).toBe('wasteland')
-        expect(resolveRestEncounterTable('high', null)).toBe('desert')
-        expect(resolveRestEncounterTable('medium', { encounterType: 'forest' })).toBe('forest')
-    })
-
-    it('triggerRestEncounter calls forceEncounter on local maps', () => {
-        const prevMap = globalState.gMap
-        const prevPlayer = globalState.player
-        const prevWorldPos = globalState.worldPosition
-        globalState.player = new Player()
-        globalState.gMap = { encounterType: 'wasteland' } as any
-        globalState.worldPosition = null
-        const spy = vi.spyOn(Worldmap, 'forceEncounter').mockReturnValue(true)
-        expect(triggerRestEncounter('medium')).toBe(true)
-        expect(spy).toHaveBeenCalledWith('wasteland')
-        spy.mockRestore()
-        globalState.gMap = prevMap
-        globalState.player = prevPlayer
-        globalState.worldPosition = prevWorldPos
-    })
-})
-
-describe('Parity — rest encounter interrupts', () => {
+describe('Pip-Boy rest (pipboy.cc pipboyRest)', () => {
     let savedPlayer: typeof globalState.player
     let savedTick: number
     let savedCombat: boolean
@@ -76,62 +45,23 @@ describe('Parity — rest encounter interrupts', () => {
         globalState.player = new Player()
         globalState.gameTickTime = 50_000
         globalState.inCombat = false
-        setRestDangerOverride(null)
     })
 
     afterEach(() => {
         globalState.player = savedPlayer
         globalState.gameTickTime = savedTick
         globalState.inCombat = savedCombat
-        setRestDangerOverride(null)
         Scripting.timeEventList.length = 0
     })
 
-    it('safe danger never interrupts', () => {
-        expect(rollRestInterrupt('safe', () => 0)).toBe(false)
-        expect(rollRestInterrupt('safe', () => 0.99)).toBe(false)
-    })
-
-    it('high danger interrupts when rng rolls under chance', () => {
-        // chance 25% → floor(rng*100) < 25
-        expect(rollRestInterrupt('high', () => 0.24)).toBe(true)
-        expect(rollRestInterrupt('high', () => 0.25)).toBe(false)
-    })
-
-    it('restForHours stops early and emits rest:interrupted', () => {
-        setRestDangerOverride('high')
-        const handler = vi.fn()
-        EventBus.on('rest:interrupted', handler)
-        // Always interrupt on first hour check
+    it('restForHours rests every hour asked (no random ambushes in pipboyRest)', () => {
         const spy = vi.spyOn(Math, 'random').mockReturnValue(0.0)
         const before = globalState.gameTickTime
-        const result = restForHours(8)
-        expect(result.interrupted).toBe(true)
-        expect(result.hoursCompleted).toBe(0)
-        expect(result.ticksAdvanced).toBe(0)
-        expect(globalState.gameTickTime).toBe(before)
-        expect(handler).toHaveBeenCalledOnce()
-        spy.mockRestore()
-        EventBus.off('rest:interrupted', handler)
-    })
-
-    it('restForHours completes all hours when never interrupted', () => {
-        setRestDangerOverride('high')
-        const spy = vi.spyOn(Math, 'random').mockReturnValue(0.99)
-        const before = globalState.gameTickTime
         const result = restForHours(4)
-        expect(result.interrupted).toBe(false)
         expect(result.hoursCompleted).toBe(4)
         expect(result.ticksAdvanced).toBe(4 * TICKS_PER_HOUR)
         expect(globalState.gameTickTime).toBe(before + 4 * TICKS_PER_HOUR)
         spy.mockRestore()
-    })
-
-    it('setRestDangerOverride forces danger level', () => {
-        setRestDangerOverride('medium')
-        expect(getRestDanger()).toBe('medium')
-        setRestDangerOverride('safe')
-        expect(getRestDanger()).toBe('safe')
     })
 
     it('advanceGameTime does not double-apply poison DoT on the next live tick', () => {
@@ -231,5 +161,34 @@ describe('Parity — Highwayman car stub (P1-6)', () => {
             savedMaps: {},
         } as any)
         expect(empty.hasCar).toBe(false)
+    })
+})
+
+describe('rest safety (critter.cc _critter_can_obj_dude_rest)', () => {
+    it('refuses while a living critter is after the player, or strangers are about where resting is not allowed', async () => {
+        const { canRest, restForHours } = await import('./character/rest.js')
+        const savedPlayer = globalState.player
+        const savedMap = globalState.gMap
+        const savedCombat = globalState.inCombat
+        try {
+            const player: any = { teamNum: 0, type: 'critter' }
+            const raider: any = { type: 'critter', teamNum: 1, dead: false, whoHitMe: null }
+            globalState.player = player
+            globalState.inCombat = false
+            ;(globalState as any).gMap = { getObjects: () => [player, raider] }
+            expect(canRest()).toBe(true)
+            raider.whoHitMe = player
+            expect(canRest()).toBe(false)
+            expect(restForHours(2).refusedReason).toBe('unsafe')
+            raider.whoHitMe = null
+            ;(globalState as any).gMap = { getObjects: () => [player, raider], canRestHere: false }
+            expect(canRest()).toBe(false)
+            raider.dead = true
+            expect(canRest()).toBe(true)
+        } finally {
+            globalState.player = savedPlayer
+            ;(globalState as any).gMap = savedMap
+            globalState.inCombat = savedCombat
+        }
     })
 })

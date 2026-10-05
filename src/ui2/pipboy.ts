@@ -27,6 +27,8 @@ import {
 import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
 import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
 import { gameDate, gameTimeHour } from '../gameTime.js'
+import { EventBus } from '../eventBus.js'
+import { getMessage } from '../util.js'
 import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import { openCompanionTrade } from '../partyTrade.js'
 import { canOpenCarTrunk, openCarTrunk, getCarTrunk, hasCar, getCarFuel } from '../car.js'
@@ -563,20 +565,23 @@ export class PipBoyPanel extends UIPanel {
         }
     }
 
+    /**
+     * pipboyRest: the clock runs and nothing is printed. Where resting is
+     * not allowed the engine refuses with pipboy.msg 215 in a message box.
+     */
     private _doRest(hours: number): void {
         const result: TimeAdvanceResult = restForHours(hours)
-        if (result.refusedReason === 'combat') {
-            this._restMessage = 'Cannot rest during combat.'
-            return
+        this._restMessage = ''
+        if (result.refusedReason === 'unsafe' || result.refusedReason === 'combat') {
+            EventBus.emit('audio:playSound', { soundId: 'iisxxxx1' })
+            let text: string | null = null
+            try {
+                text = getMessage('pipboy', 215)
+            } catch {
+                text = null
+            }
+            EventBus.emit('ui:messageBox', { text: text || 'You cannot rest at this location!' })
         }
-        if (result.refusedReason) {
-            this._restMessage = 'Rest failed.'
-            return
-        }
-        this._restMessage = result.interrupted
-            ? `Rest interrupted after ${result.hoursCompleted ?? 0}h! Healed ${result.hpHealed} HP.`
-            : `Rested ${hours}h. Healed ${result.hpHealed} HP.` +
-              (result.eventsFired ? ` (${result.eventsFired} timed events)` : '')
     }
 
     // ── Input handling ─────────────────────────────────────────────────────

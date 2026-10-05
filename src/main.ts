@@ -58,8 +58,6 @@ import { createPlayerEntity } from './ecs/entityFactory.js'
 import { EventBus } from './eventBus.js'
 import { SaveLoadPanel } from './ui2/saveLoadPanel.js'
 import { save, load } from './saveload.js'
-import { triggerRestEncounter } from './restEncounter.js'
-import type { RestDanger } from './character/rest.js'
 import { applySettings, getSettings, loadAndApplySettings, patchSettings } from './settings.js'
 import { CreditsPanel } from './ui2/creditsPanel.js'
 import { Engine } from './engine.js'
@@ -450,11 +448,6 @@ function initUIManager(): void {
             console.error('[main] Failed to enter world after chargen:', err)
             EventBus.emit('ui:openPanel', { panelName: 'mainMenu' })
         }
-    })
-
-    // P1-11: rest interrupt → random encounter when encounters are enabled.
-    EventBus.on('rest:interrupted', ({ danger }) => {
-        triggerRestEncounter(danger as RestDanger)
     })
 
     // P1-8: ending credits → return to main menu.
