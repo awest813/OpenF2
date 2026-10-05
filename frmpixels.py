@@ -37,7 +37,7 @@ def read32At(buf, idx):
 def readFRMInfo(f: BufferedReader, exportImage=True):
 	_version = read32(f)
 	fps = read16(f)
-	_actionFrame = read16(f)
+	actionFrame = read16(f)
 	numFrames = read16(f)
 	dOffsetX = [read16(f) for _ in range(6)]
 	dOffsetY = [read16(f) for _ in range(6)]
@@ -68,6 +68,7 @@ def readFRMInfo(f: BufferedReader, exportImage=True):
 	# print "frameOffset:", frameOffset
 	return {'numFrames': numFrames,
 			'fps': fps,
+			'actionFrame': actionFrame,
 			'numDirections': nDirTotal,
 			'totalFrames': numFrames * nDirTotal,
 	        'directionOffsets': [{'x': x, 'y': y} for x,y in zip(dOffsetX, dOffsetY)],
@@ -220,6 +221,7 @@ def exportFRMs(frmFiles, outFile, palette, exportImage=True):
 			'frameWidth': maxW,
 			'frameHeight': maxH,
 			'fps': _fps,
+			'actionFrame': frmInfos[0]['actionFrame'],
 			'numDirections': len(frmFiles),
 	        'directionOffsets': dOffsets,
 	        'frameOffsets': _frameOffsets}

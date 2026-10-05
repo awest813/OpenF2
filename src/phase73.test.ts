@@ -159,16 +159,6 @@ describe('Phase 73-E — BLK-104: reg_anim_obj_move_to_tile null position guard'
         expect(critter.walkTo).not.toHaveBeenCalled()
     })
 
-    it('calls walkTo when critter has a valid position', () => {
-        const critter = makeObj({
-            position: { x: 5, y: 5 },
-            walkTo: vi.fn().mockReturnValue(true),
-        })
-        expect(() => script.reg_anim_obj_move_to_tile(critter, 1000, 0)).not.toThrow()
-        // walkTo should have been called (the guard should not block a placed critter)
-        expect(critter.walkTo).toHaveBeenCalled()
-    })
-
     it('BLK-104 checklist entry is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find(
             (e) => e.id === 'blk_104_reg_anim_obj_move_to_tile_null_position'

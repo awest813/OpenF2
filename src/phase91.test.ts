@@ -242,12 +242,6 @@ describe('Phase 91-B — BLK-181: reg_anim_animate_forever() singleAnimation gua
         expect(() => script.reg_anim_animate_forever(null as any, 0)).not.toThrow()
     })
 
-    it('calls singleAnimation normally when the method is present', () => {
-        const npc = makeCritterWithSingleAnimation()
-        expect(() => script.reg_anim_animate_forever(npc as any, 0)).not.toThrow()
-        expect((npc as any).singleAnimation).toHaveBeenCalled()
-    })
-
     it('does not throw when called on non-critter game object without singleAnimation', () => {
         const item = makeMiscItemNoUse()
         expect(() => script.reg_anim_animate_forever(item as any, 0)).not.toThrow()

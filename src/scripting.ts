@@ -79,6 +79,12 @@ import { getSettings, iniOverride, violenceToIni, patchSettings } from './settin
 import { itemDropAll } from './mapAging.js'
 import { equipItem, isRealItem, removeItem } from './equipment.js'
 import { hasDrugEvent } from './character/timedEffects.js'
+import {
+    ANIM_COUNT, ANIM_FALL_BACK, ANIM_FALL_BACK_SF, ANIM_FALL_FRONT, ANIM_FALL_FRONT_BLOOD, ANIM_FALL_FRONT_SF,
+    ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, resetAnimSequences,
+    regAnimAnimate, regAnimAnimateForever, regAnimAnimateReversed, regAnimBegin, regAnimClear, regAnimEnd,
+    regAnimMoveToObject, regAnimMoveToTile, regAnimPlaySfx, regAnimRunToObject, regAnimRunToTile, regAnimSetArt,
+} from './animSequence.js'
 
 export namespace Scripting {
     let useElevatorHandler: (source: unknown, type: number) => number = () => -1
@@ -304,6 +310,15 @@ export namespace Scripting {
             if (take > 0 && adjustCaps(item, -take)) {amount += take}
         }
         return true
+    }
+
+    /** _correctDeath: a gory death is a plain fall under the violence filter or when there is no such art. */
+    function correctDeath(critter: any, anim: number, forceBack: boolean): number {
+        if (anim < 51 /* ANIM_BIG_HOLE_SF */ || anim > 63) {return anim}
+        const maxBlood = violenceToIni(globalState.violenceLevel) >= 3
+        if (maxBlood && critter?.type === 'critter' && critterArt(critter, anim)) {return anim}
+        if (forceBack) {return ANIM_FALL_BACK}
+        return critter?.type === 'critter' && critterArt(critter, ANIM_FALL_FRONT) ? ANIM_FALL_FRONT : ANIM_FALL_BACK
     }
 
     function lookupMapNameSafe(mapID: number): string | null {
@@ -1599,7 +1614,9 @@ export namespace Scripting {
             if (!isGameObject(obj) || obj.type !== 'critter' || obj.dead === true) {return 1}
             const c = obj as any
             if (c.knockedOut === true) {return 2}
-            let state = c.knockedDown === true ? 2 : 0
+            // Prone while knocked down or showing the lying-down frame of a fall.
+            const lying = c.animCode === ANIM_FALL_BACK_SF || c.animCode === ANIM_FALL_FRONT_SF
+            let state = c.knockedDown === true || lying ? 2 : 0
             if (c.crippledLeftLeg) {state |= 0x04}
             if (c.crippledRightLeg) {state |= 0x08}
             if (c.crippledLeftArm) {state |= 0x10}
@@ -2246,13 +2263,11 @@ export namespace Scripting {
             const byName: Record<string, number> = { armor: 0, container: 1, drug: 2, weapon: 3, ammo: 4, misc: 5, key: 6 }
             return obj.subtype !== undefined && byName[obj.subtype] !== undefined ? byName[obj.subtype] : -1
         }
+        /** opAnimBusy: -1 while the object is in a running animation sequence (or moving), else 0. */
         anim_busy(obj: Obj) {
-            log('anim_busy', arguments)
-            if (!isGameObject(obj)) {
-                warn('anim_busy: not game object: ' + obj)
-                return false
-            }
-            return obj.inAnim()
+            if (!isGameObject(obj)) {return 0}
+            if (animationIsBusy(obj) !== 0) {return -1}
+            return (obj as any).path ? -1 : 0
         }
         obj_art_fid(obj: Obj) {
             if (!isGameObject(obj)) {
@@ -2326,48 +2341,32 @@ export namespace Scripting {
             }
             obj.use(source)
         }
+        /**
+         * opAnim: an animation code below ANIM_COUNT plays once (forwards for
+         * frame 0, else backwards); a fall leaves the critter lying, and getting
+         * up from one ends standing. 1000 sets the rotation, 1010 the frame.
+         */
         anim(obj: Obj, anim: number, param: number) {
-            if (!isGameObject(obj)) {
-                warn('anim: not a game object: ' + obj)
-                return
-            }
-            if (anim === 1000)
-                // set rotation
-                {obj.orientation = param}
-            else if (anim === 1010)
-                // set frame
-                {obj.frame = param}
-            else if (anim === 0)
-                // ANIM_stand — reset to idle standing frame
-                {obj.frame = 0}
-            else if (anim >= 1 && anim <= 99) {
-                // Standard ANIM_* animation constants (1=walk, 2=jump_begin, …, 50=fall_front_blood, etc.).
-                // BLK-125 (Phase 79): Trigger a one-shot animation cycle on the object using
-                // singleAnimation so the visual plays in the browser.  Falls back to setting
-                // frame=0 for objects that don't support singleAnimation (e.g. static items).
-                log('anim', arguments, 'animation')
-                if (typeof (obj as any).singleAnimation === 'function') {
-                    try { (obj as any).singleAnimation(false, null) } catch (_e) { /* ignore */ }
+            if (!isGameObject(obj)) {return}
+            const o = obj as any
+            if (anim < ANIM_COUNT) {
+                anim = correctDeath(o, anim, true)
+                regAnimBegin(ANIMATION_REQUEST_UNRESERVED)
+                if (param === 0) {
+                    regAnimAnimate(o, anim, 0)
+                    if (anim >= ANIM_FALL_BACK && anim <= ANIM_FALL_FRONT_BLOOD) {regAnimSetArt(o, anim + 28, -1)}
+                    if (o.type === 'critter') {o.knockedOut = false}
                 } else {
-                    obj.frame = 0
+                    regAnimAnimateReversed(o, anim, 0)
+                    if (anim === ANIM_PRONE_TO_STANDING) {regAnimSetArt(o, ANIM_FALL_FRONT_SF, -1)}
+                    else if (anim === ANIM_BACK_TO_STANDING) {regAnimSetArt(o, ANIM_FALL_BACK_SF, -1)}
+                    if (o.type === 'critter') {o.knockedDown = true}
                 }
-            } else if (anim >= 100 && anim <= 999) {
-                // Extended ANIM_* constants (100+ are engine-internal or sfall-specific).
-                // Log silently rather than stubbing so the console stays clean.
-                log('anim (extended)', arguments, 'animation')
-            } else if (anim >= 1001 && anim <= 1009) {
-                // Codes 1001–1009 are between the rotation marker (1000) and the
-                // frame-set marker (1010).  They appear in some vanilla and modded
-                // scripts as engine-internal constants that the browser build does
-                // not drive.  Log silently to avoid flooding the console.
-                log('anim (mid-range)', arguments, 'animation')
-            } else if (anim > 1010) {
-                // Unknown high-valued anim codes beyond the frame-set marker.
-                // Log silently — these appear in some modded scripts and are not blockers.
-                log('anim (unknown high code)', arguments, 'animation')
-            } else {
-                // Negative or otherwise unclassified anim code — log silently.
-                log('anim (unclassified code)', arguments, 'animation')
+                regAnimEnd()
+            } else if (anim === 1000) {
+                if (typeof param === 'number' && param >= 0 && param < 6) {o.orientation = param}
+            } else if (anim === 1010) {
+                o.frame = param
             }
         }
 
@@ -2843,128 +2842,44 @@ export namespace Scripting {
         }
 
         // animation
-        reg_anim_func(signal: any, callback: any) {
-            log('reg_anim_func', arguments, 'animation')
-            // ANIM_BEGIN (1): start an animation sequence — no-op since we don't
-            // queue animations, but register the intent.
-            // ANIM_COMPLETE (2): register a callback to be called when the animation
-            // sequence completes.  Since the browser build has no async animation
-            // queue, call the callback immediately so script continuation logic
-            // (like transitioning to the next dialogue step or triggering a follow-up
-            // event) is not permanently blocked.
-            if (signal === 2 /* ANIM_COMPLETE */ && typeof callback === 'function') {
-                try {
-                    callback()
-                } catch (e) {
-                    warn('reg_anim_func: ANIM_COMPLETE callback threw: ' + e, 'animation')
-                }
-            }
+        /** opRegAnimFunc: 1 begins a sequence (with request flags), 2 clears an object's, 3 ends it. Not in combat. */
+        reg_anim_func(cmd: number, param: any) {
+            if (globalState.inCombat) {return}
+            if (cmd === 1) {regAnimBegin(typeof param === 'number' ? param : ANIMATION_REQUEST_UNRESERVED)}
+            else if (cmd === 2) {regAnimClear(param)}
+            else if (cmd === 3) {regAnimEnd()}
         }
+        /** opRegAnimAnimate; the dying fall of pid 0x100002F is skipped under the violence filter. */
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
-            // BLK-121: Trigger a single non-looping animation cycle on obj.
-            log('reg_anim_animate', arguments, 'animation')
-            this.reg_anim_animate_once(obj, anim, delay)
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (anim === 20 && (obj as any).pid === 0x100002f && violenceToIni(globalState.violenceLevel) < 2) {return}
+            regAnimAnimate(obj, anim, delay)
         }
         reg_anim_animate_forever(obj: Obj, anim: number) {
-            log('reg_anim_animate_forever', arguments, 'animation')
-            if (!isGameObject(obj)) {
-                warn('reg_anim_animate_forever: not a game object')
-                return
-            }
-            //console.log("ANIM FOREVER: " + obj.art + " / " + anim)
-            if (anim !== 0) {warn('reg_anim_animate_forever: anim = ' + anim)}
-            // BLK-181: Guard against objects that don't implement singleAnimation() —
-            // Arroyo village NPCs (elder, guards) call reg_anim_animate_forever() during
-            // map_enter_p_proc and dialogue ceremony sequences; critters spawned via
-            // create_object_sid() may not have a singleAnimation method attached in the
-            // browser build.  Without this guard, calling singleAnimation() on such an
-            // object throws TypeError and aborts the animation sequence, preventing NPC
-            // idle animations from looping during the end-of-arroyo ceremony.
-            if (typeof (obj as any).singleAnimation !== 'function') {
-                warn('reg_anim_animate_forever: object has no singleAnimation() — no-op', undefined, this)
-                return
-            }
-            function animate() {
-                (obj as any).singleAnimation(false, animate)
-            }
-            animate()
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimAnimateForever(obj, anim)
         }
-        animate_move_obj_to_tile(obj: Critter, tileNum: any, isRun: number) {
-            log('animate_move_obj_to_tile', arguments, 'movement')
-            if (!isGameObject(obj)) {
-                warn('animate_move_obj_to_tile: not a game object', 'movement', this)
-                return
+        /**
+         * opAnimateMoveObjectToTile: walk (flags 0) or run there, outside combat,
+         * if the critter can act; flag 0x10 first clears what it was doing.
+         */
+        animate_move_obj_to_tile(obj: Critter, tileNum: number, flags: number) {
+            if (!isGameObject(obj) || typeof tileNum !== 'number' || tileNum <= -1) {return}
+            const c = obj as any
+            if (c.type !== 'critter' || c.dead || c.knockedOut || c.knockedDown || globalState.inCombat) {return}
+            let f = typeof flags === 'number' ? flags : 0
+            if (f & 0x10) {
+                regAnimClear(c)
+                f &= ~0x10
             }
-            // FO2's FCMALPNK pre-processor converts literal ints into
-            // procedure calls (e.g. `animate_move_obj_to_tile(tile_num(self_obj), 0)`
-            // passes a procedure reference).  We resolve such references here
-            // by calling them in the current script context; if FCMALPNK ever
-            // returns the procedure name as a string instead, this needs
-            // adjusting to look it up in the current script.
-            if (typeof tileNum === 'function') {tileNum = tileNum.call(this)}
-            if (isNaN(tileNum)) {
-                warn('animate_move_obj_to_tile: invalid tile num', 'movement', this)
-                return
-            }
-
-            const tile = fromTileNum(tileNum)
-            if (tile.x < 0 || tile.x >= 200 || tile.y < 0 || tile.y >= 200) {
-                warn(
-                    'animate_move_obj_to_tile: invalid tile: ' + tile.x + ', ' + tile.y + ' (' + tileNum + ')',
-                    'movement',
-                    this
-                )
-                return
-            }
-            // BLK-182: Guard against objects that don't implement walkTo() — the arroyo
-            // elder's approach-to-player movement script calls animate_move_obj_to_tile()
-            // on the elder critter; if the object is a misc item used as a movement
-            // waypoint, walkTo() is undefined and obj.walkTo(...) throws TypeError,
-            // crashing the ceremony sequence.  Mirror the guard from reg_anim_obj_move_to_tile
-            // (BLK-104) for consistency.
-            if (typeof (obj as any).walkTo !== 'function') {
-                warn('animate_move_obj_to_tile: object cannot walk', 'movement', this)
-                return
-            }
-            if (!obj.walkTo(tile, !!isRun)) {
-                warn('animate_move_obj_to_tile: no path', 'movement', this)
-                return
-            }
+            regAnimBegin(ANIMATION_REQUEST_UNRESERVED)
+            if (f === 0) {regAnimMoveToTile(c, tileNum, -1)}
+            else {regAnimRunToTile(c, tileNum, -1)}
+            regAnimEnd()
         }
         reg_anim_obj_move_to_tile(obj: Obj, tileNum: number, delay: number) {
-            log('reg_anim_obj_move_to_tile', arguments, 'movement')
-            if (!isGameObject(obj)) {
-                warn('reg_anim_obj_move_to_tile: not a game object', 'movement', this)
-                return
-            }
-            if (isNaN(tileNum) || tileNum < 0) {
-                warn('reg_anim_obj_move_to_tile: invalid tile num', 'movement', this)
-                return
-            }
-            const tile = fromTileNum(tileNum)
-            if (tile.x < 0 || tile.x >= 200 || tile.y < 0 || tile.y >= 200) {
-                warn(
-                    'reg_anim_obj_move_to_tile: invalid tile: ' + tile.x + ', ' + tile.y + ' (' + tileNum + ')',
-                    'movement',
-                    this
-                )
-                return
-            }
-            if (!(obj as Critter).walkTo) {
-                warn('reg_anim_obj_move_to_tile: object cannot walk', 'movement', this)
-                return
-            }
-            // BLK-104: Guard against null position — critters in inventory or
-            // mid-map-transition have no tile assignment.  walkTo() accesses
-            // this.position.x immediately, so calling it with a null position
-            // throws a TypeError.  Skip movement for unplaced critters.
-            if (!obj.position) {
-                warn('reg_anim_obj_move_to_tile: object has no position — skipping movement', 'movement', this)
-                return
-            }
-            if (!(obj as Critter).walkTo(tile, false)) {
-                warn('reg_anim_obj_move_to_tile: no path', 'movement', this)
-            }
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimMoveToTile(obj, tileNum, delay)
         }
 
         // ── Vanilla opcodes (interpreter_extra.cc) ──────────────────────────
@@ -3047,30 +2962,42 @@ export namespace Scripting {
         game_ui_is_disabled() {
             return globalState.gameUIDisabled ? 1 : 0
         }
-        anim_action_frame(_obj: Obj, _anim: number) {
-            return 0
+        /** _op_anim_action_frame: the action frame of the object's art for that animation. */
+        anim_action_frame(obj: Obj, anim: number) {
+            if (!isGameObject(obj)) {return 0}
+            const o = obj as any
+            const art = o.type === 'critter' ? critterArt(o, anim) : o.art
+            return (art && globalState.imageInfo?.[art]?.actionFrame) ?? 0
         }
         reg_anim_animate_reverse(obj: Obj, anim: number, delay: number) {
-            // No reverse playback; the animation still runs.
-            this.reg_anim_animate(obj, anim, delay)
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimAnimateReversed(obj, anim, delay)
         }
-        reg_anim_obj_run_to_tile(obj: Obj, tileNum: number, _delay: number) {
-            if (!isGameObject(obj) || !(obj as Critter).walkTo || !obj.position) {return}
-            if (!isFinite(tileNum) || tileNum < 0) {return}
-            ;(obj as Critter).walkTo(fromTileNum(tileNum), true)
+        reg_anim_obj_run_to_tile(obj: Obj, tileNum: number, delay: number) {
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimRunToTile(obj, tileNum, delay)
         }
-        reg_anim_obj_move_to_obj(obj: Obj, target: Obj, _delay: number) {
-            if (!isGameObject(obj) || !isGameObject(target) || !(obj as Critter).walkTo || !obj.position || !target.position) {return}
-            ;(obj as Critter).walkTo(target.position, false)
+        reg_anim_obj_move_to_obj(obj: Obj, target: Obj, delay: number) {
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimMoveToObject(obj, target, delay)
         }
-        reg_anim_obj_run_to_obj(obj: Obj, target: Obj, _delay: number) {
-            if (!isGameObject(obj) || !isGameObject(target) || !(obj as Critter).walkTo || !obj.position || !target.position) {return}
-            ;(obj as Critter).walkTo(target.position, true)
+        reg_anim_obj_run_to_obj(obj: Obj, target: Obj, delay: number) {
+            if (globalState.inCombat || !isGameObject(obj)) {return}
+            regAnimRunToObject(obj, target, delay)
         }
-        reg_anim_play_sfx(_obj: Obj, name: string, _delay: number) {
-            if (typeof name === 'string' && name) {EventBus.emit('audio:playSound', { soundId: name })}
+        /** opRegAnimPlaySfx: a sound step (allowed in combat too). */
+        reg_anim_play_sfx(obj: Obj, name: string, delay: number) {
+            if (!isGameObject(obj)) {return}
+            regAnimPlaySfx(obj, typeof name === 'string' ? name : '', delay)
         }
-        animate_stand_reverse_obj(_obj: Obj) {}
+        /** opAnimateStandReverse: the stand animation played backwards, outside combat. */
+        animate_stand_reverse_obj(obj: Obj) {
+            const target: any = isGameObject(obj) ? obj : this.self_obj
+            if (!isGameObject(target) || globalState.inCombat) {return}
+            regAnimBegin(ANIMATION_REQUEST_UNRESERVED)
+            regAnimAnimateReversed(target, ANIM_STAND, 0)
+            regAnimEnd()
+        }
         make_daytime() {}
         /** scripts_request_world_map: leave for the world map. */
         world_map() {
@@ -3130,14 +3057,13 @@ export namespace Scripting {
             if (isGameObject(obj)) {(obj as any).lockJammed = true}
         }
 
+        /** opAnimateStand: the object (or the script's own) stands, outside combat. */
         animate_stand_obj(obj: Critter) {
-            log('animate_stand_obj', arguments, 'animation')
-            if (!isGameObject(obj)) {
-                warn('animate_stand_obj: not a game object', undefined, this)
-                return
-            }
-            // Reset to idle (frame 0 of the standing animation)
-            obj.frame = 0
+            const target: any = isGameObject(obj) ? obj : this.self_obj
+            if (!isGameObject(target) || globalState.inCombat) {return}
+            regAnimBegin(ANIMATION_REQUEST_UNRESERVED)
+            regAnimAnimate(target, ANIM_STAND, 0)
+            regAnimEnd()
         }
 
         explosion(tile: number, elevation: number, damage: number) {
@@ -8070,20 +7996,6 @@ export namespace Scripting {
 
 
 
-        reg_anim_animate_once(obj: Obj, anim: number, _delay: number): void {
-            if (!isGameObject(obj)) {
-                warn('reg_anim_animate_once: not a game object', 'animation', this)
-                return
-            }
-            // anim 0 = idle/stand animation; trigger it as a single non-looping cycle
-            if (typeof (obj as any).singleAnimation === 'function') {
-                try {
-                    (obj as any).singleAnimation(false, null)
-                } catch (e) {
-                    warn('reg_anim_animate_once: singleAnimation threw: ' + e, 'animation', this)
-                }
-            }
-        }
 
         // BLK-122 / P2-2 — gfade CSS helpers delegate to fade.ts (kept for tests).
         gfade_out_css(_time: number): void {
@@ -8654,6 +8566,7 @@ export namespace Scripting {
     }
 
     export function reset(mapName: string, mapID?: number) {
+        resetAnimSequences()
         timeEventList.length = 0 // clear timed events
         dialogueOptionProcs.length = 0
         gameObjects = null

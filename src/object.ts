@@ -1440,11 +1440,14 @@ export class Critter extends Obj {
         if (fps === 0) {fps = 10}
 
         if (time - this.lastFrameTime >= 1000 / fps) {
-            this.frame++
+            // A reversed animation (reg_anim_animate_reverse) runs back to frame 0.
+            const reverse = (this as any).animReverse === true
+            this.frame += reverse ? -1 : 1
             this.lastFrameTime = time
 
-            if (this.frame === globalState.imageInfo[this.art].numFrames) {
+            if (reverse ? this.frame < 0 : this.frame === globalState.imageInfo[this.art].numFrames) {
                 // animation is done
+                if (reverse) {this.frame = 0}
                 if (this.animCallback) {
                     this.animCallback()
                 }

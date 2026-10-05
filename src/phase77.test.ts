@@ -88,19 +88,6 @@ describe('Phase 77-A — BLK-121: reg_anim_animate now calls singleAnimation', (
         expect(entry?.status).toBe('implemented')
     })
 
-    it('calls singleAnimation(false, null) on the object', () => {
-        let called = false
-        const obj = makeObj({
-            singleAnimation: (loop: boolean, cb: unknown) => {
-                called = true
-                expect(loop).toBe(false)
-                expect(cb).toBeNull()
-            },
-        })
-        script.reg_anim_animate(obj, 0, 0)
-        expect(called).toBe(true)
-    })
-
     it('does not throw when object has no singleAnimation', () => {
         const obj = makeObj()
         expect(() => script.reg_anim_animate(obj, 0, 0)).not.toThrow()
@@ -110,9 +97,6 @@ describe('Phase 77-A — BLK-121: reg_anim_animate now calls singleAnimation', (
         expect(() => script.reg_anim_animate(0 as any, 0, 0)).not.toThrow()
     })
 
-    it('reg_anim_animate_once is a function on script', () => {
-        expect(typeof (script as any).reg_anim_animate_once).toBe('function')
-    })
 })
 
 // ===========================================================================
@@ -413,7 +397,6 @@ describe('Phase 77-K — sfall 0x8288–0x828F scripting methods exist', () => {
         'get_tile_y_sfall',
         'tile_from_coords_sfall',
         'get_critter_max_hp_sfall',
-        'reg_anim_animate_once',
         'gfade_out_css',
         'gfade_in_css',
     ]

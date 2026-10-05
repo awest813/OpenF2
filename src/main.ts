@@ -20,6 +20,10 @@ import { heart } from './heart.js'
 import { hexDirectionTo, hexDistance, hexesInRadius, hexFromScreen, hexInDirectionDistance } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
+import { tickAnimSequences } from './animSequence.js'
+
+/** When the animation sequences last ticked (performance.now ms). */
+let lastAnimSequenceTick = 0
 import { removeItem } from './equipment.js'
 import { IDBCache } from './idbcache.js'
 import { initGame, enterWorldMap } from './init.js'
@@ -1182,6 +1186,12 @@ heart.update = function () {
         }
 
         obj.updateAnim()
+    }
+
+    // Animation sequences count their delays in animation ticks (10 a second).
+    if (time - lastAnimSequenceTick >= 100) {
+        lastAnimSequenceTick = time
+        tickAnimSequences()
     }
 
     globalState.lastUpdateTime = Math.floor(window.performance.now() - time)

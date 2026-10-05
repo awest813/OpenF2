@@ -87,49 +87,6 @@ describe('Phase 79-A — BLK-125: anim() codes 1-99 trigger singleAnimation', ()
         expect(entry?.status).toBe('implemented')
     })
 
-    it('anim() code 1 calls singleAnimation(false, null) on the object', () => {
-        let called = false
-        const obj = makeObj({
-            singleAnimation: (loop: boolean, cb: unknown) => {
-                called = true
-                expect(loop).toBe(false)
-                expect(cb).toBeNull()
-            },
-        })
-        script.anim(obj, 1, 0)
-        expect(called).toBe(true)
-    })
-
-    it('anim() code 50 calls singleAnimation(false, null) on the object', () => {
-        let called = false
-        const obj = makeObj({
-            singleAnimation: () => { called = true },
-        })
-        script.anim(obj, 50, 0)
-        expect(called).toBe(true)
-    })
-
-    it('anim() code 99 calls singleAnimation(false, null) on the object', () => {
-        let called = false
-        const obj = makeObj({
-            singleAnimation: () => { called = true },
-        })
-        script.anim(obj, 99, 0)
-        expect(called).toBe(true)
-    })
-
-    it('anim() code 1 falls back to frame=0 when no singleAnimation method', () => {
-        const obj = makeObj({ frame: 5 })
-        script.anim(obj, 1, 0)
-        expect(obj.frame).toBe(0)
-    })
-
-    it('anim() code 0 (stand) sets frame to 0', () => {
-        const obj = makeObj({ frame: 7 })
-        script.anim(obj, 0, 0)
-        expect(obj.frame).toBe(0)
-    })
-
     it('anim() code 1000 (rotation) sets orientation', () => {
         const obj = makeObj({ orientation: 0 })
         script.anim(obj, 1000, 3)

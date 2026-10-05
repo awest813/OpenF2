@@ -77,13 +77,6 @@ describe('Phase 19-A — anim() de-stub for ANIM_* codes', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('anim code 0 (ANIM_stand) resets frame to 0 and emits no stub', () => {
-        const obj = makeObj({ frame: 5 })
-        script.anim(obj, 0, 0)
-        expect(obj.frame).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('anim code 1 (ANIM_walk) is handled silently — no stub emitted', () => {
         const obj = makeObj()
         script.anim(obj, 1, 0)
