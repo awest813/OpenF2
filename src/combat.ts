@@ -417,7 +417,7 @@ export class Combat {
         return !obj.isPlayer && obj.teamNum !== playerTeam
     }
 
-    /** Number of living critters standing between attacker and target. */
+    /** Standing critters between attacker and target (_combat_is_shot_blocked's count). */
     private crittersInLineOfFire(obj: Critter, target: Critter): number {
         if (!obj.position || !target.position) {return 0}
         const path = hexLine(obj.position, target.position)
@@ -427,7 +427,11 @@ export class Combat {
         let blockers = 0
         for (const c of candidates) {
             if (c === obj || c === target || c.dead || !c.position) {continue}
-            if (between.has(`${c.position.x},${c.position.y}`)) {blockers++}
+            // _combat_is_shot_blocked: the fallen don't count, big critters count twice.
+            if ((c as any).knockedDown || (c as any).knockedOut) {continue}
+            if (between.has(`${c.position.x},${c.position.y}`)) {
+                blockers += ((c as any).flags & OBJECT_MULTIHEX) !== 0 ? 2 : 1
+            }
         }
         return blockers
     }
@@ -1559,6 +1563,28 @@ export class Combat {
         } catch (e) {
             console.warn('[combat] AI turn failed for ' + obj.name + ': ' + e)
         }
+    }
+
+    /**
+     * combat.cc _combat_attack_this outside combat: the bad-shot checks run
+     * first (with a full AP bar), and a refused attack prints its message
+     * without starting a fight.
+     */
+    static playerCanStartAttack(player: Critter, target: Critter): boolean {
+        if (!player.AP) {player.AP = new ActionPoints(player)}
+        else {player.AP.resetAP()}
+        const probe = Object.create(Combat.prototype) as Combat
+        probe.combatants = []
+        const weapon: any = player.equippedWeapon
+        const hitMode: HitMode = weapon?.weapon?.hitMode?.() ?? 1
+        const info = getAttackWeaponInfo(player, hitMode)
+        const aiming = (weapon?.weapon?.isCalled?.() ?? false) && canAimAttack(player, info)
+        const bad = probe.checkBadShot(player, target, hitMode, aiming)
+        if (bad === 'ok') {return true}
+        const msg = badShotMessage(bad, attackApCostFor(player, info, aiming))
+        if (msg) {uiLog(msg)}
+        if (bad === 'noAmmo') {EventBus.emit('audio:playSound', { soundId: 'out_of_ammo' })}
+        return false
     }
 
     /**

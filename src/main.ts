@@ -135,6 +135,7 @@ export function playerUse(obj?: Obj) {
         // attacking it first (combat.cc _combat with gcsd attacker/defender).
         if (globalState.attackCursor && !who.dead && !globalState.inCombat && Config.engine.doCombat) {
             globalState.attackCursor = false
+            if (!Combat.playerCanStartAttack(globalState.player, who)) {return}
             Combat.start(globalState.player, who)
             if (globalState.combat?.inPlayerTurn) {
                 globalState.combat.playerAttack(who, (fire) => {
