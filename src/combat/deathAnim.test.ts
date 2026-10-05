@@ -80,3 +80,27 @@ describe('HOOK_SUBCOMBATDAMAGE', () => {
         expect(computeDamage({ ...input, replaceRounds: (dr, dt) => dr + dt }, () => 10)).toBe(22 + 5)
     })
 })
+
+describe('a lethal hit in combat', () => {
+    it('plays the death _pick_death chose, not a generic one', async () => {
+        const { Combat } = await import('../combat.js')
+        globalState.violenceLevel = 2
+        const target = critter([ANIM_FALL_BACK, ANIM_FALL_FRONT, ANIM_CHUNKS_OF_FLESH, ANIM_DANCING_AUTOFIRE])
+        let hp = 10
+        Object.assign(target, {
+            name: 'raider', isPlayer: false, orientation: 3, position: { x: 1, y: 1 },
+            stats: { modifyBase: (_: string, d: number) => { hp += d } },
+            getStat: (s: string) => (s === 'HP' ? hp : 0),
+            hasAnimation: () => false,
+            staticAnimation(_: string) {},
+        })
+        const attacker: any = { name: 'you', isPlayer: true, orientation: 0, position: { x: 0, y: 0 }, getStat: () => 5 }
+        const combat: any = Object.create(Combat.prototype)
+        combat.combatantId = () => 0
+        combat.perish = () => {}
+        const info: any = { weapon: null, mode: 7, damageType: 'Normal', attackType: 'ranged', perk: -1 }
+        combat.hitCritter(attacker, target, 60, 0, info)
+        expect(target.dead).toBe(true)
+        expect(target.animCode).toBe(ANIM_CHUNKS_OF_FLESH)
+    })
+})

@@ -73,6 +73,7 @@ import { awardCritterXp } from './character/xp.js'
 import { isProne } from './animSequence.js'
 import { loadPRO } from './pro.js'
 import { attackAnimationForMode, deathAnimationFor, isHitFromFront } from './combat/deathAnim.js'
+import { dodgeAnimation, showDamageReaction, standUpAnimation } from './combat/damageAnim.js'
 
 // Turn-based combat system
 
@@ -752,10 +753,9 @@ export class Combat {
      * Apply an attack's result flags to the critter that suffered them
      * (combat.cc _set_new_results and the knockback in attackComputeDamage).
      */
-    private applyResultFlags(victim: Critter, flags: number, damage: number, attacker: Critter, info: AttackWeaponInfo): void {
-        if (victim.dead) {return}
+    private applyResultFlags(victim: Critter, flags: number, damage: number, attacker: Critter, info: AttackWeaponInfo, wasProne = isProne(victim)): number {
+        if (victim.dead) {return 0}
         const v = victim as any
-        const wasProne = isProne(victim)
         if (flags & Dam.KNOCKED_OUT) {
             v.knockedOut = true
             v.knockedDown = true
@@ -773,7 +773,7 @@ export class Combat {
         if ((flags & Dam.DROP) && !victim.isPlayer) {CriticalEffects.dropWeapon(victim)}
         if (flags & Dam.DEAD) {
             critterKill(victim, attacker, true, wasProne ? undefined : this.deathAnimation(attacker, victim, damage, info))
-            return
+            return 0
         }
 
         // Knockback: melee/unarmed/explosive hits push single-hex critters
@@ -785,11 +785,13 @@ export class Combat {
             let stonewall = false
             if (victim.isPlayer && perkRank(victim, PerkId.STONEWALL) > 0) {
                 stonewall = true
-                if (this.random(0, 100) < 50) {return}
+                if (this.random(0, 100) < 50) {return 0}
             }
             const dist = knockbackDistance(damage, info.perk, stonewall, knockbackModifier(info.weapon, attacker, victim))
             if (dist > 0 && attacker.position) {knockBack(liveMap(), victim, attacker.position, dist)}
+            return dist
         }
+        return 0
     }
 
     /** _show_damage_to_object's pick of the death animation (with sfall's DeathAnim hooks). */
@@ -811,13 +813,19 @@ export class Combat {
             damage,
             damageType: normalizeDamageType(info.damageType),
         })
+        // _show_damage_to_object: a critter already lying down only shows its death.
+        const wasProne = isProne(target)
         if (damage > 0) {
             ;(target as any).damageLastTurn = ((target as any).damageLastTurn ?? 0) + damage
-            critterDamage(target, damage, obj)
+            const lethal = !target.dead && typeof target.getStat === 'function' && target.getStat('HP') - damage <= 0
+            const deathAnim = lethal && !wasProne ? this.deathAnimation(obj, target, damage, info) : undefined
+            critterDamage(target, damage, obj, true, false, undefined, undefined, deathAnim)
         }
-        this.applyResultFlags(target, flags, damage, obj, info)
+        const knockback = this.applyResultFlags(target, flags, damage, obj, info, wasProne)
         if (target.dead) {
             this.perish(target)
+        } else if (!wasProne && target.type === 'critter') {
+            showDamageReaction(target, flags, target === obj || isHitFromFront(obj, target), knockback)
         }
     }
 
@@ -1212,6 +1220,8 @@ export class Combat {
                 attackerId: this.combatantId(obj),
                 targetId: this.combatantId(target),
             })
+            // _action_melee: the defender sidesteps a blow that missed.
+            if (info.attackType === 'melee' || info.attackType === 'unarmed') {dodgeAnimation(target)}
             if (outcome.roll === Roll.CriticalFailure) {
                 const failure = this.criticalFailure(obj, target, info)
                 report.critical = failure.critical
@@ -2066,6 +2076,7 @@ export class Combat {
         c.knockedDown = false
         const cost = critter.isPlayer && perkRank(critter, PerkId.QUICK_RECOVERY) > 0 ? 1 : 3
         if (critter.AP) {critter.AP.combat = Math.max(0, critter.AP.combat - cost)}
+        standUpAnimation(critter)
     }
 }
 

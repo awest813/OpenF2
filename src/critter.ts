@@ -476,13 +476,14 @@ export function critterDamage(
     useScript = true,
     useAnim = true,
     damageType?: string,
-    callback?: () => void
+    callback?: () => void,
+    deathAnim?: number
 ) {
     obj.stats.modifyBase('HP', -damage)
     if (obj.isPlayer) {
         syncPlayerEntityFromCritter()
     }
-    if (obj.getStat('HP') <= 0) {return critterKill(obj, source, useScript)}
+    if (obj.getStat('HP') <= 0) {return critterKill(obj, source, useScript, deathAnim)}
 
     if (useScript) {
         // Trigger damage_p_proc on the damaged critter's script so scripted effects
