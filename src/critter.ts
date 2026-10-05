@@ -17,6 +17,7 @@ limitations under the License.
 
 import { critterArt } from './animSequence.js'
 import { ANIM_BURNED_TO_NOTHING, ANIM_FALL_BACK, ANIM_FIRE_DANCE } from './combat/deathAnim.js'
+import { playDeath } from './combat/damageAnim.js'
 import { HOOK, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { hexDirectionTo } from './geometry.js'
@@ -459,6 +460,9 @@ export function critterKill(
             }
             // _show_damage_to_object: a fire dance burns down to nothing.
             const burned = code === ANIM_FIRE_DANCE ? critterArt(obj, ANIM_BURNED_TO_NOTHING) : null
+            // As a sequence step (joining an attack's sequence when there is
+            // one); the body is left on the last frame.
+            if (playDeath(obj, code, !!burned, () => { if (callback) {callback()} })) {return}
             playCode(code, art, burned ? () => playCode(ANIM_BURNED_TO_NOTHING, burned, finish) : finish)
             return
         }

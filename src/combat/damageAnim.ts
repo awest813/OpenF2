@@ -7,7 +7,8 @@
 import globalState from '../globalState.js'
 import { hexInDirectionDistance, type Point } from '../geometry.js'
 import {
-    ANIMATION_REQUEST_RESERVED, critterArt, regAnimAnimate, regAnimBegin, regAnimClear, regAnimEnd, regAnimSetArt,
+    ANIMATION_REQUEST_RESERVED, critterArt, regAnimAnimate, regAnimBegin, regAnimCallback, regAnimClear, regAnimEnd,
+    regAnimSetArt,
 } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 
@@ -18,6 +19,7 @@ export const ANIM_HIT_FROM_BACK = 15
 export const ANIM_FALL_BACK = 20
 export const ANIM_FALL_FRONT = 21
 export const ANIM_FIRE_DANCE = 33
+export const ANIM_BURNED_TO_NOTHING = 29
 export const ANIM_PRONE_TO_STANDING = 36
 export const ANIM_BACK_TO_STANDING = 37
 /** A fall's single-frame lying-down version (ANIM_FALL_BACK_SF − ANIM_FALL_BACK). */
@@ -57,17 +59,102 @@ export function pickFall(critter: any, anim: number): number {
     return anim
 }
 
-/** Play `steps` (an animation, or a lying-down frame to switch to) as one sequence. */
-function play(critter: any, steps: Array<{ anim: number } | { art: number }>): boolean {
-    regAnimClear(critter)
+type Step = { anim: number } | { art: number } | { call: () => void }
+
+function registerStep(owner: any, step: Step, delay: number): number {
+    if ('anim' in step) {return regAnimAnimate(owner, step.anim, delay)}
+    if ('art' in step) {return regAnimSetArt(owner, step.art, delay)}
+    return regAnimCallback(owner, step.call, delay)
+}
+
+/** Play `steps` now as one sequence of their own. False when it could not be registered. */
+function playNow(owner: any, steps: Step[]): boolean {
+    regAnimClear(owner)
     if (regAnimBegin(ANIMATION_REQUEST_RESERVED) === -1) {return false}
     let delay = 0
     for (const step of steps) {
-        const ok = 'anim' in step ? regAnimAnimate(critter, step.anim, delay) : regAnimSetArt(critter, step.art, -1)
-        if (ok === -1) {return false}
+        if (registerStep(owner, step, delay) === -1) {return false}
         delay = -1
     }
     return regAnimEnd() !== -1
+}
+
+/**
+ * While an attack is being worked out, reactions wait here so they can join
+ * the attacker's swing in one sequence (_action_melee / _action_ranged).
+ */
+let batch: Array<{ owner: any; steps: Step[] }> | null = null
+
+function play(owner: any, steps: Step[]): boolean {
+    if (batch) {
+        batch.push({ owner, steps })
+        return true
+    }
+    return playNow(owner, steps)
+}
+
+/** Start collecting reactions for an attack (anything left over plays at once). */
+export function beginReactionBatch(): void {
+    const stale = batch
+    batch = null
+    for (const p of stale ?? []) {playNow(p.owner, p.steps)}
+    batch = []
+}
+
+/**
+ * The attack's sequence: the attacker's swing, each reaction starting at the
+ * swing's action frame (the attacker's own after the swing), then `onDone`.
+ * Without the swing's art, or when the sequence cannot be registered, the
+ * reactions play at once and `fallback(onDone)` animates the attacker.
+ */
+export function endReactionBatch(attacker: any, attackAnim: number, onDone: () => void, fallback: (done: () => void) => void): void {
+    // A critter hit twice shows only its last reaction (one animation at a time).
+    const latest = new Map<any, Step[]>()
+    for (const p of batch ?? []) {
+        latest.delete(p.owner)
+        latest.set(p.owner, p.steps)
+    }
+    const pending = [...latest].map(([owner, steps]) => ({ owner, steps }))
+    batch = null
+    const art = critterArt(attacker, attackAnim)
+    const immediate = () => {
+        for (const p of pending) {playNow(p.owner, p.steps)}
+        fallback(onDone)
+    }
+    if (!art) {
+        immediate()
+        return
+    }
+    regAnimClear(attacker)
+    for (const p of pending) {regAnimClear(p.owner)}
+    const actionFrame = Math.max(0, globalState.imageInfo?.[art]?.actionFrame ?? 0)
+    let ok = regAnimBegin(ANIMATION_REQUEST_RESERVED) !== -1 && regAnimAnimate(attacker, attackAnim, 0) !== -1
+    let first = true
+    for (const p of pending) {
+        if (!ok) {break}
+        let delay = p.owner === attacker ? -1 : first && actionFrame > 0 ? actionFrame : 0
+        if (p.owner !== attacker) {first = false}
+        for (const step of p.steps) {
+            if (registerStep(p.owner, step, delay) === -1) {
+                ok = false
+                break
+            }
+            delay = -1
+        }
+    }
+    ok = ok && regAnimCallback(attacker, onDone, -1) !== -1 && regAnimEnd() !== -1
+    if (!ok) {immediate()}
+}
+
+/**
+ * _show_death: a death animation (a fire dance burns on down to nothing),
+ * then `done`. False when it could not be played as a sequence.
+ */
+export function playDeath(critter: any, anim: number, burnedAfter: boolean, done: () => void): boolean {
+    const steps: Step[] = [{ anim }]
+    if (burnedAfter) {steps.push({ anim: ANIM_BURNED_TO_NOTHING })}
+    steps.push({ call: done })
+    return play(critter, steps)
 }
 
 /**

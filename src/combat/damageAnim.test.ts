@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import globalState from '../globalState.js'
-import { resetAnimSequences } from '../animSequence.js'
+import { resetAnimSequences, tickAnimSequences } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 import {
     ANIM_DODGE_ANIM, ANIM_FALL_BACK, ANIM_FALL_FRONT, ANIM_FIRE_DANCE, ANIM_HIT_FROM_BACK, ANIM_HIT_FROM_FRONT,
-    dodgeAnimation, pickFall, showDamageReaction, standUpAnimation,
+    beginReactionBatch, dodgeAnimation, endReactionBatch, pickFall, showDamageReaction, standUpAnimation,
 } from './damageAnim.js'
 
 const BASE = 'art/critters/hmjmps'
@@ -90,5 +90,39 @@ describe('_show_damage_to_object for a survivor', () => {
         c.knockedDown = true
         dodgeAnimation(c)
         expect(c.animCode).toBe(0)
+    })
+})
+
+describe('an attack as one sequence (_action_melee)', () => {
+    it("the defender reacts at the swing's action frame, and the turn goes on once all is done", () => {
+        globalState.imageInfo[BASE + 'aq'] = { numFrames: 6, fps: 10, actionFrame: 3 } as any // ANIM_THROW_PUNCH
+        const attacker = critter([])
+        const defender = critter([ANIM_HIT_FROM_FRONT], { x: 51, y: 50 })
+        let done = false
+        beginReactionBatch()
+        showDamageReaction(defender, 0, true, 0)
+        expect(defender.animCode).toBeUndefined()
+        endReactionBatch(attacker, 16, () => { done = true }, () => { throw new Error('no fallback expected') })
+        expect(attacker.animCode).toBe(16)
+        tickAnimSequences()
+        tickAnimSequences()
+        expect(defender.animCode).toBeUndefined()
+        tickAnimSequences()
+        expect(defender.animCode).toBe(ANIM_HIT_FROM_FRONT)
+        defender.animCallback()
+        expect(done).toBe(false)
+        attacker.animCallback()
+        expect(done).toBe(true)
+    })
+
+    it('without the swing art the reactions play at once and the old animation runs', () => {
+        const attacker = critter([])
+        const defender = critter([ANIM_HIT_FROM_FRONT], { x: 51, y: 50 })
+        let fellBack = false
+        beginReactionBatch()
+        showDamageReaction(defender, 0, true, 0)
+        endReactionBatch(attacker, 16, () => {}, (finish) => { fellBack = true; finish() })
+        expect(fellBack).toBe(true)
+        expect(defender.animCode).toBe(ANIM_HIT_FROM_FRONT)
     })
 })

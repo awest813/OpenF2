@@ -73,7 +73,7 @@ import { awardCritterXp } from './character/xp.js'
 import { isProne } from './animSequence.js'
 import { loadPRO } from './pro.js'
 import { attackAnimationForMode, deathAnimationFor, isHitFromFront } from './combat/deathAnim.js'
-import { dodgeAnimation, showDamageReaction, standUpAnimation } from './combat/damageAnim.js'
+import { beginReactionBatch, dodgeAnimation, endReactionBatch, showDamageReaction, standUpAnimation } from './combat/damageAnim.js'
 
 // Turn-based combat system
 
@@ -794,6 +794,17 @@ export class Combat {
         return 0
     }
 
+    /**
+     * The attacker's swing with the defenders' reactions timed to its action
+     * frame (_action_melee / _action_ranged), then `callback`.
+     */
+    private playAttack(obj: Critter, info: AttackWeaponInfo, hitMode: HitMode, callback?: () => void): void {
+        const kick = (obj as any).unarmedAttackAnim === 'r' || (!info.weapon && info.mode === 2)
+        const anim = attackAnimationForMode(info.mode, kick)
+        const done = () => { if (callback) {callback()} }
+        endReactionBatch(obj, anim, done, (finish) => obj.staticAnimation('attack', finish))
+    }
+
     /** _show_damage_to_object's pick of the death animation (with sfall's DeathAnim hooks). */
     private deathAnimation(attacker: Critter, victim: Critter, damage: number, info: AttackWeaponInfo): number {
         const kick = (attacker as any).unarmedAttackAnim === 'r' || (!info.weapon && info.mode === 2)
@@ -944,8 +955,7 @@ export class Combat {
         for (const victim of victims) {
             if (victim === obj) {
                 const damage = this.getDamageDone(obj, obj, 2, 0, 1, info.hitMode)
-                if (damage > 0) {critterDamage(obj, damage, obj)}
-                if (obj.dead) {this.perish(obj)}
+                this.hitCritter(obj, obj, damage, 0, info)
                 out.push({ critter: obj, damage, flags: 0, died: obj.dead === true })
                 continue
             }
@@ -1139,6 +1149,7 @@ export class Combat {
         if (firing && isRangedWeapon(firing)) {
             consumeRounds(firing, 1)
         }
+        beginReactionBatch()
 
         // turn to face the target
         // BLK-059: Guard against null positions before calling hexNearestNeighbor.
@@ -1270,7 +1281,7 @@ export class Combat {
         this.attackTaunts(obj, target, report, info)
 
         // attack!
-        obj.staticAnimation('attack', callback)
+        this.playAttack(obj, info, hitMode, callback)
     }
 
     /**
@@ -1375,6 +1386,7 @@ export class Combat {
             const hex = hexNearestNeighbor(obj.position, target.position)
             if (hex !== null) {obj.orientation = hex.direction}
         }
+        beginReactionBatch()
 
         const attackerState = obj as any
         attackerState.lastCombatTarget = target
@@ -1490,7 +1502,7 @@ export class Combat {
         this.recordAttack(obj, target, report)
         this.attackTaunts(obj, target, report, info)
 
-        obj.staticAnimation('attack', callback)
+        this.playAttack(obj, info, hitMode, callback)
     }
 
     perish(obj: Critter) {
