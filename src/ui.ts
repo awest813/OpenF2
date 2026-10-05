@@ -50,6 +50,7 @@ import { examineLines } from './examine.js'
 import { parkCarAtPlayer } from './car.js'
 import { finishStealing, openStealing, type StealScreen } from './steal.js'
 import { isDrug, takeDrug } from './character/timedEffects.js'
+import { isBook, useBook } from './books.js'
 import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
 
@@ -79,7 +80,7 @@ function refreshInventoryPanel(): void {
             name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
             amount: (o as any).amount ?? 1,
             // USE reloads with matching ammo and takes drugs (inventory.cc).
-            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o),
+            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o) || isBook(o),
             pid,
         }
     })
@@ -442,6 +443,16 @@ export function initUI() {
         const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
         const item = panel?.items[index]
         const live = globalState.player?.inventory?.[index]
+        if (live && isBook(live)) {
+            // _obj_use_item: a book that was read is used up.
+            if (useBook(live) === 1) {
+                const inv = globalState.player.inventory
+                if (typeof (live as any).amount === 'number' && (live as any).amount > 1) {(live as any).amount--}
+                else {inv.splice(inv.indexOf(live), 1)}
+            }
+            refreshInventoryPanel()
+            return
+        }
         if (live && isDrug(live)) {
             // inventory.cc USE on a drug: _item_d_take_drug on the player; a
             // dose that was taken is used up.
