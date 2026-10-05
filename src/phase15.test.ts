@@ -7,16 +7,6 @@ describe('Phase 15-A — has_trait object cases no longer stubbed', () => {
         drainStubHits()
     })
 
-    it('returns worn-state for INVEN_TYPE_WORN on critters', () => {
-        const script = new Scripting.Script()
-        const critter: any = { type: 'critter', equippedArmor: { pid: 1 }, visible: true, orientation: 0, aiNum: 2, teamNum: 3 }
-
-        expect(script.has_trait(1, critter, 0)).toBe(1)
-        critter.equippedArmor = null
-        expect(script.has_trait(1, critter, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('returns AI/team numbers for critter object traits', () => {
         const script = new Scripting.Script()
         const critter: any = { type: 'critter', equippedArmor: null, visible: true, orientation: 0, aiNum: 9, teamNum: 4 }

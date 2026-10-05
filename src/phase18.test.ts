@@ -334,23 +334,6 @@ describe('Phase 18-B — TRAIT_PERK (type 0) in has_trait and critter_add_trait'
         expect(stubHitCount()).toBe(0)
     })
 
-    it('critter_add_trait(0, critter, perkId, 0) sets perk rank to 0', () => {
-        const script = new Scripting.Script()
-        const critter = makeCritter()
-        critter.perkRanks[3] = 2
-        script.critter_add_trait(critter, 0, 3, 0) // PERK_TOUGHNESS = 3
-        expect(critter.perkRanks[3]).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('critter_add_trait(0, critter, perkId, -5) clamps to 0', () => {
-        const script = new Scripting.Script()
-        const critter = makeCritter()
-        script.critter_add_trait(critter, 0, 6, -5) // PERK_ACTION_BOY = 6
-        expect(critter.perkRanks[6]).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('has_trait then critter_add_trait round-trip works', () => {
         const script = new Scripting.Script()
         const critter = makeCritter()

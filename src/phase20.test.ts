@@ -85,30 +85,9 @@ describe('Phase 20-C — has_trait TRAIT_OBJECT new cases (1, 2, 3, 667, 668)', 
         expect(stubHitCount()).toBe(0)
     })
 
-    it('has_trait(1, critter, 1) returns 1 when rightHand is equipped', () => {
-        const weapon = makeObj({ type: 'item' })
-        const c = makeCritter({ rightHand: weapon })
-        expect(script.has_trait(1, c, 1)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('has_trait(1, critter, 2) returns 0 when no leftHand equipped', () => {
         const c = makeCritter({ leftHand: null })
         expect(script.has_trait(1, c, 2)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('has_trait(1, critter, 2) returns 1 when leftHand is equipped', () => {
-        const weapon = makeObj({ type: 'item' })
-        const c = makeCritter({ leftHand: weapon })
-        expect(script.has_trait(1, c, 2)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('has_trait(1, critter, 3) returns inventory length', () => {
-        const items = [makeObj(), makeObj(), makeObj()]
-        const c = makeCritter({ inventory: items })
-        expect(script.has_trait(1, c, 3)).toBe(3)
         expect(stubHitCount()).toBe(0)
     })
 
@@ -124,21 +103,9 @@ describe('Phase 20-C — has_trait TRAIT_OBJECT new cases (1, 2, 3, 667, 668)', 
         expect(stubHitCount()).toBe(0)
     })
 
-    it('has_trait(1, obj, 667) returns 1 when extra.isFlat is true', () => {
-        const obj = makeObj({ extra: { isFlat: true } })
-        expect(script.has_trait(1, obj, 667)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('has_trait(1, obj, 668) returns 0 when noBlock not set', () => {
         const obj = makeObj({ extra: {} })
         expect(script.has_trait(1, obj, 668)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('has_trait(1, obj, 668) returns 1 when extra.noBlock is true', () => {
-        const obj = makeObj({ extra: { noBlock: true } })
-        expect(script.has_trait(1, obj, 668)).toBe(1)
         expect(stubHitCount()).toBe(0)
     })
 
@@ -168,41 +135,6 @@ describe('Phase 20-D — critter_add_trait TRAIT_OBJECT new cases (667, 668)', (
         script = new (Scripting as any).Script()
     })
 
-    it('critter_add_trait(obj, 1, 667, 1) sets extra.isFlat = true', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 1, 667, 1)
-        expect((c as any).extra.isFlat).toBe(true)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('critter_add_trait(obj, 1, 667, 0) sets extra.isFlat = false', () => {
-        const c = makeCritter({ extra: { isFlat: true } })
-        script.critter_add_trait(c, 1, 667, 0)
-        expect((c as any).extra.isFlat).toBe(false)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('critter_add_trait(obj, 1, 668, 1) sets extra.noBlock = true', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 1, 668, 1)
-        expect((c as any).extra.noBlock).toBe(true)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('critter_add_trait(obj, 1, 668, 0) sets extra.noBlock = false', () => {
-        const c = makeCritter({ extra: { noBlock: true } })
-        script.critter_add_trait(c, 1, 668, 0)
-        expect((c as any).extra.noBlock).toBe(false)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('critter_add_trait initialises extra if absent', () => {
-        const c = makeCritter()
-        delete (c as any).extra
-        script.critter_add_trait(c, 1, 667, 1)
-        expect((c as any).extra.isFlat).toBe(true)
-    })
-
     it('critter_add_trait TRAIT_OBJECT 667/668 do not emit stubs', () => {
         const c = makeCritter()
         drainStubHits()
@@ -211,13 +143,6 @@ describe('Phase 20-D — critter_add_trait TRAIT_OBJECT new cases (667, 668)', (
         expect(stubHitCount()).toBe(0)
     })
 
-    it('has_trait round-trip: set via critter_add_trait, read via has_trait', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 1, 667, 1)
-        expect(script.has_trait(1, c, 667)).toBe(1)
-        script.critter_add_trait(c, 1, 668, 1)
-        expect(script.has_trait(1, c, 668)).toBe(1)
-    })
 })
 
 // ---------------------------------------------------------------------------

@@ -179,11 +179,6 @@ describe('Phase 25-D — has_trait(TRAIT_OBJECT) extended cases', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('has_trait(1, critter, 4) returns 1 for critter type', () => {
-        const c = makeCritter()
-        expect(script.has_trait(1, c, 4)).toBe(1)
-    })
-
     it('has_trait(1, item, 4) returns 0 for item type', () => {
         const obj = makeObj()
         expect(script.has_trait(1, obj, 4)).toBe(0)
@@ -194,24 +189,9 @@ describe('Phase 25-D — has_trait(TRAIT_OBJECT) extended cases', () => {
         expect(script.has_trait(1, obj, 7)).toBe(0)
     })
 
-    it('has_trait(1, obj, 7) returns 1 for locked object', () => {
-        const obj = makeObj({ locked: true })
-        expect(script.has_trait(1, obj, 7)).toBe(1)
-    })
-
     it('has_trait(1, obj, 8) returns 0 for closed object', () => {
         const obj = makeObj({ open: false })
         expect(script.has_trait(1, obj, 8)).toBe(0)
-    })
-
-    it('has_trait(1, obj, 8) returns 1 for open object', () => {
-        const obj = makeObj({ open: true })
-        expect(script.has_trait(1, obj, 8)).toBe(1)
-    })
-
-    it('has_trait(1, obj, 9) returns pid', () => {
-        const obj = makeObj({ pid: 77 })
-        expect(script.has_trait(1, obj, 9)).toBe(77)
     })
 
     it('has_trait(1, obj, 11) returns 0 for unscripted object', () => {
@@ -237,24 +217,6 @@ describe('Phase 25-E — critter_add_trait(TRAIT_OBJECT) extended cases', () => 
     beforeEach(() => {
         drainStubHits()
         script = new (Scripting as any).Script()
-    })
-
-    it('critter_add_trait(critter, 1, 7, 1) sets locked = true', () => {
-        const c = makeCritter()
-        expect(() => script.critter_add_trait(c, 1, 7, 1)).not.toThrow()
-        expect(c.locked).toBe(true)
-    })
-
-    it('critter_add_trait(critter, 1, 7, 0) sets locked = false', () => {
-        const c = makeCritter({ locked: true })
-        script.critter_add_trait(c, 1, 7, 0)
-        expect(c.locked).toBe(false)
-    })
-
-    it('critter_add_trait(critter, 1, 8, 1) sets open = true', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 1, 8, 1)
-        expect(c.open).toBe(true)
     })
 
     it('unknown TRAIT_OBJECT case is a silent no-op (no stub hit)', () => {

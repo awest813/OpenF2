@@ -148,24 +148,9 @@ describe('Phase 90-B — BLK-177: critter_add_trait TRAIT_CHAR uninitialised cha
         expect(() => script.critter_add_trait(npc, 2, 5, 1)).not.toThrow()
     })
 
-    it('initialises charTraits and adds the trait when absent', () => {
-        const npc = makeCritterNoCharTraits()
-        script.critter_add_trait(npc, 2, 3, 1)
-        expect(npc.charTraits).toBeDefined()
-        expect(npc.charTraits.has(3)).toBe(true)
-    })
-
     it('initialises charTraits and does not crash on delete when absent', () => {
         const npc = makeCritterNoCharTraits()
         expect(() => script.critter_add_trait(npc, 2, 7, 0)).not.toThrow()
-    })
-
-    it('works normally when charTraits is already a Set', () => {
-        const npc = makeCritter()
-        script.critter_add_trait(npc, 2, 1, 1)
-        expect(npc.charTraits.has(1)).toBe(true)
-        script.critter_add_trait(npc, 2, 1, 0) // revoke
-        expect(npc.charTraits.has(1)).toBe(false)
     })
 
     it('does not throw when called on non-critter object', () => {
@@ -188,20 +173,6 @@ describe('Phase 90-C — BLK-178: critter_add_trait TRAIT_SKILL null skills guar
         const npc = makeCritter()
         delete (npc as any).skills
         expect(() => script.critter_add_trait(npc as any, 3, 3, 10)).not.toThrow()
-    })
-
-    it('applies skill boost normally when skills is present', () => {
-        const baseSkills: Record<string, number> = {}
-        const npc = makeCritter({
-            skills: {
-                skillPoints: 0,
-                getBase: (s: string) => baseSkills[s] ?? 30,
-                setBase: vi.fn((s: string, v: number) => { baseSkills[s] = v }),
-                baseSkills,
-            },
-        })
-        script.critter_add_trait(npc, 3, 3 /* SKILL_UNARMED */, 15)
-        expect(npc.skills.setBase).toHaveBeenCalled()
     })
 
     it('does not modify skills when TRAIT_SKILL amount is non-finite', () => {
@@ -453,13 +424,6 @@ describe('Phase 90-F — Arroyo combat and NPC smoke tests', () => {
      * Simulates the Elder granting a TRAIT_CHAR trait to the player via a fresh
      * critter object that was spawned by create_object_sid() without charTraits.
      */
-    it('Elder trait grant: critter_add_trait TRAIT_CHAR on critter without charTraits', () => {
-        const freshNpc = makeCritterNoCharTraits()
-        expect(() => script.critter_add_trait(freshNpc, 2, 4 /* TRAIT_GIFTED */, 1)).not.toThrow()
-        expect(freshNpc.charTraits).toBeDefined()
-        expect(freshNpc.charTraits.has(4)).toBe(true)
-    })
-
     /**
      * Simulates the Arroyo village guard having TRAIT_SKILL boosted when skills
      * component is not yet attached (partial NPC init during map_enter_p_proc).

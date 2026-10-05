@@ -57,7 +57,8 @@ import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, S
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
-import { getCritterCarryLimitLbs } from './critterInventory.js'
+import { getCritterCarryLimitLbs, getCritterInventoryWeightLbs } from './critterInventory.js'
+import { perkRank } from './character/perkIds.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
 import { fillCarGas, getCarFuel, getCarPark, getCarTrunkMaxSize, setCarFuel, setCarTrunkMaxSize, setHasCar } from './car.js'
@@ -237,6 +238,9 @@ export namespace Scripting {
     export const timeEventList: TimedEvent[] = []
     let overrideStartPos: StartPos | null = null
     let scriptDebuggerSink: ScriptDebuggerSink | null = null
+
+    const PERK_COUNT = 119
+    const TRAIT_COUNT = 16
 
     // opMetarule constants.
     const CITY_CAR_OUT_OF_GAS = 21
@@ -1187,210 +1191,68 @@ export namespace Scripting {
             (obj as Critter).stats.setBase(statName, amount)
             return 0
         }
+        /** opHasTrait: perk rank, a few object fields, or whether the player picked a trait. */
         has_trait(traitType: number, obj: Obj, trait: number) {
             if (!isGameObject(obj)) {
-                warn('has_trait: not game object: ' + obj, undefined, this)
+                warn('has_trait: obj is NULL', undefined, this)
                 return 0
             }
-
-            if (traitType === 0) {
-                // TRAIT_PERK — return the critter's perk rank for this perk ID
-                if (obj.type !== 'critter') {return 0}
-                return (obj as Critter).perkRanks[trait] ?? 0
-            }
-
-            if (traitType === 1) {
-                // TRAIT_OBJECT
-                switch (trait) {
-                    case 0:
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).equippedArmor ? 1 : 0 // INVEN_TYPE_WORN
-                    case 1: // INVEN_TYPE_RIGHT_HAND — 1 if critter has a right-hand item equipped
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).rightHand ? 1 : 0
-                    case 2: // INVEN_TYPE_LEFT_HAND — 1 if critter has a left-hand item equipped
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).leftHand ? 1 : 0
-                    case 3: // INVEN_TYPE_INV_COUNT — total number of items in inventory
-                        return obj.inventory ? obj.inventory.length : 0
-                    case 4: // OBJECT_TYPE — generic object type code (0=item, 1=critter, 2=scenery, 3=wall)
-                        if (obj.type === 'critter') {return 1}
-                        if (obj.type === 'scenery') {return 2}
-                        if (obj.type === 'wall') {return 3}
-                        return 0
-                    case 5:
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).aiNum // OBJECT_AI_PACKET
-                    case 6:
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).teamNum // OBJECT_TEAM_NUM
-                    case 7: // OBJECT_LOCKED — 1 if the object is locked
-                        return obj.locked ? 1 : 0
-                    case 8: // OBJECT_OPEN — 1 if the object is open
-                        return obj.open ? 1 : 0
-                    case 9: // OBJECT_PID — prototype ID of the object
-                        return obj.pid ?? 0
-                    case 10:
-                        return obj.orientation // OBJECT_CUR_ROT
-                    case 11: // OBJECT_SID — script ID of the object (0 if unscripted)
-                        return (obj as any)._sid ?? 0
-                    case 666: // OBJECT_VISIBILITY
-                        return obj.visible === false ? 0 : 1 // 1 = visible, 0 = invisible
-                    case 667: // OBJECT_IS_FLAT — 1 if object is flat (rendered below critters)
-                        return (obj as any).extra?.isFlat ? 1 : 0
-                    case 668: // OBJECT_NO_BLOCK — 1 if object does not block movement
-                        return (obj as any).extra?.noBlock ? 1 : 0
-                    case 669: // OBJECT_CUR_WEIGHT — total carried weight in lbs
-                        if (obj.type !== 'critter') {return 0}
-                        return (obj as Critter).stats.getBase('Carry')
-                    default:
-                        // Unknown TRAIT_OBJECT sub-case — return 0 silently so scripts
-                        // that probe optional object attributes do not crash.
-                        log('has_trait(TRAIT_OBJECT,' + trait + '): unknown sub-case — returning 0', arguments)
-                        return 0
-                }
-            }
-
-            if (traitType === 2) {
-                // TRAIT_CHAR — check if the critter has the given character-creation trait.
-                // Fallout 2 trait IDs 0–15 correspond to the 16 creation-time mutations
-                // (Fast Metabolism, Bruiser, Small Frame, etc.).  We store these in the
-                // `charTraits` Set on the Critter instance.
-                if (obj.type !== 'critter') {return 0}
-                return (obj as Critter).charTraits.has(trait) ? 1 : 0
-            }
-
-            if (traitType === 3) {
-                // BLK-157: TRAIT_SKILL — return the critter's current base skill value for
-                // the given skill ID.  New Reno boxing scripts call has_trait(TRAIT_SKILL, obj,
-                // SKILL_UNARMED) to read back the accumulated trait-skill value that was set via
-                // critter_add_trait(TRAIT_SKILL, …).  Without this handler the result was
-                // always 0, causing fight-setup logic to skip all skill adjustments.
-                if (obj.type !== 'critter') {return 0}
-                const skillName = skillNumToName[trait]
-                if (!skillName) {
-                    log('has_trait(TRAIT_SKILL,' + trait + '): unknown skill id — returning 0', arguments)
+            const o = obj as any
+            switch (traitType) {
+                case 0: // CRITTER_TRAIT_PERK
+                    if (trait >= PERK_COUNT) {return 0}
+                    return perkRank(o, trait)
+                case 1: // CRITTER_TRAIT_OBJECT
+                    switch (trait) {
+                        case 5: // AI packet
+                            return o.type === 'critter' ? (o.aiNum ?? 0) : 0
+                        case 6: // team
+                            return o.type === 'critter' ? (o.teamNum ?? 0) : 0
+                        case 10: // rotation
+                            return o.orientation ?? 0
+                        case 666: // not hidden
+                            return o.visible === false ? 0 : 1
+                        case 669: // inventory weight
+                            return getCritterInventoryWeightLbs(o)
+                        default:
+                            return 0
+                    }
+                case 2: // CRITTER_TRAIT_TRAIT: the player's chosen traits, whoever is asked about
+                    if (trait >= TRAIT_COUNT) {return 0}
+                    return (globalState.player as any)?.charTraits?.has?.(trait) ? 1 : 0
+                default:
                     return 0
-                }
-                return (obj as Critter).skills.getBase(skillName)
             }
-
-            // Unknown traitType — return 0 silently rather than stubbing so that
-            // scripts probing unusual trait categories do not produce console noise.
-            log('has_trait: unknown traitType ' + traitType + ' — returning 0', arguments)
-            return 0
         }
+        /** opCritterAddTrait: add or take one perk rank, or set a critter's AI packet or team. Always -1. */
         critter_add_trait(obj: Obj, traitType: number, trait: number, amount: number) {
             if (!isGameObject(obj)) {
-                warn('critter_add_trait: not game object: ' + obj, undefined, this)
-                return
+                warn('critter_add_trait: obj is NULL', undefined, this)
+                return -1
             }
-
-            if (obj.type !== 'critter') {
-                warn('critter_add_trait: not a critter: ' + obj, undefined, this)
-                return
-            }
-
+            if (obj.type !== 'critter') {return -1}
+            const critter = obj as any
             if (traitType === 0) {
-                // TRAIT_PERK — set the perk rank for this perk ID.
-                // Guard: some mock objects and edge-case NPCs lack a perkRanks record;
-                // initialise it on demand so no TypeError is thrown.
-                if (!(obj as Critter).perkRanks) {(obj as Critter).perkRanks = {}
-                ;}(obj as Critter).perkRanks[trait] = Math.max(0, amount)
-                return
-            }
-
-            if (traitType === 1) {
-                // TRAIT_OBJECT
-                switch (trait) {
-                    case 5: // OBJECT_AI_PACKET
-                        info('Setting critter AI packet to ' + amount, undefined, this)
-                        ;(<Critter>obj).aiNum = amount
-                        return
-                    case 6: // OBJECT_TEAM_NUM
-                        info('Setting critter team to ' + amount, undefined, this)
-                        ;(<Critter>obj).teamNum = amount
-                        return
-                    case 7: // OBJECT_LOCKED — set locked state
-                        obj.locked = amount !== 0
-                        return
-                    case 8: // OBJECT_OPEN — set open state
-                        obj.open = amount !== 0
-                        return
-                    case 10: // OBJECT_CUR_ROT
-                        obj.orientation = ((amount % 6) + 6) % 6
-                        return
-                    case 666: // OBJECT_VISIBILITY
-                        obj.visible = amount !== 0
-                        return
-                    case 667: // OBJECT_IS_FLAT — mark object as flat (rendered below critters)
-                        if (!(obj as any).extra) {(obj as any).extra = {}
-                        ;}(obj as any).extra.isFlat = amount !== 0
-                        return
-                    case 668: // OBJECT_NO_BLOCK — mark object as non-blocking for movement
-                        if (!(obj as any).extra) {(obj as any).extra = {}
-                        ;}(obj as any).extra.noBlock = amount !== 0
-                        return
-                    case 669: // OBJECT_CUR_WEIGHT — set the critter's carry weight
-                        (obj as Critter).stats.setBase('Carry', Math.max(0, amount))
-                        return
-                    default:
-                        // Unknown TRAIT_OBJECT sub-case — log silently and return.
-                        log('critter_add_trait(TRAIT_OBJECT,' + trait + ',' + amount + '): unknown sub-case — no-op', arguments)
-                        return
-                }
-            }
-
-            if (traitType === 2) {
-                // TRAIT_CHAR — add or remove a character-creation trait by ID.
-                // amount > 0: grant the trait; amount <= 0: revoke it.
-                // BLK-177: Guard against uninitialised charTraits — critters spawned via
-                // create_object_sid() during the Arroyo temple map_enter_p_proc may not
-                // have charTraits initialised before the Elder's trait-grant script fires.
-                // Without this guard, calling .add() or .delete() on undefined throws a
-                // TypeError and crashes the VM, preventing map initialisation.
-                const critterForTrait = obj as Critter
-                if (!critterForTrait.charTraits) {critterForTrait.charTraits = new Set()}
+                // perkAddForce / perkRemove
+                if (trait < 0 || trait >= PERK_COUNT) {return -1}
+                if (!critter.perkRanks) {critter.perkRanks = {}}
+                const rank = perkRank(critter, trait)
                 if (amount > 0) {
-                    critterForTrait.charTraits.add(trait)
-                } else {
-                    critterForTrait.charTraits.delete(trait)
+                    const maxRank = PERK_MAP.get(trait)?.ranks
+                    if (maxRank === undefined || maxRank === -1 || rank < maxRank) {critter.perkRanks[trait] = rank + 1}
+                } else if (rank >= 1) {
+                    critter.perkRanks[trait] = rank - 1
                 }
-                return
+                if (critter === globalState.player) {syncPlayerEntityFromCritter()}
+            } else if (traitType === 1) {
+                if (trait === 5) {
+                    critter.aiNum = amount // critterSetAiPacket
+                } else if (trait === 6) {
+                    const inParty = globalState.gParty?.isPartyMember?.(critter) ?? false
+                    if (!inParty && critter.teamNum !== amount && !globalState.loadingGame) {critter.teamNum = amount}
+                }
             }
-
-            if (traitType === 3) {
-                // BLK-156: TRAIT_SKILL — adjust the critter's base skill value by amount.
-                // New Reno boxing scripts call critter_add_trait(boxer, TRAIT_SKILL,
-                // SKILL_UNARMED, +bonus) before a fight and critter_add_trait(boxer,
-                // TRAIT_SKILL, SKILL_UNARMED, -bonus) afterward to undo the boost.
-                // Without this handler the skill boost was silently discarded, leaving
-                // every boxer at their unmodified stats and breaking fight scripting.
-                // Non-finite amounts are treated as 0 (parallel to BLK-160).
-                const skillName = skillNumToName[trait]
-                if (!skillName) {
-                    log('critter_add_trait(TRAIT_SKILL,' + trait + '): unknown skill id — no-op', arguments)
-                    return
-                }
-                const safeAmount = Number.isFinite(amount) ? amount : 0
-                const critter = obj as Critter
-                // BLK-178: Guard against null critter.skills — mirrors BLK-174 (give_exp_points).
-                // Arroyo NPC scripts call critter_add_trait(TRAIT_SKILL, …) on partially
-                // initialised critters before the skills component is attached (e.g. during the
-                // Elder's greeting before the character creation screen fully populates the
-                // player object).  Without this guard, critter.skills.setBase() throws a
-                // TypeError and halts the script VM.  Skip the skill adjustment silently.
-                if (!critter.skills) {
-                    warn('critter_add_trait(TRAIT_SKILL): critter.skills is null — no-op', undefined, this)
-                    return
-                }
-                critter.skills.setBase(skillName, critter.skills.getBase(skillName) + safeAmount)
-                return
-            }
-
-            // Unknown traitType — log silently rather than stubbing so that
-            // scripts using optional trait categories do not produce console noise.
-            log('critter_add_trait: unknown traitType ' + traitType + ' — no-op', arguments)
+            return -1
         }
         item_caps_total(obj: Obj) {
             if (!isGameObject(obj)) {
@@ -1830,20 +1692,16 @@ export namespace Scripting {
             // the exact position is occupied.
             return this.move_to(obj, tileNum, elevation)
         }
+        /**
+         * opGetCritterState: CRITTER_STATE_DEAD (1) for a dead or non-critter
+         * object; 2 (prone) while knocked out or down; otherwise 0, plus the
+         * crippled-limb and blinded bits while the critter can act.
+         */
         critter_state(obj: Critter) {
-            /*stub("critter_state", arguments);*/
-            if (!isGameObject(obj)) {
-                warn('critter_state: not game object: ' + obj)
-                return 1
-            }
-
-            // interpreter_extra.cc opGetCritterState: CRITTER_STATE_DEAD (1) for a
-            // dead or non-critter object; otherwise CRITTER_STATE_PRONE (2) when
-            // knocked down or out, plus the crippled-limb and blinded damage bits.
-            if (obj.type !== 'critter' || obj.dead === true) {return 1}
+            if (!isGameObject(obj) || obj.type !== 'critter' || obj.dead === true) {return 1}
             const c = obj as any
-            let state = 0
-            if (c.knockedOut === true || c.knockedDown === true) {state |= 0x02}
+            if (c.knockedOut === true) {return 2}
+            let state = c.knockedDown === true ? 2 : 0
             if (c.crippledLeftLeg) {state |= 0x04}
             if (c.crippledRightLeg) {state |= 0x08}
             if (c.crippledLeftArm) {state |= 0x10}
@@ -7465,7 +7323,9 @@ export namespace Scripting {
         // New Reno scripts read pre-fight base skill values to verify that
         // skill boosts applied by critter_add_trait have taken effect.
         get_critter_base_skill_sfall(obj: Obj, skillId: number): number {
-            return this.has_trait(3 /* TRAIT_SKILL */, obj, skillId) as number
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            const skillName = skillNumToName[skillId]
+            return skillName ? ((obj as Critter).skills?.getBase(skillName) ?? 0) : 0
         }
 
         // sfall 0x82C2 — set_critter_base_skill_sfall(obj, skillId, val):

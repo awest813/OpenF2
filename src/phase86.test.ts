@@ -83,26 +83,6 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 86-A — BLK-156: critter_add_trait TRAIT_SKILL (traitType=3)', () => {
-    it('adds a positive skill delta to the critter\'s base skill', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 40 })
-        script.critter_add_trait(boxer as any, 3, 3 /* SKILL_UNARMED */, 30)
-        expect(boxer.skills.baseSkills['Unarmed']).toBe(70)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('subtracts a negative skill delta (undo pattern)', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 70 })
-        script.critter_add_trait(boxer as any, 3, 3, -30)
-        expect(boxer.skills.baseSkills['Unarmed']).toBe(40)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('applies to any valid skill index (e.g. Speech=14)', () => {
-        const npc = makeCritterWithSkills({ Speech: 50 })
-        script.critter_add_trait(npc as any, 3, 14, 20)
-        expect(npc.skills.baseSkills['Speech']).toBe(70)
-    })
-
     it('treats NaN amount as 0 (non-finite guard)', () => {
         const boxer = makeCritterWithSkills({ Unarmed: 55 })
         script.critter_add_trait(boxer as any, 3, 3, NaN)
@@ -135,26 +115,6 @@ describe('Phase 86-A — BLK-156: critter_add_trait TRAIT_SKILL (traitType=3)', 
 // ---------------------------------------------------------------------------
 
 describe('Phase 86-B — BLK-157: has_trait TRAIT_SKILL (traitType=3)', () => {
-    it('returns the current base skill value for a valid skill', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 65 })
-        const result = script.has_trait(3 /* TRAIT_SKILL */, boxer as any, 3 /* SKILL_UNARMED */)
-        expect(result).toBe(65)
-    })
-
-    it('returns the default start value when skill not yet in baseSkills', () => {
-        const boxer = makeCritterWithSkills({}) // no 'Unarmed' key
-        // skills.getBase falls back to 30 in our mock
-        const result = script.has_trait(3, boxer as any, 3)
-        expect(result).toBe(30)
-    })
-
-    it('reflects a boost applied via critter_add_trait TRAIT_SKILL', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 50 })
-        script.critter_add_trait(boxer as any, 3, 3, 25)
-        const after = script.has_trait(3, boxer as any, 3)
-        expect(after).toBe(75)
-    })
-
     it('returns 0 for unknown skill id', () => {
         const boxer = makeCritterWithSkills()
         const result = script.has_trait(3, boxer as any, 9999)
@@ -178,12 +138,6 @@ describe('Phase 86-B — BLK-157: has_trait TRAIT_SKILL (traitType=3)', () => {
 // ---------------------------------------------------------------------------
 
 describe('Phase 86-C — BLK-158: critter_add_trait_sfall delegates (not a no-op)', () => {
-    it('applies TRAIT_SKILL boost via the sfall opcode path', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 45 })
-        script.critter_add_trait_sfall(boxer as any, 3, 3, 20)
-        expect(boxer.skills.baseSkills['Unarmed']).toBe(65)
-    })
-
     it('applies TRAIT_PERK (traitType=0) via sfall opcode', () => {
         const boxer = makeCritterWithSkills()
         script.critter_add_trait_sfall(boxer as any, 0 /* TRAIT_PERK */, 5 /* perkId */, 1)
@@ -281,12 +235,6 @@ describe('Phase 86-E — BLK-160: critter_mod_skill non-finite amount guard', ()
 // ---------------------------------------------------------------------------
 
 describe('Phase 86-F — sfall 0x82B8 get_critter_trait_typed_sfall', () => {
-    it('reads TRAIT_SKILL base value via sfall accessor', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 72 })
-        const result = script.get_critter_trait_typed_sfall(boxer as any, 3, 3)
-        expect(result).toBe(72)
-    })
-
     it('reads TRAIT_PERK rank via sfall accessor', () => {
         const boxer = makeCritterWithSkills()
         boxer.perkRanks[12] = 2

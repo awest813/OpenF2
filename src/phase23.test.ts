@@ -100,13 +100,6 @@ describe('Phase 23-A — has_trait TRAIT_CHAR (type 2)', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('returns 1 when the critter has the given char trait', () => {
-        const c = makeCritter()
-        c.charTraits.add(4) // TRAIT_FINESSE = 4
-        expect(script.has_trait(2, c, 4)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('returns 0 for a different trait not in charTraits', () => {
         const c = makeCritter()
         c.charTraits.add(4)
@@ -127,13 +120,6 @@ describe('Phase 23-A — has_trait TRAIT_CHAR (type 2)', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('handles all trait IDs 0–15 without stub hits', () => {
-        const c = makeCritter()
-        for (let i = 0; i <= 15; i++) {c.charTraits.add(i)}
-        drainStubHits()
-        for (let i = 0; i <= 15; i++) {expect(script.has_trait(2, c, i)).toBe(1)}
-        expect(stubHitCount()).toBe(0)
-    })
 })
 
 // ---------------------------------------------------------------------------
@@ -148,40 +134,10 @@ describe('Phase 23-B — critter_add_trait TRAIT_CHAR (type 2)', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('adds a char trait when amount > 0', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 2, 5, 1) // TRAIT_KAMIKAZE = 5
-        expect(c.charTraits.has(5)).toBe(true)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('does not add a char trait when amount === 0', () => {
         const c = makeCritter()
         script.critter_add_trait(c, 2, 5, 0)
         expect(c.charTraits.has(5)).toBe(false)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('removes an existing char trait when amount <= 0', () => {
-        const c = makeCritter()
-        c.charTraits.add(5)
-        script.critter_add_trait(c, 2, 5, 0)
-        expect(c.charTraits.has(5)).toBe(false)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('is idempotent — adding the same trait twice leaves it once', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 2, 3, 1)
-        script.critter_add_trait(c, 2, 3, 1)
-        expect(c.charTraits.size).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('round-trip: add then has_trait', () => {
-        const c = makeCritter()
-        script.critter_add_trait(c, 2, 14, 1) // TRAIT_SKILLED = 14
-        expect(script.has_trait(2, c, 14)).toBe(1)
         expect(stubHitCount()).toBe(0)
     })
 
