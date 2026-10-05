@@ -84,6 +84,24 @@ export namespace ScriptVMBridge {
         }
     }
 
+    /**
+     * opTokenize: with no previous token, the text up to the first separator;
+     * else the field after the one that follows `prev`, or 0 when there is none.
+     */
+    export function tokenize(str: string, prev: unknown, ch: string): string | number {
+        if (typeof prev !== 'string') {
+            const end = str.indexOf(ch)
+            return end < 0 ? str : str.slice(0, end)
+        }
+        const found = str.indexOf(prev)
+        if (found < 0) {return 0}
+        let start = found + prev.length
+        while (start < str.length && str[start] !== ch) {start++}
+        if (str[start] !== ch) {return 0}
+        const end = str.indexOf(ch, start + 1)
+        return str.slice(start + 1, end < 0 ? str.length : end)
+    }
+
     function varName(this: ScriptVM, value: any): string {
         if(typeof value === "number")
             {return this.intfile.identifiers[value] ?? String(value)}
@@ -108,18 +126,19 @@ export namespace ScriptVMBridge {
        // Phase 49 — new core opcodes
        // ---------------------------------------------------------------------------
 
-       // 0x80A0 — map_first_run: 1 if this is the first time entering the current
-       // map in this session, 0 otherwise.  Scripts use this to run one-time setup
-       // logic (placing critters, setting up quest state) only on the first visit.
-       ,0x80A0: function() { this.push(Scripting.getMapFirstRun()) }
+       // 0x80A0 — tokenize(string, previous token, separator char) (intlib opTokenize).
+       ,0x80A0: function() {
+            const ch = String.fromCharCode(this.pop())
+            const prev = this.pop()
+            const str = String(this.pop() ?? '')
+            this.push(tokenize(str, prev, ch))
+       }
 
 
 
 
-       // 0x80C7 — script_action: push the current script context action being used.
-       // Identical semantics to action_being_used (0x80FA); both map to the same
-       // script property.
-       ,0x80C7: function() { this.push(this.scriptObj.action_being_used) } // script_action
+       // 0x80C7 — script_action: the number of the procedure the script is running.
+       ,0x80C7: function() { this.push((<any>this.scriptObj)._action ?? 0) } // script_action
 
        // 0x80D6 — pickup_obj(obj): move an object from the map into the player's
        // inventory.  Used by scripted item hand-offs.
@@ -159,7 +178,7 @@ export namespace ScriptVMBridge {
        ,0x8109: bridged("inven_cmds", 3)
        ,0x80FF: bridged("critter_attempt_placement", 3)
        ,0x8127: bridged("critter_injure", 2, false)
-       ,0x80E8: bridged("critter_heal", 2, false)
+       ,0x80E8: bridged("critter_heal", 2)
        ,0x8151: bridged("critter_is_fleeing", 1)
        ,0x8152: bridged("critter_set_flee_state", 2, false) // void?
        ,0x80DA: bridged("wield_obj_critter", 2, false)
@@ -167,7 +186,7 @@ export namespace ScriptVMBridge {
        ,0x8117: bridged("rm_mult_objs_from_inven", 3)
        ,0x80D8: bridged("add_obj_to_inven", 2, false)
        ,0x80DC: bridged("obj_can_see_obj", 2)
-       ,0x80E9: bridged("set_light_level", 1)
+       ,0x80E9: bridged("set_light_level", 1, false)
        ,0x80BB: bridged("tile_contains_obj_pid", 3)
        ,0x80D3: bridged("tile_distance_objs", 2)
        ,0x80D2: bridged("tile_distance", 2)
@@ -205,7 +224,7 @@ export namespace ScriptVMBridge {
        ,0x813C: bridged("critter_mod_skill", 3) // int or void?
        ,0x80EF: bridged("critter_dmg", 3, false)
        ,0x80ed: bridged("kill_critter", 2, false)
-       ,0x811a: bridged("explosion", 3) // int?
+       ,0x811a: bridged("explosion", 3, false)
        ,0x8123: bridged("get_poison", 1)
        ,0x8122: bridged("poison", 2, false)
        ,0x80A1: bridged("give_exp_points", 1, false)
@@ -242,7 +261,7 @@ export namespace ScriptVMBridge {
        ,0x80F9: bridged("dialogue_system_enter", 0, false)
        ,0x8129: bridged("gdialog_mod_barter", 1, false)
        ,0x80DE: bridged("start_gdialog", 5, false)
-       ,0x811C: bridged("gsay_start", 0) // void?
+       ,0x811C: bridged("gsay_start", 0, false)
        ,0x811E: bridged("gsay_reply", 2, false)
        ,0x8120: bridged("gsay_message", 3, false)
        ,0x814E: bridged("gdialog_set_barter_mod", 1, false)

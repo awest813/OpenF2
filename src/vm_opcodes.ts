@@ -52,6 +52,9 @@ function includes(arr: number[], item: number): boolean {
 
 export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0x8002: function () {}, // start critical (nop)
+    0x8000: function () {}, // noop
+    0x804a: function () {}, // start_critical (nop)
+    0x804b: function () {}, // end_critical (nop)
     0xc001: function () {
         this.push(this.script.read32())
     }, // op_push_d
