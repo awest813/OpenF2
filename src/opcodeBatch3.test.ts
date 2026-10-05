@@ -149,3 +149,4 @@ describe('messages, lights, floating text, dialogue entry', () => {
         globalState.inCombat = false
     })
 })
+

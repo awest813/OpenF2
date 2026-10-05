@@ -60,7 +60,7 @@ import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
 import { canCritterCarryMore, getCritterCarryLimitLbs, getCritterInventoryWeightLbs } from './critterInventory.js'
-import { perkRank } from './character/perkIds.js'
+import { PerkId, perkRank } from './character/perkIds.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { advanceGameTime, bindTimedEventList } from './character/rest.js'
 import { fillCarGas, getCarFuel, getCarPark, getCarTrunkMaxSize, setCarFuel, setCarTrunkMaxSize, setHasCar } from './car.js'
@@ -2713,21 +2713,23 @@ export namespace Scripting {
             info('REPLY: ' + msg, 'dialogue')
             uiSetDialogueReply(msg)
         }
-        gsay_message(msgList: number, msgID: string | number, reaction: number) {
-            log('gsay_message', arguments)
+        /**
+         * _op_gsay_message: show the line with a single [Done] option (proto.msg
+         * 650) that carries on with the script. True when the option was offered.
+         */
+        gsay_message(msgList: number, msgID: string | number, _reaction: number, resume?: () => void): boolean {
             const msg = getScriptMessage(msgList, msgID)
-            // BLK-207: Guard against null/empty message — mirrors the same guard in
-            // gsay_reply, gsay_option (BLK-107), and giq_option (BLK-204).  Arroyo
-            // Elder ceremony scripts use gsay_message() for scripted narration beats;
-            // a missing message key returns '' from getScriptMessage(), which would
-            // pass the null-only check and reach uiSetDialogueReply with an empty
-            // string, rendering a blank reply in the dialogue panel.  Skip silently.
-            if (msg === null || msg === '') {
-                warn('gsay_message: msg is null/empty — reply skipped', undefined, this)
-                return
+            uiSetDialogueReply(msg ?? '')
+            if (!currentDialogueObject) {return false}
+            let done: string | null = null
+            try {
+                done = getMessage('proto', 650)
+            } catch {
+                done = null
             }
-            info('GSAY MESSAGE: ' + msg, 'dialogue')
-            uiSetDialogueReply(msg)
+            dialogueOptionProcs.push(() => resume?.())
+            uiAddDialogueOption(done ?? '[Done]', dialogueOptionProcs.length - 1)
+            return true
         }
         gsay_end() {
             log('gsay_end', arguments)
@@ -2784,7 +2786,8 @@ export namespace Scripting {
                 return
             }
 
-            const INT: number = typeof player.getStat === 'function' ? (player.getStat('INT') ?? 5) : 5
+            // _op_giq_option: Intelligence plus the Smooth Talker rank.
+            const INT: number = (typeof player.getStat === 'function' ? (player.getStat('INT') ?? 5) : 5) + perkRank(player, PerkId.SMOOTH_TALKER)
             // BLK-168: Guard against non-numeric INT (getStat may return undefined
             // for new-game player objects whose stat tables aren't fully initialised
             // yet; defaulting to 5 matches Fallout 2's base human INT).

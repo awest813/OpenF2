@@ -263,7 +263,23 @@ export namespace ScriptVMBridge {
        ,0x80DE: bridged("start_gdialog", 5, false)
        ,0x811C: bridged("gsay_start", 0, false)
        ,0x811E: bridged("gsay_reply", 2, false)
-       ,0x8120: bridged("gsay_message", 3, false)
+       // 0x8120 — gsay_message: the line with a single [Done] option; the script
+       // waits there (_gdialogSayMessage) and goes on once Done is picked.
+       ,0x8120: function() {
+            const reaction = this.pop()
+            const msgId = this.pop()
+            const msgList = this.pop()
+            const resume = () => {
+                const ret = this.retStack.pop()
+                if (ret === undefined || ret === -1) {return}
+                this.pc = ret
+                this.run()
+            }
+            if ((<any>this.scriptObj).gsay_message(msgList, msgId, reaction, resume)) {
+                this.retStack.push(this.pc + 2)
+                this.halted = true
+            }
+       }
        ,0x814E: bridged("gdialog_set_barter_mod", 1, false)
 
        ,0x811D: function() { // gsay_end
@@ -287,8 +303,10 @@ export namespace ScriptVMBridge {
             // wrap target in a function
             //var targetFn = () => { this.call() }
             //console.log("TARGET=%o, proc=%o this=%o", targetFn, this.intfile.proceduresTable[target], this)
-            const targetProc = this.intfile.proceduresTable[target]?.name
-            if (!targetProc) {
+            // A procedure given by name is shown but does nothing (the engine
+            // drops the name: gameDialogAddMessageOptionWithProcIdentifier).
+            const targetProc = typeof target === 'string' ? null : this.intfile.proceduresTable[target]?.name
+            if (targetProc === undefined) {
                 console.warn(`[vm_bridge] giq_option: procedure at index ${target} not found — option skipped`)
                 return
             }
@@ -298,7 +316,7 @@ export namespace ScriptVMBridge {
             // so a subsequent `end_dialogue` cleanly unwinds to the dialogue
             // system rather than back to the option.  This matches sfall
             // behavior but is a known divergence from the original VM.
-            const targetFn = () => { this.call(targetProc!) }
+            const targetFn = () => { if (targetProc) {this.call(targetProc)} }
 
             this.scriptObj.giq_option(iqTest, msgList, msgId, targetFn, reaction)
         }
@@ -311,12 +329,12 @@ export namespace ScriptVMBridge {
             const msgId = this.pop()
             const msgList = this.pop()
 
-            const targetProc = this.intfile.proceduresTable[target]?.name
-            if (!targetProc) {
+            const targetProc = typeof target === 'string' ? null : this.intfile.proceduresTable[target]?.name
+            if (targetProc === undefined) {
                 console.warn(`[vm_bridge] gsay_option: procedure at index ${target} not found — option skipped`)
                 return
             }
-            const targetFn = () => { this.call(targetProc!) }
+            const targetFn = () => { if (targetProc) {this.call(targetProc)} }
 
             this.scriptObj.gsay_option(msgList, msgId, targetFn, reaction)
         }
