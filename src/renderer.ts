@@ -25,6 +25,8 @@ import { tileFromScreen } from './tile.js'
 import { Config } from './config.js'
 import { WindowFrame } from './widgets.js'
 import { Font } from './formats/fon.js'
+import { accuracyLabel, moveCostLabel, type CursorLabel } from './ui2/cursorReadouts.js'
+import { Combat, movementApCost } from './combat.js'
 
 // Abstract game renderer
 
@@ -93,15 +95,18 @@ export class Renderer {
         if (Config.ui.showFloor) {
             this.renderFloor(this.floorTiles)
         }
+        let cursorLabel: { label: CursorLabel; x: number; y: number } | null = null
         if (Config.ui.showCursor) {
             const scr = hexToScreen(mouseHex.x, mouseHex.y)
-            this.renderImage(
-                'hex_outline',
-                scr.x - 16 - globalState.cameraPosition.x,
-                scr.y - 12 - globalState.cameraPosition.y,
-                32,
-                16
-            )
+            const cx = scr.x - 16 - globalState.cameraPosition.x
+            const cy = scr.y - 12 - globalState.cameraPosition.y
+            const label = this.cursorReadout(mouseHex)
+            if (label?.crosshair) {
+                cursorLabel = { label: label.label, x: mousePos[0] + 16, y: mousePos[1] + 4 }
+            } else {
+                this.renderImage('hex_outline', cx, cy, 32, 16)
+                if (label) {cursorLabel = { label: label.label, x: cx + 12, y: cy + 12 }}
+            }
         }
         if (Config.ui.showObjects) {
             this.renderObjects(this.objects)
@@ -122,7 +127,7 @@ export class Renderer {
             }
         }
 
-        if (globalState.inCombat) {
+        if (globalState.inCombat && Config.ui.showDebugOverlay) {
             const whose = globalState.combat.inPlayerTurn
                 ? 'player'
                 : globalState.combat.combatants[globalState.combat.whoseTurn].name
@@ -148,10 +153,16 @@ export class Renderer {
             })
         }
 
-        this.renderText('mh: ' + mouseHex.x + ',' + mouseHex.y, 5, 15)
-        this.renderText('mt: ' + mouseSquare.x + ',' + mouseSquare.y, 75, 15)
-        //heart.graphics.print("mt: " + mouseTile.x + "," + mouseTile.y, 100, 15)
-        this.renderText('m: ' + mousePos[0] + ', ' + mousePos[1], 175, 15)
+        if (Config.ui.showCoordinates) {
+            this.renderText('mh: ' + mouseHex.x + ',' + mouseHex.y, 5, 15)
+            this.renderText('mt: ' + mouseSquare.x + ',' + mouseSquare.y, 75, 15)
+            this.renderText('m: ' + mousePos[0] + ', ' + mousePos[1], 175, 15)
+        }
+
+        if (cursorLabel && cursorLabel.label.text) {
+            heart.ctx.fillStyle = cursorLabel.label.color
+            this.renderText(cursorLabel.label.text, cursorLabel.x, cursorLabel.y)
+        }
 
         //this.text("fps: " + heart.timer.getFPS(), SCREEN_WIDTH - 50, 15)
 
@@ -171,6 +182,49 @@ export class Renderer {
         }
 
         this.renderUIOverlay()
+    }
+
+    private _pathCache: { from: string; to: string; length: number } | null = null
+
+    /**
+     * What the cursor shows (game_mouse.cc): over a critter in combat or
+     * with the crosshair armed, the chance to hit; on an empty hex during
+     * the player's combat turn, what walking there costs.
+     */
+    private cursorReadout(mouseHex: Point): { label: CursorLabel; crosshair: boolean } | null {
+        const player: any = globalState.player
+        if (!player?.position || !globalState.gMap) {return null}
+        const combat = globalState.combat
+        const playersTurn = globalState.inCombat && combat?.inPlayerTurn === true
+        const critter: any = (globalState.gMap as any).critterAtPosition?.(mouseHex)
+        if (critter && critter !== player && !critter.dead && (playersTurn || globalState.attackCursor)) {
+            const accuracy = player.AP ? Combat.playerToHit(player, critter) : null
+            return { label: accuracyLabel({ accuracy, isCritter: true, team: critter.teamNum ?? 0 }), crosshair: true }
+        }
+        if (!playersTurn) {return null}
+        const from = player.position.x + ',' + player.position.y
+        const to = mouseHex.x + ',' + mouseHex.y
+        if (!this._pathCache || this._pathCache.from !== from || this._pathCache.to !== to) {
+            let length = 0
+            try {
+                const path = globalState.gMap.recalcPath(player.position, mouseHex)
+                length = Array.isArray(path) ? Math.max(0, path.length - 1) : 0
+            } catch {
+                length = 0
+            }
+            this._pathCache = { from, to, length }
+        }
+        const length = this._pathCache.length
+        return {
+            label: moveCostLabel({
+                inCombat: true,
+                pathLength: length,
+                moveCost: movementApCost(player, length),
+                freeMove: player.AP?.move ?? 0,
+                actionPoints: player.AP?.combat ?? 0,
+            }),
+            crosshair: false,
+        }
     }
 
     objectRenderInfo(obj: Obj): ObjectRenderInfo | null {

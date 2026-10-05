@@ -18,7 +18,7 @@ export const Config = {
         showObjects: true, // show objects?
         showWalls: true, // show walls?
         showBoundingBox: false, // show bounding boxes around objects?
-        showSpatials: true, // show spatial script triggers?
+        showSpatials: false, // label spatial script triggers on the map (debug)?
         showFonts: false, // show all fonts for debugging?
         showDebugOverlay: false, // show in-browser debug overlay (HP, AP, entity count)?
         forceUI2OnlyGameplayPanels: (globalThis as any)?.process?.env?.UI2_ONLY_GAMEPLAY_PANELS === '1',

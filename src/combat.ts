@@ -1573,18 +1573,37 @@ export class Combat {
     static playerCanStartAttack(player: Critter, target: Critter): boolean {
         if (!player.AP) {player.AP = new ActionPoints(player)}
         else {player.AP.resetAP()}
-        const probe = Object.create(Combat.prototype) as Combat
-        probe.combatants = []
+        const { bad, apCost } = Combat.probePlayerShot(player, target)
+        if (bad === 'ok') {return true}
+        const msg = badShotMessage(bad, apCost)
+        if (msg) {uiLog(msg)}
+        if (bad === 'noAmmo') {EventBus.emit('audio:playSound', { soundId: 'out_of_ammo' })}
+        return false
+    }
+
+    /**
+     * combat.cc _combat_to_hit: the crosshair's chance to hit `target` with
+     * the current item action, or null when the shot is refused.
+     */
+    static playerToHit(player: Critter, target: Critter): number | null {
+        if (!player?.AP || !target) {return null}
+        const { bad, probe, hitMode } = Combat.probePlayerShot(player, target)
+        if (bad !== 'ok') {return null}
+        return probe.getHitChance(player, target, 'uncalled', hitMode).hit
+    }
+
+    private static probePlayerShot(player: Critter, target: Critter): { bad: BadShot; apCost: number; probe: Combat; hitMode: HitMode } {
+        const live = globalState.combat
+        const probe = live ?? (() => {
+            const p = Object.create(Combat.prototype) as Combat
+            p.combatants = []
+            return p
+        })()
         const weapon: any = player.equippedWeapon
         const hitMode: HitMode = weapon?.weapon?.hitMode?.() ?? 1
         const info = getAttackWeaponInfo(player, hitMode)
         const aiming = (weapon?.weapon?.isCalled?.() ?? false) && canAimAttack(player, info)
-        const bad = probe.checkBadShot(player, target, hitMode, aiming)
-        if (bad === 'ok') {return true}
-        const msg = badShotMessage(bad, attackApCostFor(player, info, aiming))
-        if (msg) {uiLog(msg)}
-        if (bad === 'noAmmo') {EventBus.emit('audio:playSound', { soundId: 'out_of_ammo' })}
-        return false
+        return { bad: probe.checkBadShot(player, target, hitMode, aiming), apCost: attackApCostFor(player, info, aiming), probe, hitMode }
     }
 
     /**
