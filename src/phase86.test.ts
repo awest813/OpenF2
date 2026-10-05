@@ -201,12 +201,6 @@ describe('Phase 86-D — BLK-159: set_critter_skill_points non-finite guard', ()
 // ---------------------------------------------------------------------------
 
 describe('Phase 86-E — BLK-160: critter_mod_skill non-finite amount guard', () => {
-    it('applies a normal finite delta correctly', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 50 })
-        script.critter_mod_skill(boxer as any, 3, 15)
-        expect(boxer.skills.baseSkills['Unarmed']).toBe(65)
-    })
-
     it('treats NaN amount as 0 — skill unchanged', () => {
         const boxer = makeCritterWithSkills({ Unarmed: 50 })
         script.critter_mod_skill(boxer as any, 3, NaN)
@@ -250,14 +244,6 @@ describe('Phase 86-F — sfall 0x82B8 get_critter_trait_typed_sfall', () => {
 })
 
 describe('Phase 86-F — sfall 0x82B9 critter_mod_skill_sfall', () => {
-    it('modifies skill and returns new total', () => {
-        const boxer = makeCritterWithSkills({ Unarmed: 60 })
-        const result = script.critter_mod_skill_sfall(boxer as any, 3, 10)
-        expect(boxer.skills.baseSkills['Unarmed']).toBe(70)
-        // getSkill adds 10 in the mock, so result is 80
-        expect(typeof result).toBe('number')
-    })
-
     it('guards against non-finite amount', () => {
         const boxer = makeCritterWithSkills({ Unarmed: 60 })
         expect(() => script.critter_mod_skill_sfall(boxer as any, 3, NaN)).not.toThrow()
@@ -273,9 +259,6 @@ describe('Phase 86-F — sfall 0x82BA get_npc_stat_sfall', () => {
         expect(typeof result).toBe('number')
     })
 
-    it('returns 0 for null object', () => {
-        expect(script.get_npc_stat_sfall(null as any, 0)).toBe(0)
-    })
 })
 
 describe('Phase 86-F — sfall 0x82BB set_npc_stat_sfall', () => {

@@ -306,20 +306,6 @@ describe('Phase 91-D — BLK-183: critter_mod_skill() null skills guard', () => 
         expect(script.critter_mod_skill(npc as any, 3, 10)).toBe(0)
     })
 
-    it('applies skill modification normally when skills is present', () => {
-        const baseSkills: Record<string, number> = {}
-        const npc = makeCritter({
-            skills: {
-                skillPoints: 0,
-                getBase: (s: string) => baseSkills[s] ?? 30,
-                setBase: vi.fn((s: string, v: number) => { baseSkills[s] = v }),
-                baseSkills,
-            },
-        })
-        script.critter_mod_skill(npc as any, 3 /* SKILL_UNARMED */, 10)
-        expect(npc.skills.setBase).toHaveBeenCalled()
-    })
-
     it('does not throw with non-finite amount when skills is null', () => {
         const npc = makeCritterNullSkills()
         expect(() => script.critter_mod_skill(npc as any, 3, NaN)).not.toThrow()

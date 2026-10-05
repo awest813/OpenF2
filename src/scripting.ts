@@ -50,6 +50,7 @@ import { installSfallFunctions, sfallSettings } from './sfallFunctions.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
+import { skillDependencies } from './skills.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
@@ -396,6 +397,8 @@ export namespace Scripting {
         33: 'Age',
         // 34: Gender — handled separately in get_critter_stat
         35: 'HP',       // Current HP
+        36: 'Poison Level',
+        37: 'Radiation Level',
     }
 
     const skillNumToName: { [num: number]: string } = {
@@ -1155,10 +1158,7 @@ export namespace Scripting {
             // frequently called from scripts that may hold a stale or null reference
             // (e.g. dead or destroyed critters).  Without this guard obj.getStat()
             // throws a TypeError when obj is 0 (the Fallout 2 null-ref convention).
-            if (!isGameObject(obj)) {
-                warn('get_critter_stat: not a game object — returning 0', undefined, this)
-                return 0
-            }
+            if (!isGameObject(obj)) {return -1}
             if (stat === 34) {
                 // STAT_gender
                 if ((obj as Player).isPlayer) {return (obj as Player).gender === 'female' ? 1 : 0}
@@ -1171,24 +1171,32 @@ export namespace Scripting {
             warn('get_critter_stat: unknown stat ' + stat + ' — returning 0', undefined, this)
             return 0
         }
+        /**
+         * opSetCritterStat: only the player, and the value is added to the base
+         * stat (critterSetBaseStat). Derived stats do not change; a result out of
+         * the stat's range is refused; current HP, poison and radiation adjust.
+         */
         set_critter_stat(obj: Obj, stat: number, amount: number) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('set_critter_stat: not a critter: ' + obj, undefined, this)
-                return -1
+            if (!isGameObject(obj) || obj !== globalState.player) {return -1}
+            const critter = obj as any
+            const value = Number.isFinite(amount) ? Math.trunc(amount) : 0
+            if (stat >= 0 && stat <= 6) {
+                const next = critter.stats.getBase(statMap[stat]) + value
+                if (next >= 1 && next <= 10) {critter.stats.setBase(statMap[stat], next)}
+            } else if (stat === 33) {
+                const next = critter.stats.getBase('Age') + value
+                if (next >= 16 && next <= 101) {critter.stats.setBase('Age', next)}
+            } else if (stat === 34) {
+                const next = (critter.gender === 'female' ? 1 : 0) + value
+                if (next === 0 || next === 1) {critter.gender = next === 1 ? 'female' : 'male'}
+            } else if (stat === 35) {
+                this.critter_heal(obj, value)
+            } else if (stat === 36) {
+                adjustPoison(critter, value)
+            } else if (stat === 37) {
+                adjustRadiation(critter, value)
             }
-            const statName = statMap[stat]
-            if (!statName) {
-                warn('set_critter_stat: unknown stat number: ' + stat, undefined, this)
-                return -1
-            }
-            // BLK-133: Guard against non-finite amount values — NaN or Infinity
-            // passed by a script arithmetic error would silently corrupt the stat
-            // store.  Clamp to 0 and warn so the issue is traceable.
-            if (typeof amount !== 'number' || !isFinite(amount)) {
-                warn('set_critter_stat: non-finite amount (' + amount + ') — clamping to 0', undefined, this)
-                amount = 0
-            }
-            (obj as Critter).stats.setBase(statName, amount)
+            if (stat >= 0 && stat <= 6) {syncPlayerEntityFromCritter()}
             return 0
         }
         /** opHasTrait: perk rank, a few object fields, or whether the player picked a trait. */
@@ -1511,38 +1519,31 @@ export namespace Scripting {
             }
             return hexDistance(a.position, b.position) <= 12 ? 1 : 0
         }
+        /**
+         * opCritterModifySkill: only the player. Adds or takes skill points one at
+         * a time (a tagged skill counts half as many); never past 300 or below the
+         * skill's starting value. Returns 0.
+         */
         critter_mod_skill(obj: Obj, skill: number, amount: number) {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('critter_mod_skill: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const skillName = skillNumToName[skill]
-            if (!skillName) {
-                warn('critter_mod_skill: unknown skill number: ' + skill, undefined, this)
-                return 0
-            }
-            // BLK-160: Guard against non-finite amount — New Reno combat scripts compute
-            // skill deltas from damage arithmetic; a NaN/Infinity amount would silently
-            // corrupt the SkillSet base value, causing get_critter_skill to return NaN
-            // for all subsequent skill reads on this critter.  Treat non-finite as 0
-            // (no change) and warn so the underlying script bug is visible in logs.
-            if (!Number.isFinite(amount)) {
-                warn('critter_mod_skill: non-finite amount (' + amount + ') — treating as 0', undefined, this)
-                amount = 0
-            }
+            if (!isGameObject(obj) || obj !== globalState.player || !Number.isFinite(amount) || amount === 0) {return 0}
             const critter = obj as Critter
-            // BLK-183: Guard against null critter.skills — Arroyo village guard NPCs have
-            // critter_mod_skill() called during their map_enter_p_proc initialization before
-            // the skills component is attached (partially-initialised critters spawned via
-            // create_object_sid()).  Without this guard, critter.skills.setBase() and
-            // critter.skills.getBase() throw TypeError, crashing the NPC init sequence.
-            // Mirror the guard from BLK-178 (critter_add_trait TRAIT_SKILL).
-            if (!critter.skills) {
-                warn('critter_mod_skill: critter.skills is null — no-op', undefined, this)
-                return 0
+            const skillName = skillNumToName[skill]
+            if (!skillName || !critter.skills) {return 0}
+            let points = Math.abs(Math.trunc(amount))
+            if (critter.skills.isTagged(skillName)) {points = Math.trunc(points / 2)}
+            const start = skillDependencies[skillName]?.startValue ?? 0
+            for (let i = 0; i < points; i++) {
+                const base = critter.skills.getBase(skillName)
+                if (amount > 0) {
+                    if (critter.getSkill(skillName) >= 300) {break}
+                    critter.skills.setBase(skillName, base + 1)
+                } else {
+                    if (base <= start) {break}
+                    critter.skills.setBase(skillName, base - 1)
+                }
             }
-            critter.skills.setBase(skillName, critter.skills.getBase(skillName) + amount)
-            return critter.getSkill(skillName)
+            syncPlayerEntityFromCritter()
+            return 0
         }
         /** opUsingSkill: only the player's Sneak state is known (1 while sneak mode is on); 0 otherwise. */
         using_skill(obj: Obj, skill: number) {
@@ -1597,11 +1598,17 @@ export namespace Scripting {
             this._howMuch = value - chance
             return chance <= value ? RollResult.SUCCESS : RollResult.FAILURE
         }
+        /** opSuccess: 1 for a success, 0 for a failure, -1 for anything else. */
         is_success(roll: number) {
-            return rollResultIsSuccess(roll as any) ? 1 : 0
+            if (roll === RollResult.SUCCESS || roll === RollResult.CRITICAL_SUCCESS) {return 1}
+            if (roll === RollResult.FAILURE || roll === RollResult.CRITICAL_FAILURE) {return 0}
+            return -1
         }
+        /** opCritical: 1 for a critical, 0 for a plain roll, -1 for anything else. */
         is_critical(roll: number) {
-            return rollResultIsCritical(roll as any) ? 1 : 0
+            if (roll === RollResult.CRITICAL_SUCCESS || roll === RollResult.CRITICAL_FAILURE) {return 1}
+            if (roll === RollResult.FAILURE || roll === RollResult.SUCCESS) {return 0}
+            return -1
         }
         /**
          * opCritterGetInventoryObject: armor (0), right hand (1), left hand (2) or the

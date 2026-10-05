@@ -67,21 +67,6 @@ afterEach(() => {
 // ===========================================================================
 
 describe('Phase 72-C — BLK-098: get_critter_stat() null game-object guard', () => {
-    it('returns 0 for null object without throwing', () => {
-        expect(() => script.get_critter_stat(null as any, 0)).not.toThrow()
-        expect(script.get_critter_stat(null as any, 0)).toBe(0)
-    })
-
-    it('returns 0 for numeric 0 (Fallout 2 null-ref convention)', () => {
-        expect(() => script.get_critter_stat(0 as any, 0)).not.toThrow()
-        expect(script.get_critter_stat(0 as any, 0)).toBe(0)
-    })
-
-    it('returns 0 for stat 34 (gender) when object is null', () => {
-        expect(() => script.get_critter_stat(null as any, 34)).not.toThrow()
-        expect(script.get_critter_stat(null as any, 34)).toBe(0)
-    })
-
     it('returns the stat value for a valid critter', () => {
         const obj = makeObj({ getStat: (s: string) => (s === 'Max HP' ? 80 : 5) })
         // stat 7 = Max HP (stat 6 = LUK in the Fallout 2 statMap)

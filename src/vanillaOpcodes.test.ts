@@ -142,3 +142,51 @@ describe('obj_type / obj_item_subtype / critter_inven_obj / inven_cmds / get_pc_
         expect(script.get_pc_stat(5)).toBe(0)
     })
 })
+
+describe('set_critter_stat / critter_mod_skill / is_success / is_critical', () => {
+    it('set_critter_stat adds to the player\'s base stat and refuses anyone else', async () => {
+        const { default: globalState } = await import('./globalState.js')
+        const { Critter } = await import('./object.js')
+        const { SkillSet, StatSet } = await import('./char.js')
+        const make = (): any => {
+            const c: any = new (Critter as any)()
+            c.stats = new StatSet()
+            c.skills = new SkillSet()
+            return c
+        }
+        const saved = globalState.player
+        const dude: any = make()
+        dude.isPlayer = true
+        dude.stats.setBase('STR', 5)
+        globalState.player = dude
+        const script: any = new (Scripting as any).Script()
+        expect(script.set_critter_stat(dude, 0, 2)).toBe(0)
+        expect(dude.stats.getBase('STR')).toBe(7)
+        script.set_critter_stat(dude, 0, 5) // 12 is out of range: refused
+        expect(dude.stats.getBase('STR')).toBe(7)
+        const npc: any = make()
+        npc.stats.setBase('STR', 5)
+        expect(script.set_critter_stat(npc, 0, 2)).toBe(-1)
+        expect(npc.stats.getBase('STR')).toBe(5)
+
+        // critter_mod_skill: points one by one, half for a tagged skill; player only.
+        const lockpick = dude.skills.getBase('Lockpick')
+        expect(script.critter_mod_skill(dude, 9, 10)).toBe(0)
+        expect(dude.skills.getBase('Lockpick')).toBe(lockpick + 10)
+        dude.skills.tagged.push('Lockpick')
+        script.critter_mod_skill(dude, 9, 10)
+        expect(dude.skills.getBase('Lockpick')).toBe(lockpick + 15)
+        script.critter_mod_skill(dude, 9, -1000)
+        expect(dude.skills.getBase('Lockpick')).toBe(lockpick)
+        const npcLockpick = npc.skills.getBase('Lockpick')
+        script.critter_mod_skill(npc, 9, 10)
+        expect(npc.skills.getBase('Lockpick')).toBe(npcLockpick)
+        globalState.player = saved
+    })
+
+    it('is_success and is_critical give -1 for values that are not rolls', () => {
+        const script: any = new (Scripting as any).Script()
+        expect([0, 1, 2, 3, 7].map((r) => script.is_success(r))).toEqual([0, 0, 1, 1, -1])
+        expect([0, 1, 2, 3, 7].map((r) => script.is_critical(r))).toEqual([1, 0, 0, 1, -1])
+    })
+})

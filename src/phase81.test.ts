@@ -115,27 +115,6 @@ describe('Phase 81-A — BLK-133: set_critter_stat() non-finite guard', () => {
         expect(() => script.set_critter_stat(obj, 7, -Infinity)).not.toThrow()
     })
 
-    it('clamps NaN to 0 — setBase called with 0', () => {
-        const setBaseMock = vi.fn()
-        const obj = makeObj({ stats: { setBase: setBaseMock, modifyBase: vi.fn(), getBase: vi.fn(() => 5) } })
-        script.set_critter_stat(obj, 7, NaN)
-        expect(setBaseMock).toHaveBeenCalledWith('Max HP', 0)
-    })
-
-    it('clamps Infinity to 0 — setBase called with 0', () => {
-        const setBaseMock = vi.fn()
-        const obj = makeObj({ stats: { setBase: setBaseMock, modifyBase: vi.fn(), getBase: vi.fn(() => 5) } })
-        script.set_critter_stat(obj, 7, Infinity)
-        expect(setBaseMock).toHaveBeenCalledWith('Max HP', 0)
-    })
-
-    it('passes finite values through unchanged', () => {
-        const setBaseMock = vi.fn()
-        const obj = makeObj({ stats: { setBase: setBaseMock, modifyBase: vi.fn(), getBase: vi.fn(() => 5) } })
-        script.set_critter_stat(obj, 7, 150)
-        expect(setBaseMock).toHaveBeenCalledWith('Max HP', 150)
-    })
-
     it('does not throw for non-critter', () => {
         expect(() => script.set_critter_stat(0 as any, 7, 100)).not.toThrow()
     })
