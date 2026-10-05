@@ -41,9 +41,16 @@ export class SkilldexPanel extends UIPanel {
     }
 
     private _activate(skill: Skills): void {
+        const target = globalState.skillTarget
+        globalState.skillTarget = null
         this.hide()
         if (!skillRequiresTarget(skill)) {
             useSkilldexSkill(skill)
+            return
+        }
+        if (target) {
+            // Opened from the action menu: the skill goes straight to that object.
+            EventBus.emit('skilldex:useOnTarget', { skill, target })
             return
         }
         globalState.uiMode = UIMode.useSkill

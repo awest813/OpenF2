@@ -81,7 +81,7 @@ function refreshInventoryPanel(): void {
             name: o.name ?? (pid !== undefined ? `pid:${pid}` : '?'),
             amount: (o as any).amount ?? 1,
             // USE reloads with matching ammo and takes drugs (inventory.cc).
-            canUse: (pid !== undefined && pid === ammoPid) || isDrug(o) || isBook(o) || isChargedItem(o),
+            canUse: !!globalState.useItemOnTarget || (pid !== undefined && pid === ammoPid) || isDrug(o) || isBook(o) || isChargedItem(o),
             pid,
         }
     })
@@ -444,6 +444,14 @@ export function initUI() {
         const panel = globalState.uiManager?.get<InventoryPanel>('inventory')
         const item = panel?.items[index]
         const live = globalState.player?.inventory?.[index]
+        if (live && globalState.useItemOnTarget) {
+            // inventoryOpenUseItemOn: the chosen item goes to the action-menu target.
+            const target = globalState.useItemOnTarget
+            globalState.useItemOnTarget = null
+            EventBus.emit('ui:closePanel', { panelName: 'inventory' })
+            EventBus.emit('inventory:useItemOn', { item: live, target })
+            return
+        }
         if (live && isChargedItem(live)) {
             useChargedItem(live)
             refreshInventoryPanel()

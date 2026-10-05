@@ -94,3 +94,76 @@ export class HoverLook {
         this.tested = false
     }
 }
+
+export type ActionMenuItem = 'cancel' | 'inventory' | 'look' | 'rotate' | 'talk' | 'use' | 'skill' | 'push'
+
+/** proto.msg-free labels for the action menu icons (intrface 253 … 435). */
+export const ACTION_MENU_LABELS: Record<ActionMenuItem, string> = {
+    cancel: 'Cancel',
+    inventory: 'Use item on',
+    look: 'Look',
+    rotate: 'Rotate',
+    talk: 'Talk',
+    use: 'Use',
+    skill: 'Use skill',
+    push: 'Push',
+}
+
+const CRITTER_NO_STEAL = 0x20
+
+/**
+ * actionCheckPush: an active critter in talking range (within 9 hexes)
+ * whose script has push_p_proc, and in combat not one fighting the player.
+ */
+export function canPush(player: any, target: any, inCombat: boolean, distance: number): boolean {
+    if (target?.type !== 'critter' || target === player) {return false}
+    if (target.dead || target.knockedOut || target.loseTurn) {return false}
+    if (distance >= 9) {return false}
+    if (!target._script || target._script.push_p_proc === undefined) {return false}
+    if (inCombat) {
+        if (target.teamNum === player?.teamNum && target === player?.whoHitMe) {return false}
+        if (target.whoHitMe && target.whoHitMe.teamNum === player?.teamNum) {return false}
+    }
+    return true
+}
+
+/** The action menu for a held click in ARROW mode (_gmouse_handle_event). */
+export function actionMenuItems(target: any, player: any, inCombat: boolean, distance = 0): ActionMenuItem[] {
+    const items: ActionMenuItem[] = []
+    switch (target?.type) {
+        case 'item':
+            items.push('use', 'look')
+            if (target.subtype === 'container') {items.push('inventory', 'skill')}
+            items.push('cancel')
+            break
+        case 'critter':
+            if (target === player) {
+                items.push('rotate')
+            } else {
+                if (canTalkTo(target)) {
+                    if (!inCombat) {items.push('talk')}
+                } else if (((target.pro?.extra?.flags ?? 0) & CRITTER_NO_STEAL) === 0) {
+                    items.push('use')
+                }
+                if (canPush(player, target, inCombat, distance)) {items.push('push')}
+            }
+            items.push('look', 'inventory', 'skill', 'cancel')
+            break
+        case 'scenery':
+            if (canUse(target)) {items.push('use')}
+            items.push('look', 'inventory', 'skill', 'cancel')
+            break
+        case 'wall':
+            items.push('look')
+            if (canUse(target)) {items.push('inventory')}
+            items.push('cancel')
+            break
+    }
+    return items
+}
+
+/** gameMouseHighlightActionMenuItemAtIndex: every 10 pixels of vertical drag moves the highlight one item. */
+export function actionMenuIndex(startY: number, currentY: number, count: number, previous = 0): number {
+    const steps = Math.trunc((currentY - startY) / 10)
+    return Math.max(0, Math.min(count - 1, previous + steps))
+}

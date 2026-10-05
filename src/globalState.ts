@@ -105,6 +105,8 @@ export default {
     combatDifficulty: 1, // Normal
     gameDifficulty: 1, // Normal
     metFrankHorrigan: false,
+    skillTarget: null,
+    useItemOnTarget: null,
     mouseMode: 'move',
     violenceLevel: 2, // Maximum blood
 
@@ -274,6 +276,10 @@ export default {
     gameDifficulty: number
     /** wmGenData.didMeetFrankHorrigan: his world-map ambush has happened. */
     metFrankHorrigan: boolean
+    /** Action menu → Use skill: the object the Skilldex choice is used on. */
+    skillTarget: any
+    /** Action menu → Use item on: the object the inventory choice is used on. */
+    useItemOnTarget: any
     /** Violence level: 0=minimal, 1=normal, 2=maximum blood. */
     violenceLevel: number
 

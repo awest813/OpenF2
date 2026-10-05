@@ -17,7 +17,7 @@ import { Combat } from './combat.js'
 import { critterKill } from './critter.js'
 import { getElevator, lookupMapNameFromLookup } from './data.js'
 import { heart } from './heart.js'
-import { hexDistance, hexesInRadius, hexFromScreen } from './geometry.js'
+import { hexDirectionTo, hexDistance, hexesInRadius, hexFromScreen, hexInDirectionDistance } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
 import { IDBCache } from './idbcache.js'
@@ -36,7 +36,6 @@ import { UIMode } from './uiMode.js'
 import {
     uiCalledShot,
     uiCloseCalledShot,
-    uiContextMenu,
     uiElevator,
     uiLog,
     uiLoot,
@@ -46,7 +45,9 @@ import {
 } from './ui.js'
 import { getFileJSON, getProtoMsg, getRandomInt } from './util.js'
 import { examineLines, lookAtText } from './examine.js'
-import { arrowPrimaryAction, cycleMouseMode, HoverLook } from './mouseMode.js'
+import { ActionMenuPanel } from './ui2/actionMenuPanel.js'
+import { isDrug, takeDrug } from './character/timedEffects.js'
+import { actionMenuIndex, actionMenuItems, type ActionMenuItem, arrowPrimaryAction, cycleMouseMode, HoverLook } from './mouseMode.js'
 import { WebGLRenderer } from './webglrenderer.js'
 import { Config } from './config.js'
 import { fonUnpack } from './formats/fon.js'
@@ -316,6 +317,104 @@ function actOnObject(obj: Obj, action: () => void): void {
     combat.afterPlayerAction()
 }
 
+function talkTo(who: Critter): void {
+    actOnObject(who, () => {
+        if (who._script && who._script.talk_p_proc !== undefined) {
+            Scripting.talk(who._script, who)
+        } else if (canTradeWithPartyMember(who)) {
+            openCompanionTrade(who)
+        }
+    })
+}
+
+/** actionPush: push_p_proc, or the critter steps one hex away from the player. */
+function pushCritter(who: Critter): void {
+    const player = globalState.player
+    if (Scripting.push(who, player) === true) {return}
+    if (!who.position || !player.position) {return}
+    const dir = hexDirectionTo(player.position, who.position)
+    if (dir === null || dir === undefined) {return}
+    const dest = hexInDirectionDistance(who.position, dir, 1)
+    if (dest && !globalState.gMap.objectsAtPosition(dest).some((o: Obj) => o.type === 'critter' || (typeof (o as any).blocks === 'function' && (o as any).blocks()))) {
+        who.walkTo(dest, false)
+    }
+}
+
+/**
+ * actionUseItemOn → _protinst_use_item_on: walk up, let the target's
+ * use_obj_on_p_proc have it, else the default: a drug is taken by a living
+ * critter (proto.msg 581; 583–586 for the dead), anything else does nothing
+ * (582).
+ */
+function useItemOn(item: Obj, target: Obj): void {
+    actOnObject(target, () => {
+        if (Scripting.useObjOn(target, item) === true) {return}
+        const player = globalState.player
+        if (isDrug(item)) {
+            if (target.type !== 'critter') {
+                uiLog(protoMsg(582, 'That does nothing.'))
+                return
+            }
+            if ((target as Critter).dead) {
+                const id = 583 + getRandomInt(0, 3)
+                uiLog(protoMsg(id, "That won't work on the dead."))
+                return
+            }
+            if (takeDrug(target, item) === 1) {
+                const inv = player.inventory
+                if (typeof (item as any).amount === 'number' && (item as any).amount > 1) {(item as any).amount--}
+                else if (inv.includes(item)) {inv.splice(inv.indexOf(item), 1)}
+                if (target !== player) {
+                    uiLog(protoMsg(581, 'You use the %s on %s.').replace('%s', item.name ?? '').replace('%s', target.name ?? ''))
+                }
+            }
+            return
+        }
+        uiLog(protoMsg(582, 'That does nothing.'))
+    })
+}
+
+EventBus.on('inventory:useItemOn', ({ item, target }) => useItemOn(item as Obj, target as Obj))
+
+EventBus.on('skilldex:useOnTarget', ({ skill, target }) => playerUseSkill(skill as Skills, target as Obj))
+
+/** The action picked from the action menu (_gmouse_handle_event). */
+function doMenuAction(action: ActionMenuItem, obj: Obj): void {
+    const who = obj as Critter
+    switch (action) {
+        case 'look':
+            examineObject(obj)
+            return
+        case 'rotate':
+            globalState.player.orientation = ((globalState.player.orientation ?? 0) + 1) % 6
+            return
+        case 'talk':
+            talkTo(who)
+            return
+        case 'use':
+            if (obj.type === 'scenery') {actOnObject(obj, () => obj.use(globalState.player))}
+            else if (obj.type === 'critter') {actOnObject(obj, () => uiLoot(obj))}
+            else if (obj.isContainer && !obj.canPickUp) {actOnObject(obj, () => useContainerAndLoot(obj, globalState.player))}
+            else {actOnObject(obj, () => pickUpItem(obj))}
+            return
+        case 'skill':
+            // The Skilldex opens; the chosen skill is used on this object.
+            globalState.skillTarget = obj
+            EventBus.emit('ui:openPanel', { panelName: 'skilldex' })
+            return
+        case 'inventory':
+            // inventoryOpenUseItemOn: pick an item to use on the object.
+            globalState.useItemOnTarget = obj
+            EventBus.emit('ui:openPanel', { panelName: 'inventory' })
+            return
+        case 'push':
+            pushCritter(who)
+            return
+        case 'cancel':
+            return
+    }
+}
+
 /** The left click in ARROW mode: the object's primary action. */
 function arrowClick(): void {
     const obj = getObjectUnderCursor((o) => o.visible !== false)
@@ -337,13 +436,7 @@ function arrowClick(): void {
             examineObject(obj)
             return
         case 'talk':
-            actOnObject(obj, () => {
-                if (who._script && who._script.talk_p_proc !== undefined) {
-                    Scripting.talk(who._script, who)
-                } else if (canTradeWithPartyMember(who)) {
-                    openCompanionTrade(who)
-                }
-            })
+            talkTo(who)
             return
         case 'loot':
             if (who.dead) {actOnObject(obj, () => uiLoot(obj))}
@@ -378,6 +471,29 @@ const hoverLook = new HoverLook()
 /** Left button held this long in ARROW mode opens the action menu instead. */
 const ACTION_MENU_HOLD_MS = 400
 let leftPress: { time: number; x: number; y: number } | null = null
+/** The action menu while the button is held (target and highlight tracker). */
+let actionMenu: { target: Obj; startY: number; timer: number } | null = null
+
+function actionMenuPanel(): ActionMenuPanel | undefined {
+    return globalState.uiManager?.get<ActionMenuPanel>('actionMenu')
+}
+
+/** LEFT_BUTTON_DOWN_REPEAT in ARROW mode over an object: show the action menu. */
+function openActionMenu(press: { x: number; y: number }): void {
+    const obj = getObjectUnderCursor((o) => o.visible !== false)
+    const panel = actionMenuPanel()
+    if (!obj || !panel) {return}
+    const player = globalState.player
+    const distance = obj.position && player.position ? hexDistance(obj.position, player.position) : 0
+    const items = actionMenuItems(obj, player, globalState.inCombat, distance)
+    if (items.length === 0) {return}
+    panel.openAt(items, press.x, press.y)
+    const timer = window.setInterval(() => {
+        const [, y] = heart.mouse.getPosition()
+        panel.highlighted = actionMenuIndex(press.y, y, panel.items.length)
+    }, 30)
+    actionMenu = { target: obj, startY: press.y, timer }
+}
 
 /**
  * Create and wire the UIManagerImpl (ui2 WebGL/OffscreenCanvas path).
@@ -634,7 +750,13 @@ heart.mousepressed = (x: number, y: number, btn: string) => {
     if (btn === 'l') {
         // The action happens on release (MOUSE_EVENT_LEFT_BUTTON_UP); a long
         // press in ARROW mode opens the action menu.
-        leftPress = { time: performance.now(), x, y }
+        const press = { time: performance.now(), x, y }
+        leftPress = press
+        if (globalState.mouseMode === 'arrow') {
+            window.setTimeout(() => {
+                if (leftPress === press && !actionMenu) {openActionMenu(press)}
+            }, ACTION_MENU_HOLD_MS)
+        }
     } else if (btn === 'r') {
         // gameMouseCycleMode: move → arrow → crosshair (in combat, with a weapon) → move.
         const weapon = globalState.player?.equippedWeapon
@@ -649,11 +771,19 @@ heart.mousereleased = (x: number, y: number, btn: string) => {
     leftPress = null
     if (globalState.isInitializing || globalState.isLoading || globalState.isWaitingOnRemote) {return}
     if (globalState.uiMode !== UIMode.none && globalState.uiMode !== UIMode.useSkill) {return}
-    if (globalState.mouseMode === 'arrow' && performance.now() - press.time >= ACTION_MENU_HOLD_MS) {
-        const obj = getObjectUnderCursor((o) => o.isSelectable)
-        if (obj) {uiContextMenu(obj, { clientX: press.x, clientY: press.y })}
+    if (actionMenu) {
+        // Releasing the button picks the highlighted action.
+        const menu = actionMenu
+        actionMenu = null
+        window.clearInterval(menu.timer)
+        const panel = actionMenuPanel()
+        if (panel) {panel.highlighted = actionMenuIndex(menu.startY, y, panel.items.length)}
+        const action = panel?.selected ?? 'cancel'
+        panel?.hide()
+        doMenuAction(action, menu.target)
         return
     }
+    if (globalState.mouseMode === 'arrow' && performance.now() - press.time >= ACTION_MENU_HOLD_MS) {return}
     handleMapClick()
 }
 

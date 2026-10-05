@@ -62,6 +62,10 @@ export interface EngineEvents {
     'inventory:equip': { entityId: number; itemPid: number; slot: EquipSlot }
     'inventory:unequip': { entityId: number; slot: EquipSlot }
     'inventory:useItem': { index: number }
+    /** Skilldex opened from the action menu: use `skill` on `target`. */
+    'skilldex:useOnTarget': { skill: number; target: any }
+    /** Action menu → Use item on: use `item` (from the player's inventory) on `target`. */
+    'inventory:useItemOn': { item: any; target: any }
     'inventory:dropItem': { index: number }
 
     // Audio

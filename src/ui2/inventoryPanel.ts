@@ -84,6 +84,8 @@ export class InventoryPanel extends UIPanel {
 
     /** Back in combat with no AP left, the player's turn is over (combat.cc _combat_input). */
     protected override onHide(): void {
+        // Closing without choosing cancels "Use item on".
+        globalState.useItemOnTarget = null
         globalState.combat?.afterPlayerAction?.()
     }
 
