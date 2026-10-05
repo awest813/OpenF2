@@ -178,10 +178,9 @@ describe('Phase 63-C — sfall opcodes 0x8218–0x821F', () => {
         restore()
     })
 
-    it('get_month_sfall returns month 2 after 31 days', async () => {
-        // 31 days into the year: day 31 = floor(31/30)+1 = 2nd month
+    it('get_month_sfall reads the engine calendar (25 July 2241 + 31 days = August)', async () => {
         const restore = await setGameTime(31 * 86400 * 10)
-        expect(script.get_month_sfall()).toBe(2)
+        expect(script.get_month_sfall()).toBe(8)
         restore()
     })
 
@@ -194,10 +193,9 @@ describe('Phase 63-C — sfall opcodes 0x8218–0x821F', () => {
         restore()
     })
 
-    it('get_day_sfall returns day 5 after 4 days', async () => {
-        // 4 days: dayOfYear=4, 4%30=4, +1=5
+    it('get_day_sfall reads the engine calendar (25 July + 4 days = the 29th)', async () => {
         const restore = await setGameTime(4 * 86400 * 10)
-        expect(script.get_day_sfall()).toBe(5)
+        expect(script.get_day_sfall()).toBe(29)
         restore()
     })
 

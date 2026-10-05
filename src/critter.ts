@@ -423,11 +423,7 @@ export function critterKill(
             combat.pendingExperience = (combat.pendingExperience ?? 0) + xpValue
         } else if (source && source.isPlayer === true) {
             if (xpValue > 0) {
-                const player = source as any
-                const levelsGained = awardCritterXp(player, xpValue)
-                if (levelsGained > 0) {
-                    console.log('[XP] You reached level ' + player.level + '!')
-                }
+                awardCritterXp(source as any, xpValue)
             }
         }
     }

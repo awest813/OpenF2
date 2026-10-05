@@ -23,6 +23,7 @@ import { UIMode } from "./uiMode.js"
 import { BinaryReader } from "./util.js"
 import { opMap, ScriptVM } from "./vm.js"
 import { Worldmap } from "./worldmap.js"
+import { gameDate, gameTimeHour } from "./gameTime.js"
 
 // Bridge between Scripting API and the Scripting VM
 
@@ -68,22 +69,10 @@ export namespace ScriptVMBridge {
         0x80BF: function() { this.push(globalState.player) } // dude_obj
        ,0x80BC: function() { this.push(this.scriptObj.self_obj) } // self_obj
        ,0x8128: function() { this.push(this.scriptObj.combat_is_initialized) } // combat_is_initialized
-       ,0x8118: function() {
-            // get_month: compute from gameTickTime (10 ticks/second, 30-day months)
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            this.push(1 + (Math.floor(days / 30) % 12))
-        } // get_month
-       ,0x80F6: function() {
-            // game_time_hour: HHMM computed from gameTickTime
-            const secs = Math.floor(globalState.gameTickTime / 10) % 86400
-            this.push(Math.floor(secs / 3600) * 100 + Math.floor((secs % 3600) / 60))
-        } // game_time_hour
+       ,0x8118: function() { this.push(gameDate(globalState.gameTickTime).month) } // month
+       ,0x80F6: function() { this.push(gameTimeHour(globalState.gameTickTime)) } // game_time_hour (HHMM)
        ,0x80EA: function() { this.push(this.scriptObj.game_time) } // game_time
-       ,0x8119: function() {
-            // get_day: 1-based day within the current 30-day month
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            this.push(1 + days % 30)
-        } // get_day
+       ,0x8119: function() { this.push(gameDate(globalState.gameTickTime).day) } // day
        ,0x8101: function() { this.push(this.scriptObj.cur_map_index) } // cur_map_index
        ,0x80BD: function() { this.push(this.scriptObj.source_obj) } // source_obj
        ,0x80FA: function() { this.push(this.scriptObj.action_being_used) } // action_being_used
@@ -99,15 +88,8 @@ export namespace ScriptVMBridge {
        // logic (placing critters, setting up quest state) only on the first visit.
        ,0x80A0: function() { this.push(Scripting.getMapFirstRun()) }
 
-       // 0x80A2 — pc_flag_on(flag): set a player character state bit.
-       // Known bits: 3 = SNK_MODE (sneak mode), 2 = I_AM_EVIL.
-       ,0x80A2: bridged("pc_flag_on", 1, false)
 
-       // 0x80A6 — pc_flag_off(flag): clear a player character state bit.
-       ,0x80A6: bridged("pc_flag_off", 1, false)
 
-       // 0x80B1 — inven_unwield(obj): make a critter holster their current weapon.
-       ,0x80B1: bridged("inven_unwield", 1, false)
 
        // 0x80C7 — script_action: push the current script context action being used.
        // Identical semantics to action_being_used (0x80FA); both map to the same
@@ -135,7 +117,6 @@ export namespace ScriptVMBridge {
        ,0x810E: bridged("reg_anim_func", 2, false)
        ,0x8126: bridged("reg_anim_animate_forever", 2, false)
        ,0x810F: bridged("reg_anim_animate", 3, false)
-       ,0x8110: bridged("reg_anim_obj_move_to_tile", 3, false)
        ,0x810C: bridged("anim", 3, false)
        ,0x80E7: bridged("anim_busy", 1)
        ,0x810B: bridged("metarule", 2)
@@ -180,7 +161,6 @@ export namespace ScriptVMBridge {
        ,0x8147: bridged("move_obj_inven_to_obj", 2, false)
        ,0x8100: bridged("obj_pid", 1)
        ,0x80A4: bridged("obj_name", 1)
-       ,0x80A8: bridged("set_name", 2, false)           // set_name(obj, name) — BLK-050
        ,0x8149: bridged("obj_art_fid", 1)
        ,0x8150: bridged("obj_on_screen", 1)
        ,0x80f5: bridged("obj_can_hear_obj", 2)
@@ -223,11 +203,8 @@ export namespace ScriptVMBridge {
        ,0x80D0: bridged("attack_complex", 8, false)
        ,0x8153: bridged("terminate_combat", 0, false)
        ,0x8145: bridged("use_obj_on_obj", 2, false)
-       ,0x8144: bridged("use_obj", 1, false)
        ,0x80D9: bridged("rm_obj_from_inven", 2, false)
        ,0x80CB: bridged("set_critter_stat", 3)
-       ,0x8148: bridged("obj_set_light_level", 3, false)
-       ,0x80A5: bridged("set_exit_grids", 5, false)
        ,0x80E4: bridged("load_map", 2, false)
        ,0x8115: bridged("play_gmovie", 1, false)
        ,0x80A3: bridged("play_sfx", 1, false)
@@ -238,15 +215,10 @@ export namespace ScriptVMBridge {
        ,0x80F0: bridged("add_timer_event", 3, false)
        ,0x80F1: bridged("rm_timer_event", 1, false)
        ,0x80F9: bridged("dialogue_system_enter", 0, false)
-       ,0x8111: bridged("proto_data", 2)
-       ,0x8112: bridged("get_pc_stat", 1)
-       ,0x8113: bridged("radiation_dec", 2, false)
-       ,0x8114: bridged("radiation_add", 2, false)
        ,0x8129: bridged("gdialog_mod_barter", 1, false)
        ,0x80DE: bridged("start_gdialog", 5, false)
        ,0x811C: bridged("gsay_start", 0) // void?
        ,0x811E: bridged("gsay_reply", 2, false)
-       ,0x80DF: bridged("end_dialogue", 0) // void?
        ,0x8120: bridged("gsay_message", 3, false)
        ,0x814E: bridged("gdialog_set_barter_mod", 1, false)
 
@@ -305,13 +277,7 @@ export namespace ScriptVMBridge {
             this.scriptObj.gsay_option(msgList, msgId, targetFn, reaction)
         }
 
-       ,0x811b: function() { // get_year: compute current game year from gameTickTime
-            // Game starts in year 2241. Uses 360-day years (12 × 30-day months).
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            this.push(2241 + Math.floor(days / 360))
-        }
 
-       ,0x8155: bridged("obj_get_rot", 1)
        ,0x8156: bridged("set_obj_rot", 2, false)
 
        // sfall extended opcodes
@@ -438,45 +404,8 @@ export namespace ScriptVMBridge {
        ,0x81A8: bridged("get_combat_free_move", 1)       // get_combat_free_move(obj) → free AP for movement this combat turn
        ,0x81A9: bridged("set_combat_free_move", 2, false) // set_combat_free_move(obj, ap) — set free movement AP
 
-        // Phase 48 — gap opcodes in 0x8140–0x814D range
-        // tile_add_blocking(tile, rotation) — mark a tile as blocking line of sight/movement.
-        ,0x8140: function(this: GameScriptVM) {
-            const _rotation = this.pop()
-            const tile = this.pop()
-            if (!globalState.blockedTiles) { globalState.blockedTiles = new Set<number>() }
-            if (typeof tile === 'number' && isFinite(tile)) {
-                globalState.blockedTiles.add(tile)
-            }
-        }
-        // tile_remove_blocking(tile, rotation) — clear the blocking flag on a tile.
-        ,0x8141: function(this: GameScriptVM) {
-            const _rotation = this.pop()
-            const tile = this.pop()
-            if (globalState.blockedTiles && typeof tile === 'number') {
-                globalState.blockedTiles.delete(tile)
-            }
-        }
 
-       // give_karma / take_karma — add or subtract from GVAR_PLAYER_REPUTATION (GVAR_0).
-       // In Fallout 2 these are sometimes compiled as standalone opcodes when the
-       // macro expansion is inlined by the script compiler.
-       ,0x8142: function() { // give_karma(obj, amount) — award karma to GVAR_0
-            const amount = this.pop()
-            this.pop() // obj — Fallout 2 apply karma to player only
-            const current = this.scriptObj.global_var(0)
-            this.scriptObj.set_global_var(0, (typeof current === 'number' ? current : 0) + (typeof amount === 'number' ? amount : 0))
-        }
-       ,0x8143: function() { // take_karma(obj, amount) — penalise karma
-            const amount = this.pop()
-            this.pop() // obj
-            const current = this.scriptObj.global_var(0)
-            this.scriptObj.set_global_var(0, (typeof current === 'number' ? current : 0) - (typeof amount === 'number' ? amount : 0))
-        }
 
-       // dialogue_reaction — adjust current NPC reaction during dialogue.
-       // The browser build does not track a per-dialogue reaction score; we
-       // accept the argument and return 0 rather than crashing on unknown opcode.
-       ,0x814D: function() { this.pop() } // dialogue_reaction(how_much) — no-op (no reaction system)
 
        // -----------------------------------------------------------------------
        // Phase 49 — sfall extended opcodes 0x81AA–0x81AD
@@ -1990,6 +1919,67 @@ export namespace ScriptVMBridge {
        // 0x831F — set_critter_gender_sfall(obj, val): set gender.
        ,0x831F: bridged("set_critter_gender_sfall", 2, false) // set gender (0 or 1)
     }
+
+    /**
+     * Fallout 2 opcodes the bridge above lacked or had bound to the wrong
+     * procedure, as registered by fallout2-ce interpreter_extra.cc. Each
+     * entry pops and pushes exactly what the engine's handler does, so the
+     * script's data stack stays in step.
+     */
+    const vanillaOpcodes: { [opcode: number]: (this: GameScriptVM) => void } = {
+        0x80A2: bridged("scr_return", 1, false),
+        0x80A5: bridged("sfx_build_open_name", 2),
+        0x80A6: bridged("get_pc_stat", 1),
+        0x80A8: bridged("set_map_start", 4, false),
+        0x80AD: bridged("skill_contest", 3),
+        0x80B1: bridged("how_much", 1),
+        0x80B3: bridged("reaction_influence", 3),
+        0x80B5: bridged("roll_dice", 2),
+        0x80C0: bridged("obj_being_used_with", 0),
+        0x80CD: bridged("animate_stand_reverse_obj", 1, false),
+        0x80D1: bridged("make_daytime", 0, false),
+        0x80DB: bridged("use_obj", 1, false),
+        0x80DD: bridged("attack_complex", 8, false),
+        0x80DF: bridged("end_dialogue", 0, false),
+        0x80E0: bridged("dialogue_reaction", 1, false),
+        0x80E2: bridged("set_map_music", 2, false),
+        0x80E6: bridged("set_exit_grids", 5, false),
+        0x80EB: bridged("game_time_in_seconds", 0),
+        0x80EE: bridged("kill_critter_type", 2, false),
+        0x80FD: bridged("radiation_add", 2, false),
+        0x80FE: bridged("radiation_dec", 2, false),
+        0x8103: bridged("critter_rm_trait", 4),
+        0x8104: bridged("proto_data", 2),
+        0x8107: bridged("obj_set_light_level", 3, false),
+        0x8108: bridged("world_map", 0, false),
+        0x8110: bridged("reg_anim_animate_reverse", 3, false),
+        0x8111: bridged("reg_anim_obj_move_to_obj", 3, false),
+        0x8112: bridged("reg_anim_obj_run_to_obj", 3, false),
+        0x8113: bridged("reg_anim_obj_move_to_tile", 3, false),
+        0x8114: bridged("reg_anim_obj_run_to_tile", 3, false),
+        0x811B: bridged("days_since_visited", 0),
+        0x812A: bridged("game_difficulty", 0),
+        0x812B: bridged("running_burning_guy", 0),
+        0x812C: bridged("inven_unwield_self", 0, false),
+        0x8135: bridged("game_ui_is_disabled", 0),
+        0x813A: bridged("anim_action_frame", 2),
+        0x813B: bridged("reg_anim_play_sfx", 3, false),
+        0x813D: bridged("sfx_build_char_name", 3),
+        0x813E: bridged("sfx_build_ambient_name", 1),
+        0x813F: bridged("sfx_build_interface_name", 1),
+        0x8140: bridged("sfx_build_item_name", 1),
+        0x8141: bridged("sfx_build_weapon_name", 4),
+        0x8142: bridged("sfx_build_scenery_name", 3),
+        0x8143: bridged("attack_setup", 2, false),
+        0x8144: bridged("destroy_mult_objs", 2),
+        0x8146: bridged("endgame_slideshow", 0, false),
+        0x8148: bridged("endgame_movie", 0, false),
+        0x814D: bridged("jam_lock", 1, false),
+        0x814F: bridged("combat_difficulty", 0),
+        0x8155: bridged("critter_stop_attacking", 1, false),
+    }
+
+    Object.assign(bridgeOpMap, vanillaOpcodes)
     Object.assign(opMap, bridgeOpMap)
 
     // define a game-oriented Script VM that has a ScriptProto instance

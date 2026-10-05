@@ -26,6 +26,7 @@ import {
 } from '../character/radiationPoison.js'
 import { getActiveEffects, getAddictions } from '../character/timedEffects.js'
 import { restForHours, canRest, type TimeAdvanceResult } from '../character/rest.js'
+import { gameDate, gameTimeHour } from '../gameTime.js'
 import { getHolodisks, markHolodiskRead } from '../character/holodisks.js'
 import { openCompanionTrade } from '../partyTrade.js'
 import { canOpenCarTrunk, openCarTrunk, getCarTrunk, hasCar, getCarFuel } from '../car.js'
@@ -154,7 +155,10 @@ export class PipBoyPanel extends UIPanel {
 
         // Title bar
         fillRect(ctx, 0, 0, width, 28, { r: 0, g: 60, b: 0, a: 255 })
-        drawCenteredText(ctx, 'PIP-BOY 2000', width / 2, 19, FALLOUT_GREEN, 14, true)
+        // pipboyDrawDate / the clock: "25 JUL 2241" and HHMM.
+        const header = pipboyDateHeader(globalState.gameTickTime ?? 0)
+        drawUIFontText(ctx, header.date, 20, 19, FALLOUT_GREEN, 12, { bold: true })
+        drawUIFontText(ctx, header.time, 155, 19, FALLOUT_GREEN, 12, { bold: true })
 
         // Tabs
         const tabs = PIPBOY_TABS
@@ -735,4 +739,15 @@ function hpColor(stats: StatsComponent): UIColor {
     if (ratio > 0.66) {return FALLOUT_GREEN}
     if (ratio > 0.33) {return FALLOUT_AMBER}
     return FALLOUT_RED
+}
+
+const MONTH_ABBREVIATIONS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+/** The Pip-Boy's date and clock readout (pipboyDrawDate, gameTimeGetHour). */
+export function pipboyDateHeader(ticks: number): { date: string; time: string } {
+    const d = gameDate(ticks)
+    return {
+        date: `${String(d.day).padStart(2, '0')} ${MONTH_ABBREVIATIONS[d.month - 1]} ${String(d.year).padStart(4, '0')}`,
+        time: String(gameTimeHour(ticks)).padStart(4, '0'),
+    }
 }

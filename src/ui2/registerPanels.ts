@@ -19,6 +19,7 @@ import { PrototypeInspectorPanel } from './prototypeInspectorPanel.js'
 import { MainMenuPanel } from './mainMenuPanel.js'
 import { CharacterCreationPanel } from './characterCreationPanel.js'
 import { SkilldexPanel } from './skilldexPanel.js'
+import { MessageBoxPanel } from './messageBoxPanel.js'
 import { QuestLog } from '../quest/questLog.js'
 
 export const PRIMARY_GAMEPLAY_PANEL_NAMES = [
@@ -47,6 +48,7 @@ export function registerDefaultPanels(
     manager.register(new MainMenuPanel(screenWidth, screenHeight))
     manager.register(new CharacterCreationPanel(screenWidth, screenHeight))
     manager.register(new SkilldexPanel(screenWidth, screenHeight))
+    manager.register(new MessageBoxPanel(screenWidth, screenHeight))
 
     manager.register(new DialoguePanel(screenWidth, screenHeight))
     manager.register(new BarterPanel(screenWidth, screenHeight))

@@ -83,6 +83,8 @@ export interface EngineEvents {
     'ui:closePanel': { panelName: string }
     /** A line for the interface bar's display monitor (display_monitor.cc). */
     'ui:message': { text: string }
+    /** Engine-style one-button message box (showDialogBox). */
+    'ui:messageBox': { text: string }
     'settings:changed': { settings: GameSettings }
     'barter:talkRequested': Record<string, never>
     'barter:offerAccepted': {

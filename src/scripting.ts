@@ -43,7 +43,10 @@ import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
-import { isWithinPerception as perceives } from './combat/aiPacket.js'
+import { isWithinPerception as perceives, playerIsSneaking } from './combat/aiPacket.js'
+import { randomRoll as engineRandomRoll } from './combat/fo2Formulas.js'
+import { EventBus } from './eventBus.js'
+import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
@@ -756,6 +759,8 @@ export namespace Scripting {
 
     export class Script {
         _didOverride = false // Did the procedure call override the default action?
+        _howMuch = 0 // Margin of the last roll_vs_skill / do_check (how_much)
+        _returnValue = 0 // scr_return value
         _barterMod = 0 // One-time barter modifier set by gdialog_set_barter_mod
 
         scriptName!: string
@@ -1406,10 +1411,8 @@ export namespace Scripting {
                 warn('give_exp_points: non-finite XP (' + xp + ') — no-op', undefined, this)
                 return
             }
-            awardCritterXp(player, xp, {
-                onGain: (amount) => uiLog('You gain ' + amount + ' experience points.'),
-                onLevelUp: (level) => uiLog('You have reached experience level ' + level + '.'),
-            })
+            // opGiveExpPoints prints nothing itself; a level-up announces itself.
+            awardCritterXp(player, xp)
         }
 
         // critters
@@ -1972,29 +1975,44 @@ export namespace Scripting {
             }
             return (obj as Critter).getSkill(skillName)
         }
+        /**
+         * opRollVsSkill / skillRoll: randomRoll(skill + modifier, Critical
+         * Chance) — the same roll the attack uses, criticals included. Steal
+         * gets +30 while sneaking works. The margin is kept for how_much.
+         */
         roll_vs_skill(obj: Obj, skill: number, bonus: number) {
-            const skillValue = this.has_skill(obj, skill)
-            // BLK-197: Guard against non-finite bonus — Arroyo and Temple encounter
-            // scripts compute the bonus from arithmetic that can yield NaN (e.g.
-            // when a critter's stat is uninitialised).  rollSkillCheck(v, NaN) computes
-            // v + NaN = NaN, and NaN < roll is always false, making every check fail.
-            // Coerce non-finite bonus to 0 so the roll is made against the raw skill.
+            if (!isGameObject(obj) || obj.type !== 'critter') {return RollResult.CRITICAL_FAILURE}
+            let skillValue = this.has_skill(obj, skill)
             const safeBonus = (typeof bonus === 'number' && isFinite(bonus)) ? bonus : 0
-            return toRollResult(rollSkillCheck(skillValue, safeBonus))
+            const STEAL = 10
+            if ((obj as Critter).isPlayer && skill === STEAL && playerIsSneaking((min, max) => getRandomInt(min, max), obj)) {
+                skillValue += 30
+            }
+            let critChance = 0
+            try {
+                critChance = (obj as Critter).getStat?.('Critical Chance') ?? 0
+            } catch {
+                critChance = 0
+            }
+            const result = engineRandomRoll(skillValue + safeBonus, critChance, (min, max) => getRandomInt(min, max))
+            this._howMuch = result.delta
+            return result.roll
         }
+        /** opDoCheck / statRoll: d10 against stat + modifier; success or failure only. */
         do_check(obj: Obj, check: number, modifier: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
                 warn('do_check: not a critter: ' + obj, undefined, this)
-                return RollResult.FAILURE
+                return 0
             }
             const statName = statMap[check]
-            if (!statName) {
-                warn('do_check: unknown stat number: ' + check, undefined, this)
-                return RollResult.FAILURE
+            if (!statName || check < 0 || check > 6) {
+                warn('do_check: stat out of range: ' + check, undefined, this)
+                return 0
             }
-            // SPECIAL stats are on a 1–10 scale; multiply by 10 for percentile roll
-            const statValue = (obj as Critter).getStat(statName) * 10
-            return toRollResult(rollSkillCheck(statValue, modifier))
+            const value = (obj as Critter).getStat(statName) + ((typeof modifier === 'number' && isFinite(modifier)) ? modifier : 0)
+            const chance = getRandomInt(1, 10)
+            this._howMuch = value - chance
+            return chance <= value ? RollResult.SUCCESS : RollResult.FAILURE
         }
         is_success(roll: number) {
             return rollResultIsSuccess(roll as any) ? 1 : 0
@@ -2350,24 +2368,42 @@ export namespace Scripting {
                 return
             }
 
-            // opAttackComplex: nothing happens when either side is out of action
-            // or the target is fleeing; mid-fight the attacker just engages.
-            const self: any = this.self_obj
-            const target: any = obj
+            this._scriptAttack(this.self_obj, obj)
+        }
+        /** attack_setup(attacker, defender) (opAttackSetup): attack_complex with an explicit attacker. */
+        attack_setup(attacker: Obj, defender: Obj) {
+            info('[enter combat via attack_setup]')
+            if (!attacker) {return}
+            this._scriptAttack(attacker, defender)
+        }
+        /**
+         * opAttackComplex / opAttackSetup: nothing happens when either side is
+         * dead, knocked out or hidden, or the target is fleeing; mid-fight the
+         * attacker just engages (joining at the end of the round).
+         */
+        private _scriptAttack(attacker: any, target: any) {
             const inactive = (c: any) => !c || c.dead || c.knockedOut || c.visible === false
-            if (inactive(self) || inactive(target)) {return}
+            if (inactive(attacker) || inactive(target)) {return}
             if (((target.combatManeuver ?? 0) & 0x04) !== 0) {return}
 
             // Track the starting combatant for get_last_pers_obj (0x81D3).
-            ;(globalState as any).lastPersistentObj = this.self_obj
+            ;(globalState as any).lastPersistentObj = attacker
             if (globalState.inCombat && globalState.combat) {
-                if (((self.combatManeuver ?? 0) & 0x01) === 0) {
-                    self.combatManeuver = (self.combatManeuver ?? 0) | 0x01
-                    self.whoHitMe = target
+                if (((attacker.combatManeuver ?? 0) & 0x01) === 0) {
+                    attacker.combatManeuver = (attacker.combatManeuver ?? 0) | 0x01
+                    attacker.whoHitMe = target
                 }
                 return
             }
-            if (Config.engine.doCombat) {Combat.start(self as Critter, obj instanceof Critter ? obj : undefined)}
+            if (Config.engine.doCombat) {Combat.start(attacker as Critter, target instanceof Critter ? target : undefined)}
+        }
+        critter_stop_attacking(obj: Obj) {
+            // opCritterStopAttacking: disengage and forget the enemy.
+            if (!isGameObject(obj)) {return}
+            const c: any = obj
+            c.combatManeuver = (c.combatManeuver ?? 0) | 0x02
+            c.whoHitMe = null
+            c.aiLastTarget = null
         }
         terminate_combat() {
             info('[terminate_combat]')
@@ -3621,6 +3657,169 @@ export namespace Scripting {
             }
         }
 
+        // ── Vanilla opcodes (interpreter_extra.cc) ──────────────────────────
+        /** scr_return(value): the value a procedure hands back to the engine. */
+        scr_return(value: number) {
+            this._returnValue = value
+        }
+        /** how_much(unused): the margin of the last roll_vs_skill / do_check. */
+        how_much(_unused: number) {
+            return this._howMuch ?? 0
+        }
+        /** skill_contest, roll_dice and reaction_influence are unimplemented in the engine and return 0. */
+        skill_contest(_a: number, _b: number, _c: number) {
+            return 0
+        }
+        roll_dice(_a: number, _b: number) {
+            return 0
+        }
+        reaction_influence(_a: number, _b: number, _c: number) {
+            return 0
+        }
+        /** obj_being_used_with: the object this one is being used on. */
+        obj_being_used_with() {
+            return this.target_obj ?? 0
+        }
+        /** set_map_start(x, y, elevation, rotation): where the current map starts. */
+        set_map_start(x: number, y: number, elevation: number, rotation: number) {
+            const map: any = globalState.gMap
+            if (!map || !isFinite(x) || !isFinite(y)) {return}
+            map.startingPosition = { x, y }
+            map.startingElevation = elevation
+            if (map.mapObj) {
+                map.mapObj.startPosition = { x, y }
+                map.mapObj.startOrientation = rotation
+            }
+        }
+        /** game_time_in_seconds (0x80EB). */
+        game_time_in_seconds() {
+            return Math.floor((globalState.gameTickTime ?? 0) / 10)
+        }
+        /** days_since_visited: whole days since the player last left this map, −1 on a first visit. */
+        days_since_visited() {
+            const last = (globalState.gMap as any)?.lastVisitTime ?? 0
+            if (!last) {return -1}
+            return Math.floor(((globalState.gameTickTime ?? 0) - last) / 864000)
+        }
+        /** kill_critter_type(pid, deathFrame): kill every living, visible critter with that pid. */
+        kill_critter_type(pid: number, _deathFrame: number) {
+            const objects: Obj[] = globalState.gMap?.getObjects?.() ?? []
+            for (const obj of objects.slice()) {
+                if (obj.type !== 'critter' || obj.pid !== pid) {continue}
+                const c = obj as Critter
+                if (c.dead || c.visible === false) {continue}
+                critterKill(c)
+            }
+        }
+        /** critter_rm_trait(obj, kind, param, value): removes a perk entirely; returns −1. */
+        critter_rm_trait(obj: Obj, kind: number, param: number, _value: number) {
+            if (!isGameObject(obj) || obj.type !== 'critter') {return -1}
+            if (kind === 0) {
+                const ranks = (obj as any).perkRanks
+                if (ranks && typeof ranks === 'object') {delete ranks[param]}
+            }
+            return -1
+        }
+        /** inven_unwield (0x812C) unwields the script's own critter. */
+        inven_unwield_self() {
+            if (this.self_obj) {this.inven_unwield(this.self_obj as Obj)}
+        }
+        game_difficulty() {
+            return globalState.gameDifficulty ?? 1
+        }
+        combat_difficulty() {
+            return globalState.combatDifficulty ?? 1
+        }
+        /** running_burning_guy preference (on by default). */
+        running_burning_guy() {
+            return 1
+        }
+        game_ui_is_disabled() {
+            return globalState.gameUIDisabled ? 1 : 0
+        }
+        anim_action_frame(_obj: Obj, _anim: number) {
+            return 0
+        }
+        reg_anim_animate_reverse(obj: Obj, anim: number, delay: number) {
+            // No reverse playback; the animation still runs.
+            this.reg_anim_animate(obj, anim, delay)
+        }
+        reg_anim_obj_run_to_tile(obj: Obj, tileNum: number, _delay: number) {
+            if (!isGameObject(obj) || !(obj as Critter).walkTo || !obj.position) {return}
+            if (!isFinite(tileNum) || tileNum < 0) {return}
+            ;(obj as Critter).walkTo(fromTileNum(tileNum), true)
+        }
+        reg_anim_obj_move_to_obj(obj: Obj, target: Obj, _delay: number) {
+            if (!isGameObject(obj) || !isGameObject(target) || !(obj as Critter).walkTo || !obj.position || !target.position) {return}
+            ;(obj as Critter).walkTo(target.position, false)
+        }
+        reg_anim_obj_run_to_obj(obj: Obj, target: Obj, _delay: number) {
+            if (!isGameObject(obj) || !isGameObject(target) || !(obj as Critter).walkTo || !obj.position || !target.position) {return}
+            ;(obj as Critter).walkTo(target.position, true)
+        }
+        reg_anim_play_sfx(_obj: Obj, name: string, _delay: number) {
+            if (typeof name === 'string' && name) {EventBus.emit('audio:playSound', { soundId: name })}
+        }
+        animate_stand_reverse_obj(_obj: Obj) {}
+        make_daytime() {}
+        /** scripts_request_world_map: leave for the world map. */
+        world_map() {
+            EventBus.emit('ui:openPanel', { panelName: 'worldMap' })
+        }
+        dialogue_reaction(_reaction: number) {}
+        set_map_music(_map: number, _name: string) {}
+        /** sfx_build_*_name: sound effect file names; the bridge has no sound bank, so names pass through or are empty. */
+        sfx_build_open_name(_obj: Obj, _action: number) {
+            return ''
+        }
+        sfx_build_char_name(_obj: Obj, _anim: number, _extra: number) {
+            return ''
+        }
+        sfx_build_ambient_name(name: string) {
+            return typeof name === 'string' ? name : ''
+        }
+        sfx_build_interface_name(name: string) {
+            return typeof name === 'string' ? name : ''
+        }
+        sfx_build_item_name(_name: string) {
+            return ''
+        }
+        sfx_build_weapon_name(_type: number, _weapon: Obj, _hitMode: number, _target: Obj) {
+            return ''
+        }
+        sfx_build_scenery_name(_obj: Obj, _action: number, _extra: number) {
+            return ''
+        }
+        /**
+         * destroy_mult_objs(obj, count): take up to `count` of the item out of
+         * whoever carries it and return how many went; an item on the ground
+         * is destroyed and 0 is returned.
+         */
+        destroy_mult_objs(obj: Obj, count: number) {
+            if (!isGameObject(obj)) {return 0}
+            const carriers: any[] = [this.self_obj, globalState.player, ...(globalState.gMap?.getObjects?.() ?? [])]
+            for (const owner of carriers) {
+                if (!owner || !Array.isArray(owner.inventory)) {continue}
+                if (!owner.inventory.includes(obj)) {continue}
+                const have = typeof (obj as any).amount === 'number' ? (obj as any).amount : 1
+                const n = Math.max(0, Math.min(have, count))
+                return this.rm_mult_objs_from_inven(owner, obj, n) ?? n
+            }
+            this.destroy_object(obj)
+            return 0
+        }
+        endgame_slideshow() {
+            signalEndGame(0, globalVars, { play: true })
+        }
+        /** endgame_movie: the credits roll (endgamePlayMovie). */
+        endgame_movie() {
+            EventBus.emit('ui:openPanel', { panelName: 'credits' })
+        }
+        /** jam_lock(obj): a jammed lock stays shut until it is reset. */
+        jam_lock(obj: Obj) {
+            if (isGameObject(obj)) {(obj as any).lockJammed = true}
+        }
+
         animate_stand_obj(obj: Critter) {
             log('animate_stand_obj', arguments, 'animation')
             if (!isGameObject(obj)) {
@@ -4633,24 +4832,21 @@ export namespace Scripting {
         }
 
         // sfall extended opcode — get in-game calendar year (0x81A5).
-        // Game epoch is year 2241; uses 360-day years (12 × 30-day months).
+        // The engine calendar (gameTimeGetDate): starts 25 July 2241, real month lengths.
         get_year(): number {
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            return 2241 + Math.floor(days / 360)
+            return gameDate(globalState.gameTickTime).year
         }
 
         // sfall extended opcode — get in-game calendar month (0x81A6).
-        // Returns 1–12; Fallout 2 uses 30-day months.
+        // Returns 1–12.
         get_month(): number {
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            return (Math.floor(days / 30) % 12) + 1
+            return gameDate(globalState.gameTickTime).month
         }
 
         // sfall extended opcode — get in-game calendar day of month (0x81A7).
-        // Returns 1–30; Fallout 2 uses 30-day months.
+        // Returns 1–31.
         get_day(): number {
-            const days = Math.floor(globalState.gameTickTime / (10 * 86400))
-            return (days % 30) + 1
+            return gameDate(globalState.gameTickTime).day
         }
 
         // sfall extended opcode — get free movement AP for the current combat turn (0x81A8).
@@ -5654,27 +5850,22 @@ export namespace Scripting {
 
         // sfall 0x8218 — get_year_sfall():
         // Return the current in-game year (2241 at game start).
-        // Derived from gameTickTime: 10 ticks = 1 second; 1 year = 360 days (12×30).
+        // From the engine calendar (gameTimeGetDate).
         get_year_sfall(): number {
-            const totalSecs = globalState.gameTickTime / 10
-            return 2241 + Math.floor(totalSecs / (360 * 86400))
+            return gameDate(globalState.gameTickTime).year
         }
 
         // sfall 0x8219 — get_month_sfall():
         // Return the current in-game month (1–12).
-        // Fallout 2 uses 360-day years with 12 months of 30 days each.
+        // From the engine calendar (gameTimeGetDate).
         get_month_sfall(): number {
-            const totalSecs = globalState.gameTickTime / 10
-            const dayOfYear = Math.floor(totalSecs / 86400) % 360
-            return Math.floor(dayOfYear / 30) + 1
+            return gameDate(globalState.gameTickTime).month
         }
 
         // sfall 0x821A — get_day_sfall():
         // Return the current in-game day of the month (1–30).
         get_day_sfall(): number {
-            const totalSecs = globalState.gameTickTime / 10
-            const dayOfYear = Math.floor(totalSecs / 86400) % 360
-            return (dayOfYear % 30) + 1
+            return gameDate(globalState.gameTickTime).day
         }
 
         // sfall 0x821B — get_time_sfall():

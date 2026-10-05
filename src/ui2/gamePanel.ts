@@ -31,6 +31,11 @@ import { syncPlayerEntityFromCritter, readPlayerHudSnapshot } from '../playerPro
 import { attackApCostFor, getAttackWeaponInfo } from '../combat/attackInfo.js'
 import { reloadApCost } from '../combat/fo2Formulas.js'
 import { reloadWeaponFully } from '../combat/ammo.js'
+import { gameDate, gameTimeString } from '../gameTime.js'
+import { Skills, skillRequiresTarget } from '../skills.js'
+import { useSkilldexSkill } from '../skilldex.js'
+import { UIMode } from '../uiMode.js'
+import { centerCamera } from '../renderer.js'
 import { PerkId, perkRank } from '../character/perkIds.js'
 
 const PANEL_HEIGHT = 99
@@ -438,15 +443,86 @@ export class GamePanel extends UIPanel {
                 return this._open('options')
             case 'p':
             case 'P':
-                return this._open('pipboy')
+                return this._openPipboy()
+            case 'z':
+            case 'Z':
+                return this._openPipboy('rest')
             case 's':
             case 'S':
                 return this._open('skilldex')
             case 'Tab':
                 return this._open('pipboy', 'map')
+            case ',':
+            case '<':
+                return this._rotatePlayer(5)
+            case '.':
+            case '>':
+                return this._rotatePlayer(1)
+            case '/':
+            case '?':
+                this._printDateTime()
+                return true
+            case 'Home':
+                // KEY_HOME: scroll the view back to the player.
+                if (globalState.player?.position) {centerCamera(globalState.player.position)}
+                return true
+            case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8':
+                return this._useSkillHotkey(Number(key))
             default:
                 return false
         }
+    }
+
+    /** The Pip-Boy (and Z to rest) is refused in combat with misc.msg 7. */
+    private _openPipboy(tab?: string): boolean {
+        if (globalState.inCombat) {
+            EventBus.emit('audio:playSound', { soundId: 'iisxxxx1' })
+            let text: string | null = null
+            try {
+                text = getMessage('misc', 7)
+            } catch {
+                text = null
+            }
+            EventBus.emit('ui:messageBox', { text: text || 'Pipboy not available in combat!' })
+            return true
+        }
+        return this._open('pipboy', tab)
+    }
+
+    /** , and . turn the player one facing (game.cc animationRegisterRotate*). */
+    private _rotatePlayer(step: number): boolean {
+        const player: any = globalState.player
+        if (!player || player.dead) {return false}
+        player.orientation = ((player.orientation ?? 0) + step) % 6
+        try {
+            player.art = player.getAnimation?.('idle') ?? player.art
+        } catch {
+            // keep the current frame
+        }
+        return true
+    }
+
+    /** / prints the date and time (editor.msg 500+ month name, gameTimeGetTimeString). */
+    private _printDateTime(): void {
+        EventBus.emit('audio:playSound', { soundId: 'ui_click' })
+        this.addMonitorMessage(dateTimeMessage(globalState.gameTickTime ?? 0))
+    }
+
+    /**
+     * 1–8: Sneak toggles at once; the other Skilldex skills arm the skill
+     * cursor (game.cc KEY_1 … KEY_8).
+     */
+    private _useSkillHotkey(n: number): boolean {
+        EventBus.emit('audio:playSound', { soundId: 'ui_click' })
+        const skill = n as Skills
+        if (!skillRequiresTarget(skill)) {
+            useSkilldexSkill(skill)
+            return true
+        }
+        globalState.uiMode = UIMode.useSkill
+        globalState.skillMode = skill
+        return true
     }
 
     private _open(panelName: string, openAs?: string): boolean {
@@ -514,15 +590,17 @@ export class GamePanel extends UIPanel {
         const action = weapon?.weapon
         EventBus.emit('audio:playSound', { soundId: 'ui_click' })
         if (action?.mode === 'reload') {
+            // interface.cc _intface_use_item / _intface_item_reload: short of
+            // AP nothing happens; otherwise load what can be loaded (paying
+            // the reload AP and playing the ready sound only if anything
+            // went in) and move on to the next action either way.
             if (globalState.inCombat && !(globalState.combat?.inPlayerTurn ?? false)) {return}
             const result = reloadWeaponFully(player, weapon)
+            if (result.reason === 'no-ap') {return}
+            if (typeof action.cycleMode === 'function') {action.cycleMode(player)}
             if (result.loaded > 0) {
                 EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })
-                if (typeof action.cycleMode === 'function') {action.cycleMode(player)}
                 globalState.combat?.afterPlayerAction?.()
-            } else if (result.reason === 'no-ap') {
-                const cost = reloadApCost(weapon?.pro?.extra?.perk ?? -1)
-                EventBus.emit('ui:message', { text: `You need ${cost} action points.` })
             }
             return
         }
@@ -572,4 +650,18 @@ function drawButton(
     fillRect(ctx, x, y, w, h, bg)
     strokeRect(ctx, x, y, w, h, border)
     drawUIFontText(ctx, label, x + w / 2, y + h / 2 + 4, border, 9, { align: 'center' })
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** game.cc KEY_SLASH: "<month>: <day>/<year> <h:mm>". */
+export function dateTimeMessage(ticks: number): string {
+    const d = gameDate(ticks)
+    let month: string | null = null
+    try {
+        month = getMessage('editor', 500 + d.month - 1)
+    } catch {
+        month = null
+    }
+    return `${month || MONTH_NAMES[d.month - 1]}: ${d.day}/${d.year} ${gameTimeString(ticks)}`
 }

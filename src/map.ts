@@ -72,6 +72,9 @@ export interface SerializedMap {
     roofMap: string[][]
 
     mapObj: any // required?
+
+    /** Game time when the player last left (or saved on) the map (MapHeader.lastVisitTime). */
+    lastVisitTime?: number
 }
 
 export class GameMap {
@@ -81,6 +84,9 @@ export class GameMap {
     numLevels: number
 
     currentElevation = 0 // current map elevation
+
+    /** MapHeader.lastVisitTime: 0 until the player has left this map once. */
+    lastVisitTime = 0
 
     floorMap: string[][] = null // Floor tilemap
     roofMap: string[][] = null // Roof tilemap
@@ -396,6 +402,8 @@ export class GameMap {
         }
 
         this.name = mapName.toLowerCase()
+        // A map read fresh from disk has never been visited.
+        this.lastVisitTime = 0
 
         Events.emit('loadMapPre')
 
@@ -626,6 +634,8 @@ export class GameMap {
             name: this.name,
             mapID: this.mapID,
             numLevels: this.numLevels,
+            // map.cc mapSave stamps the visit time whenever the map is written out.
+            lastVisitTime: globalState.gameTickTime ?? 0,
             mapObj: {
                 levels: this.mapObj.levels.map((level: any) => ({ tiles: level.tiles })),
                 startPosition: this.mapObj.startPosition,
@@ -651,6 +661,7 @@ export class GameMap {
         this.name = obj.name
         this.mapID = obj.mapID
         this.numLevels = obj.numLevels
+        this.lastVisitTime = typeof obj.lastVisitTime === 'number' ? obj.lastVisitTime : 0
         this.mapObj = obj.mapObj
         this.mapScript = obj.mapScript ? Scripting.deserializeScript(obj.mapScript) : null
         this.objects = obj.objects.map((level) => level.map((obj) => deserializeObj(obj)))

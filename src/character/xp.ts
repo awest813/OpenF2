@@ -19,6 +19,8 @@ const TRAIT_GIFTED = 15
 /** stat_defs.h PC_LEVEL_MAX */
 const PC_LEVEL_MAX = 99
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
+import { EventBus } from '../eventBus.js'
+import { getMessage } from '../util.js'
 
 /** Base SPECIAL with trait modifiers (critterGetBaseStatWithTraitModifier). */
 function baseStat(player: XpCritter, stat: string): number {
@@ -97,6 +99,17 @@ export function awardCritterXp(
             player.stats.modifyBase('HP', hpPerLevel)
         }
 
+        // stat.cc pcAddExperienceWithOptions: "You have gone up a level." and the jingle.
+        if ((player as any).isPlayer || player === (globalState.player as any)) {
+            let text: string | null = null
+            try {
+                text = getMessage('stat', 600)
+            } catch {
+                text = null
+            }
+            EventBus.emit('ui:message', { text: text || 'You have gone up a level.' })
+            EventBus.emit('audio:playSound', { soundId: 'levelup' })
+        }
         opts.onLevelUp?.(player.level)
         // A perk every 3 levels (every 4 with Skilled).
         const perkRate = hasSkilled ? 4 : 3

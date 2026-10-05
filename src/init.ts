@@ -19,11 +19,12 @@ import { CriticalEffects } from './criticalEffects.js'
 import { Events } from './events.js'
 import { Point } from './geometry.js'
 import globalState from './globalState.js'
+import { NEW_GAME_TICKS } from './gameTime.js'
 import { GameMap } from './map.js'
 import { Player } from './player.js'
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { saveLoadInit } from './saveload.js'
-import { initUI, uiLog } from './ui.js'
+import { initUI } from './ui.js'
 import { Worldmap } from './worldmap.js'
 import { shouldSkipMainMenu } from './character/chargen.js'
 
@@ -35,8 +36,8 @@ export interface InitGameOptions {
 export function initGame(options: InitGameOptions = {}): void {
     globalState.player = new Player()
     globalState.gMap = new GameMap()
-
-    uiLog('Welcome to OpenF2')
+    // scr_game_init: a new game starts at 8:24 in the morning on 25 July 2241.
+    globalState.gameTickTime = NEW_GAME_TICKS
 
     if (shouldSkipMainMenu()) {
         // Dev shortcut: `?artemple` (or any map name) loads immediately.
