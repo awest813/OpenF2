@@ -20,7 +20,7 @@ import { heart } from './heart.js'
 import { hexDirectionTo, hexDistance, hexesInRadius, hexFromScreen, hexInDirectionDistance } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
-import { tickAnimSequences } from './animSequence.js'
+import { setRegAnimCombatCheck, tickAnimSequences } from './animSequence.js'
 
 /** When the animation sequences last ticked (performance.now ms). */
 let lastAnimSequenceTick = 0
@@ -1134,7 +1134,9 @@ heart.update = function () {
         }
     }
 
-    const didTick = time - globalState.lastGameTick >= 1000 / 10 // 10 Hz game tick
+    // sfall stop_game (map_disable_bk_processes): the clock, timers, critters and animations wait.
+    const backgroundStopped = (globalState as any).backgroundProcessesStopped === true
+    const didTick = !backgroundStopped && time - globalState.lastGameTick >= 1000 / 10 // 10 Hz game tick
     if (didTick) {
         globalState.lastGameTick = time
         // The game clock stands still during combat; each round advances it
@@ -1173,6 +1175,7 @@ heart.update = function () {
         globalState.audioEngine.tick()
         // DeleteAllTempArrays: sfall temporary arrays live for one frame.
         deleteTempArrays()
+        setRegAnimCombatCheck(true)
 
         // Slice F / P1-4 / P1-5: drug expiry + rad/poison DoT on the player.
         if (globalState.player && (globalState.player as Critter).stats) {
@@ -1182,7 +1185,7 @@ heart.update = function () {
         }
     }
 
-    for (const obj of globalState.gMap.getObjects()) {
+    for (const obj of backgroundStopped ? [] : globalState.gMap.getObjects()) {
         if (obj.type === 'critter') {
             if (
                 didTick &&

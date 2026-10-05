@@ -122,3 +122,47 @@ describe('object lists (Arrays.cpp list_begin)', () => {
         globalState.gMap = saved
     })
 })
+
+describe('input state (InputFuncs.cpp)', () => {
+    it('key_pressed takes DirectInput scan codes, 256+ for mouse buttons', async () => {
+        const { noteKey, noteMouseButton, clearInputState } = await import('./inputState.js')
+        const { sfallMethods } = await import('./sfallFunctions.js')
+        noteKey('KeyA', 65, true)
+        expect(sfallMethods.key_pressed(30)).toBe(1) // DIK_A
+        expect(sfallMethods.key_pressed(0x80000000 | 65)).toBe(1) // VK_A
+        noteMouseButton(2, true)
+        expect(sfallMethods.get_mouse_buttons()).toBe(2)
+        expect(sfallMethods.key_pressed(257)).toBe(1)
+        clearInputState()
+        expect(sfallMethods.key_pressed(30)).toBe(0)
+    })
+})
+
+describe('sfall reg_anim steps (Anims.cpp)', () => {
+    it('run in the sequence, and only in combat after reg_anim_combat_check(0)', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const { resetAnimSequences, tickAnimSequences, setRegAnimCombatCheck } = await import('./animSequence.js')
+        resetAnimSequences()
+        const script: any = new (Scripting as any).Script()
+        const obj: any = { type: 'scenery', position: { x: 5, y: 5 }, orientation: 0, _type: 'obj' }
+        script.reg_anim_func(1, 1)
+        script.reg_anim_turn_towards(obj, toTileNum({ x: 5, y: 9 }))
+        script.reg_anim_func(3, 0)
+        tickAnimSequences()
+        expect(obj.orientation).not.toBe(0)
+
+        globalState.inCombat = true
+        obj.visible = true
+        script.reg_anim_func(1, 1)
+        script.reg_anim_animate_and_hide(obj, 0, -1)
+        script.reg_anim_func(3, 0)
+        expect(obj.visible).toBe(true) // ignored in combat
+        script.reg_anim_combat_check(0)
+        script.reg_anim_func(1, 1)
+        script.reg_anim_destroy(obj)
+        script.reg_anim_func(3, 0)
+        setRegAnimCombatCheck(true)
+        globalState.inCombat = false
+        resetAnimSequences()
+    })
+})

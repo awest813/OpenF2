@@ -22,7 +22,7 @@ declare const __dirname: string
 import { Combat, CombatStartData } from './combat.js'
 import { critterDamage } from './critter.js'
 import { areaContainingMap, lookupMapName, lookupScriptName, setMapMusic } from './data.js'
-import { hexDistance, hexInDirection, hexInDirectionDistance, Point, hexToScreen } from './geometry.js'
+import { hexDirectionTo, hexDistance, hexInDirection, hexInDirectionDistance, Point, hexToScreen } from './geometry.js'
 import { Spatial } from './map.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
@@ -81,6 +81,7 @@ import {
     ANIM_BACK_TO_STANDING, ANIM_PRONE_TO_STANDING, ANIM_STAND, ANIMATION_REQUEST_UNRESERVED, animationIsBusy, critterArt, isProne, resetAnimSequences, weaponAnimationCode,
     regAnimAnimate, regAnimAnimateForever, regAnimAnimateReversed, regAnimBegin, regAnimClear, regAnimEnd,
     regAnimMoveToObject, regAnimMoveToTile, regAnimPlaySfx, regAnimRunToObject, regAnimRunToTile, regAnimSetArt,
+    regAnimBlocked, regAnimCallback, setRegAnimCombatCheck,
 } from './animSequence.js'
 
 export namespace Scripting {
@@ -2792,19 +2793,19 @@ export namespace Scripting {
         // animation
         /** opRegAnimFunc: 1 begins a sequence (with request flags), 2 clears an object's, 3 ends it. Not in combat. */
         reg_anim_func(cmd: number, param: any) {
-            if (globalState.inCombat) {return}
+            if (regAnimBlocked()) {return}
             if (cmd === 1) {regAnimBegin(typeof param === 'number' ? param : ANIMATION_REQUEST_UNRESERVED)}
             else if (cmd === 2) {regAnimClear(param)}
             else if (cmd === 3) {regAnimEnd()}
         }
         /** opRegAnimAnimate; the dying fall of pid 0x100002F is skipped under the violence filter. */
         reg_anim_animate(obj: Obj, anim: number, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             if (anim === 20 && (obj as any).pid === 0x100002f && violenceToIni(globalState.violenceLevel) < 2) {return}
             regAnimAnimate(obj, anim, delay)
         }
         reg_anim_animate_forever(obj: Obj, anim: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimAnimateForever(obj, anim)
         }
         /**
@@ -2826,8 +2827,65 @@ export namespace Scripting {
             regAnimEnd()
         }
         reg_anim_obj_move_to_tile(obj: Obj, tileNum: number, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimMoveToTile(obj, tileNum, delay)
+        }
+
+        // ── sfall's reg_anim steps (Anims.cpp): skipped in combat unless reg_anim_combat_check(0). ──
+        /** reg_anim_combat_check(0): reg_anim_* work in combat too, until the frame ends. */
+        reg_anim_combat_check(on: number) {
+            setRegAnimCombatCheck(on > 0)
+        }
+        /** reg_anim_destroy: the object is removed when the sequence gets here. */
+        reg_anim_destroy(obj: Obj) {
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
+            regAnimCallback(obj, () => this.destroy_object(obj), -1)
+        }
+        /** reg_anim_animate_and_hide: play the animation, then hide the object. */
+        reg_anim_animate_and_hide(obj: Obj, anim: number, delay: number) {
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
+            regAnimAnimate(obj, anim, delay)
+            regAnimCallback(obj, () => { (obj as any).visible = false }, -1)
+        }
+        /** reg_anim_light(obj, radius 0–8, delay): the light's radius changes at that step. */
+        reg_anim_light(obj: Obj, radius: number, delay: number) {
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
+            const r = Math.max(0, Math.min(8, Math.trunc(radius)))
+            regAnimCallback(obj, () => {
+                Lightmap.syncObjectEmitterLight(obj, (obj as any).lightIntensity ?? 0, r)
+                ;(obj as any).lightRadius = r
+            }, delay)
+        }
+        /** reg_anim_change_fid: the object's art changes at that step. */
+        reg_anim_change_fid(obj: Obj, fid: number, delay: number) {
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
+            regAnimCallback(obj, () => {
+                try {
+                    ;(obj as any).art = lookupArt(fid)
+                    ;(obj as any).frmPID = fid & 0xffffff
+                } catch {
+                    warn('reg_anim_change_fid: no art for fid 0x' + (fid >>> 0).toString(16), undefined, this)
+                }
+            }, delay)
+        }
+        /** reg_anim_take_out: the critter draws its weapon. */
+        reg_anim_take_out(obj: Obj, _holdFrame: number) {
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
+            regAnimAnimate(obj, 38, -1)
+        }
+        /** reg_anim_turn_towards: the object turns to face the tile. */
+        reg_anim_turn_towards(obj: Obj, tile: number) {
+            if (regAnimBlocked() || !isGameObject(obj) || !obj.position || !isValidTileNum(tile)) {return}
+            regAnimCallback(obj, () => {
+                if (obj.position) {obj.orientation = hexDirectionTo(obj.position, fromTileNum(tile))}
+            }, -1)
+        }
+        /** reg_anim_callback(procedure): the script's procedure runs when the sequence gets here. */
+        reg_anim_callback(proc: number | string) {
+            const vm: any = this._vm
+            const name = typeof proc === 'string' ? proc : vm?.intfile?.proceduresTable?.[proc]?.name
+            if (!name || !vm) {return}
+            regAnimCallback(null, () => vm.call(name), -1)
         }
 
         // ── Vanilla opcodes (interpreter_extra.cc) ──────────────────────────
@@ -2939,19 +2997,19 @@ export namespace Scripting {
             return (art && globalState.imageInfo?.[art]?.actionFrame) ?? 0
         }
         reg_anim_animate_reverse(obj: Obj, anim: number, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimAnimateReversed(obj, anim, delay)
         }
         reg_anim_obj_run_to_tile(obj: Obj, tileNum: number, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimRunToTile(obj, tileNum, delay)
         }
         reg_anim_obj_move_to_obj(obj: Obj, target: Obj, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimMoveToObject(obj, target, delay)
         }
         reg_anim_obj_run_to_obj(obj: Obj, target: Obj, delay: number) {
-            if (globalState.inCombat || !isGameObject(obj)) {return}
+            if (regAnimBlocked() || !isGameObject(obj)) {return}
             regAnimRunToObject(obj, target, delay)
         }
         /** opRegAnimPlaySfx: a sound step (allowed in combat too). */

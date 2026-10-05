@@ -41,6 +41,7 @@ import { inventorySize, itemWeight } from './critterInventory.js'
 import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
 import { loadMessage, scriptListIndex } from './data.js'
+import { keyDown, mouseButtonsDown } from './inputState.js'
 import { IniSection, parseIniSetting, readIniFile, setIniString } from './iniFiles.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
@@ -238,6 +239,24 @@ function iniSectionArray(section: IniSection, temp = false): number {
     return id
 }
 
+const sfallSounds = new Map<number, HTMLAudioElement>()
+let lastSoundId = 0
+
+/** Sound::PlaySfallSound: no drive letters or "..", at least four characters. */
+function playSfallSound(path: string, mode: number): number {
+    if (/:|\.\./.test(path) || path.length <= 3 || typeof Audio === 'undefined') {return 0}
+    const volAdjust = (mode & 0x7fff0000) >> 16
+    const kind = Math.min(mode & 0xf, 2)
+    const audio = new Audio('data/' + path.replace(/\\/g, '/').toLowerCase())
+    audio.loop = kind !== 0
+    audio.volume = Math.max(0, Math.min(1, 1 - volAdjust / 32767))
+    void audio.play().catch(() => {})
+    if (kind === 0) {return 0}
+    const id = ++lastSoundId
+    sfallSounds.set(id, audio)
+    return id
+}
+
 function noop(): number {
     return 0
 }
@@ -260,13 +279,34 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_shader_int: noop, set_shader_float: noop, set_shader_vector: noop, get_shader_version: noop, set_shader_mode: noop,
     get_shader_texture: noop, set_shader_texture: noop, force_graphics_refresh: noop, set_palette: noop,
     eax_available: noop, set_eax_environment: noop,
-    input_funcs_available: () => 1, tap_key: noop, key_pressed: noop,
+    input_funcs_available: () => 1, tap_key: noop,
+    /** key_pressed(DIK scan code, or a VK code with bit 0x80000000): held down now. */
+    key_pressed: (key: number) => keyDown(Math.trunc(key)),
+    /** get_mouse_buttons: 1 left, 2 right, 4 middle. */
+    get_mouse_buttons: () => mouseButtonsDown(),
     fs_create: () => -1, fs_copy: () => -1, fs_find: () => -1, fs_write_byte: noop, fs_write_short: noop, fs_write_int: noop,
     fs_write_string: noop, fs_write_bstring: noop, fs_delete: noop, fs_size: noop, fs_pos: () => -1, fs_seek: noop, fs_resize: noop,
     fs_read_byte: noop, fs_read_short: noop, fs_read_int: noop, fs_read_float: noop,
     set_dm_model: noop, set_df_model: noop, set_movie_path: noop, hero_select_win: noop, set_hero_race: noop, set_hero_style: noop,
-    nb_create_char: noop, refresh_pc_art: noop, modified_ini: noop, get_window_under_mouse: noop, get_mouse_buttons: noop,
-    stop_game: noop, resume_game: noop, reg_anim_callback: noop, play_sfall_sound: noop, stop_sfall_sound: noop,
+    nb_create_char: noop, refresh_pc_art: noop, modified_ini: noop, get_window_under_mouse: noop,
+    /** stop_game / resume_game: map_disable/enable_bk_processes. */
+    stop_game() { (globalState as any).backgroundProcessesStopped = true },
+    resume_game() { (globalState as any).backgroundProcessesStopped = false },
+    /**
+     * play_sfall_sound(file, mode): an mp3/wav from the game folder; mode 0
+     * plays once (returns 0), 1 loops and 2 replaces the music (both return
+     * an id for stop_sfall_sound). Bits 16–30 lower the volume.
+     */
+    play_sfall_sound(file: string, mode: number) {
+        if (!(mode >= 0)) {return 0}
+        return playSfallSound(String(file ?? ''), Math.trunc(mode))
+    },
+    stop_sfall_sound(id: number) {
+        const audio = sfallSounds.get(id)
+        if (!audio) {return}
+        audio.pause()
+        sfallSounds.delete(id)
+    },
     create_spatial: noop, tile_light: () => -1,
 
     // ── version and state ──
@@ -490,7 +530,20 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     },
     get_last_attacker(obj: any) { return isObject(obj) ? (obj.lastCombatAttacker ?? obj.whoHitMe ?? 0) : 0 },
     get_last_target(obj: any) { return isObject(obj) ? (obj.aiLastTarget ?? obj.lastCombatTarget ?? 0) : 0 },
-    get_attack_type(this: any) { return this.get_attack_type_sfall?.() ?? -1 },
+    /**
+     * get_attack_type: the interface's attack for the active hand (ATKTYPE_*):
+     * left 0/1, right 2/3 (primary/secondary), 4 punch, 6/7 reloading.
+     */
+    get_attack_type() {
+        const player: any = globalState.player
+        if (!player) {return -1}
+        const hand = player.activeHand === 1 ? 1 : 0
+        const weapon = player.equippedWeapon
+        const mode: string = weapon?.weapon?.mode ?? 'primary'
+        if (!weapon || weapon.pro?.extra?.subType !== 3) {return 4}
+        if (mode === 'reload') {return 6 + hand}
+        return hand * 2 + (mode === 'secondary' || mode === 'secondary-aimed' ? 1 : 0)
+    },
     toggle_active_hand() {
         const p: any = globalState.player
         if (p) {p.activeHand = p.activeHand === 1 ? 0 : 1}
@@ -508,7 +561,12 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     remove_weapon_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.weapons.delete(obj)} },
     remove_target_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.targets.delete(obj)} },
     remove_attacker_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.attackers.delete(obj)} },
-    set_critter_burst_disable(obj: any, v: number) { if (isObject(obj)) {obj.burstDisabled = v !== 0} },
+    /** set_critter_burst_disable: the AI stops picking burst fire for this critter (not the player). */
+    set_critter_burst_disable(obj: any, v: number) {
+        if (!isCritter(obj) || obj === globalState.player) {return}
+        if (v) {sfallSettings.noBurst.add(obj)}
+        else {sfallSettings.noBurst.delete(obj)}
+    },
     force_aimed_shots(pid: number) { sfallSettings.aimedShots.set(pid, true) },
     disable_aimed_shots(pid: number) { sfallSettings.aimedShots.set(pid, false) },
     /** get_bodypart_hit_modifier / set_bodypart_hit_modifier: the called-shot penalties. */
@@ -736,17 +794,6 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
             return arrayOf(dynamite ? [30, 50] : [40, 80])
         }
         return 0
-    },
-
-    // ── reg_anim extras ──
-    reg_anim_destroy(this: any, obj: any) { this.destroy_object?.(obj) },
-    reg_anim_animate_and_hide(this: any, obj: any, anim: number, delay: number) { this.reg_anim_animate?.(obj, anim, delay) },
-    reg_anim_combat_check: noop,
-    reg_anim_light(this: any, obj: any, radius: number, intensity: number) { this.obj_set_light_level?.(obj, intensity, radius) },
-    reg_anim_change_fid(this: any, obj: any, fid: number) { this.art_change_fid_num?.(obj, fid) },
-    reg_anim_take_out: noop,
-    reg_anim_turn_towards(this: any, obj: any, tile: number) {
-        if (isObject(obj) && obj.position) {this.anim?.(obj, 1000, this.tile_dir?.(toTileNum(obj.position), tile) ?? 0)}
     },
 }
 

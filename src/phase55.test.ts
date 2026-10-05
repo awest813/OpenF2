@@ -9,6 +9,7 @@
  *   E. Save schema v16 — migration, normalization of playerArmorPID/playerPerksOwed
  */
 
+import { sfallSettings } from './sfallSettings.js'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Scripting } from './scripting.js'
 import { SCRIPTING_STUB_CHECKLIST, drainStubHits } from './scriptingChecklist.js'
@@ -324,7 +325,7 @@ describe('Phase 55-D — sfall opcode numbers (sfall Opcodes.cpp)', () => {
         const vm: any = { stack: [critter, 1] as any[], scriptObj: new (Scripting as any).Script(), lastOpcode: 0x8216, intfile: { name: 't', identifiers: {} }, recordUnsupportedProcedure() {}, push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
         opMap[0x8216].call(vm)
         expect(vm.stack).toHaveLength(0)
-        expect(critter.burstDisabled).toBe(true)
+        expect(sfallSettings.noBurst.has(critter)).toBe(true)
     })
 })
 

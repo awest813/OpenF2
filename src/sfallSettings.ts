@@ -44,6 +44,8 @@ function defaultSettings() {
         npcStatMax: {} as Record<number, number>,
         npcStatMin: {} as Record<number, number>,
         aimedShots: new Map<number, boolean>(),
+        /** set_critter_burst_disable: critters whose AI never picks burst fire. */
+        noBurst: new WeakSet<object>(),
         /** Knockback modifiers (Combat.cpp mWeapons, mTargets, mAttackers): type 0 sets, 1 multiplies. */
         knockback: {
             weapons: new WeakMap<object, { type: number; value: number }>(),

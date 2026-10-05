@@ -131,6 +131,21 @@ interface Sequence {
 let building: Sequence | null = null
 let active: Sequence[] = []
 
+let regAnimCombatCheck = true
+
+/**
+ * sfall reg_anim_combat_check: while on (the default, put back every frame),
+ * scripts cannot register animations in combat.
+ */
+export function setRegAnimCombatCheck(on: boolean): void {
+    regAnimCombatCheck = on
+}
+
+/** Whether a script's reg_anim_* call is ignored now (checkCombatMode). */
+export function regAnimBlocked(): boolean {
+    return regAnimCombatCheck && globalState.inCombat === true
+}
+
 export function resetAnimSequences(): void {
     building = null
     active = []

@@ -8,6 +8,7 @@
  * (_combat_turn_run); here every step that animates is awaited instead.
  */
 
+import { sfallSettings } from '../sfallSettings.js'
 import type { Combat } from '../combat.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, Point } from '../geometry.js'
 import globalState from '../globalState.js'
@@ -660,7 +661,9 @@ export class AiTurn {
         const ai = this.ai
         const toHit = () => this.combat.getHitChance(withWeapon(this.c, weapon), defender, 'torso', 2).hit
         let secondary = false
-        switch (ai.areaAttackMode) {
+        // sfall set_critter_burst_disable: no burst or continuous fire (an area mode no case matches).
+        const noBurst = sfallSettings.noBurst.has(this.c) && (secondaryMode(weapon) === 7 || secondaryMode(weapon) === 8)
+        if (!noBurst) switch (ai.areaAttackMode) {
             case AreaAttackMode.ALWAYS:
                 secondary = true
                 break
