@@ -188,15 +188,6 @@ describe('Phase 16-C — proto_data partial implementation', () => {
         drainStubHits()
     })
 
-    it('returns the pid itself for data_member 0 (PROTO_DATA_PID) without needing proMap', () => {
-        const script = new Scripting.Script()
-        // data_member 0 always returns the PID — no proto lookup needed.
-        // This must work even without proMap loaded.
-        const pid = 0x00000042
-        expect(script.proto_data(pid, 0)).toBe(pid)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('returns 0 and no stub for data_member 1-5 when proMap is unavailable', () => {
         const script = new Scripting.Script()
         // proMap is null in tests → loadPRO returns null → proto_data returns 0

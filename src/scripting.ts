@@ -2206,210 +2206,80 @@ export namespace Scripting {
             obj.use(this.self_obj as Critter, false)
             //stub("obj_open", arguments)
         }
+        /** opGetProtoData (protoGetDataMember): the members depend on the proto's type. */
         proto_data(pid: number, data_member: number): any {
-            // data_member 0 (PROTO_DATA_PID) can be returned directly without
-            // loading the proto — the PID is the argument itself.
-            if (data_member === 0) {return pid}
-
-            // Load the prototype for this PID.  The PID encodes both the object
-            // type (bits 31-24) and the 1-based prototype index (bits 15-0).
-            const pro = loadPRO(pid, pid & 0xffff)
-            if (!pro) {
-                warn('proto_data: could not load PRO for pid=0x' + pid.toString(16))
-                return 0
+            const type = (pid >>> 24) & 0xff
+            let pro: any
+            try {
+                pro = loadPRO(pid, pid & 0xffff)
+            } catch {
+                pro = null
             }
-
-            switch (data_member) {
-                // --- Common header fields (all proto types) ---
-                case 1:
-                    // PROTO_DATA_TEXT_ID — message table ID used for the object name
-                    return pro.textID ?? 0
-                case 2:
-                    // PROTO_DATA_FID — combined FRM id (frmType << 24 | frmPID)
-                    return ((pro.frmType ?? 0) << 24) | (pro.frmPID ?? 0)
-                case 3:
-                    // PROTO_DATA_LIGHT_DIST — light emission radius
-                    return pro.lightRadius ?? 0
-                case 4:
-                    // PROTO_DATA_LIGHT_INTENS — light emission intensity
-                    return pro.lightIntensity ?? 0
-                case 5:
-                    // PROTO_DATA_FLAGS — general object flags bitfield
-                    return pro.flags ?? 0
-
-                // --- Item header fields (type == 0: items) ---
-                case 8:
-                    // ITEM_DATA_SUBTYPE — item sub-type (armor=0, weapon=3, ammo=4, …)
-                    return pro.extra?.subType ?? 0
-                case 9:
-                    // ITEM_DATA_WEIGHT — item weight in tenths of a pound
-                    return pro.extra?.weight ?? 0
-                case 10:
-                    // ITEM_DATA_COST — base barter value in caps
-                    return pro.extra?.cost ?? 0
-                case 11:
-                    // ITEM_DATA_SIZE — inventory size slots occupied
-                    return pro.extra?.size ?? 0
-
-                // --- Weapon-specific item fields ---
-                case 12:
-                    // WEAPON_DATA_ANIMATION_CODE — animation code (lookup key into
-                    // art/critters weapon suffix tables, e.g. 0=fists, 1=knife, 2=club…)
-                    return pro.extra?.animCode ?? 0
-                case 13:
-                    // ITEM_DATA_MATERIAL — material type of the item (0=glass, 1=metal, 2=plastic…).
-                    // Used by some scripts for breakage/damage calculations.
-                    return pro.extra?.material ?? 0
-                case 14:
-                    // WEAPON_DATA_MIN_DMG — minimum damage roll
-                    return pro.extra?.minDmg ?? 0
-                case 15:
-                    // WEAPON_DATA_MAX_DMG — maximum damage roll
-                    return pro.extra?.maxDmg ?? 0
-                case 16:
-                    // WEAPON_DATA_DMG_TYPE — damage type index
-                    return pro.extra?.dmgType ?? 0
-                case 17:
-                    // WEAPON_DATA_ATTACK_MODE_1 — primary attack mode (lower nibble of attackMode byte)
-                    return (pro.extra?.attackMode ?? 0) & 0xf
-                case 18:
-                    // WEAPON_DATA_ATTACK_MODE_2 — secondary attack mode (upper nibble of attackMode byte)
-                    return ((pro.extra?.attackMode ?? 0) >> 4) & 0xf
-                case 19:
-                    // WEAPON_DATA_PROJ_PID — projectile prototype PID for ranged weapons
-                    return pro.extra?.projPID ?? 0
-                case 20:
-                    // WEAPON_DATA_MIN_ST — minimum Strength required to wield this weapon
-                    return pro.extra?.minST ?? 0
-                case 21:
-                    // WEAPON_DATA_AP_COST_1 — AP cost for primary attack
-                    return pro.extra?.APCost1 ?? 0
-                case 22:
-                    // WEAPON_DATA_AP_COST_2 — AP cost for secondary attack
-                    return pro.extra?.APCost2 ?? 0
-                case 25:
-                    // WEAPON_DATA_CALIBER — ammo caliber index
-                    return pro.extra?.caliber ?? 0
-                case 26:
-                    // WEAPON_DATA_AMMO_PID — required ammo proto PID
-                    return pro.extra?.ammoPID ?? 0
-                case 27:
-                    // WEAPON_DATA_MAX_AMMO — magazine capacity
-                    return pro.extra?.maxAmmo ?? 0
-                case 34:
-                    // WEAPON_DATA_BURST_ROUNDS (weapons) / ARMOR_DATA_DR_LASER (armor).
-                    // Disambiguate by item sub-type: subType 0 = armor, 3 = weapon.
-                    if (pro.extra?.subType === 0)
-                        {return pro.extra?.stats?.['DR Laser'] ?? 0}
-                    return pro.extra?.rounds ?? 0
-
-                // --- Armor-specific item fields ---
-                case 32:
-                    // ARMOR_DATA_AC — Armor Class bonus
-                    return pro.extra?.AC ?? 0
-                case 33:
-                    // ARMOR_DATA_DR_NORMAL — Damage Resistance vs Normal damage
-                    return pro.extra?.stats?.['DR Normal'] ?? 0
-                case 35:
-                    // ARMOR_DATA_DR_FIRE — Damage Resistance vs Fire damage
-                    return pro.extra?.stats?.['DR Fire'] ?? 0
-                case 36:
-                    // ARMOR_DATA_DR_PLASMA — Damage Resistance vs Plasma damage
-                    return pro.extra?.stats?.['DR Plasma'] ?? 0
-                case 37:
-                    // ARMOR_DATA_DR_ELECTRICAL — Damage Resistance vs Electrical damage
-                    return pro.extra?.stats?.['DR Electrical'] ?? 0
-                case 38:
-                    // ARMOR_DATA_DR_EMP — Damage Resistance vs EMP damage
-                    return pro.extra?.stats?.['DR EMP'] ?? 0
-                case 39:
-                    // ARMOR_DATA_DR_EXPLOSIVE — Damage Resistance vs Explosive damage
-                    return pro.extra?.stats?.['DR Explosive'] ?? 0
-
-                // --- Armor DT (Damage Threshold) fields ---
-                case 40:
-                    // ARMOR_DATA_DT_NORMAL — Damage Threshold vs Normal damage
-                    return pro.extra?.stats?.['DT Normal'] ?? 0
-                case 41:
-                    // ARMOR_DATA_DT_LASER — Damage Threshold vs Laser damage
-                    return pro.extra?.stats?.['DT Laser'] ?? 0
-                case 42:
-                    // ARMOR_DATA_DT_FIRE — Damage Threshold vs Fire damage
-                    return pro.extra?.stats?.['DT Fire'] ?? 0
-                case 43:
-                    // ARMOR_DATA_DT_PLASMA — Damage Threshold vs Plasma damage
-                    return pro.extra?.stats?.['DT Plasma'] ?? 0
-                case 44:
-                    // ARMOR_DATA_DT_ELECTRICAL — Damage Threshold vs Electrical damage
-                    return pro.extra?.stats?.['DT Electrical'] ?? 0
-                case 45:
-                    // ARMOR_DATA_DT_EMP — Damage Threshold vs EMP damage
-                    return pro.extra?.stats?.['DT EMP'] ?? 0
-                case 46:
-                    // ARMOR_DATA_DT_EXPLOSIVE — Damage Threshold vs Explosive damage
-                    return pro.extra?.stats?.['DT Explosive'] ?? 0
-
-                // --- Armor / weapon extended fields ---
-                case 47:
-                    // ARMOR_DATA_PERK / WEAPON_DATA_PERK — perk granted by wearing/wielding this item
-                    return pro.extra?.perk ?? -1
-
-                // --- Critter kill/XP data (accessed via critter PIDs) ---
-                case 48:
-                    // CRITTER_DATA_EXPERIENCE — base XP awarded for killing this critter
-                    return pro.extra?.XPValue ?? 0
-                case 49:
-                    // CRITTER_DATA_KILL_TYPE — kill-type category for kill-count tracking
-                    return pro.extra?.killType ?? 0
-
-                // --- Common extended flags ---
-                case 7:
-                    // PROTO_DATA_FLAGS2 — extended object flags bitfield (second flags word).
-                    // Encodes things like "can use on floor", "two-handed", "big gun", etc.
-                    return pro.extra?.flags2 ?? pro.flags2 ?? 0
-
-                // --- Critter fields ---
-                case 6:
-                    // CRITTER_DATA_ACTION_FLAGS — critter action flags
-                    return pro.extra?.actionFlags ?? 0
-
-                // --- Weapon range fields ---
-                case 23:
-                    // WEAPON_DATA_MAX_RANGE_1 — maximum range for primary attack
-                    return pro.extra?.maxRange1 ?? 0
-                case 24:
-                    // WEAPON_DATA_MAX_RANGE_2 — maximum range for secondary attack
-                    return pro.extra?.maxRange2 ?? 0
-
-                // --- Ammo / drug specific fields ---
-                case 28:
-                    // AMMO_DATA_AC_ADJUST — AC modifier applied per bullet in burst
-                    return pro.extra?.acAdjust ?? 0
-                case 29:
-                    // AMMO_DATA_DR_ADJUST — DR modifier (as percentage of final DR)
-                    return pro.extra?.drAdjust ?? 0
-                case 30:
-                    // AMMO_DATA_DMG_MULT — damage multiplier numerator
-                    return pro.extra?.dmgMult ?? 1
-                case 31:
-                    // AMMO_DATA_DMG_DIV — damage multiplier denominator
-                    return pro.extra?.dmgDiv ?? 1
-
-                // --- Extended critter/weapon/item fields (50–64) ---
-                // These indices are not defined in vanilla Fallout 2 PRO headers but
-                // appear in some modded or sfall-extended scripts.  Return 0 silently
-                // so scripts do not crash when they probe these fields.
-                case 50: case 51: case 52: case 53: case 54: case 55:
-                case 56: case 57: case 58: case 59: case 60: case 61:
-                case 62: case 63: case 64:
-                    log('proto_data: extended field ' + data_member + ' (safe default 0)', arguments)
+            if (!pro) {return 0}
+            const extra = pro.extra ?? {}
+            const fid = ((pro.frmType ?? 0) << 24) | (pro.frmPID ?? 0)
+            const msgFile = ['pro_item', 'pro_crit', 'pro_scen', 'pro_wall', 'pro_tile', 'pro_misc'][type]
+            const text = (offset: number): string => {
+                try {
+                    return getMessage(msgFile, (pro.textID ?? 0) + offset) ?? ''
+                } catch {
+                    return ''
+                }
+            }
+            // Members 0–8 are the common header everywhere but tiles.
+            if (type !== 4) {
+                switch (data_member) {
+                    case 0: return pid
+                    case 1: return text(0)
+                    case 2: return type === 5 ? 0 : text(1) // misc reports the pointer as an int
+                    case 3: return fid
+                    case 4: return pro.lightRadius ?? 0
+                    case 5: return pro.lightIntensity ?? 0
+                    case 6: return pro.flags ?? 0
+                }
+            }
+            switch (type) {
+                case 0: // items
+                    switch (data_member) {
+                        case 7: // extended flags: item flags, action flags, weapon flags, attack modes
+                            return (((extra.itemFlags ?? 0) << 24) | ((extra.actionFlags ?? 0) << 16) |
+                                ((extra.weaponFlags ?? 0) << 8) | (extra.attackMode ?? 0)) >>> 0
+                        case 8: return extra.scriptID ?? -1
+                        case 9: return extra.subType ?? 0
+                        case 11: return extra.materialID ?? 0
+                        case 12: return extra.size ?? 0
+                        case 13: return extra.weight ?? 0
+                        case 14: return extra.cost ?? 0
+                        case 15: return extra.invFRM ?? -1
+                        case 555: return extra.subType === 3 ? (extra.maxRange1 ?? 0) : 0
+                    }
                     return 0
-
+                case 1: // critters
+                    switch (data_member) {
+                        case 7: return extra.actionFlags ?? 0
+                        case 8: return extra.scriptID ?? -1
+                        case 10: return extra.headFID ?? -1
+                        case 11: return extra.bodyType ?? 0
+                    }
+                    return 0
+                case 2: // scenery
+                    switch (data_member) {
+                        case 7: return (((extra.wallLightTypeFlags ?? 0) << 16) | (extra.actionFlags ?? 0)) >>> 0
+                        case 8: return extra.scriptPID ?? -1
+                        case 9: return extra.subType ?? 0
+                        case 11: return extra.materialID ?? 0
+                    }
+                    return 0
+                case 3: // walls
+                    switch (data_member) {
+                        case 7: return (((extra.wallLightTypeFlags ?? 0) << 16) | (extra.actionFlags ?? 0)) >>> 0
+                        case 8: return extra.scriptPID ?? -1
+                        case 9: return extra.materialID ?? 0
+                    }
+                    return 0
+                case 5: // misc
+                    return data_member === 7 ? (extra.actionFlags ?? 0) : 0
                 default:
-                    // Unknown proto_data field index — return 0 silently rather than
-                    // emitting a stub hit.  Mods occasionally probe non-standard field
-                    // indices; a safe 0 is the least-surprising fallback.
-                    log('proto_data: unknown field ' + data_member + ' (safe default 0)', arguments)
                     return 0
             }
         }

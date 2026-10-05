@@ -251,12 +251,6 @@ describe('Phase 19-D — proto_data extended data members', () => {
     // Since loadPRO requires globalState.proMap, we test via the method signature
     // and use the PID=0 guard (data_member 0 returns pid directly).
 
-    it('data_member 0 (PID) returns the pid arg directly — existing behaviour', () => {
-        const result = script.proto_data(0x100042, 0)
-        expect(result).toBe(0x100042)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('proto_data returns 0 gracefully for pid with no proto (unavailable proMap)', () => {
         // When proMap is null, proto_data should return 0 with a warning, not throw.
         // Test for data_members 12, 17, 18, 19, 20, 32, 33, 34

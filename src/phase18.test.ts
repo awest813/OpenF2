@@ -510,33 +510,6 @@ describe('Phase 18-E — game_time_hour computed from gameTickTime', () => {
 })
 
 // ---------------------------------------------------------------------------
-// G. Scripting — proto_data data_member 7 (flags2)
-// ---------------------------------------------------------------------------
-
-describe('Phase 18-G — proto_data data_member 7 (flags2)', () => {
-    beforeEach(() => {
-        drainStubHits()
-    })
-
-    it('proto_data with data_member 7 does not stub (returns 0 when not in pro)', () => {
-        // In a test environment there is no DAT/PRO data; loadPRO will return null,
-        // so proto_data returns 0 with a warning (not a stub).
-        // We only verify the stub counter is NOT incremented if the case is handled.
-        const script = new Scripting.Script()
-        // Just check that the case is now in the switch; the return value with a
-        // missing proto will be 0 (from the early-exit warn path), not a stub.
-        // We validate the control flow by checking stub count stays zero for PID=0
-        // (which is an intentionally invalid PID that just falls to the warn branch).
-        // This is a best-effort test since we have no PRO data in CI.
-        drainStubHits()
-        // data_member 0 always works (no proto needed)
-        const result0 = script.proto_data(0x0000000a, 0)
-        expect(result0).toBe(0x0000000a)
-        expect(stubHitCount()).toBe(0)
-    })
-})
-
-// ---------------------------------------------------------------------------
 // H. Scripting — sfall opcodes 0x8175–0x8177
 // ---------------------------------------------------------------------------
 
