@@ -103,6 +103,9 @@ export class BarterPanel extends UIPanel {
     private _liveMerchantInv: Obj[] | null = null
     private _livePlayerTbl: Obj[] = []
     private _liveMerchantTbl: Obj[] = []
+    /** Engine pricing for the live tables (barter.ts); null in snapshot mode. */
+    private _pricing: BarterPricing | null = null
+    private _refusalText = 'OFFER REFUSED — add more to your table'
 
     constructor(screenWidth: number, screenHeight: number) {
         super('barter', {
@@ -130,7 +133,8 @@ export class BarterPanel extends UIPanel {
      * snapshots; an accepted offer commits the table items across sides —
      * mirroring legacy uiBarterMode without any lossy name-keyed apply-back.
      */
-    openWithLive(playerInventory: Obj[], merchantInventory: Obj[]): void {
+    openWithLive(playerInventory: Obj[], merchantInventory: Obj[], pricing: BarterPricing | null = null): void {
+        this._pricing = pricing
         this._livePlayerInv = playerInventory
         this._liveMerchantInv = merchantInventory
         this._livePlayerTbl = []
@@ -153,6 +157,7 @@ export class BarterPanel extends UIPanel {
     protected override onHide(): void {
         this._selected = null
         this._hovered = null
+        this._pricing = null
         this._livePlayerInv = null
         this._liveMerchantInv = null
         this._livePlayerTbl = []
@@ -195,8 +200,8 @@ export class BarterPanel extends UIPanel {
         this._drawColumn(ctx, RIGHT_INV_X, COL_Y, this.merchantInventory,'rightInv')
 
         // Value totals
-        const playerVal   = totalValue(this.playerTable)
-        const merchantVal = merchantAskValue(this.merchantTable)
+        const playerVal   = this._pricing ? this._pricing.offer(this._livePlayerTbl) : totalValue(this.playerTable)
+        const merchantVal = this._pricing ? this._pricing.ask(this._liveMerchantTbl) : merchantAskValue(this.merchantTable)
         const btnY = height - 40
 
         drawUIFontText(ctx, `YOUR: $${playerVal}`, LEFT_INV_X, btnY - 4,
@@ -206,7 +211,7 @@ export class BarterPanel extends UIPanel {
         // Offer-refused feedback banner — rendered one line above the value labels
         // so it does not overlap them.
         if (this._offerRefused) {
-            drawUIFontText(ctx, 'OFFER REFUSED — add more to your table', width / 2, btnY - 18, FALLOUT_RED, 10, { align: 'center' })
+            drawUIFontText(ctx, this._refusalText, width / 2, btnY - 18, FALLOUT_RED, 10, { align: 'center' })
         }
 
         // OFFER button
@@ -475,9 +480,10 @@ export class BarterPanel extends UIPanel {
     }
 
     private _tryOffer(): void {
-        const playerVal   = totalValue(this.playerTable)
-        const merchantVal = merchantAskValue(this.merchantTable)
-        if (playerVal >= merchantVal) {
+        const playerVal   = this._pricing ? this._pricing.offer(this._livePlayerTbl) : totalValue(this.playerTable)
+        const merchantVal = this._pricing ? this._pricing.ask(this._liveMerchantTbl) : merchantAskValue(this.merchantTable)
+        const refusal = this._pricing ? this._pricing.check(this._livePlayerTbl, this._liveMerchantTbl) : (playerVal >= merchantVal ? null : 'OFFER REFUSED — add more to your table')
+        if (refusal === null) {
             this._offerRefused = false
             if (this._livePlayerInv && this._liveMerchantInv) {
                 // Live mode: swap table items across the real inventories,
@@ -506,6 +512,7 @@ export class BarterPanel extends UIPanel {
             this._clampAllScrolls()
         } else {
             this._offerRefused = true
+            this._refusalText = refusal
             EventBus.emit('barter:offerRefused', { playerVal, merchantVal })
         }
     }
@@ -526,6 +533,16 @@ export class BarterPanel extends UIPanel {
             else {dest.push({ ...item })}
         }
     }
+}
+
+/** Engine barter pricing for the live tables (see barter.ts). */
+export interface BarterPricing {
+    /** What the player's table is worth. */
+    offer(items: Obj[]): number
+    /** What the merchant wants for its table. */
+    ask(items: Obj[]): number
+    /** null when the trade goes through, else the refusal text. */
+    check(offer: Obj[], wanted: Obj[]): string | null
 }
 
 // ---------------------------------------------------------------------------

@@ -3349,8 +3349,9 @@ export namespace Scripting {
             this._barterMod = mod
         }
         gdialog_mod_barter(mod: number) {
-            // switch to barter mode
+            // gameDialogBarter: switch to barter mode with this modifier.
             log('gdialog_mod_barter', arguments)
+            this._barterMod = typeof mod === 'number' && isFinite(mod) ? mod : 0
             if (!this.self_obj) {
                 warn('gdialog_mod_barter: no self_obj — barter mode skipped', undefined, this)
                 return
@@ -3365,6 +3366,8 @@ export namespace Scripting {
                 return
             }
             currentDialogueObject = this.self_obj as Critter
+            // gameDialogEnter clears the barter modifier.
+            this._barterMod = 0
             uiStartDialogue(false, this.self_obj as Critter)
             //stub("start_gdialog", arguments)
         }

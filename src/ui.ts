@@ -50,6 +50,7 @@ import { examineLines } from './examine.js'
 import { parkCarAtPlayer } from './car.js'
 import { finishStealing, openStealing, type StealScreen } from './steal.js'
 import { isDrug, takeDrug } from './character/timedEffects.js'
+import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
 
 // UI system
@@ -1395,7 +1396,16 @@ export function uiBarterMode(merchant: Critter) {
     // initUI resumes the dialogue).
     const barterPanel = globalState.uiManager?.get<BarterPanel>('barter')
     if (barterPanel) {
-        barterPanel.openWithLive(globalState.player.inventory, merchant.inventory)
+        // inventoryOpenTrade: the dialogue's barter mod plus the merchant's mood.
+        const barterMod = ((merchant as any)._script?._barterMod ?? 0) + reactionModifier(merchant)
+        barterPanel.openWithLive(globalState.player.inventory, merchant.inventory, {
+            offer: (items) => inventoryCost(items),
+            ask: (items) => barterAskValue(items, merchant, barterMod),
+            check: (offer, wanted) => {
+                const reason = checkTrade(offer, wanted, merchant, barterMod)
+                return reason ? refusalText(reason) : null
+            },
+        })
         return
     }
 
