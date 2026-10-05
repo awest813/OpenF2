@@ -55,7 +55,7 @@ import { skillDependencies } from './skills.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
-import { getSfallGlobal, setSfallGlobal, getSfallGlobalInt, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
+import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
@@ -3163,14 +3163,20 @@ export namespace Scripting {
         }
 
         // sfall extended API
+        /** get_sfall_global_int / set_sfall_global: by an 8-character name or a number. */
         get_sfall_global(name: string): number {
-            return getSfallGlobal(name)
+            return getSfallGlobalAny(name)
         }
-        set_sfall_global(name: string, value: number): void {
-            setSfallGlobal(name, value)
+        set_sfall_global(name: string | number, value: number): void {
+            if (setSfallGlobalAny(name, value) !== 0) {
+                warn('set_sfall_global() - the name of the global variable must consist of 8 characters.', undefined, this)
+            }
         }
-        get_sfall_global_int(index: number): number {
-            return getSfallGlobalInt(index)
+        get_sfall_global_int(nameOrIndex: string | number): number {
+            return getSfallGlobalAny(nameOrIndex)
+        }
+        get_sfall_global_float(nameOrIndex: string | number): number {
+            return rawToFloat(getSfallGlobalAny(nameOrIndex))
         }
         set_sfall_global_int(index: number, value: number): void {
             setSfallGlobalInt(index, value)

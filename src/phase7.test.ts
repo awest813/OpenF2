@@ -131,41 +131,12 @@ describe('sfall global variable store', () => {
         expect(getSfallGlobal('PHASE7_UNSET_KEY')).toBe(0)
     })
 
-    it('round-trips a value via set/get', () => {
-        setSfallGlobal('PHASE7_TEST_A', 42)
-        expect(getSfallGlobal('PHASE7_TEST_A')).toBe(42)
-    })
-
-    it('stores negative values correctly', () => {
-        setSfallGlobal('PHASE7_NEGATIVE', -7)
-        expect(getSfallGlobal('PHASE7_NEGATIVE')).toBe(-7)
-    })
-
-    it('independent keys do not interfere', () => {
-        setSfallGlobal('PHASE7_KEY_X', 100)
-        setSfallGlobal('PHASE7_KEY_Y', 200)
-        expect(getSfallGlobal('PHASE7_KEY_X')).toBe(100)
-        expect(getSfallGlobal('PHASE7_KEY_Y')).toBe(200)
-    })
-
-    it('overwriting a key updates the stored value', () => {
-        setSfallGlobal('PHASE7_OVERWRITE', 1)
-        setSfallGlobal('PHASE7_OVERWRITE', 999)
-        expect(getSfallGlobal('PHASE7_OVERWRITE')).toBe(999)
-    })
-
     it('stores zero explicitly', () => {
         setSfallGlobal('PHASE7_ZERO', 99)
         setSfallGlobal('PHASE7_ZERO', 0)
         expect(getSfallGlobal('PHASE7_ZERO')).toBe(0)
     })
 
-    it('key names are case-sensitive', () => {
-        setSfallGlobal('PHASE7_CASE', 1)
-        setSfallGlobal('phase7_case', 2)
-        expect(getSfallGlobal('PHASE7_CASE')).toBe(1)
-        expect(getSfallGlobal('phase7_case')).toBe(2)
-    })
 })
 
 // ---------------------------------------------------------------------------

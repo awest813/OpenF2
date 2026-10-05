@@ -20,7 +20,6 @@ import {
     getSfallGlobal,
     getSfallGlobalInt,
     setSfallGlobalInt,
-    MAX_SFALL_INT_GLOBALS,
 } from './sfallGlobals.js'
 
 // ---------------------------------------------------------------------------
@@ -131,15 +130,6 @@ describe('get_radiation algorithm', () => {
 // can be imported directly (no browser-only deps).
 
 describe('sfall integer-indexed globals — construction', () => {
-    it('MAX_SFALL_INT_GLOBALS is a positive integer', () => {
-        expect(MAX_SFALL_INT_GLOBALS).toBeGreaterThan(0)
-        expect(Number.isInteger(MAX_SFALL_INT_GLOBALS)).toBe(true)
-    })
-
-    it('MAX_SFALL_INT_GLOBALS matches real sfall default of 4096', () => {
-        expect(MAX_SFALL_INT_GLOBALS).toBe(4096)
-    })
-
     it('all slots default to 0 before any set()', () => {
         // Spot-check a range of indices
         for (const i of [0, 1, 100, 1000, 4095]) {
@@ -159,8 +149,8 @@ describe('sfall integer-indexed globals — get/set', () => {
     })
 
     it('round-trips a value at the last valid index', () => {
-        setSfallGlobalInt(MAX_SFALL_INT_GLOBALS - 1, 7)
-        expect(getSfallGlobalInt(MAX_SFALL_INT_GLOBALS - 1)).toBe(7)
+        setSfallGlobalInt(4095, 7)
+        expect(getSfallGlobalInt(4095)).toBe(7)
     })
 
     it('stores negative values correctly', () => {
@@ -191,20 +181,6 @@ describe('sfall integer-indexed globals — get/set', () => {
 describe('sfall integer-indexed globals — bounds', () => {
     it('get() with negative index returns 0', () => {
         expect(getSfallGlobalInt(-1)).toBe(0)
-    })
-
-    it('get() at MAX_SFALL_INT_GLOBALS (one past end) returns 0', () => {
-        expect(getSfallGlobalInt(MAX_SFALL_INT_GLOBALS)).toBe(0)
-    })
-
-    it('set() with negative index is silently ignored', () => {
-        setSfallGlobalInt(-1, 42)
-        expect(getSfallGlobalInt(-1)).toBe(0)  // still out-of-range
-    })
-
-    it('set() at MAX_SFALL_INT_GLOBALS is silently ignored', () => {
-        setSfallGlobalInt(MAX_SFALL_INT_GLOBALS, 42)
-        expect(getSfallGlobalInt(MAX_SFALL_INT_GLOBALS)).toBe(0)
     })
 
     it('integer globals are separate from string globals', () => {

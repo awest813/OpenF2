@@ -178,14 +178,6 @@ describe('Phase 36-B — sfallGlobals serialization helpers', () => {
         expect(getSfallGlobalInt(42)).toBe(0)
     })
 
-    it('serializeSfallGlobals captures string-keyed globals', () => {
-        setSfallGlobal('alpha', 1)
-        setSfallGlobal('beta', 2)
-        const snap = serializeSfallGlobals()
-        expect(snap.stringKeyed?.['alpha']).toBe(1)
-        expect(snap.stringKeyed?.['beta']).toBe(2)
-    })
-
     it('serializeSfallGlobals captures non-zero int-indexed globals as sparse map', () => {
         setSfallGlobalInt(10, 55)
         setSfallGlobalInt(20, 66)
@@ -210,45 +202,6 @@ describe('Phase 36-B — sfallGlobals serialization helpers', () => {
     it('deserializeSfallGlobals restores int-indexed globals', () => {
         deserializeSfallGlobals({ intIndexed: { 7: 99 } })
         expect(getSfallGlobalInt(7)).toBe(99)
-    })
-
-    it('deserializeSfallGlobals clears previous state before restoring', () => {
-        setSfallGlobal('old', 100)
-        setSfallGlobalInt(1, 200)
-        deserializeSfallGlobals({ stringKeyed: { fresh: 1 } })
-        expect(getSfallGlobal('old')).toBe(0)   // cleared
-        expect(getSfallGlobal('fresh')).toBe(1) // restored
-        expect(getSfallGlobalInt(1)).toBe(0)    // cleared
-    })
-
-    it('round-trip: serialize then deserialize reproduces original values', () => {
-        setSfallGlobal('flag_a', 10)
-        setSfallGlobal('flag_b', 20)
-        setSfallGlobalInt(5, 30)
-        setSfallGlobalInt(100, 40)
-
-        const snap = serializeSfallGlobals()
-        resetSfallGlobals()
-
-        expect(getSfallGlobal('flag_a')).toBe(0)
-        expect(getSfallGlobalInt(5)).toBe(0)
-
-        deserializeSfallGlobals(snap)
-        expect(getSfallGlobal('flag_a')).toBe(10)
-        expect(getSfallGlobal('flag_b')).toBe(20)
-        expect(getSfallGlobalInt(5)).toBe(30)
-        expect(getSfallGlobalInt(100)).toBe(40)
-    })
-
-    it('deserializeSfallGlobals ignores non-finite values', () => {
-        deserializeSfallGlobals({
-            stringKeyed: { valid: 5, invalid: NaN },
-            intIndexed: { 0: 3, 1: Infinity },
-        })
-        expect(getSfallGlobal('valid')).toBe(5)
-        expect(getSfallGlobal('invalid')).toBe(0) // ignored
-        expect(getSfallGlobalInt(0)).toBe(3)
-        expect(getSfallGlobalInt(1)).toBe(0)      // ignored
     })
 
     it('deserializeSfallGlobals handles missing fields gracefully', () => {

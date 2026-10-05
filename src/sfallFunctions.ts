@@ -33,6 +33,7 @@ import { HIT_LOCATION_PENALTY } from './combat/fo2Formulas.js'
 import { CRITICAL_HIT_TABLES, HIT_LOCATION_ORDER, PLAYER_CRITICAL_HIT_TABLE } from './combat/criticalTables.js'
 import { playerInSneakMode, playerIsSneaking } from './combat/aiPacket.js'
 import { getRandomInt } from './util.js'
+import { getProtoData, setProtoData } from './protoOffsets.js'
 
 /** sfall-tunable engine settings (read by the systems that honour them). */
 export const sfallSettings = {
@@ -473,6 +474,9 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         }
         return arrayOf(dirs)
     },
+    /** get_proto_data / set_proto_data: a proto field by its byte offset (sfall PROTO_*). */
+    get_proto_data: (pid: number, offset: number) => getProtoData(Number(pid), Number(offset)),
+    set_proto_data(pid: number, offset: number, value: number) { setProtoData(Number(pid), Number(offset), Number(value)) },
     art_exists(fid: number) {
         return typeof fid === 'number' && fid > 0 ? 1 : 0
     },
