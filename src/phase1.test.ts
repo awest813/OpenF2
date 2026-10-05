@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { applyTraits, removeTraits, TRAIT_MAP } from './character/traits.js'
 import {
+    PerkId,
     isPerkAvailable,
     grantPerk,
     getAvailablePerks,
@@ -218,27 +219,25 @@ describe('base skill computation from SPECIAL', () => {
 // ---------------------------------------------------------------------------
 
 describe('Trait: Fast Metabolism (id=0)', () => {
-    it('raises healing rate and radiation resistance, lowers poison resistance', () => {
+    it('raises healing rate; radiation and poison resistance drop to 0 (trait.cc)', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
         const hrBefore = stats.healingRate
-        const rrBefore = stats.radiationResistance
-        const prBefore = stats.poisonResistance
         applyTraits([0], stats, skills)
         expect(stats.healingRate).toBe(hrBefore + 2)
-        expect(stats.radiationResistance).toBe(rrBefore + 2)
-        expect(stats.poisonResistance).toBe(prBefore - 10)
+        expect(stats.radiationResistance).toBe(0)
+        expect(stats.poisonResistance).toBe(0)
     })
 })
 
 describe('Trait: Small Frame (id=2)', () => {
-    it('+1 agility mod, -25 carry weight', () => {
+    it('+1 agility mod, carry weight −10 per STR (STR 5 → −50)', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
         const carryBefore = stats.carryWeight
         applyTraits([2], stats, skills)
         expect(stats.agilityMod).toBe(1)
-        expect(stats.carryWeight).toBe(carryBefore - 25)
+        expect(stats.carryWeight).toBe(carryBefore - 50)
     })
 })
 
@@ -253,12 +252,12 @@ describe('Trait: Finesse (id=4)', () => {
 })
 
 describe('Trait: Kamikaze (id=5)', () => {
-    it('+10 sequence', () => {
+    it('+5 sequence (trait.cc)', () => {
         const stats = makeStats()
         const skills = makeSkills(stats)
         const seqBefore = stats.sequence
         applyTraits([5], stats, skills)
-        expect(stats.sequence).toBe(seqBefore + 10)
+        expect(stats.sequence).toBe(seqBefore + 5)
     })
 })
 
@@ -302,50 +301,60 @@ describe('removeTraits reverses effects', () => {
 // Perks — additional coverage beyond leveling.test.ts
 // ---------------------------------------------------------------------------
 
-describe('Perk prerequisites — SPECIAL', () => {
-    it('Sharpshooter (id=5) requires PER≥7 and INT≥6 and level≥9', () => {
-        const sharpshooter = PERK_MAP.get(5)!
+describe('Perk prerequisites — SPECIAL (FO2 perk IDs, perk.cc table)', () => {
+    it('Sharpshooter (id=14) requires PER≥7 and INT≥6 and level≥9', () => {
+        const sharpshooter = PERK_MAP.get(PerkId.SHARPSHOOTER)!
         const stats = makeStats({ level: 9, perception: 7, intelligence: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(sharpshooter, stats, skills, 0)).toBe(true)
     })
 
     it('Sharpshooter blocked when PER is below 7', () => {
-        const sharpshooter = PERK_MAP.get(5)!
+        const sharpshooter = PERK_MAP.get(PerkId.SHARPSHOOTER)!
         const stats = makeStats({ level: 9, perception: 6, intelligence: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(sharpshooter, stats, skills, 0)).toBe(false)
     })
 
-    it('Better Criticals (id=7) requires PER≥6, AGI≥4, LUK≥6', () => {
-        const bc = PERK_MAP.get(7)!
+    it('Better Criticals (id=21) requires PER≥6, AGI≥4, LUK≥6', () => {
+        const bc = PERK_MAP.get(PerkId.BETTER_CRITICALS)!
         const stats = makeStats({ level: 9, perception: 6, agility: 4, luck: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(bc, stats, skills, 0)).toBe(true)
     })
 
     it('Better Criticals blocked when LUK is below 6', () => {
-        const bc = PERK_MAP.get(7)!
+        const bc = PERK_MAP.get(PerkId.BETTER_CRITICALS)!
         const stats = makeStats({ level: 9, perception: 6, agility: 4, luck: 5 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(bc, stats, skills, 0)).toBe(false)
     })
 
-    it('Sniper (id=9) requires level≥18, PER≥8, AGI≥8', () => {
-        const sniper = PERK_MAP.get(9)!
-        const hiStats = makeStats({ level: 18, perception: 8, agility: 8 })
-        const lowStats = makeStats({ level: 18, perception: 8, agility: 7 })
+    it('Sniper (id=24) requires level≥24, PER≥8, AGI≥8 and Small Guns≥80', () => {
+        const sniper = PERK_MAP.get(PerkId.SNIPER)!
+        const hiStats = makeStats({ level: 24, perception: 8, agility: 8 })
+        const lowStats = makeStats({ level: 24, perception: 8, agility: 7 })
         const skills = makeSkills(hiStats)
+        skills.smallGuns = 80
         const skillsLow = makeSkills(lowStats)
+        skillsLow.smallGuns = 80
         expect(isPerkAvailable(sniper, hiStats, skills, 0)).toBe(true)
         expect(isPerkAvailable(sniper, lowStats, skillsLow, 0)).toBe(false)
+        skills.smallGuns = 79
+        expect(isPerkAvailable(sniper, hiStats, skills, 0)).toBe(false)
+    })
+
+    it('Gain perks need the stat below 10', () => {
+        const gainStr = PERK_MAP.get(PerkId.GAIN_STRENGTH)!
+        expect(isPerkAvailable(gainStr, makeStats({ level: 12, strength: 9 }), makeSkills(makeStats()), 0)).toBe(true)
+        expect(isPerkAvailable(gainStr, makeStats({ level: 12, strength: 10 }), makeSkills(makeStats()), 0)).toBe(false)
     })
 })
 
 describe('Perk prerequisites — skill threshold', () => {
-    it('Master Trader (id=13) requires barter≥75', () => {
-        const mt = PERK_MAP.get(13)!
-        const stats = makeStats({ level: 9, charisma: 7 })
+    it('Master Trader (id=17) requires level 12, CHA 7, barter≥75', () => {
+        const mt = PERK_MAP.get(PerkId.MASTER_TRADER)!
+        const stats = makeStats({ level: 12, charisma: 7 })
         const skills = makeSkills(stats)
         skills.barter = 74
         expect(isPerkAvailable(mt, stats, skills, 0)).toBe(false)
@@ -353,8 +362,8 @@ describe('Perk prerequisites — skill threshold', () => {
         expect(isPerkAvailable(mt, stats, skills, 0)).toBe(true)
     })
 
-    it('Ghost (id=14) requires sneak≥60', () => {
-        const ghost = PERK_MAP.get(14)!
+    it('Ghost (id=38) requires sneak≥60', () => {
+        const ghost = PERK_MAP.get(PerkId.GHOST)!
         const stats = makeStats({ level: 6, agility: 6 })
         const skills = makeSkills(stats)
         skills.sneak = 59
@@ -362,21 +371,38 @@ describe('Perk prerequisites — skill threshold', () => {
         skills.sneak = 60
         expect(isPerkAvailable(ghost, stats, skills, 0)).toBe(true)
     })
+
+    it('Mr. Fixit needs Repair 40 AND Science 40; Master Thief Lockpick 50 OR Steal 50', () => {
+        const fixit = PERK_MAP.get(PerkId.MR_FIXIT)!
+        const thief = PERK_MAP.get(PerkId.MASTER_THIEF)!
+        const stats = makeStats({ level: 12 })
+        const skills = makeSkills(stats)
+        skills.repair = 40
+        skills.science = 39
+        expect(isPerkAvailable(fixit, stats, skills, 0)).toBe(false)
+        skills.science = 40
+        expect(isPerkAvailable(fixit, stats, skills, 0)).toBe(true)
+        skills.lockpick = 10
+        skills.steal = 50
+        expect(isPerkAvailable(thief, stats, skills, 0)).toBe(true)
+        skills.steal = 49
+        expect(isPerkAvailable(thief, stats, skills, 0)).toBe(false)
+    })
 })
 
 describe('Perk rank limit', () => {
-    it('Toughness (id=3) can be taken up to 3 times', () => {
-        const toughness = PERK_MAP.get(3)!
-        const stats = makeStats({ level: 3, endurance: 6 })
+    it('Toughness (id=12) can be taken up to 3 times', () => {
+        const toughness = PERK_MAP.get(PerkId.TOUGHNESS)!
+        const stats = makeStats({ level: 3, endurance: 6, luck: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(toughness, stats, skills, 0)).toBe(true)
         expect(isPerkAvailable(toughness, stats, skills, 2)).toBe(true)
         expect(isPerkAvailable(toughness, stats, skills, 3)).toBe(false)  // at cap
     })
 
-    it('Lifegiver (id=8) can be taken twice', () => {
-        const lifegiver = PERK_MAP.get(8)!
-        const stats = makeStats({ level: 9, endurance: 4 })
+    it('Lifegiver (id=28) can be taken twice', () => {
+        const lifegiver = PERK_MAP.get(PerkId.LIFEGIVER)!
+        const stats = makeStats({ level: 12, endurance: 4 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(lifegiver, stats, skills, 1)).toBe(true)
         expect(isPerkAvailable(lifegiver, stats, skills, 2)).toBe(false)  // at cap
@@ -384,32 +410,32 @@ describe('Perk rank limit', () => {
 })
 
 describe('grantPerk — stat effects', () => {
-    it('Toughness (id=3) adds 10 to all DR values per rank', () => {
-        const stats = makeStats({ level: 3, endurance: 6 })
+    it('Toughness (id=12) adds 10 to normal DR per rank', () => {
+        const stats = makeStats({ level: 3, endurance: 6, luck: 6 })
         const skills = makeSkills(stats)
         const perks: Map<number, number> = new Map()
         const drBefore = stats.dr.normal
-        grantPerk(3, stats, skills, perks)
+        expect(grantPerk(PerkId.TOUGHNESS, stats, skills, perks)).toBe(true)
         expect(stats.dr.normal).toBe(drBefore + 10)
-        expect(stats.dr.fire).toBe(drBefore + 10)
+        expect(stats.dr.fire).toBe(drBefore)
     })
 
-    it('Lifegiver (id=8) adds 4 to max HP per rank', () => {
-        const stats = makeStats({ level: 9, endurance: 4 })
+    it('Lifegiver (id=28) adds 4 to max HP per rank', () => {
+        const stats = makeStats({ level: 12, endurance: 4 })
         const skills = makeSkills(stats)
         const perks: Map<number, number> = new Map()
         const hpBefore = stats.maxHp
-        grantPerk(8, stats, skills, perks)
+        expect(grantPerk(PerkId.LIFEGIVER, stats, skills, perks)).toBe(true)
         expect(stats.maxHp).toBe(hpBefore + 4)
     })
 
-    it('Survivalist (id=12) adds 25 to outdoorsman skill', () => {
+    it('Survivalist (id=16) adds 25 to outdoorsman skill', () => {
         const stats = makeStats({ level: 3, endurance: 6, agility: 6, intelligence: 6 })
         const skills = makeSkills(stats)
+        skills.outdoorsman = 40
         const perks: Map<number, number> = new Map()
-        const outBefore = skills.outdoorsman
-        grantPerk(12, stats, skills, perks)
-        expect(skills.outdoorsman).toBe(outBefore + 25)
+        expect(grantPerk(PerkId.SURVIVALIST, stats, skills, perks)).toBe(true)
+        expect(skills.outdoorsman).toBe(65)
     })
 })
 
@@ -437,10 +463,12 @@ describe('getAvailablePerks', () => {
     it('excludes perks already at max rank', () => {
         const stats = makeStats({ level: 3 })
         const skills = makeSkills(stats)
-        // Grant both ranks of Bonus Move (id=1, ranks=2)
-        const perks: Map<number, number> = new Map([[1, 2]])
-        const available = getAvailablePerks(stats, skills, perks)
-        expect(available.find((p) => p.id === 1)).toBeUndefined()
+        // Grant both ranks of Earlier Sequence (id=6, ranks=3, level 3, PER 6)
+        const perks: Map<number, number> = new Map([[PerkId.EARLIER_SEQUENCE, 3]])
+        const statsPer = makeStats({ level: 3, perception: 6 })
+        const available = getAvailablePerks(statsPer, makeSkills(statsPer), perks)
+        expect(available.find((p) => p.id === PerkId.EARLIER_SEQUENCE)).toBeUndefined()
+        expect(getAvailablePerks(statsPer, makeSkills(statsPer), new Map()).find((p) => p.id === PerkId.EARLIER_SEQUENCE)).toBeDefined()
     })
 })
 

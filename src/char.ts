@@ -42,9 +42,17 @@ export class SkillSet {
     }
 
     static fromPro(skills: any): SkillSet {
-        // console.log("fromPro: %o", skills);
-
-        return new SkillSet(skills);
+        // A critter proto stores skill *points*; the engine's skill value is
+        // default + stat bonus + points (skill.cc skillGetValue). Store the
+        // default here so getBase() keeps its "start value + points" meaning.
+        const base: { [name: string]: number } = {};
+        for (const name in skills ?? {}) {
+            const points = skills[name];
+            const dep = skillDependencies[name === 'Melee' ? 'Melee Weapons' : name];
+            if (typeof points !== 'number') {continue;}
+            base[name === 'Melee' ? 'Melee Weapons' : name] = (dep?.startValue ?? 0) + points;
+        }
+        return new SkillSet(base);
     }
 
     getBase(skill: string): number {
@@ -55,10 +63,15 @@ export class SkillSet {
             return 0;
         }
 
-        return this.baseSkills[skill] || skillDep.startValue;
+        const stored = this.baseSkills[skill];
+        return typeof stored === 'number' ? stored : skillDep.startValue;
     }
 
-    get(skill: string, stats: StatSet): number {
+    /**
+     * Skill value. `statReader` supplies effective SPECIAL values (with perk,
+     * drug and armor modifiers); it defaults to the raw StatSet.
+     */
+    get(skill: string, stats: StatSet, statReader?: (stat: string) => number): number {
         const base = this.getBase(skill);
         const skillDep = skillDependencies[skill];
 
@@ -74,12 +87,13 @@ export class SkillSet {
             skillValue = skillDep.startValue + (skillValue - skillDep.startValue) * 2 + 20;
         }
 
+        const readStat = statReader ?? ((st: string) => stats.get(st));
         for(const dep of skillDep.dependencies) {
             if(dep.statType)
-                {skillValue += Math.floor(stats.get(dep.statType) * dep.multiplier);}
+                {skillValue += Math.floor(readStat(dep.statType) * dep.multiplier);}
         }
 
-        return skillValue;
+        return Math.min(SkillSet.SKILL_MAX, skillValue);
     }
 
     setBase(skill: string, skillValue: number) {
@@ -197,10 +211,15 @@ export class StatSet {
             return 0;
         }
 
-        return this.baseStats[stat] || statDep.defaultValue;
+        const stored = this.baseStats[stat];
+        return typeof stored === 'number' ? stored : statDep.defaultValue;
     }
 
-    get(stat: string): number {
+    /**
+     * Stat value. For derived stats, `statReader` supplies the SPECIAL values
+     * the formula uses (effective values incl. perks/armor); defaults to raw.
+     */
+    get(stat: string, statReader?: (stat: string) => number): number {
         const base = this.getBase(stat);
 
         const statDep = statDependencies[stat];
@@ -212,9 +231,10 @@ export class StatSet {
 
         let statValue = base;
         if(this.useBonuses) {
+            const readStat = statReader ?? ((st: string) => this.get(st));
             for(const dep of statDep.dependencies) {
                 if(dep.statType)
-                    {statValue += Math.floor(this.get(dep.statType) * dep.multiplier);}
+                    {statValue += Math.floor(readStat(dep.statType) * dep.multiplier);}
             }
         }
 

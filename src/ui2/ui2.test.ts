@@ -2369,13 +2369,14 @@ describe('CharacterScreen Perks Tab', () => {
         screen.show()
         screen.onMouseDown(10 + 2 * 120 + 5, 32 + 5, 'l')
 
-        // Click second perk (Bonus Move, ID 1) in list.
+        // Click the second available perk. With all-5 SPECIAL at level 3 the
+        // FO2 table offers Awareness (0), then Quick Pockets (48, AGI 5).
         // Row 0: header
         // Row 1: Awareness
-        // Row 2: Bonus Move
+        // Row 2: Quick Pockets
         screen.onMouseDown(50, 60 + 13 + 2 * 26 + 5, 'l')
 
-        expect(screen['selectedPerkId']).toBe(1)
+        expect(screen['selectedPerkId']).toBe(48)
     })
 
     it('clicking [CHOOSE] button grants the perk and consumes a perk point', () => {

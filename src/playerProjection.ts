@@ -11,6 +11,7 @@
  * EntityManager.
  */
 
+import { PerkId } from './character/perkIds.js'
 import globalState from './globalState.js'
 import { EntityManager } from './ecs/entityManager.js'
 import type { SkillsComponent, StatsComponent } from './ecs/components.js'
@@ -228,6 +229,13 @@ export function recordCritterPerkGrant(perkId: number): void {
         player.perkRanks = {}
     }
     player.perkRanks[perkId] = (player.perkRanks[perkId] ?? 0) + 1
+    // character_editor.cc: one-off effects applied when the perk is picked.
+    if (perkId === PerkId.LIFEGIVER && player.stats && typeof player.stats.modifyBase === 'function') {
+        player.stats.modifyBase('Max HP', 4)
+        player.stats.modifyBase('HP', 4)
+    } else if (perkId === PerkId.EDUCATED && player.skills && typeof player.skills.skillPoints === 'number') {
+        player.skills.skillPoints += 2
+    }
     globalState.playerPerksOwed = Math.max(0, (globalState.playerPerksOwed ?? 0) - 1)
     syncPlayerEntityFromCritter()
 }

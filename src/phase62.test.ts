@@ -308,9 +308,9 @@ describe('Phase 62-E — sfall opcodes 0x8210–0x8217', () => {
     })
 
     it('get_perk_name_sfall returns perk name from PERK_MAP', () => {
-        // Perk 0 is 'Awareness', perk 5 is 'Sharpshooter' (per character/perks.ts)
+        // FO2 perk IDs (perk_defs.h): 0 Awareness, 14 Sharpshooter
         expect(script.get_perk_name_sfall(0)).toBe('Awareness')
-        expect(script.get_perk_name_sfall(5)).toBe('Sharpshooter')
+        expect(script.get_perk_name_sfall(14)).toBe('Sharpshooter')
     })
 
     it('get_perk_name_sfall returns empty string for unknown perk', () => {

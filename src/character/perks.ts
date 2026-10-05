@@ -9,6 +9,11 @@
 
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { recomputeDerivedStats } from '../ecs/derivedStats.js'
+import { GAIN_STAT_PERKS, PERK_STAT_EFFECTS, PerkId, perkSkillBonusesFor } from './perkIds.js'
+
+export { PerkId } from './perkIds.js'
+
+type SkillKey = keyof Omit<SkillsComponent, 'componentType' | 'tagged' | 'availablePoints'>
 
 export interface PerkPrerequisite {
     minLevel?: number
@@ -19,7 +24,19 @@ export interface PerkPrerequisite {
     minIntelligence?: number
     minAgility?: number
     minLuck?: number
-    minSkill?: { skill: keyof Omit<SkillsComponent, 'componentType' | 'tagged' | 'availablePoints'>; value: number }
+    /** Stat must be strictly below this value (negative entries in perk.cc). */
+    maxStrength?: number
+    maxPerception?: number
+    maxEndurance?: number
+    maxCharisma?: number
+    maxIntelligence?: number
+    maxAgility?: number
+    maxLuck?: number
+    minSkill?: { skill: SkillKey; value: number }
+    /** Second skill gate (perk.cc param2). */
+    minSkill2?: { skill: SkillKey; value: number }
+    /** How minSkill and minSkill2 combine: 'and' (both) or 'or' (either). */
+    skillMode?: 'and' | 'or'
     /** Can only take this perk once (default true). */
     unique?: boolean
     /** Maximum times this perk can be taken. */
@@ -41,16 +58,39 @@ function checkPrereqs(
     skills: SkillsComponent,
 ): boolean {
     if (p.minLevel !== undefined && stats.level < p.minLevel) {return false}
-    if (p.minStrength !== undefined && stats.strength + stats.strengthMod < p.minStrength) {return false}
-    if (p.minPerception !== undefined && stats.perception + stats.perceptionMod < p.minPerception) {return false}
-    if (p.minEndurance !== undefined && stats.endurance + stats.enduranceMod < p.minEndurance) {return false}
-    if (p.minCharisma !== undefined && stats.charisma + stats.charismaMod < p.minCharisma) {return false}
-    if (p.minIntelligence !== undefined && stats.intelligence + stats.intelligenceMod < p.minIntelligence) {return false}
-    if (p.minAgility !== undefined && stats.agility + stats.agilityMod < p.minAgility) {return false}
-    if (p.minLuck !== undefined && stats.luck + stats.luckMod < p.minLuck) {return false}
+    const eff = {
+        strength: stats.strength + stats.strengthMod,
+        perception: stats.perception + stats.perceptionMod,
+        endurance: stats.endurance + stats.enduranceMod,
+        charisma: stats.charisma + stats.charismaMod,
+        intelligence: stats.intelligence + stats.intelligenceMod,
+        agility: stats.agility + stats.agilityMod,
+        luck: stats.luck + stats.luckMod,
+    }
+    if (p.minStrength !== undefined && eff.strength < p.minStrength) {return false}
+    if (p.minPerception !== undefined && eff.perception < p.minPerception) {return false}
+    if (p.minEndurance !== undefined && eff.endurance < p.minEndurance) {return false}
+    if (p.minCharisma !== undefined && eff.charisma < p.minCharisma) {return false}
+    if (p.minIntelligence !== undefined && eff.intelligence < p.minIntelligence) {return false}
+    if (p.minAgility !== undefined && eff.agility < p.minAgility) {return false}
+    if (p.minLuck !== undefined && eff.luck < p.minLuck) {return false}
+    if (p.maxStrength !== undefined && eff.strength >= p.maxStrength) {return false}
+    if (p.maxPerception !== undefined && eff.perception >= p.maxPerception) {return false}
+    if (p.maxEndurance !== undefined && eff.endurance >= p.maxEndurance) {return false}
+    if (p.maxCharisma !== undefined && eff.charisma >= p.maxCharisma) {return false}
+    if (p.maxIntelligence !== undefined && eff.intelligence >= p.maxIntelligence) {return false}
+    if (p.maxAgility !== undefined && eff.agility >= p.maxAgility) {return false}
+    if (p.maxLuck !== undefined && eff.luck >= p.maxLuck) {return false}
+    const skillOk = (req: { skill: SkillKey; value: number }) => ((skills as any)[req.skill] as number) >= req.value
     if (p.minSkill !== undefined) {
-        const val = (skills as any)[p.minSkill.skill] as number
-        if (val < p.minSkill.value) {return false}
+        const first = skillOk(p.minSkill)
+        if (p.minSkill2 === undefined) {
+            if (!first) {return false}
+        } else if (p.skillMode === 'or') {
+            if (!first && !skillOk(p.minSkill2)) {return false}
+        } else if (!first || !skillOk(p.minSkill2)) {
+            return false
+        }
     }
     return true
 }
@@ -65,313 +105,538 @@ export function isPerkAvailable(
     return checkPrereqs(perk.prerequisites, stats, skills)
 }
 
+/**
+ * Mirror a perk's effect onto the ECS projection so prerequisite checks made
+ * between Critter→ECS syncs see it. The Critter (object.ts getStat/getSkill)
+ * applies the authoritative, dynamic effect.
+ */
+function applyPerkToEcs(id: number, s: StatsComponent, sk: SkillsComponent): void {
+    const effect = PERK_STAT_EFFECTS.get(id)
+    if (effect) {
+        switch (effect.stat) {
+            case 'Melee': s.meleeDamageMod += effect.perRank; break
+            case 'Sequence': s.sequenceMod += effect.perRank; break
+            case 'Healing Rate': s.healingRateMod += effect.perRank; break
+            case 'Critical Chance': s.criticalChanceMod += effect.perRank; break
+            case 'DR Radiation': s.radiationResistanceMod += effect.perRank; break
+            case 'DR Poison': s.poisonResistanceMod += effect.perRank; break
+            case 'DR Normal': s.dr.normal += effect.perRank; break
+            case 'Carry': s.carryWeightMod += effect.perRank; break
+            case 'AP': s.maxAPMod += effect.perRank; break
+            default: break
+        }
+    }
+    const gain = GAIN_STAT_PERKS.get(id)
+    if (gain) {
+        const key = ({ STR: 'strength', PER: 'perception', END: 'endurance', CHA: 'charisma',
+            INT: 'intelligence', AGI: 'agility', LUK: 'luck' } as const)[gain as 'STR']
+        ;(s as any)[key] += 1
+    }
+    if (id === PerkId.LIFEGIVER) {s.maxHpMod += 4}
+    for (const [skill, bonus] of Object.entries(perkSkillBonusesFor(id))) {
+        ;(sk as any)[skill] += bonus
+    }
+    recomputeDerivedStats(s)
+}
+
 // ---------------------------------------------------------------------------
-// Perk definitions — a representative selection covering the full list
+// Perk definitions — every player-selectable Fallout 2 perk, keyed by the
+// engine perk ID. Ranks, level and prerequisites mirror perk.cc.
 // ---------------------------------------------------------------------------
 
 export const PERKS: Perk[] = [
-    // --- Tier 1 (Level 3) ---
     {
-        id: 0, name: 'Awareness', ranks: 1,
-        description: 'With Awareness you have a better understanding of other creatures. You are given detailed information about a target\'s condition when you examine them.',
+        id: PerkId.AWARENESS, name: 'Awareness', ranks: 1,
+        description: 'With Awareness, you are given detailed information about any critter you examine: their hit points and the weapon they are equipped with.',
         prerequisites: { minLevel: 3, minPerception: 5 },
-        apply() {},  // handled in examine code
+        apply(s, sk) { applyPerkToEcs(PerkId.AWARENESS, s, sk) },
     },
     {
-        id: 1, name: 'Bonus Move', ranks: 2,
-        description: 'For each rank of this perk, you receive 2 free Action Points each combat turn that can only be used for movement.',
-        prerequisites: { minLevel: 3 },
-        // Only modify the persistent modifier; grantPerk() calls recomputeDerivedStats()
-        // which will set maxAP = 5 + ceil(AGI/2) + maxAPMod. Writing directly to maxAP
-        // here would just be overwritten on the very next line of grantPerk().
-        apply(s) { s.maxAPMod += 2 },
+        id: PerkId.BONUS_HTH_ATTACKS, name: 'Bonus HtH Attacks', ranks: 1,
+        description: 'You have learned the secret arts of the East, or you just punch faster. Hand-to-hand and melee attacks cost 1 less Action Point.',
+        prerequisites: { minLevel: 15, minAgility: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.BONUS_HTH_ATTACKS, s, sk) },
     },
     {
-        id: 2, name: 'Empathy', ranks: 1,
-        description: 'You can tell what kind of response you\'ll get from an NPC before you say it in dialogue.',
-        prerequisites: { minLevel: 3, minPerception: 7 },
-        apply() {},  // handled in dialogue UI
+        id: PerkId.BONUS_HTH_DAMAGE, name: 'Bonus HtH Damage', ranks: 3,
+        description: 'Experience in unarmed and melee combat gives you +2 Melee Damage per level of this perk.',
+        prerequisites: { minLevel: 3, minStrength: 6, minAgility: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.BONUS_HTH_DAMAGE, s, sk) },
     },
     {
-        id: 3, name: 'Toughness', ranks: 3,
-        description: '+10% to all Damage Resistance per rank.',
-        prerequisites: { minLevel: 3, minEndurance: 6 },
-        apply(s, _, rank) {
-            s.dr.normal += 10
-            s.dr.fire += 10
-            s.dr.plasma += 10
-            s.dr.laser += 10
-            s.dr.explosive += 10
-            s.dr.electrical += 10
-            s.dr.emp += 10
-        },
+        id: PerkId.BONUS_MOVE, name: 'Bonus Move', ranks: 2,
+        description: 'For each level of this perk, you get 2 extra Action Points each combat turn that can only be used for movement.',
+        prerequisites: { minLevel: 6, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.BONUS_MOVE, s, sk) },
     },
     {
-        id: 4, name: 'Strong Back', ranks: 3,
-        description: '+50 lbs carry weight per rank.',
-        prerequisites: { minLevel: 3, minStrength: 6, minEndurance: 6 },
-        apply(s) { s.carryWeightMod += 50; recomputeDerivedStats(s) },
+        id: PerkId.BONUS_RANGED_DAMAGE, name: 'Bonus Ranged Damage', ranks: 2,
+        description: 'Your training with ranged weapons adds +2 points of damage per bullet per level of this perk.',
+        prerequisites: { minLevel: 6, minAgility: 6, minLuck: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.BONUS_RANGED_DAMAGE, s, sk) },
     },
     {
-        id: 5, name: 'Sharpshooter', ranks: 1,
-        description: '+2 Perception for the purpose of ranged weapon range.',
-        prerequisites: { minLevel: 9, minPerception: 7, minIntelligence: 6 },
-        apply(s) { s.perceptionMod += 2 },
-    },
-    {
-        id: 6, name: 'Action Boy', ranks: 2,
-        description: '+1 AP per rank.',
-        prerequisites: { minLevel: 12, minAgility: 5 },
-        // Only modify the persistent modifier; grantPerk() calls recomputeDerivedStats()
-        // which will set maxAP = 5 + ceil(AGI/2) + maxAPMod. Writing directly to maxAP
-        // here would just be overwritten on the very next line of grantPerk().
-        apply(s) { s.maxAPMod += 1 },
-    },
-    {
-        id: 7, name: 'Better Criticals', ranks: 1,
-        description: '+20% to the critical hit table. You cause better critical hits.',
-        prerequisites: { minLevel: 9, minPerception: 6, minAgility: 4, minLuck: 6 },
-        apply(s) { s.criticalChanceMod += 20; recomputeDerivedStats(s) },
-    },
-    {
-        id: 8, name: 'Lifegiver', ranks: 2,
-        description: '+4 Max HP per rank.',
-        prerequisites: { minLevel: 9, minEndurance: 4 },
-        apply(s) {
-            s.maxHpMod += 4
-            recomputeDerivedStats(s)
-            s.currentHp = Math.min(s.currentHp + 4, s.maxHp)
-        },
-    },
-    {
-        id: 9, name: 'Sniper', ranks: 1,
-        description: 'When you make a ranged attack you may make a second d100 roll for the location hit using the best of the two rolls.',
-        prerequisites: { minLevel: 18, minPerception: 8, minAgility: 8 },
-        apply() {},  // handled in called-shot resolution
-    },
-    {
-        id: 10, name: 'Healer', ranks: 4,
-        description: '+1 to +5 HP healed per use of First Aid or Doctor per rank.',
-        prerequisites: { minLevel: 3, minPerception: 7, minAgility: 6, minIntelligence: 5 },
-        apply() {},  // handled in skill use
-    },
-    {
-        id: 11, name: 'Educated', ranks: 3,
-        description: '+2 skill points per level per rank.',
-        prerequisites: { minLevel: 3, minIntelligence: 6 },
-        apply() {},  // handled in level-up logic
-    },
-    {
-        id: 12, name: 'Survivalist', ranks: 1,
-        description: '+25% Outdoorsman skill.',
-        prerequisites: { minLevel: 3, minEndurance: 6, minAgility: 6, minIntelligence: 6 },
-        apply(_s, sk) { sk.outdoorsman += 25 },
-    },
-    {
-        id: 13, name: 'Master Trader', ranks: 1,
-        description: '+30% Barter skill.',
-        prerequisites: { minLevel: 9, minCharisma: 7, minSkill: { skill: 'barter', value: 75 } },
-        apply(_s, sk) { sk.barter += 30 },
-    },
-    {
-        id: 14, name: 'Ghost', ranks: 1,
-        description: '+20% Sneak in darkness.',
-        prerequisites: { minLevel: 6, minAgility: 6, minSkill: { skill: 'sneak', value: 60 } },
-        apply(_s, sk) { sk.sneak += 20 },
-    },
-    {
-        id: 15, name: 'Pickpocket', ranks: 1,
-        description: '+30% Steal when stealing items with lower weight.',
-        prerequisites: { minLevel: 9, minAgility: 8, minSkill: { skill: 'steal', value: 80 } },
-        apply(_s, sk) { sk.steal += 30 },
-    },
-    // --- Tier: FO2-aligned additions (campaign-critical) ---
-    {
-        id: 16, name: 'Bonus Rate of Fire', ranks: 1,
+        id: PerkId.BONUS_RATE_OF_FIRE, name: 'Bonus Rate of Fire', ranks: 1,
         description: 'Ranged weapon attacks cost 1 less Action Point.',
         prerequisites: { minLevel: 15, minPerception: 6, minIntelligence: 6, minAgility: 7 },
-        apply() {}, // handled in attack AP cost
+        apply(s, sk) { applyPerkToEcs(PerkId.BONUS_RATE_OF_FIRE, s, sk) },
     },
     {
-        id: 17, name: 'More Criticals', ranks: 3,
-        description: '+5% chance to cause a critical hit per rank.',
-        prerequisites: { minLevel: 6, minLuck: 6 },
-        apply(s) { s.criticalChanceMod += 5; recomputeDerivedStats(s) },
-    },
-    {
-        id: 46, name: 'Earlier Sequence', ranks: 3,
-        description: '+2 Sequence per rank.',
+        id: PerkId.EARLIER_SEQUENCE, name: 'Earlier Sequence', ranks: 3,
+        description: 'You are more likely to move before your opponents in combat: +2 Sequence per level of this perk.',
         prerequisites: { minLevel: 3, minPerception: 6 },
-        apply(s) { s.sequenceMod += 2; recomputeDerivedStats(s) },
+        apply(s, sk) { applyPerkToEcs(PerkId.EARLIER_SEQUENCE, s, sk) },
     },
     {
-        id: 19, name: 'Faster Healing', ranks: 3,
-        description: '+2 Healing Rate per rank.',
+        id: PerkId.FASTER_HEALING, name: 'Faster Healing', ranks: 3,
+        description: 'You heal faster: +2 Healing Rate per level of this perk.',
         prerequisites: { minLevel: 3, minEndurance: 6 },
-        apply(s) { s.healingRateMod += 2; recomputeDerivedStats(s) },
+        apply(s, sk) { applyPerkToEcs(PerkId.FASTER_HEALING, s, sk) },
     },
     {
-        id: 20, name: 'Rad Resistance', ranks: 2,
-        description: '+15% Radiation Resistance per rank.',
-        prerequisites: { minLevel: 6, minEndurance: 6, minIntelligence: 4 },
-        apply(s) { s.radiationResistanceMod += 15; recomputeDerivedStats(s) },
+        id: PerkId.MORE_CRITICALS, name: 'More Criticals', ranks: 3,
+        description: 'You are more likely to cause critical hits in combat: +5% Critical Chance per level of this perk.',
+        prerequisites: { minLevel: 6, minLuck: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.MORE_CRITICALS, s, sk) },
     },
     {
-        id: 21, name: 'Dodger', ranks: 2,
-        description: '+5 Armor Class per rank.',
-        prerequisites: { minLevel: 9, minAgility: 6 },
-        apply(s) { /* AC handled via agilityMod approximation */ s.agilityMod += 1; recomputeDerivedStats(s) },
-    },
-    {
-        id: 22, name: 'Snakeater', ranks: 2,
-        description: '+25% Poison Resistance per rank.',
-        prerequisites: { minLevel: 6, minEndurance: 3 },
-        apply(s) { s.poisonResistanceMod += 25; recomputeDerivedStats(s) },
-    },
-    {
-        id: 23, name: 'Mr. Fixit', ranks: 1,
-        description: '+10% Repair and Science.',
-        prerequisites: { minLevel: 12, minSkill: { skill: 'repair', value: 40 } },
-        apply(_s, sk) { sk.repair += 10; sk.science += 10 },
-    },
-    {
-        id: 24, name: 'Medic', ranks: 1,
-        description: '+10% First Aid and Doctor.',
-        prerequisites: { minLevel: 12, minSkill: { skill: 'firstAid', value: 40 } },
-        apply(_s, sk) { sk.firstAid += 10; sk.doctor += 10 },
-    },
-    {
-        id: 25, name: 'Master Thief', ranks: 1,
-        description: '+15% Lockpick and Steal.',
-        prerequisites: { minLevel: 12, minSkill: { skill: 'lockpick', value: 50 } },
-        apply(_s, sk) { sk.lockpick += 15; sk.steal += 15 },
-    },
-    {
-        id: 26, name: 'Speaker', ranks: 1,
-        description: '+20% Speech.',
-        prerequisites: { minLevel: 9, minSkill: { skill: 'speech', value: 50 } },
-        apply(_s, sk) { sk.speech += 20 },
-    },
-    {
-        id: 27, name: 'Fortune Finder', ranks: 1,
-        description: 'You find more bottle caps in random encounters and loot.',
-        prerequisites: { minLevel: 6, minLuck: 8 },
-        apply() {},
-    },
-    {
-        id: 28, name: 'Scout', ranks: 1,
-        description: 'See further on the World Map and find more special encounters.',
-        prerequisites: { minLevel: 3, minPerception: 8 },
-        apply() {},
-    },
-    {
-        id: 29, name: 'Explorer', ranks: 1,
-        description: 'Higher chance of finding special World Map encounters.',
-        prerequisites: { minLevel: 9 },
-        apply() {},
-    },
-    {
-        id: 30, name: 'Ranger', ranks: 1,
-        description: 'Fewer hostile World Map encounters; better outdoorsman rolls.',
-        prerequisites: { minLevel: 6, minPerception: 6, minSkill: { skill: 'outdoorsman', value: 30 } },
-        apply(_s, sk) { sk.outdoorsman += 15 },
-    },
-    {
-        id: 31, name: 'Pathfinder', ranks: 2,
-        description: 'Travel on the World Map takes 25% less time per rank.',
-        prerequisites: { minLevel: 6, minEndurance: 6, minSkill: { skill: 'outdoorsman', value: 40 } },
-        apply() {},
-    },
-    {
-        id: 32, name: 'Smooth Talker', ranks: 3,
-        description: '+1 Intelligence for dialogue checks per rank.',
-        prerequisites: { minLevel: 3, minIntelligence: 4 },
-        apply(s) { s.intelligenceMod += 1 },
-    },
-    {
-        id: 33, name: 'Swift Learner', ranks: 3,
-        description: '+5% experience points gained per rank.',
-        prerequisites: { minLevel: 3, minIntelligence: 4 },
-        apply() {},
-    },
-    {
-        id: 34, name: 'Tag!', ranks: 1,
-        description: 'Choose an additional Tag Skill (+20% and double improvement).',
-        prerequisites: { minLevel: 12 },
-        apply() {}, // picker applies tag via SkillSet
-    },
-    {
-        id: 35, name: 'Living Anatomy', ranks: 1,
-        description: '+10% Doctor and +5 damage against living creatures.',
-        prerequisites: { minLevel: 12, minSkill: { skill: 'doctor', value: 60 } },
-        apply(_s, sk) { sk.doctor += 10 },
-    },
-    {
-        id: 36, name: 'Bonus HtH Damage', ranks: 3,
-        description: '+2 Melee Damage per rank.',
-        prerequisites: { minLevel: 3, minAgility: 6 },
-        apply(s) { s.meleeDamageMod += 2; recomputeDerivedStats(s) },
-    },
-    {
-        id: 37, name: 'Adrenaline Rush', ranks: 1,
-        description: '+1 Strength when below half Hit Points.',
-        prerequisites: { minLevel: 6, minStrength: 5 },
-        apply() {},
-    },
-    {
-        id: 38, name: 'Cautious Nature', ranks: 1,
-        description: '+3 Perception for encounter placement distance.',
+        id: PerkId.NIGHT_VISION, name: 'Night Vision', ranks: 1,
+        description: 'With Night Vision, you can see better in the dark: darkness penalizes your attacks less.',
         prerequisites: { minLevel: 3, minPerception: 6 },
-        apply() {},
+        apply(s, sk) { applyPerkToEcs(PerkId.NIGHT_VISION, s, sk) },
     },
     {
-        id: 39, name: 'Gain Strength', ranks: 1,
-        description: '+1 Strength permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.strength += 1; recomputeDerivedStats(s) },
+        id: PerkId.PRESENCE, name: 'Presence', ranks: 3,
+        description: 'People are more likely to react favorably to you: +10% initial reaction per level of this perk.',
+        prerequisites: { minLevel: 3, minCharisma: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.PRESENCE, s, sk) },
     },
     {
-        id: 40, name: 'Gain Perception', ranks: 1,
-        description: '+1 Perception permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.perception += 1; recomputeDerivedStats(s) },
+        id: PerkId.RAD_RESISTANCE, name: 'Rad Resistance', ranks: 2,
+        description: 'You are better able to avoid radiation: +15% Radiation Resistance per level of this perk.',
+        prerequisites: { minLevel: 6, minEndurance: 6, minIntelligence: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.RAD_RESISTANCE, s, sk) },
     },
     {
-        id: 41, name: 'Gain Endurance', ranks: 1,
-        description: '+1 Endurance permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.endurance += 1; recomputeDerivedStats(s) },
+        id: PerkId.TOUGHNESS, name: 'Toughness', ranks: 3,
+        description: 'You are tougher than the average person: +10% Damage Resistance (normal) per level of this perk.',
+        prerequisites: { minLevel: 3, minEndurance: 6, minLuck: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.TOUGHNESS, s, sk) },
     },
     {
-        id: 42, name: 'Gain Charisma', ranks: 1,
-        description: '+1 Charisma permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.charisma += 1; recomputeDerivedStats(s) },
+        id: PerkId.STRONG_BACK, name: 'Strong Back', ranks: 3,
+        description: 'You can carry an extra 50 lbs. of equipment per level of this perk.',
+        prerequisites: { minLevel: 3, minStrength: 6, minEndurance: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.STRONG_BACK, s, sk) },
     },
     {
-        id: 43, name: 'Gain Intelligence', ranks: 1,
-        description: '+1 Intelligence permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.intelligence += 1; recomputeDerivedStats(s) },
+        id: PerkId.SHARPSHOOTER, name: 'Sharpshooter', ranks: 1,
+        description: 'You have a talent for hitting things at longer distances: +2 Perception for the purposes of ranged attack distance.',
+        prerequisites: { minLevel: 9, minPerception: 7, minIntelligence: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SHARPSHOOTER, s, sk) },
     },
     {
-        id: 44, name: 'Gain Agility', ranks: 1,
-        description: '+1 Agility permanently.',
-        prerequisites: { minLevel: 12 },
-        apply(s) { s.agility += 1; recomputeDerivedStats(s) },
+        id: PerkId.SILENT_RUNNING, name: 'Silent Running', ranks: 1,
+        description: 'You can run while sneaking without penalty.',
+        prerequisites: { minLevel: 6, minAgility: 6, minSkill: { skill: 'sneak', value: 50 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SILENT_RUNNING, s, sk) },
     },
     {
-        id: 45, name: 'Gain Luck', ranks: 1,
-        description: '+1 Luck permanently.',
+        id: PerkId.SURVIVALIST, name: 'Survivalist', ranks: 1,
+        description: 'You are a master of the outdoors: +25% to Outdoorsman.',
+        prerequisites: { minLevel: 3, minEndurance: 6, minIntelligence: 6, minSkill: { skill: 'outdoorsman', value: 40 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SURVIVALIST, s, sk) },
+    },
+    {
+        id: PerkId.MASTER_TRADER, name: 'Master Trader', ranks: 1,
+        description: 'You have mastered one aspect of bartering: buying goods far more cheaply than normal (25% discount).',
+        prerequisites: { minLevel: 12, minCharisma: 7, minSkill: { skill: 'barter', value: 75 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.MASTER_TRADER, s, sk) },
+    },
+    {
+        id: PerkId.EDUCATED, name: 'Educated', ranks: 3,
+        description: 'You gain +2 skill points every time you advance a level, per level of this perk.',
+        prerequisites: { minLevel: 6, minIntelligence: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.EDUCATED, s, sk) },
+    },
+    {
+        id: PerkId.HEALER, name: 'Healer', ranks: 2,
+        description: 'The healing of bodies comes easier to you: +4-10 hit points healed with First Aid and Doctor per level of this perk.',
+        prerequisites: { minLevel: 3, minPerception: 7, minIntelligence: 5, minAgility: 6, minSkill: { skill: 'firstAid', value: 40 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.HEALER, s, sk) },
+    },
+    {
+        id: PerkId.FORTUNE_FINDER, name: 'Fortune Finder', ranks: 1,
+        description: 'You have the talent of finding money: more money in random encounters.',
+        prerequisites: { minLevel: 6, minLuck: 8 },
+        apply(s, sk) { applyPerkToEcs(PerkId.FORTUNE_FINDER, s, sk) },
+    },
+    {
+        id: PerkId.BETTER_CRITICALS, name: 'Better Criticals', ranks: 1,
+        description: 'The critical hits you cause in combat are more devastating: +20% to the critical hit table roll.',
+        prerequisites: { minLevel: 9, minPerception: 6, minAgility: 4, minLuck: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.BETTER_CRITICALS, s, sk) },
+    },
+    {
+        id: PerkId.EMPATHY, name: 'Empathy', ranks: 1,
+        description: 'You have studied other people: the best and worst dialogue replies are highlighted.',
+        prerequisites: { minLevel: 6, minPerception: 7, minIntelligence: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.EMPATHY, s, sk) },
+    },
+    {
+        id: PerkId.SLAYER, name: 'Slayer', ranks: 1,
+        description: 'The Slayer walks the earth! In hand-to-hand combat, all of your successful hits are upgraded to critical hits.',
+        prerequisites: { minLevel: 24, minStrength: 8, minAgility: 8, minSkill: { skill: 'unarmed', value: 80 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SLAYER, s, sk) },
+    },
+    {
+        id: PerkId.SNIPER, name: 'Sniper', ranks: 1,
+        description: 'You have mastered the firearm as a source of pain. Any successful ranged hit has a chance (d10 against your Luck) of being upgraded to a critical hit.',
+        prerequisites: { minLevel: 24, minPerception: 8, minAgility: 8, minSkill: { skill: 'smallGuns', value: 80 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SNIPER, s, sk) },
+    },
+    {
+        id: PerkId.SILENT_DEATH, name: 'Silent Death', ranks: 1,
+        description: 'While sneaking, if you hit an opponent in the back with a hand-to-hand attack, you do double damage.',
+        prerequisites: { minLevel: 18, minAgility: 10, minSkill: { skill: 'sneak', value: 80 }, minSkill2: { skill: 'unarmed', value: 80 }, skillMode: 'or' },
+        apply(s, sk) { applyPerkToEcs(PerkId.SILENT_DEATH, s, sk) },
+    },
+    {
+        id: PerkId.ACTION_BOY, name: 'Action Boy', ranks: 2,
+        description: 'Each level of Action Boy gives you an additional Action Point to spend every combat turn.',
+        prerequisites: { minLevel: 12, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.ACTION_BOY, s, sk) },
+    },
+    {
+        id: PerkId.MENTAL_BLOCK, name: 'Mental Block', ranks: 1,
+        description: 'You have learned to control your mind: resistance to mental intrusion.',
+        prerequisites: { minLevel: 310 },
+        apply(s, sk) { applyPerkToEcs(PerkId.MENTAL_BLOCK, s, sk) },
+    },
+    {
+        id: PerkId.LIFEGIVER, name: 'Lifegiver', ranks: 2,
+        description: 'You gain an additional 4 hit points every time you advance a level, per level of this perk.',
+        prerequisites: { minLevel: 12, minEndurance: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.LIFEGIVER, s, sk) },
+    },
+    {
+        id: PerkId.DODGER, name: 'Dodger', ranks: 1,
+        description: 'You are less likely to be hit in combat: +5 Armor Class.',
+        prerequisites: { minLevel: 9, minAgility: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.DODGER, s, sk) },
+    },
+    {
+        id: PerkId.SNAKEATER, name: 'Snakeater', ranks: 2,
+        description: 'You have built up an immunity to poison: +25% Poison Resistance per level of this perk.',
+        prerequisites: { minLevel: 6, minEndurance: 3 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SNAKEATER, s, sk) },
+    },
+    {
+        id: PerkId.MR_FIXIT, name: 'Mr. Fixit', ranks: 1,
+        description: 'This perk gives you +10% to Repair and Science.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'repair', value: 40 }, minSkill2: { skill: 'science', value: 40 }, skillMode: 'and' },
+        apply(s, sk) { applyPerkToEcs(PerkId.MR_FIXIT, s, sk) },
+    },
+    {
+        id: PerkId.MEDIC, name: 'Medic', ranks: 1,
+        description: 'This perk gives you +10% to First Aid and Doctor.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'firstAid', value: 40 }, minSkill2: { skill: 'doctor', value: 40 }, skillMode: 'and' },
+        apply(s, sk) { applyPerkToEcs(PerkId.MEDIC, s, sk) },
+    },
+    {
+        id: PerkId.MASTER_THIEF, name: 'Master Thief', ranks: 1,
+        description: 'A little extra edge at the thieving arts: +15% to Lockpick and Steal.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'steal', value: 50 }, minSkill2: { skill: 'lockpick', value: 50 }, skillMode: 'or' },
+        apply(s, sk) { applyPerkToEcs(PerkId.MASTER_THIEF, s, sk) },
+    },
+    {
+        id: PerkId.SPEAKER, name: 'Speaker', ranks: 1,
+        description: 'Being an expert speaker means you gain +20% to Speech.',
+        prerequisites: { minLevel: 9, minSkill: { skill: 'speech', value: 50 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SPEAKER, s, sk) },
+    },
+    {
+        id: PerkId.HEAVE_HO, name: 'Heave Ho!', ranks: 3,
+        description: 'Each level of this perk gives you +2 Strength for purposes of determining range with thrown weapons only.',
+        prerequisites: { minLevel: 6, maxStrength: 9 },
+        apply(s, sk) { applyPerkToEcs(PerkId.HEAVE_HO, s, sk) },
+    },
+    {
+        id: PerkId.FRIENDLY_FOE, name: 'Friendly Foe', ranks: 1,
+        description: 'You can detect friends from foes in combat: friends are highlighted in green.',
+        prerequisites: { minLevel: 310, minPerception: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.FRIENDLY_FOE, s, sk) },
+    },
+    {
+        id: PerkId.PICKPOCKET, name: 'Pickpocket', ranks: 1,
+        description: 'You are much more adept at stealing: size and facing modifiers are ignored when stealing.',
+        prerequisites: { minLevel: 15, minAgility: 8, minSkill: { skill: 'steal', value: 80 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.PICKPOCKET, s, sk) },
+    },
+    {
+        id: PerkId.GHOST, name: 'Ghost', ranks: 1,
+        description: 'When the sun sets or in poorly lit areas, you move like a ghost: +20% to Sneak.',
+        prerequisites: { minLevel: 6, minSkill: { skill: 'sneak', value: 60 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.GHOST, s, sk) },
+    },
+    {
+        id: PerkId.CULT_OF_PERSONALITY, name: 'Cult Of Personality', ranks: 1,
+        description: 'Everyone likes you: your karma is always treated as positive in reactions.',
+        prerequisites: { minLevel: 12, minCharisma: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.CULT_OF_PERSONALITY, s, sk) },
+    },
+    {
+        id: PerkId.SCROUNGER, name: 'Scrounger', ranks: 1,
+        description: 'You can find more ammo than the normal post-nuclear survivor.',
+        prerequisites: { minLevel: 310, minLuck: 8 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SCROUNGER, s, sk) },
+    },
+    {
+        id: PerkId.EXPLORER, name: 'Explorer', ranks: 1,
+        description: 'The mark of the Explorer is to find more special encounters on the world map.',
+        prerequisites: { minLevel: 9 },
+        apply(s, sk) { applyPerkToEcs(PerkId.EXPLORER, s, sk) },
+    },
+    {
+        id: PerkId.FLOWER_CHILD, name: 'Flower Child', ranks: 1,
+        description: 'You are less likely to be addicted to chems and your withdrawal time is halved.',
+        prerequisites: { minLevel: 310, minEndurance: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.FLOWER_CHILD, s, sk) },
+    },
+    {
+        id: PerkId.PATHFINDER, name: 'Pathfinder', ranks: 2,
+        description: 'The Pathfinder is better able to find the shortest route: world map travel time is reduced by 25% per level of this perk.',
+        prerequisites: { minLevel: 6, minEndurance: 6, minSkill: { skill: 'outdoorsman', value: 40 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.PATHFINDER, s, sk) },
+    },
+    {
+        id: PerkId.ANIMAL_FRIEND, name: 'Animal Friend', ranks: 1,
+        description: 'Animals will not attack you unless you attack them first.',
+        prerequisites: { minLevel: 310, minIntelligence: 5, minSkill: { skill: 'outdoorsman', value: 25 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.ANIMAL_FRIEND, s, sk) },
+    },
+    {
+        id: PerkId.SCOUT, name: 'Scout', ranks: 1,
+        description: 'You have improved your ability to see distant locations: the world map view radius increases by one square.',
+        prerequisites: { minLevel: 3, minPerception: 7 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SCOUT, s, sk) },
+    },
+    {
+        id: PerkId.MYSTERIOUS_STRANGER, name: 'Mysterious Stranger', ranks: 1,
+        description: 'You have gained the attention of a Mysterious Stranger, who may appear to aid you in random encounters.',
+        prerequisites: { minLevel: 9, minLuck: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.MYSTERIOUS_STRANGER, s, sk) },
+    },
+    {
+        id: PerkId.RANGER, name: 'Ranger', ranks: 1,
+        description: 'You gain +15% to Outdoorsman and find fewer hostile random encounters.',
+        prerequisites: { minLevel: 6, minPerception: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.RANGER, s, sk) },
+    },
+    {
+        id: PerkId.QUICK_POCKETS, name: 'Quick Pockets', ranks: 1,
+        description: 'You have learned to pack your equipment better: accessing your inventory in combat costs 2 Action Points instead of 4.',
+        prerequisites: { minLevel: 3, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.QUICK_POCKETS, s, sk) },
+    },
+    {
+        id: PerkId.SMOOTH_TALKER, name: 'Smooth Talker', ranks: 3,
+        description: 'A Smooth Talker is treated as having +1 Intelligence for dialogue purposes per level of this perk.',
+        prerequisites: { minLevel: 3, minIntelligence: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SMOOTH_TALKER, s, sk) },
+    },
+    {
+        id: PerkId.SWIFT_LEARNER, name: 'Swift Learner', ranks: 3,
+        description: 'You gain 5% more experience per level of this perk whenever experience is earned.',
+        prerequisites: { minLevel: 3, minIntelligence: 4 },
+        apply(s, sk) { applyPerkToEcs(PerkId.SWIFT_LEARNER, s, sk) },
+    },
+    {
+        id: PerkId.TAG, name: 'Tag!', ranks: 1,
+        description: 'Your skills have improved to the point where you can choose an extra tag skill.',
         prerequisites: { minLevel: 12 },
-        apply(s) { s.luck += 1; recomputeDerivedStats(s) },
+        apply(s, sk) { applyPerkToEcs(PerkId.TAG, s, sk) },
+    },
+    {
+        id: PerkId.MUTATE, name: 'Mutate', ranks: 1,
+        description: 'The radiation has changed you: you may swap one trait for another.',
+        prerequisites: { minLevel: 9 },
+        apply(s, sk) { applyPerkToEcs(PerkId.MUTATE, s, sk) },
+    },
+    {
+        id: PerkId.ADRENALINE_RUSH, name: 'Adrenaline Rush', ranks: 1,
+        description: 'With this perk you gain +1 Strength when your hit points drop below 50% of maximum.',
+        prerequisites: { minLevel: 6, maxStrength: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.ADRENALINE_RUSH, s, sk) },
+    },
+    {
+        id: PerkId.CAUTIOUS_NATURE, name: 'Cautious Nature', ranks: 1,
+        description: 'You are more careful: +3 Perception when determining placement in random encounters.',
+        prerequisites: { minLevel: 3, minPerception: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.CAUTIOUS_NATURE, s, sk) },
+    },
+    {
+        id: PerkId.COMPREHENSION, name: 'Comprehension', ranks: 1,
+        description: 'You gain 50% more skill points from reading books.',
+        prerequisites: { minLevel: 3, minIntelligence: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.COMPREHENSION, s, sk) },
+    },
+    {
+        id: PerkId.DEMOLITION_EXPERT, name: 'Demolition Expert', ranks: 1,
+        description: 'You are an expert with explosives: they do more damage and always go off on time.',
+        prerequisites: { minLevel: 9, minAgility: 4, minSkill: { skill: 'traps', value: 75 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.DEMOLITION_EXPERT, s, sk) },
+    },
+    {
+        id: PerkId.GAMBLER, name: 'Gambler', ranks: 1,
+        description: 'You gain +20% to Gambling.',
+        prerequisites: { minLevel: 6, minSkill: { skill: 'gambling', value: 50 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAMBLER, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_STRENGTH, name: 'Gain Strength', ranks: 1,
+        description: 'With this perk you gain +1 to Strength.',
+        prerequisites: { minLevel: 12, maxStrength: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_STRENGTH, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_PERCEPTION, name: 'Gain Perception', ranks: 1,
+        description: 'With this perk you gain +1 to Perception.',
+        prerequisites: { minLevel: 12, maxPerception: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_PERCEPTION, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_ENDURANCE, name: 'Gain Endurance', ranks: 1,
+        description: 'With this perk you gain +1 to Endurance.',
+        prerequisites: { minLevel: 12, maxEndurance: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_ENDURANCE, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_CHARISMA, name: 'Gain Charisma', ranks: 1,
+        description: 'With this perk you gain +1 to Charisma.',
+        prerequisites: { minLevel: 12, maxCharisma: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_CHARISMA, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_INTELLIGENCE, name: 'Gain Intelligence', ranks: 1,
+        description: 'With this perk you gain +1 to Intelligence.',
+        prerequisites: { minLevel: 12, maxIntelligence: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_INTELLIGENCE, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_AGILITY, name: 'Gain Agility', ranks: 1,
+        description: 'With this perk you gain +1 to Agility.',
+        prerequisites: { minLevel: 12, maxAgility: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_AGILITY, s, sk) },
+    },
+    {
+        id: PerkId.GAIN_LUCK, name: 'Gain Luck', ranks: 1,
+        description: 'With this perk you gain +1 to Luck.',
+        prerequisites: { minLevel: 12, maxLuck: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.GAIN_LUCK, s, sk) },
+    },
+    {
+        id: PerkId.HARMLESS, name: 'Harmless', ranks: 1,
+        description: 'Your innocent demeanor makes stealing easier: +20% to Steal.',
+        prerequisites: { minLevel: 6, minSkill: { skill: 'steal', value: 50 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.HARMLESS, s, sk) },
+    },
+    {
+        id: PerkId.HERE_AND_NOW, name: 'Here and Now', ranks: 1,
+        description: 'With this perk you immediately gain enough experience to advance to the next level.',
+        prerequisites: { minLevel: 3 },
+        apply(s, sk) { applyPerkToEcs(PerkId.HERE_AND_NOW, s, sk) },
+    },
+    {
+        id: PerkId.HTH_EVADE, name: 'HtH Evade', ranks: 1,
+        description: 'If you have no weapon in either hand, each unused Action Point is worth 2 Armor Class instead of 1, plus 1/12 of your Unarmed skill.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'unarmed', value: 75 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.HTH_EVADE, s, sk) },
+    },
+    {
+        id: PerkId.KAMA_SUTRA_MASTER, name: 'Kama Sutra Master', ranks: 1,
+        description: 'You have mastered the arts of love: improved stamina and success in amorous encounters.',
+        prerequisites: { minLevel: 3, minEndurance: 5, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.KAMA_SUTRA_MASTER, s, sk) },
+    },
+    {
+        id: PerkId.KARMA_BEACON, name: 'Karma Beacon', ranks: 1,
+        description: 'Your karma is doubled for purposes of NPC reactions.',
+        prerequisites: { minLevel: 9, minCharisma: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.KARMA_BEACON, s, sk) },
+    },
+    {
+        id: PerkId.LIGHT_STEP, name: 'Light Step', ranks: 1,
+        description: 'You are agile and lucky: you have a 50% lesser chance of setting off a trap.',
+        prerequisites: { minLevel: 9, minAgility: 5, minLuck: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.LIGHT_STEP, s, sk) },
+    },
+    {
+        id: PerkId.LIVING_ANATOMY, name: 'Living Anatomy', ranks: 1,
+        description: 'You have a better understanding of living creatures: +10% to Doctor and +5 damage to living creatures.',
+        prerequisites: { minLevel: 12, minSkill: { skill: 'doctor', value: 60 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.LIVING_ANATOMY, s, sk) },
+    },
+    {
+        id: PerkId.MAGNETIC_PERSONALITY, name: 'Magnetic Personality', ranks: 1,
+        description: 'You are naturally attractive to others: +1 to the number of companions you can have.',
+        prerequisites: { minLevel: 6, maxCharisma: 10 },
+        apply(s, sk) { applyPerkToEcs(PerkId.MAGNETIC_PERSONALITY, s, sk) },
+    },
+    {
+        id: PerkId.NEGOTIATOR, name: 'Negotiator', ranks: 1,
+        description: 'You are a very skilled negotiator: +10% to Barter and Speech.',
+        prerequisites: { minLevel: 6, minSkill: { skill: 'barter', value: 50 }, minSkill2: { skill: 'speech', value: 50 }, skillMode: 'or' },
+        apply(s, sk) { applyPerkToEcs(PerkId.NEGOTIATOR, s, sk) },
+    },
+    {
+        id: PerkId.PACK_RAT, name: 'Pack Rat', ranks: 1,
+        description: 'You are better at packing equipment: +50 lbs. carry weight.',
+        prerequisites: { minLevel: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.PACK_RAT, s, sk) },
+    },
+    {
+        id: PerkId.PYROMANIAC, name: 'Pyromaniac', ranks: 1,
+        description: 'You do +5 damage with fire-based weapons.',
+        prerequisites: { minLevel: 9, minSkill: { skill: 'bigGuns', value: 75 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.PYROMANIAC, s, sk) },
+    },
+    {
+        id: PerkId.QUICK_RECOVERY, name: 'Quick Recovery', ranks: 1,
+        description: 'You are quick at recovering from being knocked down: standing up costs 1 Action Point instead of 3.',
+        prerequisites: { minLevel: 6, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.QUICK_RECOVERY, s, sk) },
+    },
+    {
+        id: PerkId.SALESMAN, name: 'Salesman', ranks: 1,
+        description: 'You are an adept salesperson: +20% to Barter.',
+        prerequisites: { minLevel: 6, minSkill: { skill: 'barter', value: 50 } },
+        apply(s, sk) { applyPerkToEcs(PerkId.SALESMAN, s, sk) },
+    },
+    {
+        id: PerkId.STONEWALL, name: 'Stonewall', ranks: 1,
+        description: 'You are much less likely to be knocked down or knocked back in combat.',
+        prerequisites: { minLevel: 3, minStrength: 6 },
+        apply(s, sk) { applyPerkToEcs(PerkId.STONEWALL, s, sk) },
+    },
+    {
+        id: PerkId.THIEF, name: 'Thief', ranks: 1,
+        description: 'The blood of a thief runs through your veins: +10% to Sneak, Lockpick, Steal and Traps.',
+        prerequisites: { minLevel: 3 },
+        apply(s, sk) { applyPerkToEcs(PerkId.THIEF, s, sk) },
+    },
+    {
+        id: PerkId.WEAPON_HANDLING, name: 'Weapon Handling', ranks: 1,
+        description: 'You treat your Strength as 3 points higher for purposes of weapon Strength requirements.',
+        prerequisites: { minLevel: 12, maxStrength: 7, minAgility: 5 },
+        apply(s, sk) { applyPerkToEcs(PerkId.WEAPON_HANDLING, s, sk) },
     },
 ]
 
 export const PERK_MAP: Map<number, Perk> = new Map(PERKS.map((p) => [p.id, p]))
 
-/** UI Educated is id 11; scripts may set FO2 id 18 or legacy alias 47. */
-export const EDUCATED_PERK_IDS = [11, 18, 47] as const
+/** Educated is FO2 perk 18 (perk_defs.h). */
+export const EDUCATED_PERK_IDS = [PerkId.EDUCATED] as const
 
 /** Total ranks of Educated across known ID aliases. */
 export function educatedPerkRanks(perkRanks: Record<number, number> | null | undefined): number {

@@ -11,7 +11,22 @@ import type { Critter } from '../object.js'
 
 type XpCritter = Critter & Pick<Player, 'xp' | 'level' | 'perkRanks'>
 import { educatedPerkRanks } from './perks.js'
+import { PerkId, perkRank } from './perkIds.js'
+
+/** trait_defs.h */
+const TRAIT_SKILLED = 14
+const TRAIT_GIFTED = 15
+/** stat_defs.h PC_LEVEL_MAX */
+const PC_LEVEL_MAX = 99
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
+
+/** Base SPECIAL with trait modifiers (critterGetBaseStatWithTraitModifier). */
+function baseStat(player: XpCritter, stat: string): number {
+    const stats = (player as any).stats
+    if (stats && typeof stats.get === 'function') {return stats.get(stat)}
+    const v = typeof player.getStat === 'function' ? player.getStat(stat) : undefined
+    return typeof v === 'number' && Number.isFinite(v) ? v : 5
+}
 
 /** Total XP required to reach `level` (Fallout 2 triangular threshold). */
 export function xpThresholdForLevel(level: number): number {
@@ -50,19 +65,42 @@ export function awardCritterXp(
     const applyPartyTiers = opts.applyPartyTiers !== false
     const startLevel = player.level ?? 1
 
-    player.xp = (player.xp ?? 0) + amount
-    opts.onGain?.(amount)
+    // pcAddExperienceWithOptions: Swift Learner adds 5% per rank (integer math).
+    const swiftLearner = perkRank(player as any, PerkId.SWIFT_LEARNER)
+    const gained = amount + Math.trunc(swiftLearner * 5 * amount / 100)
+    player.xp = (player.xp ?? 0) + gained
+    opts.onGain?.(gained)
 
-    while ((player.xp ?? 0) >= xpThresholdForLevel(player.level ?? 1)) {
+    const traits: Set<number> | undefined = (player as any).charTraits
+    const hasSkilled = traits?.has(TRAIT_SKILLED) ?? false
+    const hasGifted = traits?.has(TRAIT_GIFTED) ?? false
+
+    while ((player.level ?? 1) < PC_LEVEL_MAX && (player.xp ?? 0) >= xpThresholdForLevel(player.level ?? 1)) {
         player.level = (player.level ?? 1) + 1
-        const intScore = typeof player.getStat === 'function' ? (player.getStat('INT') ?? 5) : 5
-        const educatedBonus = educatedPerkRanks((player as any).perkRanks) * 2
-        const pointsGained = Math.max(1, 10 + Math.floor(intScore / 2) + educatedBonus)
+
+        // character_editor.cc characterEditorUpdateLevel: 5 + 2×INT + 2×Educated
+        // (+5 Skilled, −5 Gifted), clamped to [0, 99] unspent points.
         if (player.skills) {
-            player.skills.skillPoints += pointsGained
+            const baseInt = baseStat(player, 'INT')
+            let sp = player.skills.skillPoints + 5 + baseInt * 2
+            sp += educatedPerkRanks((player as any).perkRanks) * 2
+            if (hasSkilled) {sp += 5}
+            if (hasGifted) {sp = Math.max(0, sp - 5)}
+            player.skills.skillPoints = Math.min(99, sp)
         }
+
+        // stat.cc: +(END/2 + 2) Max HP per level (+4 per Lifegiver rank), healed by the same amount.
+        if (player.stats && typeof player.stats.modifyBase === 'function') {
+            const baseEnd = baseStat(player, 'END')
+            const hpPerLevel = Math.trunc(baseEnd / 2) + 2 + perkRank(player as any, PerkId.LIFEGIVER) * 4
+            player.stats.modifyBase('Max HP', hpPerLevel)
+            player.stats.modifyBase('HP', hpPerLevel)
+        }
+
         opts.onLevelUp?.(player.level)
-        if ((player.level ?? 1) % 3 === 0) {
+        // A perk every 3 levels (every 4 with Skilled).
+        const perkRate = hasSkilled ? 4 : 3
+        if ((player.level ?? 1) % perkRate === 0) {
             globalState.playerPerksOwed = (globalState.playerPerksOwed ?? 0) + 1
         }
         if (applyPartyTiers && globalState.gParty?.applyLevelTiersForPlayerLevel) {

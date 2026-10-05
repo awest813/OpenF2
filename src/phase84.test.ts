@@ -372,16 +372,16 @@ describe('Phase 84-E-2 — sfall 0x82B2: get_critter_inventory_weight_sfall', ()
 // ===========================================================================
 
 describe('Phase 84-E-3 — sfall 0x82B3: get_critter_carry_limit_sfall', () => {
-    it('reads Carry Weight from getStat when available and positive', () => {
+    it('reads the Carry stat from getStat when available and positive', () => {
         const npc = makeObj({
-            getStat: (s: string) => (s === 'Carry Weight' ? 175 : s === 'STR' ? 5 : 5),
+            getStat: (s: string) => (s === 'Carry' ? 175 : s === 'STR' ? 5 : 5),
         })
         expect(script.get_critter_carry_limit_sfall(npc)).toBe(175)
     })
 
     it('falls back to formula when getStat returns 0', () => {
         const npc = makeObj({
-            getStat: (s: string) => (s === 'Carry Weight' ? 0 : s === 'STR' ? 7 : 5),
+            getStat: (s: string) => (s === 'Carry' ? 0 : s === 'STR' ? 7 : 5),
         })
         // formula: 25 + 7*25 = 200
         expect(script.get_critter_carry_limit_sfall(npc)).toBe(200)

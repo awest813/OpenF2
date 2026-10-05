@@ -12,13 +12,14 @@ function unitWeightLbs(item: Obj): number {
     if (typeof direct === 'number' && Number.isFinite(direct)) {
         return Math.max(0, direct)
     }
+    // Item protos store weight in whole pounds (item.cc itemGetWeight).
     const extra = (item as any).pro?.extra?.weight
     if (typeof extra === 'number' && Number.isFinite(extra)) {
-        return Math.max(0, Math.round(extra / 10))
+        return Math.max(0, extra)
     }
     const proto = (item as any).pro?.weight
     if (typeof proto === 'number' && Number.isFinite(proto)) {
-        return Math.max(0, Math.round(proto / 10))
+        return Math.max(0, proto)
     }
     return 0
 }
@@ -45,10 +46,10 @@ export function getCritterInventoryWeightLbs(critter: Critter): number {
     return total
 }
 
-/** FO2 carry limit: Carry Weight / explicit Carry base, else 25 + STR×25. */
+/** FO2 carry limit: the Carry stat (25 + 25×STR, plus perk/trait modifiers). */
 export function getCritterCarryLimitLbs(critter: Critter): number {
     if (critter && typeof critter.getStat === 'function') {
-        const carryWeight = critter.getStat('Carry Weight')
+        const carryWeight = critter.getStat('Carry')
         if (typeof carryWeight === 'number' && Number.isFinite(carryWeight) && carryWeight > 0) {
             return carryWeight
         }

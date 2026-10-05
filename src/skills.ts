@@ -94,7 +94,7 @@ export const skillDependencies: { [name: string]: Skill } = {
     Repair: new Skill(0, [new Dependency('INT', 3)]),
     Speech: new Skill(0, [new Dependency('CHA', 5)]),
     Barter: new Skill(0, [new Dependency('CHA', 4)]),
-    Gambling: new Skill(5, [new Dependency('LUK', 5)]),
+    Gambling: new Skill(0, [new Dependency('LUK', 5)]),
     Outdoorsman: new Skill(0, [new Dependency('END', 2), new Dependency('INT', 2)]),
 }
 
@@ -109,7 +109,7 @@ export const statDependencies: { [name: string]: Stat } = {
     AGI: new Stat(1, 10, 5, []),
     LUK: new Stat(1, 10, 5, []),
 
-    'Max HP': new Stat(0, 999, 0, [new Dependency('One', 15), new Dependency('END', 2), new Dependency('STR', 2)]),
+    'Max HP': new Stat(0, 999, 0, [new Dependency('One', 15), new Dependency('END', 2), new Dependency('STR', 1)]),
     AP: new Stat(1, 99, 0, [new Dependency('One', 5), new Dependency('AGI', 0.5)]),
     AC: new Stat(0, 999, 0, [new Dependency('AGI', 1)]),
     Melee: new Stat(1, 500, 0, [new Dependency('One', -5), new Dependency('STR', 1)]),

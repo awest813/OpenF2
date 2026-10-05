@@ -31,9 +31,44 @@ import { Config } from './config.js'
 import { SkillSet, StatSet } from './char.js'
 import { ActionPoints, AI } from './combat.js'
 import { markPlayerExplored } from './character/automap.js'
-import { canCritterCarryMore } from './critterInventory.js'
+import { canCritterCarryMore, getCritterInventoryWeightLbs } from './critterInventory.js'
+import { adrenalineRushBonus, gainPerkSpecialBonus, perkStatModifier, playerSkillModifier, traitStatModifier } from './character/statModifiers.js'
+import { PerkId, perkRank } from './character/perkIds.js'
+import { overloadApPenalty } from './combat/fo2Formulas.js'
+import { statDependencies } from './skills.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { uiLog } from './ui.js'
+
+const SPECIAL_STATS = new Set(['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK'])
+
+/** Clamp to the stat's legal range, as critterGetStat does. */
+function clampStat(stat: string, value: number): number {
+    const dep = statDependencies[stat]
+    if (!dep) {return value}
+    return Math.max(dep.min, Math.min(dep.max, value))
+}
+
+/**
+ * Stat bonuses from an armor proto's perk (perk.cc: Powered Armor, Combat
+ * Armor, Advanced Power Armor I/II, Armor Charisma).
+ */
+function armorPerkStatBonus(armor: Obj | null, stat: string): number {
+    const perk = (armor as any)?.pro?.extra?.perk
+    switch (perk) {
+        case PerkId.POWERED_ARMOR:
+            return stat === 'STR' ? 3 : stat === 'DR Radiation' ? 30 : 0
+        case PerkId.COMBAT_ARMOR:
+            return stat === 'DR Radiation' ? 20 : 0
+        case PerkId.ARMOR_ADVANCED_I:
+            return stat === 'STR' ? 4 : stat === 'DR Radiation' ? 60 : 0
+        case PerkId.ARMOR_ADVANCED_II:
+            return stat === 'STR' ? 4 : stat === 'DR Radiation' ? 75 : 0
+        case PerkId.ARMOR_CHARISMA:
+            return stat === 'CHA' ? 2 : 0
+        default:
+            return 0
+    }
+}
 
 // Collection of functions for working with game objects
 
@@ -1429,17 +1464,54 @@ export class Critter extends Obj {
     }
 
     getSkill(skill: string) {
-        return this.skills.get(skill, this.stats)
+        let value = this.skills.get(skill, this.stats, (st) => this.statForFormula(st))
+        if (this.isPlayer) {
+            const light = Lightmap.getObjectReceivedLight(this)
+            value += playerSkillModifier(this, skill, globalState.gameDifficulty ?? 1, light)
+        }
+        return Math.min(300, value)
+    }
+
+    /**
+     * SPECIAL value as derived-stat and skill formulas see it: the stored
+     * base plus permanent modifiers (Gain perks, armor perks, blindness), but
+     * not transient ones that read derived stats themselves (Adrenaline Rush),
+     * which would recurse.
+     */
+    private statForFormula(stat: string): number {
+        if (!SPECIAL_STATS.has(stat)) {return this.stats.get(stat)}
+        return this.specialValue(stat, false)
+    }
+
+    private specialValue(stat: string, includeTransient: boolean): number {
+        let value = this.stats.get(stat)
+        if ((this as any)._extraStats && (this as any)._extraStats[stat] !== undefined) {
+            value += (this as any)._extraStats[stat]
+        }
+        if (this.isPlayer) {value += gainPerkSpecialBonus(this, stat)}
+        value += armorPerkStatBonus(this.equippedArmor, stat)
+        if (stat === 'PER' && this.blinded) {value -= 5}
+        if (includeTransient && stat === 'STR' && this.isPlayer) {
+            value += adrenalineRushBonus(this, this.stats.get('HP'), this.getStat('Max HP'))
+        }
+        return clampStat(stat, value)
     }
 
     getStat(stat: string) {
-        let statValue = this.stats.get(stat)
-        
+        if (SPECIAL_STATS.has(stat)) {return this.specialValue(stat, true)}
+
+        let statValue = this.stats.get(stat, (st) => this.statForFormula(st))
+
         // Add sfall dynamic extra stat modifiers
         if ((this as any)._extraStats && (this as any)._extraStats[stat] !== undefined) {
             statValue += (this as any)._extraStats[stat]
         }
-        
+
+        // Trait and perk modifiers (trait.cc traitGetStatModifier, perk.cc perkAddEffect).
+        statValue += traitStatModifier(this, stat, (st) => this.stats.get(st))
+        statValue += perkStatModifier(this, stat)
+        statValue += armorPerkStatBonus(this.equippedArmor, stat)
+
         // Add armor bonuses for DT/DR stats if armor is equipped
         if (this.equippedArmor && this.equippedArmor.pro && this.equippedArmor.pro.extra) {
             const armorStats = this.equippedArmor.pro.extra.stats
@@ -1451,19 +1523,28 @@ export class Critter extends Obj {
                 statValue += this.equippedArmor.pro.extra.AC
             }
         }
-        
-        // Apply critical effect penalties
-        if (stat === 'AGI') {
-            // Each crippled leg reduces AGI by 2
-            if (this.crippledLeftLeg) {statValue = Math.max(1, statValue - 2)}
-            if (this.crippledRightLeg) {statValue = Math.max(1, statValue - 2)}
+
+        if (stat === 'AP') {
+            // stat.cc: carrying more than the limit costs 1 AP plus 1 per 40 lbs over.
+            statValue -= overloadApPenalty(this.getStat('Carry'), getCritterInventoryWeightLbs(this))
         }
-        if (stat === 'PER') {
-            // Blindness reduces perception by 5
-            if (this.blinded) {statValue = Math.max(1, statValue - 5)}
+
+        if (stat === 'AC') {
+            // stat.cc: while it is not this critter's turn, unspent AP count as AC
+            // (twice over with HtH Evade and empty hands, plus Unarmed/12).
+            const combat = globalState.combat as any
+            if (globalState.inCombat && combat && this.AP && combat.combatants?.[combat.whoseTurn] !== this) {
+                let apMult = 1
+                let evadeBonus = 0
+                if (this.isPlayer && perkRank(this, PerkId.HTH_EVADE) > 0 && !this.equippedWeapon) {
+                    apMult = 2
+                    evadeBonus = Math.trunc(this.getSkill('Unarmed') / 12)
+                }
+                statValue += evadeBonus + this.AP.combat * apMult
+            }
         }
-        
-        return statValue
+
+        return clampStat(stat, statValue)
     }
 
     getBase(): string {

@@ -231,10 +231,11 @@ export function applyCharacterCreation(
 
     applyTraitEffectsToPlayer(player, data.traitIds)
 
-    // Derived HP: set current HP = Max HP
-    const maxHp = player.stats.get('Max HP')
-    player.stats.baseStats['Max HP'] = maxHp
-    player.stats.baseStats['HP'] = maxHp
+    // Derived HP: Max HP is 15 + STR + 2×END from the formula (the stored
+    // 'Max HP' base is the bonus that level-ups and Lifegiver add to), so only
+    // current HP is stored, filled to the maximum.
+    delete player.stats.baseStats['Max HP']
+    player.stats.baseStats['HP'] = player.getStat('Max HP')
 
     // Starter inventory: no debug 1337 caps — a modest purse
     player.inventory = []

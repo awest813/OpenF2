@@ -215,11 +215,11 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
     })
 
     it('critterKill XP path applies Educated perk bonus (+2 pts/rank)', () => {
-        // Player with INT=5 and Educated rank 1 should get max(1, 10+2+2)=14 pts
+        // Player with INT=5 and Educated rank 1 gets 5 + 2×5 + 2 = 17 pts (FO2)
         const player = makePlayerObj({
             xp: 999,
             level: 1,
-            perkRanks: { 47: 1 }, // Educated rank 1
+            perkRanks: { 18: 1 }, // Educated (FO2 perk 18) rank 1
             getStat: (s: string) => s === 'INT' ? 5 : 5,
             skills: { skillPoints: 0, getBase: () => 0, setBase: () => {}, baseSkills: {} },
         })
@@ -238,7 +238,7 @@ describe('Phase 56-B — BLK-049: critterKill level-up consistency', () => {
         critterKill(victim, player as any, false)
         expect(player.level).toBe(2)
         // Expected: 10 + floor(5/2) + 2*1 = 10+2+2 = 14 points
-        expect(player.skills.skillPoints).toBe(14)
+        expect(player.skills.skillPoints).toBe(17)
     })
 
     it('critterKill XP path does not award perk credit at non-multiple-of-3 level', () => {

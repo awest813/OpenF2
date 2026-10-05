@@ -50,38 +50,39 @@ function simpleTrait(
 
 export const TRAITS: Trait[] = [
     simpleTrait(0, 'Fast Metabolism',
-        '+2 Healing Rate, +2 Radiation Resistance, -10 Poison Resistance. Cannot benefit as much from RadAway and Stimpaks.',
-        { healingRateMod: 2, radiationResistanceMod: 2, poisonResistanceMod: -10 }, {}),
+        'Your metabolic rate is twice normal: +2 Healing Rate, but your Radiation and Poison Resistance start at 0%.',
+        { healingRateMod: 2, radiationResistanceMod: -100, poisonResistanceMod: -100 }, {}),
 
     simpleTrait(1, 'Bruiser',
         '+2 Strength, -2 AP. Harder hitting, but slower in combat.',
         { strengthMod: 2, maxAPMod: -2 }, {}),
 
     simpleTrait(2, 'Small Frame',
-        '+1 Agility, -25 Carry Weight. Nimble but limited in cargo.',
-        { agilityMod: 1, carryWeightMod: -25 }, {}),
+        'You are not quite as big as everyone else: +1 Agility, but your Carry Weight is only 25 + 15 lbs per point of Strength.',
+        { agilityMod: 1, carryWeightMod: -50 }, {}),
 
     simpleTrait(3, 'One Hander',
-        '+20% one-handed weapons skill, -40% two-handed weapons skill.',
-        {}, { smallGuns: 20, bigGuns: -40, meleeWeapons: 20 }),
+        'One of your hands is very dominant: +20% to hit with one-handed weapons, -40% to hit with two-handed weapons.',
+        {}, {}),
+    // NOTE: a to-hit modifier, applied in combat (attackDetermineToHit), not a skill change.
 
     simpleTrait(4, 'Finesse',
-        '+10% Critical Chance, but all attacks do -30% damage.',
+        'Your attacks show a lot of finesse: +10% Critical Chance, but targets get +30% Damage Resistance against your attacks.',
         { criticalChanceMod: 10 }, {}),
-    // NOTE: Finesse damage penalty is handled specially in the damage formula.
+    // NOTE: the +30 DR is applied in the damage formula.
 
     simpleTrait(5, 'Kamikaze',
-        '+10 Sequence, but -AC equal to worn armor AC bonus.',
-        { sequenceMod: 10 }, {}),
-    // NOTE: AC penalty is handled in the armor equip path.
+        'By not paying attention to threats, you act faster: +5 Sequence, but you lose your natural Armor Class.',
+        { sequenceMod: 5 }, {}),
+    // NOTE: the natural AC loss is applied by Critter.getStat('AC').
 
     simpleTrait(6, 'Heavy Handed',
-        'Melee attacks do +4 damage but have worse critical hit results.',
+        'You swing harder, not better: +4 Melee Damage, but your critical hits are 30% less severe.',
         { meleeDamageMod: 4 }, {}),
-    // NOTE: critical table penalty handled in critical hit resolution.
+    // NOTE: the -30 Better Criticals is applied by Critter.getStat.
 
     simpleTrait(7, 'Fast Shot',
-        'Can use ranged weapons without aiming (no called shots), costs 1 less AP per ranged attack.',
+        'You don\'t have time for a targeted attack: attacks with ranged weapons cost 1 less AP, but you cannot aim.',
         {}, {}),
     // NOTE: flags handled in attack AP cost calculation.
 
@@ -90,7 +91,7 @@ export const TRAITS: Trait[] = [
         {}, {}),
 
     simpleTrait(9, 'Jinxed',
-        'Both the player and nearby enemies have a higher chance of critical failures.',
+        'Things just go wrong around you: every miss in combat, yours or anyone else\'s, has a 50% chance to become a critical failure.',
         {}, {}),
 
     simpleTrait(10, 'Good Natured',

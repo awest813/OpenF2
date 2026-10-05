@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { getSkillPointCost, spendSkillPoint, awardXP } from './leveling.js'
-import { grantPerk, isPerkAvailable, PERKS, PERK_MAP } from './perks.js'
+import { grantPerk, isPerkAvailable, PerkId, PERKS, PERK_MAP } from './perks.js'
 import { applyTraits, removeTraits, TRAITS, TRAIT_MAP } from './traits.js'
 import { StatsComponent, SkillsComponent, zeroDamageStats } from '../ecs/components.js'
 import { recomputeDerivedStats, computeBaseSkills } from '../ecs/derivedStats.js'
@@ -279,22 +279,22 @@ describe('player:levelUp event perksAvailable', () => {
 
 describe('isPerkAvailable', () => {
     it('returns false when level prerequisite is not met', () => {
-        const bonusMove = PERK_MAP.get(1)!  // Bonus Move, minLevel=3
-        const stats = makeStats({ level: 1 })
+        const bonusMove = PERK_MAP.get(PerkId.BONUS_MOVE)!  // Bonus Move, minLevel=6, AGI 5
+        const stats = makeStats({ level: 5 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(bonusMove, stats, skills, 0)).toBe(false)
     })
 
     it('returns true when all prerequisites are met', () => {
-        const bonusMove = PERK_MAP.get(1)!
-        const stats = makeStats({ level: 3 })
+        const bonusMove = PERK_MAP.get(PerkId.BONUS_MOVE)!
+        const stats = makeStats({ level: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(bonusMove, stats, skills, 0)).toBe(true)
     })
 
     it('returns false when rank limit is reached', () => {
-        const bonusMove = PERK_MAP.get(1)!  // ranks = 2
-        const stats = makeStats({ level: 3 })
+        const bonusMove = PERK_MAP.get(PerkId.BONUS_MOVE)!  // ranks = 2
+        const stats = makeStats({ level: 6 })
         const skills = makeSkills(stats)
         expect(isPerkAvailable(bonusMove, stats, skills, 2)).toBe(false)
     })
@@ -302,20 +302,29 @@ describe('isPerkAvailable', () => {
 
 describe('grantPerk', () => {
     it('applies perk effects on grant', () => {
-        const stats = makeStats({ level: 3 })
+        const stats = makeStats({ level: 3, perception: 6 })
+        const skills = makeSkills(stats)
+        const before = stats.sequence
+        const perks: Map<number, number> = new Map()
+        grantPerk(PerkId.EARLIER_SEQUENCE, stats, skills, perks)
+        expect(stats.sequence).toBe(before + 2)
+    })
+
+    it('Bonus Move grants move-only AP, not max AP', () => {
+        const stats = makeStats({ level: 6 })
         const skills = makeSkills(stats)
         const before = stats.maxAP
         const perks: Map<number, number> = new Map()
-        grantPerk(1 /* Bonus Move */, stats, skills, perks)
-        expect(stats.maxAP).toBe(before + 2)
+        expect(grantPerk(PerkId.BONUS_MOVE, stats, skills, perks)).toBe(true)
+        expect(stats.maxAP).toBe(before)
     })
 
     it('records the perk rank', () => {
-        const stats = makeStats({ level: 3 })
+        const stats = makeStats({ level: 6 })
         const skills = makeSkills(stats)
         const perks: Map<number, number> = new Map()
-        grantPerk(1, stats, skills, perks)
-        expect(perks.get(1)).toBe(1)
+        grantPerk(PerkId.BONUS_MOVE, stats, skills, perks)
+        expect(perks.get(PerkId.BONUS_MOVE)).toBe(1)
     })
 
     it('returns false for an unknown perk ID', () => {
@@ -438,10 +447,10 @@ describe('Action Boy multi-rank maxAP', () => {
         const basAP = stats.maxAP
         const perks: Map<number, number> = new Map()
 
-        grantPerk(6 /* Action Boy */, stats, skills, perks)
+        grantPerk(PerkId.ACTION_BOY, stats, skills, perks)
         expect(stats.maxAP).toBe(basAP + 1)
 
-        grantPerk(6, stats, skills, perks)
+        grantPerk(PerkId.ACTION_BOY, stats, skills, perks)
         expect(stats.maxAP).toBe(basAP + 2)
     })
 })

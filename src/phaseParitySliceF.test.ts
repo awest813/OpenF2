@@ -30,13 +30,15 @@ import { Scripting } from './scripting.js'
 
 describe('Parity Slice F — perks / traits tables', () => {
     it('defines a substantial FO2-aligned perk set', () => {
-        expect(PERKS.length).toBeGreaterThanOrEqual(40)
-        expect(PERK_MAP.get(11)?.name).toBe('Educated')
-        expect(PERK_MAP.get(16)?.name).toBe('Bonus Rate of Fire')
-        expect(PERK_MAP.get(34)?.name).toBe('Tag!')
-        // Earlier Sequence moved off id 18 so FO2 Educated alias does not collide
-        expect(PERK_MAP.get(46)?.name).toBe('Earlier Sequence')
-        expect(PERK_MAP.has(18)).toBe(false)
+        // Every player-selectable perk, keyed by the engine's perk ID (perk_defs.h).
+        expect(PERKS.length).toBe(81)
+        expect(PERK_MAP.get(18)?.name).toBe('Educated')
+        expect(PERK_MAP.get(5)?.name).toBe('Bonus Rate of Fire')
+        expect(PERK_MAP.get(51)?.name).toBe('Tag!')
+        expect(PERK_MAP.get(6)?.name).toBe('Earlier Sequence')
+        expect(PERK_MAP.get(106)?.name).toBe('Weapon Handling')
+        // Weapon/armor/addiction pseudo-perks are not selectable
+        expect(PERK_MAP.has(58)).toBe(false)
     })
 
     it('defines all 16 Fallout 2 traits', () => {
@@ -45,12 +47,11 @@ describe('Parity Slice F — perks / traits tables', () => {
         expect(TRAITS.map((t) => t.name)).toContain('Chem Reliant')
     })
 
-    it('educatedPerkRanks reads UI / FO2 / legacy aliases', () => {
-        expect(EDUCATED_PERK_IDS).toEqual([11, 18, 47])
-        expect(educatedPerkRanks({ 11: 2 })).toBe(2)
+    it('educatedPerkRanks reads the FO2 Educated perk (18)', () => {
+        expect(EDUCATED_PERK_IDS).toEqual([18])
         expect(educatedPerkRanks({ 18: 1 })).toBe(1)
-        expect(educatedPerkRanks({ 47: 3 })).toBe(3)
-        expect(educatedPerkRanks({ 11: 1, 47: 2 })).toBe(2)
+        expect(educatedPerkRanks({ 18: 3 })).toBe(3)
+        expect(educatedPerkRanks({ 11: 2 })).toBe(0)
     })
 })
 

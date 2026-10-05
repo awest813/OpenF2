@@ -20,15 +20,16 @@ import globalState from "./globalState.js";
 import { Scripting } from "./scripting.js";
 import { fromTileNum } from "./tile.js";
 import { getRandomInt } from "./util.js";
+import { PerkId } from "./character/perkIds.js";
 import { Worldmap } from "./worldmap.js";
 
 // Random Encounter system
 
-/** Fallout 2 perk IDs used by the encounter system (from PERKS.MSG). */
-const PERK_CAUTIOUS_NATURE = 16
-const PERK_SCOUT           = 22
-const PERK_RANGER          = 28
-const PERK_EXPLORER        = 29
+/** Fallout 2 perk IDs used by the encounter system (perk_defs.h). */
+const PERK_CAUTIOUS_NATURE = PerkId.CAUTIOUS_NATURE
+const PERK_SCOUT           = PerkId.SCOUT
+const PERK_RANGER          = PerkId.RANGER
+const PERK_EXPLORER        = PerkId.EXPLORER
 
 export namespace Encounters {
     enum Tok {
@@ -332,10 +333,7 @@ export namespace Encounters {
         const luck = globalState.player.getStat("LUK")
         let roll = getRandomInt(0, totalChance) + (luck - 5)
 
-        // Apply perk-based encounter roll modifiers (Fallout 2 perk IDs per PERKS.MSG):
-        //   Scout (ID 22): +1 roll, Ranger (ID 28): +1 roll, Explorer (ID 29): +2 roll.
-        // These perks are not yet in perks.ts but can be granted by scripts; check
-        // perkRanks directly so the bonuses activate as soon as a script awards them.
+        // Perk encounter roll modifiers (worldmap.cc): Explorer +2, Ranger +1, Scout +1.
         const perkRanks = globalState.player.perkRanks ?? {}
         if ((perkRanks[PERK_SCOUT] ?? 0) > 0) {roll += 1}
         if ((perkRanks[PERK_RANGER] ?? 0) > 0) {roll += 1}

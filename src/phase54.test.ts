@@ -4,7 +4,7 @@
  * Covers:
  *   A. BLK-041 — XP auto-award on critter kill (engine awards XP from proto.XPValue)
  *   B. BLK-042 — Player weapon slots (leftHand/rightHand) persisted in save schema v15
- *   C. BLK-043 — Skill points awarded on level-up in give_exp_points (10 + INT/2)
+ *   C. BLK-043 — Skill points awarded on level-up in give_exp_points (5 + 2×INT)
  *   D. BLK-044 — inven_unwield respects activeHand: clears leftHand for activeHand=0,
  *                 rightHand for activeHand=1
  *   E. sfall opcodes 0x81D0–0x81D7 present in opMap (prevents VM stack corruption)
@@ -146,8 +146,8 @@ describe('Phase 54-A — BLK-041: XP auto-award on critter kill', () => {
 
         expect(player.xp).toBe(1050)
         expect(player.level).toBe(2) // Level-up triggered
-        // Skill points: 10 + floor(8/2) = 14; initial 10 + 14 = 24
-        expect(player.skills.skillPoints).toBe(10 + 14)
+        // Skill points (FO2): 5 + 2×INT = 21; initial 10 + 21 = 31
+        expect(player.skills.skillPoints).toBe(10 + 21)
     })
 })
 
@@ -276,7 +276,7 @@ describe('Phase 54-C — BLK-043: Skill points on level-up in give_exp_points', 
         }
     })
 
-    it('give_exp_points awards skill points on level-up (10 + INT/2)', () => {
+    it('give_exp_points awards skill points on level-up (5 + 2×INT)', () => {
         Scripting.init('test_phase54_skillpts')
         const script = new (Scripting as any).Script()
         drainStubHits()
@@ -297,10 +297,10 @@ describe('Phase 54-C — BLK-043: Skill points on level-up in give_exp_points', 
 
         expect(player.level).toBe(2)
         // Skill points: 10 + floor(8/2) = 14
-        expect(player.skills.skillPoints).toBe(14)
+        expect(player.skills.skillPoints).toBe(21)
     })
 
-    it('give_exp_points awards correct skill points for INT=5 (10 + 2 = 12)', () => {
+    it('give_exp_points awards correct skill points for INT=5 (5 + 10 = 15)', () => {
         Scripting.init('test_phase54_skillpts2')
         const script = new (Scripting as any).Script()
         drainStubHits()
@@ -320,7 +320,7 @@ describe('Phase 54-C — BLK-043: Skill points on level-up in give_exp_points', 
 
         expect(player.level).toBe(2)
         // 10 + floor(5/2) = 12
-        expect(player.skills.skillPoints).toBe(12)
+        expect(player.skills.skillPoints).toBe(15)
     })
 
     it('give_exp_points applies Educated perk bonus (+2 per rank)', () => {
@@ -334,7 +334,7 @@ describe('Phase 54-C — BLK-043: Skill points on level-up in give_exp_points', 
             skills: new SkillSet(),
             stats: new StatSet({ INT: 8 }),
             getStat: function(s: string) { return this.stats.get(s) },
-            perkRanks: { 47: 1 }, // Educated perk rank 1
+            perkRanks: { 18: 1 }, // Educated (FO2 perk 18) rank 1
         }
         player.skills.skillPoints = 0
         ;(globalState as any).player = player
@@ -343,7 +343,7 @@ describe('Phase 54-C — BLK-043: Skill points on level-up in give_exp_points', 
 
         expect(player.level).toBe(2)
         // 10 + floor(8/2) + 2*1 = 16
-        expect(player.skills.skillPoints).toBe(16)
+        expect(player.skills.skillPoints).toBe(23)
     })
 })
 

@@ -7426,8 +7426,8 @@ export namespace Scripting {
 
         // sfall 0x82B3 — get_critter_carry_limit_sfall(obj):
         // Return the critter's maximum carry weight in lbs.
-        // Reads getStat('Carry Weight') first; falls back to Fallout 2 formula
-        // (25 + STR*25) when the stat is unavailable or zero.
+        // Reads the Carry stat (incl. Strong Back / Small Frame); falls back to
+        // the Fallout 2 formula (25 + STR*25) when the stat is unavailable or zero.
         // Used by New Reno shop scripts to check whether the player can carry loot.
         get_critter_carry_limit_sfall(obj: Obj): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
