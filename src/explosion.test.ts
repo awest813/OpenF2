@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { explode, explosionDamage, explosionVictims, type ExplosionMap } from './explosion.js'
+import { clearHookScripts, getHookArgAt, HOOK, registerHook, setHookReturn } from './hookScripts.js'
 
 function critter(name: string, x: number, y: number, opts: { dt?: number; dr?: number; hp?: number } = {}) {
     const stats: Record<string, number> = { 'DT Explosive': opts.dt ?? 0, 'DR Explosive': opts.dr ?? 0, HP: opts.hp ?? 100 }
@@ -63,6 +64,19 @@ describe('who an explosion catches', () => {
         const wall = { type: 'wall', position: { x: 50, y: 51 }, flags: 0, blocks: () => true }
         const { extras } = explosionVictims({ x: 50, y: 50 }, mapOf([behind, wall]))
         expect(extras).toEqual([])
+    })
+})
+
+describe('HOOK_ONEXPLOSION', () => {
+    afterEach(() => clearHookScripts())
+
+    it('a script can skip a found critter (0) or swap in another', () => {
+        const a = critter('A', 50, 51)
+        const b = critter('B', 50, 52)
+        const swap = critter('S', 49, 50)
+        registerHook({ start() { setHookReturn(getHookArgAt(4) === a ? 0 : swap) } }, HOOK.ONEXPLOSION, null, false)
+        const { extras } = explosionVictims({ x: 50, y: 50 }, mapOf([a, b]))
+        expect(extras).toEqual([swap])
     })
 })
 

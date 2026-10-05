@@ -20,7 +20,10 @@ import { heart } from './heart.js'
 import { hexDirectionTo, hexDistance, hexesInRadius, hexFromScreen, hexInDirectionDistance } from './geometry.js'
 import { hexToTile } from './tile.js'
 import globalState from './globalState.js'
-import { setRegAnimCombatCheck, tickAnimSequences } from './animSequence.js'
+import {
+    ANIMATION_REQUEST_RESERVED, critterArt, isProne, regAnimAnimate, regAnimBegin, regAnimCallback, regAnimEnd,
+    setRegAnimCombatCheck, tickAnimSequences,
+} from './animSequence.js'
 
 /** When the animation sequences last ticked (performance.now ms). */
 let lastAnimSequenceTick = 0
@@ -34,8 +37,8 @@ import { processRadPoisonUpTo } from './character/radiationPoison.js'
 import { processChargedItemsUpTo } from './chargedItems.js'
 import { deleteTempArrays } from './sfallArrays.js'
 import { globalScriptList, runGlobalScripts } from './globalScripts.js'
-import { HOOK, hookHasScript, hookReturn, runHook } from './hookScripts.js'
-import { Critter, Obj, useContainerAndLoot } from './object.js'
+import { HOOK, hookHasScript, hookReturn, INVMOVE, inventoryMoveBlocked, runHook, targetObjectHook } from './hookScripts.js'
+import { Critter, Obj, protoExtendedFlags, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
@@ -105,7 +108,7 @@ export function playerUse(obj?: Obj) {
     if (obj === undefined) {
         obj = getObjectUnderCursor((o) => o.isSelectable)
     }
-    const who = <Critter>obj
+    let who = <Critter>obj
 
     if (globalState.uiMode === UIMode.useSkill) {
         // using a skill on object
@@ -157,6 +160,9 @@ export function playerUse(obj?: Obj) {
         // outside combat, clicking a critter starts combat with the player
         // attacking it first (combat.cc _combat with gcsd attacker/defender).
         if (globalState.mouseMode === 'crosshair' && !who.dead && !globalState.inCombat && Config.engine.doCombat) {
+            const target = targetObjectHook(1, who)
+            if (!target) {return}
+            who = target
             if (!Combat.playerCanStartAttack(globalState.player, who)) {return}
             Combat.start(globalState.player, who)
             if (globalState.combat?.inPlayerTurn) {
@@ -176,6 +182,10 @@ export function playerUse(obj?: Obj) {
                 console.log("You can't do that yet.")
                 return
             }
+
+            const target = targetObjectHook(1, who)
+            if (!target) {return}
+            who = target
 
             // combat.cc _combat_attack_this: the engine checks AP, range, ammo,
             // crippled arms and line of fire and refuses with a message — it
@@ -222,12 +232,12 @@ export function playerUse(obj?: Obj) {
                 openCompanionTrade(who)
             } else if (who.dead === true) {
                 // loot a dead body
-                uiLoot(obj)
+                useWithHands(globalState.player, obj, () => uiLoot(obj))
             } else {
                 console.log('Cannot talk to/loot that critter')
             }
         } else {
-            obj.use(globalState.player)
+            useWithHands(globalState.player, obj, () => obj.use(globalState.player))
         }
     }
 
@@ -239,6 +249,39 @@ export function playerUse(obj?: Obj) {
 }
 
 setPlayerUseHandler(playerUse)
+
+const ANIM_MAGIC_HANDS_GROUND = 10
+const ANIM_MAGIC_HANDS_MIDDLE = 11
+const SCENERY_TYPE_STAIRS = 1
+const SCENERY_TYPE_LADDER_UP = 3
+
+/**
+ * _action_use_an_item_on_object with no item, once next to the object: the
+ * user reaches out (low for something lying down or a kneel-to-use scenery),
+ * then _obj_use. No reach for stairs, and none at all up a ladder. sfall
+ * HOOK_USEANIMOBJ may change the animation or skip it (-1).
+ */
+function useWithHands(user: Critter, target: Obj, use: () => void): void {
+    const sceneryType = target.type === 'scenery' ? (target as any).pro?.extra?.subType : -1
+    let anim = -1
+    if (sceneryType !== SCENERY_TYPE_STAIRS && sceneryType !== SCENERY_TYPE_LADDER_UP) {
+        const low = (target.type === 'critter' && isProne(target))
+            || (target.type === 'scenery' && (protoExtendedFlags(target) & 0x01) !== 0)
+        anim = low ? ANIM_MAGIC_HANDS_GROUND : ANIM_MAGIC_HANDS_MIDDLE
+        const hook = runHook(HOOK.USEANIMOBJ, [user, target, anim])
+        if (hook && hook.rets.length > 0) {anim = hookReturn(hook, 0, anim)}
+    }
+    if (anim < 0 || Config.engine.doInfiniteUse === true || !critterArt(user, anim)) {
+        use()
+        return
+    }
+    if (regAnimBegin(ANIMATION_REQUEST_RESERVED) === -1
+        || regAnimAnimate(user, anim, -1) === -1
+        || regAnimCallback(user, use, -1) === -1
+        || regAnimEnd() === -1) {
+        use()
+    }
+}
 
 /** proto.msg text with an English fallback. */
 function protoMsg(id: number, fallback: string): string {
@@ -285,6 +328,7 @@ function lookAtObject(obj: Obj): void {
  */
 function pickUpItem(item: Obj): void {
     const player = globalState.player
+    if (inventoryMoveBlocked(INVMOVE.PICKUP, item)) {return}
     if (Scripting.pickup(item, player) === true) {return}
     const amount = typeof (item as any).amount === 'number' && (item as any).amount > 0 ? (item as any).amount : 1
     if (!player.addInventoryItem(item, amount)) {

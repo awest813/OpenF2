@@ -27,6 +27,7 @@ import { WindowFrame } from './widgets.js'
 import { Font } from './formats/fon.js'
 import { accuracyLabel, moveCostLabel, type CursorLabel } from './ui2/cursorReadouts.js'
 import { Combat, movementApCost } from './combat.js'
+import { targetObjectHook } from './hookScripts.js'
 
 // Abstract game renderer
 
@@ -197,8 +198,9 @@ export class Renderer {
         if (!player?.position || !globalState.gMap) {return null}
         const combat = globalState.combat
         const playersTurn = globalState.inCombat && combat?.inPlayerTurn === true
-        const critter: any = (globalState.gMap as any).critterAtPosition?.(mouseHex)
+        let critter: any = (globalState.gMap as any).critterAtPosition?.(mouseHex)
         if (globalState.mouseMode === 'crosshair') {
+            if (critter && critter !== player) {critter = targetObjectHook(0, critter)}
             if (!critter || critter === player || critter.dead) {return null}
             const accuracy = player.AP ? Combat.playerToHit(player, critter) : null
             return { label: accuracyLabel({ accuracy, isCritter: true, team: critter.teamNum ?? 0 }), crosshair: true }

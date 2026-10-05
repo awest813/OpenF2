@@ -248,3 +248,24 @@ export function hookReturn(result: { rets: unknown[] } | null, index: number, fa
     const v = result?.rets[index]
     return typeof v === 'number' ? v : fallback
 }
+
+/**
+ * sfall HOOK_TARGETOBJECT: event 0 as the crosshair hovers, 1 on attacking.
+ * Returns the (possibly replaced) target, or null when a script refused it.
+ */
+export function targetObjectHook<T extends { dead?: boolean }>(event: number, target: T): T | null {
+    const result = runHook(HOOK.TARGETOBJECT, [event, target && !target.dead ? 1 : 0, target], { allowNonIntReturn: true })
+    if (!result || result.rets.length === 0) {return target}
+    const r = result.rets[0]
+    if (r === -1) {return null}
+    return r && typeof r === 'object' ? r as T : target
+}
+
+/** HOOK_INVENTORYMOVE target slots. */
+export const INVMOVE = { BACKPACK: 0, LEFT_HAND: 1, RIGHT_HAND: 2, ARMOR: 3, WEAPON_RELOAD: 4, CONTAINER: 5, DROP: 6, PICKUP: 7, PORTRAIT: 8 }
+
+/** sfall HOOK_INVENTORYMOVE: true when a script refused the move (any return but -1). */
+export function inventoryMoveBlocked(slot: number, item: unknown, replaced: unknown = 0): boolean {
+    const result = runHook(HOOK.INVENTORYMOVE, [slot, item, replaced ?? 0])
+    return !!result && result.rets.length > 0 && hookReturn(result, 0, -1) !== -1
+}

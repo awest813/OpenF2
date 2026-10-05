@@ -55,7 +55,7 @@ import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { EquipSlot, equipItem, isRealItem, listedItems, reconcileSlots, removeItem, setAsideEquipped, setAsideForBarter, unequipItem, unequipSlot } from './equipment.js'
 import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
-import { HOOK, RMOBJ_CONSUME_DRUG, RMOBJ_USE_OBJ, runHook } from './hookScripts.js'
+import { HOOK, hookReturn, INVMOVE, inventoryMoveBlocked, RMOBJ_CONSUME_DRUG, RMOBJ_USE_OBJ, runHook } from './hookScripts.js'
 
 // UI system
 
@@ -121,6 +121,7 @@ function reloadPlayerWeapon(item: { pid?: number; name: string }): boolean {
     if (!player || !weapon) {return true}
     const ammoPid = weaponAmmoPid(weapon)
     if (item.pid !== undefined && item.pid !== ammoPid) {return false}
+    if (inventoryMoveBlocked(INVMOVE.WEAPON_RELOAD, item, weapon)) {return true}
     const result = reloadWeapon(player, weapon)
     if (result.loaded > 0) {EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })}
     return true
@@ -451,6 +452,7 @@ export function initUI() {
         const player = globalState.player
         const item = player ? listedItems(player)[index] : undefined
         if (!player || !item || !player.position) {return}
+        if (inventoryMoveBlocked(INVMOVE.DROP, item)) {return}
         removeItem(player, item, (item as any).amount ?? 1)
         item.position = { x: player.position.x, y: player.position.y }
         globalState.gMap?.addObject?.(item)
@@ -461,12 +463,16 @@ export function initUI() {
         const player = globalState.player
         const item = player ? listedItems(player)[index] : undefined
         if (!player || !item) {return}
+        const target = slot === 'leftHand' ? INVMOVE.LEFT_HAND : slot === 'rightHand' ? INVMOVE.RIGHT_HAND : INVMOVE.ARMOR
+        if (inventoryMoveBlocked(target, item, (player as any)[slot] ?? 0)) {return}
         equipItem(player, item, slot)
         syncPlayerEntityFromCritter()
         refreshInventoryPanel()
     })
     EventBus.on('inventory:unequipSlot', ({ slot }) => {
         if (!globalState.player) {return}
+        const held = (globalState.player as any)[slot]
+        if (held && inventoryMoveBlocked(INVMOVE.BACKPACK, held)) {return}
         unequipSlot(globalState.player, slot)
         syncPlayerEntityFromCritter()
         refreshInventoryPanel()
@@ -484,6 +490,20 @@ export function initUI() {
             EventBus.emit('ui:closePanel', { panelName: 'inventory' })
             EventBus.emit('inventory:useItemOn', { item: live, target })
             return
+        }
+        if (live && (isChargedItem(live) || isBook(live) || isDrug(live))) {
+            // sfall: a drug fires HOOK_USEOBJON on the player themself, any other
+            // usable item HOOK_USEOBJ. 0 keeps the item, 1 uses it up, -1 goes on.
+            const player = globalState.player
+            const hook = isDrug(live)
+                ? runHook(HOOK.USEOBJON, [player, player, live])
+                : runHook(HOOK.USEOBJ, [player, live])
+            const choice = hook && hook.rets.length > 0 ? hookReturn(hook, 0, -1) : -1
+            if (choice === 1) {removeItem(player, live, 1)}
+            if (choice === 0 || choice === 1) {
+                refreshInventoryPanel()
+                return
+            }
         }
         if (live && isChargedItem(live)) {
             useChargedItem(live)

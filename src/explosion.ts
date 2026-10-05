@@ -16,6 +16,8 @@ import type { Rng } from './combat/fo2Formulas.js'
 import { describeAttack } from './combat/combatMessages.js'
 import { setWhoHitMe } from './combat/aiPacket.js'
 import { sfallSettings } from './sfallSettings.js'
+import { HOOK, runHook } from './hookScripts.js'
+import { toTileNum } from './tile.js'
 
 /** item.cc gRocketExplosionRadius: the reach of a free-standing blast. */
 export const EXPLOSION_RADIUS = 3
@@ -82,14 +84,34 @@ function lineBlocked(map: ExplosionMap, from: Point, to: Point): boolean {
  * The critters an explosion at `center` catches: the living critter on the
  * hex, then up to six others ring by ring out to three hexes.
  */
-export function explosionVictims(center: Point, map: ExplosionMap): { main: any; extras: any[] } {
+export function explosionVictims(
+    center: Point, map: ExplosionMap,
+    opts: { attacker?: any; throwing?: boolean; noDamage?: boolean } = {}
+): { main: any; extras: any[] } {
     const living = map.critters().filter((c) => !c.dead && c.position)
     const main = living.find((c) => c.position.x === center.x && c.position.y === center.y) ?? null
-    const extras = living
+    const candidates = living
         .filter((c) => c !== main && hexDistance(center, c.position) <= sfallSettings.explosionRadiusRocket)
-        .filter((c) => ((c.flags ?? 0) & OBJECT_SHOOT_THRU) === 0 && !lineBlocked(map, c.position, center))
         .sort((a, b) => hexDistance(center, a.position) - hexDistance(center, b.position))
-        .slice(0, sfallSettings.explosionMaxTargets)
+    const extras: any[] = []
+    for (const found of candidates) {
+        if (extras.length >= sfallSettings.explosionMaxTargets) {break}
+        // sfall HOOK_ONEXPLOSION: per checked tile, the found object may be
+        // replaced, or skipped with 0.
+        let c: any = found
+        const hook = runHook(HOOK.ONEXPLOSION, [
+            opts.noDamage ? 1 : 0, opts.attacker ?? 0, toTileNum(center), toTileNum(found.position),
+            found, main ?? 0, opts.throwing ? 1 : 0,
+        ], { allowNonIntReturn: true })
+        if (hook && hook.rets.length > 0) {
+            const r = hook.rets[0]
+            if (!r || typeof r !== 'object') {continue}
+            c = r
+        }
+        if (c === main || extras.includes(c) || !c.position || c.dead) {continue}
+        if (((c.flags ?? 0) & OBJECT_SHOOT_THRU) !== 0 || lineBlocked(map, c.position, center)) {continue}
+        extras.push(c)
+    }
     return { main, extras }
 }
 
@@ -135,7 +157,7 @@ export function explode(
     rng: Rng = defaultRng
 ): any[] {
     if (!map) {return []}
-    const { main, extras } = explosionVictims(center, map)
+    const { main, extras } = explosionVictims(center, map, { attacker: source })
     const hits = [main, ...extras].filter(Boolean).map((critter) => ({ critter, ...explosionDamage(minDamage, maxDamage, critter, rng) }))
 
     for (const hit of hits) {

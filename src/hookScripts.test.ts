@@ -117,4 +117,19 @@ describe('engine events reach the hooks', () => {
         expect(result.hoursCompleted).toBe(1)
         expect(result.interrupted).toBe(true)
     })
+
+    it('TargetObject can refuse (-1) or redirect the target; InventoryMove refuses on any return but -1', async () => {
+        const { inventoryMoveBlocked, INVMOVE, targetObjectHook } = await import('./hookScripts.js')
+        const a: any = { dead: false }
+        const b: any = { dead: false }
+        expect(targetObjectHook(1, a)).toBe(a)
+        registerHook({ start() { setHookReturn(getHookArgAt(2) === a ? b : -1) } }, HOOK.TARGETOBJECT, null, false)
+        expect(targetObjectHook(1, a)).toBe(b)
+        expect(targetObjectHook(1, b)).toBeNull()
+
+        expect(inventoryMoveBlocked(INVMOVE.DROP, a)).toBe(false)
+        registerHook({ start() { setHookReturn(getHookArgAt(0) === INVMOVE.DROP ? 1 : -1) } }, HOOK.INVENTORYMOVE, null, false)
+        expect(inventoryMoveBlocked(INVMOVE.DROP, a)).toBe(true)
+        expect(inventoryMoveBlocked(INVMOVE.PICKUP, a)).toBe(false)
+    })
 })
