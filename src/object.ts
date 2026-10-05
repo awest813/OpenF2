@@ -18,6 +18,9 @@ import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import { apToAcBonus, capSkill, clampStatValue, sfallSettings } from './sfallSettings.js'
 import { Weapon } from './critter.js'
 import { critterDamage } from './critter.js'
+import { isProne } from './animSequence.js'
+import { ANIM_EXPLODED_TO_NOTHING, checkDeath, isHitFromFront } from './combat/deathAnim.js'
+import { showDamageReaction } from './combat/damageAnim.js'
 import { getLstId, lookupScriptName } from './data.js'
 import { Events } from './events.js'
 import { directionOfDelta, hexDistance, hexToScreen, Point } from './geometry.js'
@@ -247,7 +250,16 @@ export function detonateExplosive(explosive: Obj): void {
 export function actionExplode(center: Point, minDamage: number, maxDamage: number, source: Critter | null): void {
     const detonate = (fx: Obj | null) => {
         explode({ x: center.x, y: center.y }, minDamage, maxDamage, source, {
-            damage: (critter, amount, by) => critterDamage(critter, amount, by, true, true, 'Explosive'),
+            damage: (critter, amount, by, knockback) => {
+                // _show_damage_to_object with the explosion as attacker: blown
+                // apart where gore is allowed, else a plain fall; a survivor
+                // reacts to the blast.
+                const hitFromFront = isHitFromFront({ orientation: 0 }, critter)
+                const wasProne = isProne(critter)
+                const death = wasProne ? undefined : checkDeath(critter, ANIM_EXPLODED_TO_NOTHING, 3, hitFromFront)
+                critterDamage(critter, amount, by, true, false, 'Explosive', undefined, death)
+                if (!critter.dead && !wasProne) {showDamageReaction(critter, 0, hitFromFront, knockback)}
+            },
             damageScenery: (obj) => Scripting.damage(obj, fx ?? obj, null as unknown as Obj, 20),
             startCombat: (attacker, defender) => Combat.start(attacker, defender),
         })

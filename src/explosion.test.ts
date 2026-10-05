@@ -104,7 +104,7 @@ describe('explode (actionExplode / _report_explosion)', () => {
         const startCombat = vi.fn()
         const hit = explode({ x: 50, y: 50 }, 20, 20, player, { damage, startCombat }, mapOf([victim]), fixed(20))
         expect(hit).toEqual([victim])
-        expect(damage).toHaveBeenCalledWith(victim, 20, player)
+        expect(damage).toHaveBeenCalledWith(victim, 20, player, 2)
         expect(messages).toEqual(['Guard was hit for 20 hit points.'])
         expect(victim.whoHitMe).toBe(player)
         expect(startCombat).toHaveBeenCalledWith(victim, player)

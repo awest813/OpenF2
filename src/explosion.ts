@@ -135,8 +135,8 @@ export function knockBack(map: ExplosionMap | null, critter: any, from: Point, d
 }
 
 export interface ExplosionHooks {
-    /** critterDamage: take HP (and die at 0). */
-    damage(critter: any, amount: number, source: any): void
+    /** critterDamage: take HP (and die at 0); `knockback` is how far the blast throws it. */
+    damage(critter: any, amount: number, source: any, knockback: number): void
     /** damage_p_proc on a scripted non-critter object near the blast. */
     damageScenery?(obj: any): void
     /** Start a fight: `attacker` turns on `defender`. */
@@ -161,7 +161,7 @@ export function explode(
     const hits = [main, ...extras].filter(Boolean).map((critter) => ({ critter, ...explosionDamage(minDamage, maxDamage, critter, rng) }))
 
     for (const hit of hits) {
-        if (hit.damage > 0) {hooks.damage(hit.critter, hit.damage, source)}
+        if (hit.damage > 0) {hooks.damage(hit.critter, hit.damage, source, hit.knockback)}
     }
 
     const report = (hit: { critter: any; damage: number }) => ({ critter: hit.critter, damage: hit.damage, flags: 0, died: hit.critter.dead === true })
