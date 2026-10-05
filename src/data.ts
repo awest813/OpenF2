@@ -60,6 +60,8 @@ export interface MapInfo {
     ambientSfx: [string, number][]
     music: string
     randomStartPoints: { elevation: number; tileNum: number }[]
+    /** dead_bodies_age (default yes): corpses are cleared after six days away. */
+    deadBodiesAge: boolean
 }
 
 export interface Elevator {
@@ -281,6 +283,7 @@ function parseMapInfo() {
             ambientSfx: ambientSfx,
             music: (ini[category].music || '').trim().toLowerCase(),
             randomStartPoints: randomStartPoints,
+            deadBodiesAge: String(ini[category].dead_bodies_age ?? 'yes').trim().toLowerCase() !== 'no',
         }
     }
 }
@@ -307,6 +310,15 @@ export function lookupMapName(mapID: number): string | null {
     if (mapInfo === null) {parseMapInfo()}
 
     return mapInfo![mapID].name || null
+}
+
+/** wmMapDeadBodiesAge for a map by name (yes when the map is not listed). */
+export function mapDeadBodiesAge(mapName: string): boolean {
+    try {
+        return getMapInfo(mapName)?.deadBodiesAge !== false
+    } catch {
+        return true
+    }
 }
 
 function getMapInfo(mapName: string) {

@@ -17,6 +17,7 @@ import {
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 import { EventBus } from '../eventBus.js'
 import { Config } from '../config.js'
+import { midnightCheck } from '../mapAging.js'
 
 /** FO2: heal `Healing Rate` HP every 3 game hours while resting. */
 export const TICKS_PER_SECOND = 10
@@ -158,7 +159,9 @@ export function advanceGameTime(ticks: number, opts: AdvanceOptions = {}): TimeA
 
     const amount = Math.floor(ticks)
     const eventsFired = processTimedEventsForAdvance(amount)
+    const before = globalState.gameTickTime
     globalState.gameTickTime += amount
+    midnightCheck(before, globalState.gameTickTime, globalState.gMap?.objects)
 
     let hpHealed = 0
     if (heal) {

@@ -61,6 +61,7 @@ import { save, load } from './saveload.js'
 import { applySettings, getSettings, loadAndApplySettings, patchSettings } from './settings.js'
 import { CreditsPanel } from './ui2/creditsPanel.js'
 import { Engine } from './engine.js'
+import { midnightCheck } from './mapAging.js'
 
 function playerUseSkill(skill: Skills, obj: Obj): void {
     console.log('use skill %o on %o', skill, obj)
@@ -972,7 +973,10 @@ heart.update = function () {
         globalState.lastGameTick = time
         // The game clock stands still during combat; each round advances it
         // by 5 seconds instead (combat.cc _combat_sequence).
-        if (!globalState.inCombat) {globalState.gameTickTime++}
+        if (!globalState.inCombat) {
+            globalState.gameTickTime++
+            midnightCheck(globalState.gameTickTime - 1, globalState.gameTickTime, globalState.gMap?.objects)
+        }
 
         if (Config.engine.doTimedEvents && !globalState.inCombat) {
             // check and update timed events

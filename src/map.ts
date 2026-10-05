@@ -15,17 +15,18 @@ limitations under the License.
 */
 
 import { Config } from './config.js'
-import { getCurrentMapInfo, lookupMapName } from './data.js'
+import { getCurrentMapInfo, lookupMapName, mapDeadBodiesAge } from './data.js'
 import { Events } from './events.js'
 import { hexDistance, hexInDirectionDistance, hexLine, HEX_GRID_SIZE, Point, pointInBoundingBox } from './geometry.js'
 import globalState from './globalState.js'
 import { heart } from './heart.js'
 import { Lightmap } from './lightmap.js'
-import { Critter, deserializeObj, Obj, objFromMapObject } from './object.js'
+import { createObjectWithPID, Critter, deserializeObj, Obj, objFromMapObject } from './object.js'
+import { ageMapOnReentry } from './mapAging.js'
 import { centerCamera } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { fromTileNum, hexToTile, toTileNum } from './tile.js'
-import { arrayRemove, arrayWithout, getFileJSON } from './util.js'
+import { arrayRemove, arrayWithout, getFileJSON, getRandomInt } from './util.js'
 import { markPlayerExplored } from './character/automap.js'
 
 declare let PF: any
@@ -351,6 +352,7 @@ export class GameMap {
 
             const map = globalState.dirtyMapCache[mapName]
             this.deserialize(map)
+            this.ageOnReentry(mapName)
 
             // Set position and orientation
             if (startingPosition !== undefined) {
@@ -384,6 +386,22 @@ export class GameMap {
             console.log(`[Main] Loading map ${mapName} from clean load`)
             this.loadNewMap(mapName, startingPosition, startingElevation, loadedCallback)
         }
+    }
+
+    /** mapLoadSaved: heal, unjam and clear away the dead for the time the player was gone. */
+    private ageOnReentry(mapName: string): void {
+        ageMapOnReentry(this.objects, this.lastVisitTime, globalState.gameTickTime ?? 0, mapDeadBodiesAge(mapName), {
+            createObject: (pid) => {
+                try {
+                    return createObjectWithPID(pid, -1)
+                } catch {
+                    return null
+                }
+            },
+            addObject: (obj, level) => this.addObject(obj, level),
+            removeObject: (obj) => this.removeObject(obj),
+            random: getRandomInt,
+        })
     }
 
     loadNewMap(mapName: string, startingPosition?: Point, startingElevation?: number, loadedCallback?: () => void) {
