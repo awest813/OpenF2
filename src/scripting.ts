@@ -49,7 +49,8 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
 import { iniInt, iniString, parseIniSetting } from './iniFiles.js'
-import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
+import { clearHookScripts, runHookScriptsAtProc, startHookScripts } from './hookScripts.js'
+import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, listedHookNames, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
 import { PERK_MAP } from './character/perks.js'
 import { awardCritterXp } from './character/xp.js'
@@ -440,33 +441,6 @@ export namespace Scripting {
         fn: () => void
     }
 
-    // BLK-123 (Phase 78) — sfall hook-script argument buffer.
-    // When a hook script is invoked, its arguments are stored here.
-    // get_sfall_arg() retrieves the next arg in sequence; set_sfall_return() stores
-    // the return value; get_sfall_args_count() reports how many were provided.
-    // This is a module-level buffer reset on each hook invocation.
-    const _sfallHookArgs: any[] = []
-    let _sfallHookArgCursor = 0
-    let _sfallHookReturnVal = 0
-
-    /**
-     * Push arguments into the sfall hook arg buffer before invoking a hook script.
-     * Called by the vm_bridge hook dispatcher.
-     */
-    export function sfallSetHookArgs(args: any[]): void {
-        _sfallHookArgs.length = 0
-        _sfallHookArgs.push(...args)
-        _sfallHookArgCursor = 0
-        _sfallHookReturnVal = 0
-    }
-
-    /**
-     * Return the value stored by the last set_sfall_return() call.
-     * Called by the vm_bridge hook dispatcher after hook script execution.
-     */
-    export function sfallGetHookReturn(): number {
-        return _sfallHookReturnVal
-    }
 
     const statMap: { [stat: number]: string } = {
         // SPECIAL primaries (0–6)
@@ -3706,22 +3680,7 @@ export namespace Scripting {
             return (globalState.player as any)?.activeHand ?? 0
         }
 
-        // sfall hook-script opcode — set the return value for a hook script (0x819A).
-        // No-op in the browser build; hook scripts are not implemented.
-        set_sfall_return(val: number): void {
-            // BLK-123 (Phase 78): Store value in the module-level hook return buffer.
-            _sfallHookReturnVal = typeof val === 'number' ? val : 0
-        }
 
-        // sfall hook-script opcode — get the next hook-script argument (0x819B).
-        // BLK-123 (Phase 78): Now reads from the module-level hook arg buffer in order.
-        get_sfall_arg(): number {
-            if (_sfallHookArgCursor < _sfallHookArgs.length) {
-                const v = _sfallHookArgs[_sfallHookArgCursor++]
-                return typeof v === 'number' ? v : 0
-            }
-            return 0
-        }
 
         // sfall extended opcode — teleport world-map cursor to (x, y) (0x819E).
         set_world_map_pos(x: number, y: number): void {
@@ -3774,21 +3733,7 @@ export namespace Scripting {
 
         // Phase 52 — sfall extended opcodes 0x81BE–0x81C5
 
-        // sfall 0x81C1 — get_sfall_arg_at(idx):
-        // BLK-123 (Phase 78): Returns the hook-script arg at the given zero-based index.
-        get_sfall_arg_at(idx: number): number {
-            if (typeof idx !== 'number' || idx < 0 || idx >= _sfallHookArgs.length) {return 0}
-            const v = _sfallHookArgs[idx]
-            return typeof v === 'number' ? v : 0
-        }
 
-        // sfall 0x81C2 — set_sfall_arg(idx, val):
-        // BLK-123 (Phase 78): Writes a value back into the hook-script arg buffer at idx.
-        set_sfall_arg(idx: number, val: number): void {
-            if (typeof idx === 'number' && idx >= 0 && idx < _sfallHookArgs.length) {
-                _sfallHookArgs[idx] = typeof val === 'number' ? val : 0
-            }
-        }
 
         // sfall 0x81C3 — get_object_lighting(obj):
         // Returns the current light level received by obj (0–65536).
@@ -4733,6 +4678,7 @@ export namespace Scripting {
             }
         }
         runGlobalScriptsAtProc('map_update_p_proc')
+        runHookScriptsAtProc('map_update_p_proc')
 
         // info("updated " + updated + " objects")
     }
@@ -4771,6 +4717,7 @@ export namespace Scripting {
             }
         }
         runGlobalScriptsAtProc('map_exit_p_proc')
+        runHookScriptsAtProc('map_exit_p_proc')
     }
 
     export function enterMap(
@@ -4817,7 +4764,10 @@ export namespace Scripting {
         // sfall: global scripts start once the new game's first map is in;
         // after that they get map_enter_p_proc like the map script.
         if (globalScriptsPending) {startGlobalScriptsNow()}
-        else {runGlobalScriptsAtProc('map_enter_p_proc')}
+        else {
+            runGlobalScriptsAtProc('map_enter_p_proc')
+            runHookScriptsAtProc('map_enter_p_proc')
+        }
 
         if (overrideStartPos) {
             const r = overrideStartPos
@@ -4838,12 +4788,21 @@ export namespace Scripting {
     export function requestGlobalScriptsStart(): void {
         resetSfallState()
         clearGlobalScripts()
+        clearHookScripts()
         globalScriptsPending = true
     }
 
     /** InitGlobalScripts: load the sfall global scripts and run their start procedures. */
     export function startGlobalScriptsNow(): void {
         globalScriptsPending = false
+        const loadUnattached = (name: string) => {
+            const script = loadScript(name)
+            script.self_obj = null as any
+            script.cur_map_index = currentMapID ?? 0
+            return script
+        }
+        // Hook scripts load before the global scripts (HookScripts::InitHookScripts).
+        startHookScripts(listedHookNames(), loadUnattached)
         startGlobalScripts((name) => {
             const script = loadScript(name)
             script.self_obj = null as any

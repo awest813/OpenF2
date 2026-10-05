@@ -65,7 +65,6 @@ function defaultSettings() {
         perkboxTitle: '',
         /** perk_add_mode: 1 adds a chosen selectable perk as a trait, 2 as a perk, 4 removes it from the box. */
         perkAddMode: 2,
-        hooks: new Map<number, unknown>(),
         forcedEncounter: null as null | { map: number; flags: number },
         carTown: -1,
         pipboyAvailable: 1,

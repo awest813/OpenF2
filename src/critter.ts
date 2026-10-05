@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { HOOK, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { hexDirectionTo } from './geometry.js'
 import { Critter, WeaponObj } from './object.js'
@@ -431,6 +432,8 @@ export function critterKill(
     if (useScript === undefined || useScript === true) {
         Scripting.destroy(obj, source)
     }
+    // sfall HOOK_ONDEATH: just after a critter dies.
+    runHook(HOOK.ONDEATH, [obj])
 
     if (!animName || !obj.hasAnimation(animName)) {animName = 'death'}
 

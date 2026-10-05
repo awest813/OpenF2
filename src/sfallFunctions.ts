@@ -45,6 +45,7 @@ import { Lightmap } from './lightmap.js'
 import { lookupArt } from './pro.js'
 import { keyDown, mouseButtonsDown } from './inputState.js'
 import { markMoviePlayed } from './movies.js'
+import { getHookArg, getHookArgAt, getHookArgs, hookArgCount, initingHookScripts, registerHook, setHookArg, setHookReturn } from './hookScripts.js'
 import { IniSection, parseIniSetting, readIniFile, setIniString } from './iniFiles.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
@@ -260,6 +261,13 @@ function playSfallSound(path: string, mode: number): number {
     return id
 }
 
+/** A procedure given by number (its place in the procedure table) or by name. */
+function procedureName(script: any, proc: unknown): string | null {
+    if (typeof proc === 'string') {return proc}
+    if (typeof proc !== 'number' || proc <= 0) {return null}
+    return script?._vm?.intfile?.proceduresTable?.[proc]?.name ?? null
+}
+
 function noop(): number {
     return 0
 }
@@ -337,14 +345,25 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         this._gameLoadedSeen = true
         return 1
     },
-    init_hook: noop,
-    register_hook(this: any, id: number) { sfallSettings.hooks.set(id, this) },
-    register_hook_proc(this: any, id: number, proc: unknown) { sfallSettings.hooks.set(id, proc) },
-    register_hook_proc_spec(this: any, id: number, proc: unknown) { sfallSettings.hooks.set(id, proc) },
-    get_sfall_args(this: any) {
-        const args: unknown[] = Array.isArray(this._sfallArgs) ? this._sfallArgs : []
-        return arrayOf(args)
+    /** init_hook: 1 while hook scripts first run at game start or load. */
+    init_hook: () => initingHookScripts(),
+    /** register_hook(id): this global script's start runs for the hook. */
+    register_hook(this: any, id: number) { registerHook(this, Math.trunc(id), null, false) },
+    /** register_hook_proc(id, procedure): that procedure runs for the hook; 0 unregisters. */
+    register_hook_proc(this: any, id: number, proc: unknown) {
+        if (typeof proc === 'number' && proc < 0) {return}
+        registerHook(this, Math.trunc(id), procedureName(this, proc), proc === 0)
     },
+    /** register_hook_proc_spec: the same, but this script runs after all the others. */
+    register_hook_proc_spec(this: any, id: number, proc: unknown) {
+        if (typeof proc === 'number' && proc <= 0) {return}
+        registerHook(this, Math.trunc(id), procedureName(this, proc), false, true)
+    },
+    get_sfall_arg: () => getHookArg(),
+    get_sfall_arg_at: (index: number) => getHookArgAt(Math.trunc(index)),
+    get_sfall_args: () => arrayOf(getHookArgs()),
+    set_sfall_arg(index: number, value: unknown) { setHookArg(Math.trunc(index), value) },
+    set_sfall_return(value: unknown) { setHookReturn(value) },
 
     // ── stats and skills ──
     set_pc_extra_stat(stat: number, value: number) {
@@ -1032,7 +1051,7 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
         return offset === 0 ? objectId(obj) : getObjectData(obj, Number(offset))
     },
     get_outline: (obj: any) => (isObject(obj) ? obj.outline ?? 0 : 0),
-    get_sfall_arg_at(this: any, id: number) { return this.get_sfall_arg_at?.(id) ?? 0 },
+    get_sfall_arg_at: (id: number) => (id >= 0 && id < hookArgCount() ? getHookArgAt(Math.trunc(id)) : 0),
     get_stat_max: (stat: number, who = 0) => statMax(Number(stat), !!who),
     get_stat_min: (stat: number, who = 0) => statMin(Number(stat), !!who),
     get_string_pointer: (s: string) => s,

@@ -25,21 +25,38 @@ export interface GlobalScript {
 
 const globalScripts: GlobalScript[] = []
 let scriptNames: string[] | null = null
+let hookNames: string[] | null = null
 
 /** sfall's availableGlobalScriptTypes: 1 input loop, 2 world map. */
 export const AVAILABLE_GLOBAL_SCRIPT_TYPES = 3
 
-function listedNames(): string[] {
-    if (scriptNames) {return scriptNames}
+function readListing(): void {
     try {
         const listing = getFileJSON('data/scripts/sfall_scripts.json')
         scriptNames = (Array.isArray(listing?.global) ? listing.global : [])
             .map((n: unknown) => String(n).toLowerCase())
             .filter((n: string) => n.startsWith('gl') && !isGameScript(n))
+        hookNames = (Array.isArray(listing?.hooks) ? listing.hooks : []).map((n: unknown) => String(n).toLowerCase())
     } catch {
-        scriptNames = []
+        scriptNames = scriptNames ?? []
+        hookNames = hookNames ?? []
     }
-    return scriptNames!
+}
+
+function listedNames(): string[] {
+    if (!scriptNames) {readListing()}
+    return scriptNames ?? []
+}
+
+/** The hs_*.int scripts there are. */
+export function listedHookNames(): string[] {
+    if (!hookNames) {readListing()}
+    return hookNames ?? []
+}
+
+/** For tests: use these hook script names instead of the listing. */
+export function setHookScriptNames(names: string[] | null): void {
+    hookNames = names
 }
 
 /** For tests: use these names instead of the listing. */

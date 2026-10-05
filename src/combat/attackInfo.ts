@@ -214,3 +214,14 @@ export function canAimAttack(critter: any, info: AttackWeaponInfo): boolean {
     if (t === 'Plasma' && info.attackType === 'throw') {return false}
     return true
 }
+
+/**
+ * The engine's ATKTYPE_* for an attack: the player's left hand 0/1 and
+ * right hand 2/3 (primary/secondary), anyone else's weapon 2/3, 4 punch.
+ */
+export function attackTypeId(critter: any, hitMode: HitMode): number {
+    const weapon = critter?.equippedWeapon
+    if (!weapon || weapon.pro?.extra?.subType !== 3) {return 4}
+    const hand = critter?.isPlayer ? (critter.activeHand === 1 ? 1 : 0) : 1
+    return hand * 2 + (hitMode === 2 ? 1 : 0)
+}

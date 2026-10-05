@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import { capHitChance, knockbackModifier, sfallSettings } from './sfallSettings.js'
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import { Config } from './config.js'
 import { EventBus, DamageType } from './eventBus.js'
 import { CriticalEffects } from './criticalEffects.js'
@@ -35,7 +36,8 @@ import {
     splitBurstRounds,
     type Rng,
 } from './combat/fo2Formulas.js'
-import { CRITICAL_FAILURE_TABLE, CRITICAL_HIT_TABLES, Dam, hitLocationIndex, PLAYER_CRITICAL_HIT_TABLE } from './combat/criticalTables.js'
+import { CRITICAL_FAILURE_TABLE, CRITICAL_HIT_TABLES, Dam, HIT_LOCATION_ORDER, hitLocationIndex, PLAYER_CRITICAL_HIT_TABLE } from './combat/criticalTables.js'
+import { toTileNum } from './tile.js'
 import {
     attackApCostFor,
     canAimAttack,
@@ -43,6 +45,7 @@ import {
     getAttackWeaponInfo,
     type AttackWeaponInfo,
     type HitMode,
+    attackTypeId,
 } from './combat/attackInfo.js'
 import { PerkId, perkRank } from './character/perkIds.js'
 import { describeAttack, type AttackReport } from './combat/combatMessages.js'
@@ -242,6 +245,8 @@ export interface AttackOutcome {
     /** Dam flags applied to the defender. */
     flags: number
     roll: Roll
+    /** The body part struck (a hook may change it). */
+    region?: string
 }
 
 /** CombatStartData: how a script-started fight's first turn is skewed (attack_complex). */
@@ -508,8 +513,12 @@ export class Combat {
         const ammo = getAmmoModifiers(info.weapon)
         const knocked = (target as any).knockedDown === true || (target as any).knockedOut === true
 
+        let rawChance = 0
         let hitChance = computeToHit({
-            hitChanceCap: (chance) => capHitChance(chance, obj),
+            hitChanceCap: (chance) => {
+                rawChance = chance
+                return capHitChance(chance, obj)
+            },
             isPlayer: obj.isPlayer === true,
             skill,
             hasWeapon: info.weapon !== null,
@@ -542,6 +551,13 @@ export class Combat {
             hitChance = 0
         }
 
+        // sfall HOOK_TOHIT: scripts may change the chance (kept within -99…999).
+        const toHit = runHook(HOOK.TOHIT, [
+            hitChance, obj, target, hitLocationIndex(normalizedRegion), from ? toTileNum(from) : -1,
+            attackTypeId(obj, hitMode), useDistance ? 1 : 0, rawChance,
+        ])
+        if (toHit) {hitChance = Math.max(-99, Math.min(999, hookReturn(toHit, 0, hitChance)))}
+
         const crit = attackCriticalChance(obj.getStat('Critical Chance'), normalizedRegion)
         return { hit: hitChance, crit }
     }
@@ -551,7 +567,7 @@ export class Combat {
      * Slayer / Sniper upgrades, then the critical table for a critical hit.
      */
     rollHit(obj: Critter, target: Critter, region: string, hitMode: HitMode = 1): AttackOutcome {
-        const normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
+        let normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
         const info = getAttackWeaponInfo(obj, hitMode)
         const hitChance = this.getHitChance(obj, target, normalizedRegion, hitMode)
         let roll = randomRoll(hitChance.hit, hitChance.crit, this.random, this.criticalsAllowed()).roll
@@ -568,14 +584,23 @@ export class Combat {
             }
         }
 
+        // sfall HOOK_AFTERHITROLL: scripts may change the roll and the body part.
+        const after = runHook(HOOK.AFTERHITROLL, [roll, obj, target, hitLocationIndex(normalizedRegion), hitChance.hit])
+        if (after) {
+            const r = hookReturn(after, 0, roll)
+            if (r >= 0 && r <= 3) {roll = r as Roll}
+            const part = HIT_LOCATION_ORDER[hookReturn(after, 1, -1)]
+            if (part) {normalizedRegion = part}
+        }
+
         if (roll === Roll.CriticalSuccess) {
             const crit = this.computeCriticalHit(obj, target, normalizedRegion, info)
-            return { hit: true, crit: true, DM: crit.DM, msgID: crit.msgID, flags: crit.flags, roll }
+            return { hit: true, crit: true, DM: crit.DM, msgID: crit.msgID, flags: crit.flags, roll, region: normalizedRegion }
         }
         if (roll === Roll.Success) {
-            return { hit: true, crit: false, DM: 2, flags: this.enhancedKnockoutFlags(obj, target, info), roll }
+            return { hit: true, crit: false, DM: 2, flags: this.enhancedKnockoutFlags(obj, target, info), roll, region: normalizedRegion }
         }
-        return { hit: false, crit: roll === Roll.CriticalFailure, DM: 2, flags: 0, roll }
+        return { hit: false, crit: roll === Roll.CriticalFailure, DM: 2, flags: 0, roll, region: normalizedRegion }
     }
 
     /** Jinxed: the player has the trait or the perk (Pariah Dog grants it). */
@@ -690,7 +715,11 @@ export class Combat {
 
     /** AP cost of `obj`'s attack (item.cc weaponGetActionPointCost). */
     getAttackAPCost(obj: Critter, hitMode: HitMode = 1, aiming = false): number {
-        return attackApCostFor(obj, getAttackWeaponInfo(obj, hitMode), aiming)
+        const info = getAttackWeaponInfo(obj, hitMode)
+        const cost = attackApCostFor(obj, info, aiming)
+        // sfall HOOK_CALCAPCOST.
+        const hook = runHook(HOOK.CALCAPCOST, [obj, attackTypeId(obj, hitMode), aiming ? 1 : 0, cost, info.weapon ?? 0])
+        return hook ? hookReturn(hook, 0, cost) : cost
     }
 
     /**
@@ -1079,8 +1108,8 @@ export class Combat {
 
         const who = obj.isPlayer ? 'You' : obj.name
         const targetName = target.isPlayer ? 'you' : target.name
-        const normalizedRegion = this.normalizeAttackRegionForAttacker(obj, region)
-        const outcome = this.rollHit(obj, target, normalizedRegion, hitMode)
+        const outcome = this.rollHit(obj, target, this.normalizeAttackRegionForAttacker(obj, region), hitMode)
+        const normalizedRegion = outcome.region ?? this.normalizeAttackRegionForAttacker(obj, region)
 
         const report: AttackReport = {
             attacker: obj,
@@ -1115,9 +1144,27 @@ export class Combat {
                 damage = Math.min(csd.maxDamage, Math.max(csd.minDamage, damage + csd.damageBonus))
                 if (csd.overrideAttackResults) {outcome.flags = csd.targetResults}
             }
+            // sfall HOOK_COMBATDAMAGE: scripts may change the damage and the result flags.
+            let attackerHurt = 0
+            let attackerFlags = 0
+            const dmgHook = runHook(HOOK.COMBATDAMAGE, [
+                target, obj, damage, 0, outcome.flags, 0, info.weapon ?? 0, hitLocationIndex(normalizedRegion),
+                damageMultiplier, 1, 0, attackTypeId(obj, hitMode), 0,
+            ])
+            if (dmgHook) {
+                damage = Math.max(0, hookReturn(dmgHook, 0, damage))
+                attackerHurt = Math.max(0, hookReturn(dmgHook, 1, 0))
+                outcome.flags = hookReturn(dmgHook, 2, outcome.flags)
+                attackerFlags = hookReturn(dmgHook, 3, 0)
+            }
             const extraMsg = outcome.crit && outcome.msgID ? this.getCombatMsg(outcome.msgID) || '' : ''
             this.log(who + ' hit ' + targetName + ' for ' + damage + ' damage ' + extraMsg)
             this.hitCritter(obj, target, damage, outcome.flags, info)
+            if (attackerHurt > 0 || attackerFlags) {
+                this.hitCritter(obj, obj, attackerHurt, attackerFlags, info)
+                report.attackerDamage = attackerHurt
+                report.attackerFlags = attackerFlags
+            }
             report.defenderDamage = damage
             report.defenderFlags = outcome.flags
             report.defenderDied = target.dead === true
@@ -1675,8 +1722,13 @@ export class Combat {
         }
     }
 
+    /** The fight ended because nobody is left to fight (sfall HOOK_COMBATTURN -2). */
+    endedNormally = false
+
     end() {
         if (globalState.combat !== this && globalState.combat !== null && globalState.combat !== undefined) {return}
+        // sfall HOOK_COMBATTURN: -2 when the fight ends normally, -1 when cut short.
+        runHook(HOOK.COMBATTURN, [this.endedNormally ? -2 : -1, this.combatants[this.whoseTurn] ?? 0, 0])
 
         // combat.cc _combat_over: NPCs top up their guns from their packs.
         for (const c of this.combatants.slice(0, this.numActive)) {
@@ -1808,6 +1860,9 @@ export class Combat {
         }
         const prev = this.combatants[this.whoseTurn]
         if (this.whoseTurn >= 0 && prev) {
+            // sfall HOOK_COMBATTURN (end of turn): -1 ends the fight.
+            const turnEnd = runHook(HOOK.COMBATTURN, [0, prev, 0])
+            if (turnEnd && hookReturn(turnEnd, 0, 0) === -1) {return this.end()}
             EventBus.emit('combat:turnEnd', { entityId: this.whoseTurn })
             if (prev.isPlayer) {
                 this.inPlayerTurn = false
@@ -1836,6 +1891,9 @@ export class Combat {
             const defender = this.startDefender
             this.startDefender = null
             EventBus.emit('combat:turnStart', { entityId: this.whoseTurn, isPlayer: critter?.isPlayer ?? false })
+            // sfall HOOK_COMBATTURN (start of turn): 1 skips the turn.
+            const turnStart = critter ? runHook(HOOK.COMBATTURN, [1, critter, 0]) : null
+            if (turnStart && hookReturn(turnStart, 0, 0) === 1) {continue}
             if (!critter || this.turnPrologue(critter) === 'skip') {continue}
             this.idleRounds = 0
             if (critter.isPlayer) {
@@ -1939,6 +1997,7 @@ export class Combat {
         this.refreshOutlines()
 
         if (this.shouldEnd()) {
+            this.endedNormally = true
             this.end()
             return
         }
