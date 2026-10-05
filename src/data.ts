@@ -221,17 +221,25 @@ export function getLstId(lst: string, id: number): string | null {
     return lstFiles[lst][id]
 }
 
-/** Whether scripts.lst names this script (sfall IsGameScript). */
-export function isGameScript(name: string): boolean {
+function scriptListNames(): string[] {
     if (lstFiles['scripts/scripts'] === undefined) {
         try {
             lstFiles['scripts/scripts'] = loadLst('scripts/scripts')
         } catch {
-            return false
+            return []
         }
     }
-    const wanted = name.toLowerCase()
-    return lstFiles['scripts/scripts'].some((line) => line.split('.')[0].trim().toLowerCase() === wanted)
+    return lstFiles['scripts/scripts'].map((line) => line.split('.')[0].trim().toLowerCase())
+}
+
+/** Whether scripts.lst names this script (sfall IsGameScript). */
+export function isGameScript(name: string): boolean {
+    return scriptListNames().includes(name.toLowerCase())
+}
+
+/** A script's line in scripts.lst, counting from 0; -1 when it is not there. */
+export function scriptListIndex(name: string): number {
+    return scriptListNames().indexOf(String(name ?? '').toLowerCase())
 }
 
 export function lookupScriptName(scriptID: number): string | null {

@@ -192,38 +192,6 @@ describe('Phase 62-C — BLK-064: get_ini_setting common-key defaults', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('returns 0 for unknown keys', () => {
-        expect(script.get_ini_setting('unknown.key')).toBe(0)
-        expect(script.get_ini_setting('')).toBe(0)
-        expect(script.get_ini_setting('main.NonExistent')).toBe(0)
-    })
-
-    it('returns 1 for main.SpeedInterfaceCounterAnims', () => {
-        expect(script.get_ini_setting('main.SpeedInterfaceCounterAnims')).toBe(1)
-    })
-
-    it('returns 60 for main.FPS', () => {
-        expect(script.get_ini_setting('main.FPS')).toBe(60)
-    })
-
-    it('returns 0 for main.Brightmaps (off by default)', () => {
-        expect(script.get_ini_setting('main.Brightmaps')).toBe(0)
-    })
-
-    it('returns 1 for sound.sound (enabled by default)', () => {
-        expect(script.get_ini_setting('sound.sound')).toBe(1)
-    })
-
-    it('returns 1 for preferences.combat_taunts', () => {
-        expect(script.get_ini_setting('preferences.combat_taunts')).toBe(1)
-    })
-
-    it('is case-insensitive', () => {
-        expect(script.get_ini_setting('MAIN.SPEEDINTERFACECOUNTERANIMS')).toBe(1)
-        expect(script.get_ini_setting('Main.FPS')).toBe(60)
-        expect(script.get_ini_setting('SOUND.SOUND')).toBe(1)
-    })
-
     it('checklist entry is present and implemented', () => {
         const entry = SCRIPTING_STUB_CHECKLIST.find(e => e.id === 'blk_064_get_ini_setting_defaults')
         expect(entry).toBeDefined()

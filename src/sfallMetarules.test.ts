@@ -86,3 +86,39 @@ describe('sfall metarules (Metarule.cpp)', () => {
         expect(getArray(sfallMetarules.get_metarule_table())!.size).toBe(Object.keys(sfallMetarules).length)
     })
 })
+
+describe('INI settings (IniFiles.cpp)', () => {
+    it('reads "file|section|key", -1 for a malformed name or a missing number', async () => {
+        const { setIniFile } = await import('./iniFiles.js')
+        const { Scripting } = await import('./scripting.js')
+        setIniFile('mods/test.ini', '[Main]\nSpeed=12 ; fast\nName=Vault Dweller\n[Other]\nx=1\n')
+        const script: any = new (Scripting as any).Script()
+        expect(script.get_ini_setting('mods\\test.ini|main|speed')).toBe(12)
+        expect(script.get_ini_setting('mods/test.ini|Main|Missing')).toBe(-1)
+        expect(script.get_ini_setting('nofile')).toBe(-1)
+        expect(script.get_ini_string('mods/test.ini|Main|Name')).toBe('Vault Dweller')
+        expect(getArray(sfallMetarules.get_ini_sections('mods/test.ini'))!.size).toBe(2)
+        const section = getArray(sfallMetarules.get_ini_section('mods/test.ini', 'main'))!
+        expect(section.get('Speed')).toBe('12')
+        sfallMetarules.set_ini_setting('mods/test.ini|Main|Speed', 3)
+        expect(script.get_ini_setting('mods/test.ini|Main|Speed')).toBe(3)
+    })
+})
+
+describe('object lists (Arrays.cpp list_begin)', () => {
+    it('hands out list ids; list_next walks every elevation', async () => {
+        const { sfallMethods } = await import('./sfallFunctions.js')
+        const a = { type: 'critter' }
+        const b = { type: 'item' }
+        const c = { type: 'critter' }
+        const saved = globalState.gMap
+        globalState.gMap = { objects: [[a, b], [], [c]] } as any
+        const id = sfallMethods.list_begin(0)
+        expect(sfallMethods.list_next(id)).toBe(a)
+        expect(sfallMethods.list_next(id)).toBe(c)
+        expect(sfallMethods.list_next(id)).toBe(0)
+        sfallMethods.list_end(id)
+        expect(sfallMethods.list_next(id)).toBe(0)
+        globalState.gMap = saved
+    })
+})

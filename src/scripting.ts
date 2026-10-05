@@ -48,6 +48,7 @@ import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
+import { iniInt, iniString, parseIniSetting } from './iniFiles.js'
 import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
@@ -3675,62 +3676,6 @@ export namespace Scripting {
             return (obj as Critter).getStat('AP')
         }
 
-        // sfall extended opcodes — object list iteration (0x8186–0x8188).
-        //
-        // `list_begin(type)` starts an iteration over game objects on the current
-        // elevation.  Type constants:
-        //   0 = LIST_ALL — all objects (items, critters, scenery, etc.)
-        //   1 = LIST_CRITTERS — living critters only
-        //   2 = LIST_GROUNDITEMS — items on the ground (not held)
-        //
-        // `list_next()` advances the iterator and returns the next object, or 0
-        // when the iteration is exhausted.
-        //
-        // `list_end()` disposes the current iterator (no-op in this implementation
-        // because we store only an index rather than a live cursor).
-        list_begin(listType: number): Obj | null {
-            if (!globalState.gMap || !globalState.gMap.objects) {
-                this._listIterObjects = []
-                this._listIterIndex = 0
-                return null
-            }
-            const elevation = globalState.gMap.currentElevation ?? 0
-            const all: Obj[] = globalState.gMap.objects[elevation] ?? []
-            switch (listType) {
-                case 1: // LIST_CRITTERS
-                    this._listIterObjects = all.filter((o) => o.type === 'critter' && !(o as Critter).dead)
-                    break
-                case 2: // LIST_GROUNDITEMS
-                    this._listIterObjects = all.filter((o) => o.type !== 'critter' && o.type !== 'misc')
-                    break
-                default: // LIST_ALL (0) and any unknown type
-                    this._listIterObjects = all.slice()
-                    break
-            }
-            this._listIterIndex = 0
-            return this._listIterObjects.length > 0 ? this._listIterObjects[0] : null
-        }
-        list_next(): Obj | null {
-            this._listIterIndex = (this._listIterIndex ?? 0) + 1
-            const objs = this._listIterObjects ?? []
-            if (this._listIterIndex >= objs.length) {return null}
-            return objs[this._listIterIndex]
-        }
-        list_end(): void {
-            this._listIterObjects = []
-            this._listIterIndex = 0
-        }
-        // Internal state for sfall list iteration (not serialized).
-        _listIterObjects: Obj[] = []
-        _listIterIndex = 0
-
-        // sfall extended opcode — tile number N steps in a direction (0x8189).
-        // tile_num_in_direction(tile, dir, count):
-        //   tile  — starting tile number
-        //   dir   — direction (0-5, same hex-grid directions as obj.orientation)
-        //   count — number of steps to take in that direction
-        // Returns the tile number of the destination, or the original tile when
-        // the input is out of range (count <= 0 or bad tile).
         /** opGetTileInDirection: -1 for no tile, a rotation out of range, a zero distance, or off the map. */
         /**
          * opGetTileInDirection (tileGetTileInDirection): step `count` hexes, stopping
@@ -3929,20 +3874,27 @@ export namespace Scripting {
             globalState.gParty.removePartyMember(obj)
         }
 
-        // sfall extended opcode — read an INI setting by key string (0x8198).
-        // BLK-064: Returns sensible Fallout 2 defaults for well-known config keys.
-        // Full INI file access is not available in the browser build; returning
-        // engine-appropriate defaults prevents scripts from treating absent settings
-        // as explicitly disabled (0) when the actual FO2 default is non-zero.
-        get_ini_setting(key: string): number {
-            log('get_ini_setting', arguments)
-            const normalized = key.toLowerCase()
-            const live = iniOverride(normalized)
-            if (live !== undefined) {return live}
-            if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, normalized)) {
-                return INI_SETTING_DEFAULTS[normalized]
+        /**
+         * get_ini_setting("file|section|key"): the number there, -1 when it is
+         * missing or the name is malformed. fallout2.cfg answers from the live
+         * options, as the game keeps it in memory.
+         */
+        get_ini_setting(setting: string): number {
+            const parsed = parseIniSetting(setting)
+            if (!parsed) {return -1}
+            if (parsed.file.toLowerCase() === 'fallout2.cfg') {
+                const name = (parsed.section + '.' + parsed.key).toLowerCase()
+                const live = iniOverride(name)
+                if (live !== undefined) {return live}
+                if (Object.prototype.hasOwnProperty.call(INI_SETTING_DEFAULTS, name)) {return INI_SETTING_DEFAULTS[name]}
             }
-            return 0
+            return iniInt(parsed.file, parsed.section, parsed.key, -1)
+        }
+        /** get_ini_string("file|section|key"): the text there ("" when missing), -1 for a malformed name. */
+        get_ini_string(setting: string): string | number {
+            const parsed = parseIniSetting(setting)
+            if (!parsed) {return -1}
+            return iniString(parsed.file, parsed.section, parsed.key) ?? ''
         }
 
         // sfall extended opcode — return the player's currently active hand (0x8199).
@@ -4035,10 +3987,6 @@ export namespace Scripting {
 
         // sfall extended opcode — get a string value from the mod's INI configuration (0x81A3).
         // Partial: no INI file system in browser build; returns empty string.
-        get_ini_string(key: string): string {
-            log('get_ini_string', arguments)
-            return ''
-        }
 
         /** set_global_script_type(type): 0 main loop, 1 input loop, 2 world map, 3 main loop and world map. */
         set_global_script_type(type: number): void {

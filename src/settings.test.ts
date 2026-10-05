@@ -110,18 +110,13 @@ describe('settings overlay get_ini_setting / metarules', () => {
         resetSettings()
     })
 
-    it('get_ini_setting still returns FO2 defaults at rest', () => {
-        expect(script.get_ini_setting('sound.sound')).toBe(1)
-        expect(script.get_ini_setting('preferences.combat_taunts')).toBe(1)
-        expect(script.get_ini_setting('preferences.violence_level')).toBe(3)
-        expect(script.get_ini_setting('sound.sfxvolume')).toBe(VOLUME_INI_DEFAULT)
-        expect(script.get_ini_setting('main.FPS')).toBe(60)
-    })
-
-    it('get_ini_setting follows live difficulty after a patch', () => {
+    it('get_ini_setting("fallout2.cfg|…") answers from the live options and FO2 defaults', () => {
+        expect(script.get_ini_setting('fallout2.cfg|sound|sound')).toBe(1)
+        expect(script.get_ini_setting('fallout2.cfg|preferences|violence_level')).toBe(3)
+        expect(script.get_ini_setting('fallout2.cfg|sound|sfxvolume')).toBe(VOLUME_INI_DEFAULT)
         patchSettings({ gameDifficulty: 0, combatDifficulty: 2 })
-        expect(script.get_ini_setting('preferences.game_difficulty')).toBe(0)
-        expect(script.get_ini_setting('preferences.combat_difficulty')).toBe(2)
+        expect(script.get_ini_setting('fallout2.cfg|preferences|game_difficulty')).toBe(0)
+        expect(script.get_ini_setting('fallout2.cfg|preferences|combat_difficulty')).toBe(2)
         // The engine has no difficulty metarules (35 and 55 are unused ids).
         expect(script.metarule(35, 0)).toBe(0)
         expect(script.metarule(55, 0)).toBe(0)

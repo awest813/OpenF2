@@ -170,12 +170,6 @@ describe('Phase 23-C — sfall list opcodes (0x8186-0x8188)', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('list_begin returns null/0 when no map is loaded', () => {
-        const result = script.list_begin(0)
-        expect(result === null || result === 0 || result === undefined).toBe(true)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('list_next returns null after list_begin with empty map', () => {
         script.list_begin(0)
         const result = script.list_next()

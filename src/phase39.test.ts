@@ -248,12 +248,6 @@ describe('Phase 39-I — get_ini_setting opcode (0x8198)', () => {
         expect(entry?.impact).toBe('medium')
     })
 
-    it('get_ini_setting returns 0 for any key', () => {
-        const script = new (Scripting as any).Script()
-        expect(script.get_ini_setting('ddraw.ini|sfall|DisplayBuildDate')).toBe(0)
-        expect(script.get_ini_setting('game.cfg|misc|main_menu_music')).toBe(0)
-    })
-
     it('get_ini_setting does not throw', () => {
         const script = new (Scripting as any).Script()
         expect(() => script.get_ini_setting('anything')).not.toThrow()

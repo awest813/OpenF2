@@ -40,7 +40,8 @@ import { inventoryApCost, STAT_BY_NAME, statMax, statMin } from './sfallSettings
 import { inventorySize, itemWeight } from './critterInventory.js'
 import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
-import { loadMessage } from './data.js'
+import { loadMessage, scriptListIndex } from './data.js'
+import { IniSection, parseIniSetting, readIniFile, setIniString } from './iniFiles.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
 import { PERK_COUNT, PERK_DESCRIPTIONS, resetPerkDescriptions } from './character/perkTable.js'
@@ -76,6 +77,19 @@ const LIST_TYPES: Record<number, (o: any) => boolean> = {
 function isObject(o: unknown): o is any {
     return !!o && typeof o === 'object'
 }
+
+/** FillListVector: every elevation's objects of a list type (sfall LIST_*); tiles are not objects. */
+function listObjects(type: number): any[] {
+    if (type === 4) {return []}
+    const map: any = globalState.gMap
+    if (type === 6) {return ((map?.spatials ?? []) as any[][]).flat().filter(Boolean)}
+    const test = LIST_TYPES[type] ?? (() => false)
+    return ((map?.objects ?? []) as any[][]).flat().filter((o) => o && test(o))
+}
+
+/** list_begin / list_next / list_end: lists by id (Arrays.cpp, ids from 0xCCCCCD). */
+const objectLists = new Map<number, { objs: any[]; pos: number }>()
+let lastListId = 0xcccccc
 
 function mapObjects(): any[] {
     try {
@@ -217,6 +231,12 @@ export function deserializeFakePerks(data: { perks?: FakePerk[]; traits?: FakePe
 }
 
 const STAT_NAME_BY_NUMBER = Object.fromEntries(Object.entries(STAT_BY_NAME).map(([k, v]) => [v, k])) as Record<number, string>
+
+function iniSectionArray(section: IniSection, temp = false): number {
+    const id = temp ? createTempArray(-1, 0) : createArray(-1, 0)
+    for (const { key, value } of section.values.values()) {getArray(id)?.set(key, value, true)}
+    return id
+}
 
 function noop(): number {
     return 0
@@ -516,11 +536,45 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     sneak_success: () => (playerIsSneaking((min, max) => getRandomInt(min, max)) ? 1 : 0),
 
     // ── scripts ──
-    remove_script(obj: any) { if (isObject(obj)) {obj._script = undefined} },
-    set_script: noop,
-    get_script(obj: any) { return isObject(obj) && typeof obj.scriptIndex === 'number' ? obj.scriptIndex + 1 : (isObject(obj) && obj._script ? 1 : 0) },
+    /** remove_script: the object loses its script. */
+    remove_script(obj: any) {
+        if (!isObject(obj)) {return}
+        obj._script = undefined
+        obj.script = undefined
+    },
+    /**
+     * set_script(obj, index): a new script from scripts.lst (counting from 1);
+     * its start runs, and map_enter_p_proc too unless bit 0x80000000 is set.
+     */
+    set_script(obj: any, value: number) {
+        if (!isObject(obj) || typeof obj.loadScript !== 'function') {return}
+        const index = (value & ~0xf0000000) >>> 0
+        if (index === 0) {return}
+        obj._script = undefined
+        obj.script = undefined
+        obj.loadScript(index)
+        if (obj._script && (value & 0x80000000) === 0 && typeof obj._script.map_enter_p_proc === 'function') {
+            obj._script.self_obj = obj
+            obj._script.map_enter_p_proc()
+        }
+    },
+    /** get_script: the object's script's line in scripts.lst, counting from 1; 0 for none. */
+    get_script(obj: any) {
+        if (!isObject(obj) || !obj._script) {return 0}
+        const name = obj.script ?? obj._script.scriptName
+        return name ? scriptListIndex(name) + 1 : 0
+    },
     /** set_self: the next functions act on this object as self_obj. */
-    set_self(this: any, obj: any) { if (isObject(obj)) {this.self_obj = obj} },
+    set_self(this: any, obj: any) {
+        if (isObject(obj)) {
+            if (this._selfBeforeOverride === undefined) {this._selfBeforeOverride = this.self_obj ?? null}
+            this.self_obj = obj
+        } else if (this._selfBeforeOverride !== undefined) {
+            // set_self(0) puts self_obj back.
+            this.self_obj = this._selfBeforeOverride
+            this._selfBeforeOverride = undefined
+        }
+    },
 
     // ── maths and strings ──
     sqrt: (x: number) => Math.sqrt(Number(x)),
@@ -596,9 +650,17 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     load_array: (key: unknown) => loadArray(key),
     /** list_as_array: a temporary list of the objects of a list type. */
     list_as_array(type: number) {
-        const test = LIST_TYPES[type] ?? (() => false)
-        return arrayOf(mapObjects().filter(test))
+        return arrayOf(listObjects(type))
     },
+    list_begin(type: number) {
+        objectLists.set(++lastListId, { objs: listObjects(type), pos: 0 })
+        return lastListId
+    },
+    list_next(id: number) {
+        const list = objectLists.get(id)
+        return !list || list.pos >= list.objs.length ? 0 : list.objs[list.pos++]
+    },
+    list_end(id: number) { objectLists.delete(id) },
     party_member_list(includeHidden: number) {
         let members: any[] = []
         try {
@@ -831,9 +893,21 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
     get_current_inven_size: (obj: any) => (isObject(obj) ? inventorySize(obj) : 0),
     get_cursor_mode: () => ({ move: 0, arrow: 1, crosshair: 2 } as Record<string, number>)[globalState.mouseMode ?? 'move'] ?? 0,
     get_flags: (obj: any) => (isObject(obj) ? obj.flags ?? 0 : 0),
-    get_ini_config: () => 0,
-    get_ini_section: () => arrayOf([]),
-    get_ini_sections: () => arrayOf([]),
+    /** get_ini_config(file): an array of its sections, each an array of key → value. */
+    get_ini_config(file: string) {
+        const data = readIniFile(String(file ?? ''))
+        if (!data) {return 0}
+        const id = createArray(-1, 0)
+        for (const section of data.values()) {getArray(id)?.set(section.name, iniSectionArray(section), true)}
+        return id
+    },
+    get_ini_section(file: string, section: string) {
+        const s = readIniFile(String(file ?? ''))?.get(String(section ?? '').toLowerCase())
+        return s ? iniSectionArray(s, true) : createTempArray(-1, 0)
+    },
+    get_ini_sections(file: string) {
+        return arrayOf([...(readIniFile(String(file ?? ''))?.values() ?? [])].map((s) => s.name))
+    },
     get_inven_ap_cost() {
         const player: any = globalState.player
         return inventoryApCost(player?.perkRanks?.[48] ?? 0)
@@ -981,7 +1055,12 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
         ;(sfallSettings as any).ifaceTagText.set(tag, { text: String(text ?? ''), color })
         return 0
     },
-    set_ini_setting: () => -1,
+    set_ini_setting(setting: string, value: unknown) {
+        const parsed = parseIniSetting(setting)
+        if (!parsed) {return -1}
+        setIniString(parsed.file, parsed.section, parsed.key, String(value ?? ''))
+        return 0
+    },
     set_map_enter_position(tile: number, elev: number, rot: number) {
         const p: any = globalState.player
         if (!p) {return}
