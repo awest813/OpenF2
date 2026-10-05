@@ -46,6 +46,7 @@ import type { CalledShotPanel, BodyRegion } from './ui2/calledShotPanel.js'
 import { xpForLevel } from './ecs/derivedStats.js'
 import { UIMode } from './uiMode.js'
 import { EventBus } from './eventBus.js'
+import { examineLines } from './examine.js'
 import { parkCarAtPlayer } from './car.js'
 
 // UI system
@@ -676,10 +677,12 @@ export function uiContextMenu(obj: Obj, evt: any) {
         top: `${evt.clientY}px`,
     })
     const cancelBtn = button(obj, 'cancel')
+    // The action menu's eye examines (proto_instance.cc _obj_examine):
+    // description_p_proc, then the description and the condition lines.
     const lookBtn = button(obj, 'look', () => {
-        const didOverride = Scripting.lookAt(obj, globalState.player)
-        if (!didOverride) {
-            uiLog('You see: ' + obj.getDescription())
+        const didOverride = Scripting.description(obj, globalState.player) === true
+        for (const line of examineLines(globalState.player, obj, didOverride)) {
+            if (line) {uiLog(line)}
         }
     })
     const useBtn = button(obj, 'use', () => playerUseHandler(obj))
