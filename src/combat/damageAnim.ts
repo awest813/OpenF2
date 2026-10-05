@@ -8,7 +8,7 @@ import globalState from '../globalState.js'
 import { hexInDirectionDistance, type Point } from '../geometry.js'
 import {
     ANIMATION_REQUEST_RESERVED, critterArt, regAnimAnimate, regAnimBegin, regAnimCallback, regAnimClear, regAnimEnd,
-    PROJECTILE_HEXES_PER_TICK, regAnimFly, regAnimSetArt,
+    PROJECTILE_HEXES_PER_TICK, regAnimFly, regAnimOnEnd, regAnimSetArt,
 } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 
@@ -111,7 +111,17 @@ export interface AttackSequenceOptions {
      * `path[0]`, it flies along `path`; the hits land when it arrives, then
      * `remove` takes it off the map.
      */
-    projectile?: { obj: any; path: Array<{ x: number; y: number }>; show: () => void; remove: () => void }
+    projectile?: {
+        obj: any
+        path: Array<{ x: number; y: number }>
+        show: () => void
+        remove: () => void
+        /**
+         * Explosives: on arrival the projectile becomes the explosion `art`,
+         * the `ring` around it bursts too, and the hits land with the blast.
+         */
+        explode?: { art: string; ring: Array<{ obj: any; show: () => void }> }
+    }
 }
 
 /**
@@ -148,7 +158,18 @@ export function endReactionBatch(
     const point = opts.point === true && critterArt(attacker, ANIM_POINT) !== null
     const projectile = opts.projectile && opts.projectile.path.length > 0 ? opts.projectile : null
 
+    // The turn must go on even if a step fails or the sequence is cleared.
+    let called = false
+    const finished = () => {
+        if (called) {return}
+        called = true
+        onDone()
+    }
     let ok = regAnimBegin(ANIMATION_REQUEST_RESERVED) !== -1
+    if (ok) {regAnimOnEnd(() => {
+        projectile?.remove()
+        finished()
+    })}
     if (ok && point) {ok = regAnimAnimate(attacker, ANIM_POINT, 0) !== -1}
     ok = ok && regAnimAnimate(attacker, attackAnim, point ? -1 : 0) !== -1
 
@@ -158,6 +179,19 @@ export function endReactionBatch(
         ok = regAnimCallback(projectile.obj, projectile.show, actionFrame > 0 ? actionFrame : 0) !== -1
             && regAnimFly(projectile.obj, projectile.path, 0) !== -1
         hitDelay = Math.ceil((projectile.path.length - 1) / PROJECTILE_HEXES_PER_TICK)
+        const blast = projectile.explode
+        if (ok && blast) {
+            const obj = projectile.obj
+            ok = regAnimCallback(obj, () => {
+                obj.art = blast.art
+                obj.frame = 0
+            }, -1) !== -1 && regAnimAnimate(obj, 0, 0) !== -1
+            for (const piece of blast.ring) {
+                if (!ok) {break}
+                ok = regAnimCallback(piece.obj, piece.show, 0) !== -1 && regAnimAnimate(piece.obj, 0, 0) !== -1
+            }
+            hitDelay = 0
+        }
     }
 
     let first = true
@@ -178,7 +212,7 @@ export function endReactionBatch(
     if (ok && point && attackerStanding && critterArt(attacker, ANIM_UNPOINT)) {
         ok = regAnimAnimate(attacker, ANIM_UNPOINT, -1) !== -1
     }
-    ok = ok && regAnimCallback(attacker, onDone, -1) !== -1 && regAnimEnd() !== -1
+    ok = ok && regAnimCallback(attacker, finished, -1) !== -1 && regAnimEnd() !== -1
     if (!ok) {
         projectile?.remove()
         immediate()

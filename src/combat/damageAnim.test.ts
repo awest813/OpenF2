@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import globalState from '../globalState.js'
 import { Config } from '../config.js'
-import { resetAnimSequences, tickAnimSequences } from '../animSequence.js'
+import { regAnimClear, resetAnimSequences, tickAnimSequences } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 import {
     ANIM_DODGE_ANIM, ANIM_FALL_BACK, ANIM_FALL_FRONT, ANIM_FIRE_DANCE, ANIM_HIT_FROM_BACK, ANIM_HIT_FROM_FRONT,
@@ -168,5 +168,48 @@ describe('a ranged attack (_action_ranged)', () => {
         } finally {
             Config.engine.doUseWeaponModel = saved
         }
+    })
+})
+
+describe('explosive projectiles and the safety net', () => {
+    function misc(): any {
+        const o: any = { type: 'misc', art: 'art/misc/rocket' }
+        o.singleAnimation = (_rev: boolean, cb: () => void) => { o.onAnimEnd = cb }
+        return o
+    }
+
+    it('a rocket bursts on arrival with a ring of blasts, and the hit lands with it', () => {
+        globalState.imageInfo[BASE + 'aq'] = { numFrames: 4, fps: 10, actionFrame: 0 } as any
+        globalState.imageInfo['art/misc/explode'] = { numFrames: 8, fps: 10 } as any
+        const attacker = critter([])
+        const defender = critter([ANIM_HIT_FROM_FRONT], { x: 50, y: 52 })
+        const rocket = misc()
+        const ring = [misc(), misc()].map((o) => Object.assign(o, { art: 'art/misc/explode' }))
+        const shown: any[] = []
+        beginReactionBatch()
+        showDamageReaction(defender, 0, true, 0)
+        endReactionBatch(attacker, 16, () => {}, () => { throw new Error('no fallback expected') }, {
+            projectile: {
+                obj: rocket, path: [{ x: 50, y: 51 }, { x: 50, y: 52 }],
+                show: () => shown.push(rocket), remove: () => {},
+                explode: { art: 'art/misc/explode', ring: ring.map((obj) => ({ obj, show: () => shown.push(obj) })) },
+            },
+        })
+        tickAnimSequences()
+        attacker.animCallback() // the swing ends; the rocket has landed
+        expect(rocket.art).toBe('art/misc/explode')
+        expect(shown).toEqual([rocket, ...ring])
+        expect(defender.animCode).toBe(ANIM_HIT_FROM_FRONT)
+    })
+
+    it('a sequence cleared midway still lets the turn go on', async () => {
+        globalState.imageInfo[BASE + 'aq'] = { numFrames: 4, fps: 10, actionFrame: 2 } as any
+        const attacker = critter([])
+        let done = 0
+        beginReactionBatch()
+        endReactionBatch(attacker, 16, () => { done++ }, () => { throw new Error('no fallback expected') })
+        regAnimClear(attacker)
+        await Promise.resolve()
+        expect(done).toBe(1)
     })
 })

@@ -129,6 +129,8 @@ interface Sequence {
     done: number
     running: Set<Step>
     ended: boolean
+    /** Runs when the sequence ends, however it ends. */
+    onEnd?: () => void
 }
 
 let building: Sequence | null = null
@@ -209,6 +211,11 @@ export const regAnimCallback = (owner: any, fn: () => void, delay: number) => re
 export const regAnimFly = (owner: any, path: Point[], delay: number) => register({ kind: 'fly', owner, path, delay })
 /** animationRegisterSetFid with a critter animation's art (the frame stays first). */
 export const regAnimSetArt = (owner: any, anim: number, delay: number) => register({ kind: 'setArt', owner, anim, delay })
+
+/** Run `fn` when the sequence being built ends, whether it finishes, fails or is cleared. */
+export function regAnimOnEnd(fn: () => void): void {
+    if (building) {building.onEnd = fn}
+}
 
 /** reg_anim_end: the sequence starts. */
 export function regAnimEnd(): number {
@@ -428,6 +435,7 @@ function endSequence(seq: Sequence): void {
     if (seq.ended) {return}
     seq.ended = true
     active = active.filter((s) => s !== seq)
+    if (seq.onEnd) {queueMicrotask(seq.onEnd)}
     const owners: any[] = []
     for (const step of seq.steps) {
         if (step.kind === 'callback' || owners.includes(step.owner)) {continue}

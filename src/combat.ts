@@ -72,7 +72,7 @@ import {
 } from './combat/aiPacket.js'
 import { awardCritterXp } from './character/xp.js'
 import { isProne } from './animSequence.js'
-import { loadPRO } from './pro.js'
+import { loadPRO, lookupArt, makePID } from './pro.js'
 import {
     ANIM_FIRE_CONTINUOUS, ANIM_FIRE_SINGLE, ANIM_THROW_ANIM, attackAnimationForMode, deathAnimationFor, isHitFromFront,
 } from './combat/deathAnim.js'
@@ -852,12 +852,55 @@ export class Combat {
         projectile.position = { ...path[0] }
         const map = globalState.gMap
         const shot = projectile
-        try { lazyLoadImage((shot as any).art) } catch { /* no images headless */ }
+        const preload = (art: string) => {
+            try { lazyLoadImage(art) } catch { /* no images headless */ }
+        }
+        preload((shot as any).art)
+        const ring: Obj[] = []
+        let explode: { art: string; ring: Array<{ obj: any; show: () => void }> } | undefined
+        // sfall: thrown explosive, plasma and EMP grenades and explosive
+        // ammo burst on arrival (misc FRMs 29 / 31 / 2, rockets 10), with
+        // six more blasts on the hexes around.
+        const grenade = info.attackType === 'throw' && ['Explosive', 'Plasma', 'EMP'].includes(info.damageType)
+        if ((grenade || info.damageType === 'Explosive') && (report.attackerFlags & Dam.DROP) === 0) {
+            const frm = !grenade ? 10 : info.damageType === 'EMP' ? 2 : info.damageType === 'Plasma' ? 31 : 29
+            let art: string | null = null
+            try {
+                art = lookupArt((5 << 24) | frm)
+            } catch {
+                art = null
+            }
+            if (art && globalState.imageInfo?.[art] !== undefined) {
+                preload(art)
+                const center = path[path.length - 1]
+                const pieces: Array<{ obj: any; show: () => void }> = []
+                for (let rotation = 0; rotation < 6; rotation++) {
+                    const hex = hexInDirectionDistance(center, rotation, 1)
+                    let piece: Obj | null = null
+                    try {
+                        piece = createObjectWithPID(makePID(5, 14), -1)
+                    } catch {
+                        piece = null
+                    }
+                    if (!hex || !piece) {continue}
+                    piece.art = art
+                    piece.position = { ...hex }
+                    const p = piece
+                    ring.push(p)
+                    pieces.push({ obj: p, show: () => map.addObject(p) })
+                }
+                explode = { art, ring: pieces }
+            }
+        }
         return {
             obj: shot,
             path,
             show: () => map.addObject(shot),
-            remove: () => map.removeObject(shot),
+            remove: () => {
+                map.removeObject(shot)
+                for (const p of ring) {map.removeObject(p)}
+            },
+            explode,
         }
     }
 
