@@ -146,6 +146,8 @@ export namespace Worldmap {
     }
 
     export interface EncounterTable {
+        /** The N of [Encounter Table N] (worldmap.msg 3000 + 50·N + entry). */
+        id?: number
         maps: string[]
         encounters: Encounter[]
     }
@@ -156,7 +158,11 @@ export namespace Worldmap {
     export type CondNode = any
 
     export interface Encounter {
+        /** The NN of enc_NN. */
+        id?: number
         chance: number
+        /** Counter: how many more times it may happen (-1 = always). */
+        counter?: number
         scenery: string | null // scenery name from worldmap.txt (e.g. "city")
         enc: EncounterRef //enc.enc ? parseEncounterReference(enc.enc) : enc.enc,
         cond: CondNode | null // parsed condition AST (from Encounters.parseConds)
@@ -279,8 +285,10 @@ export namespace Worldmap {
                 // conditions start with "if"
                 {cond = null}
 
+            const counter = parseInt(enc.counter)
             return {
                 chance: parseInt(enc.chance), // integeral percentage
+                counter: Number.isFinite(counter) ? counter : -1,
                 scenery: enc.scenery,
                 enc: enc.enc ? parseEncounterReference(enc.enc) : enc.enc,
                 cond: cond ? Encounters.parseConds(cond) : null,
@@ -375,11 +383,15 @@ export namespace Worldmap {
             } else if (key.indexOf('Encounter Table') === 0) {
                 const name = ini[key].lookup_name.toLowerCase()
                 const maps = ini[key].maps.split(',').map((x: string) => x.trim())
-                const encounter: EncounterTable = { maps: maps, encounters: [] }
+                const tableId = parseInt(key.slice('Encounter Table'.length))
+                const encounter: EncounterTable = { id: Number.isFinite(tableId) ? tableId : undefined, maps: maps, encounters: [] }
 
                 for (const prop in ini[key]) {
                     if (prop.indexOf('enc_') === 0) {
-                        encounter.encounters.push(parseEncounter(ini[key][prop]))
+                        const entry = parseEncounter(ini[key][prop])
+                        const entryId = parseInt(prop.slice(4))
+                        if (Number.isFinite(entryId)) {entry.id = entryId}
+                        encounter.encounters.push(entry)
                     }
                 }
                 encounterTables[name] = encounter
@@ -533,10 +545,17 @@ export namespace Worldmap {
 
     function execEncounter(encTable: EncounterTable): void {
         const enc = Encounters.evalEncounter(encTable)
+        if (!enc) {return}
         console.log('final: map %s, groups %o', enc.mapName, enc.groups)
 
         // load map
         globalState.gMap.loadMap(enc.mapName, undefined, undefined, function () {
+            // wmSetupRandomEncounter: worldmap.msg 2998 and the entry's description.
+            if (typeof encTable.id === 'number' && typeof enc.encounter?.id === 'number') {
+                const intro = message('worldmap', 2998, 'You encounter:')
+                const what = message('worldmap', 3000 + 50 * encTable.id + enc.encounter.id, '')
+                if (what) {EventBus.emit('ui:message', { text: `${intro} ${what}` })}
+            }
             // set up critters' positions in their formations
             Encounters.positionCritters(enc.groups, globalState.player.position, lookupMapFromLookup(enc.mapLookupName))
 

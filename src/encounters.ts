@@ -310,11 +310,13 @@ export namespace Encounters {
         return critters
     }
 
-    function pickEncounter(encounters: Worldmap.Encounter[]) {
+    export function pickEncounter(encounters: Worldmap.Encounter[]) {
         // Pick an encounter from an encounter list based on a roll
 
+        // A used-up Counter takes the entry out of the draw.
         let succEncounters = encounters.filter(function(enc) {
             if(enc.enc === null) {return false} // skip encounters with invalid enc ref
+            if(enc.counter === 0) {return false}
             return (enc.cond !== null) ? evalConds(enc.cond) : true
         })
         let numEncounters = succEncounters.length
@@ -339,6 +341,11 @@ export namespace Encounters {
         if ((perkRanks[PERK_RANGER] ?? 0) > 0) {roll += 1}
         if ((perkRanks[PERK_EXPLORER] ?? 0) > 0) {roll += 2}
 
+        // Game difficulty: easy +5 (capped at the total), hard -5 (floored at 0).
+        const difficulty = globalState.gameDifficulty ?? 1
+        if (difficulty === 0) {roll = Math.min(totalChance, roll + 5)}
+        else if (difficulty === 2) {roll = Math.max(0, roll - 5)}
+
         // Remove chances from roll until either we reach the end of the list or the roll runs out.
         // If our roll does *not* run out (i.e., its value exceeds totalChance), then
         // we will choose the last encounter in the list.
@@ -353,8 +360,11 @@ export namespace Encounters {
             acc -= chance
         }
 
-        console.log("idx: %d", idx)
-        return succEncounters[idx]
+        // A roll past the end picks the last candidate.
+        if(idx === succEncounters.length) {idx = succEncounters.length - 1}
+        const picked = succEncounters[idx]
+        if(picked && typeof picked.counter === "number" && picked.counter > 0) {picked.counter--}
+        return picked
     }
 
     export function positionCritters(groups: Worldmap.EncounterGroup[], playerPos: Point, map: MapInfo) {
