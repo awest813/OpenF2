@@ -343,3 +343,42 @@ describe('script attacks (opAttackComplex)', () => {
         }
     })
 })
+
+describe('floor items (_ai_search_environ / _ai_retrieve_object)', () => {
+    function mapWith(items: any[]) {
+        return {
+            getObjects: () => items,
+            removeObject: (o: any) => { const i = items.indexOf(o); if (i >= 0) {items.splice(i, 1)} },
+            recalcPath: (a: any, b: any) => [[a.x, a.y], [b.x, b.y]],
+        }
+    }
+
+    it('a hurt critter with no stimpaks walks to one on the floor, picks it up for 3 AP and uses it', async () => {
+        const stim = { type: 'item', subtype: 'drug', pid: 40, name: 'Stimpak', position: { x: 10, y: 11 }, amount: 1 }
+        const c = critter({ stats: { HP: 5, 'Max HP': 30, INT: 5 }, pro: { extra: { bodyType: 0, killType: 0 } } })
+        c.ai.info.chem_use = 'stims_when_hurt_lots'
+        c.addInventoryItem = (item: any) => c.inventory.push({ ...item, position: null })
+        ;(globalState as any).gMap = mapWith([stim])
+        const combat = combatWith([c])
+        globalState.combat = combat
+        await new AiTurn(combat, c).checkDrugs()
+        expect(c.inventory.length).toBe(0) // picked up and taken
+        expect(c.AP.combat).toBe(8 - 3 - 2)
+    })
+
+    it('ignores floor items beyond PER + 5 hexes', () => {
+        const stim = { type: 'item', subtype: 'drug', pid: 40, position: { x: 10, y: 30 } }
+        const c = critter({ stats: { HP: 5, 'Max HP': 30, INT: 5, PER: 5 }, pro: { extra: { bodyType: 0, killType: 0 } } })
+        c.ai.info.chem_use = 'stims_when_hurt_lots'
+        ;(globalState as any).gMap = mapWith([stim])
+        const combat = combatWith([c])
+        expect(new AiTurn(combat, c).searchEnviron('drug')).toBeNull()
+    })
+
+    it('a creature that is not a biped never looks', () => {
+        const stim = { type: 'item', subtype: 'drug', pid: 40, position: { x: 10, y: 11 } }
+        const c = critter({ stats: { HP: 5, 'Max HP': 30 }, pro: { extra: { bodyType: 1 } } })
+        ;(globalState as any).gMap = mapWith([stim])
+        expect(new AiTurn(combatWith([c]), c).searchEnviron('drug')).toBeNull()
+    })
+})

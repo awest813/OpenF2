@@ -694,17 +694,103 @@ export class AiTurn {
     }
 
     /** _ai_switch_weapons: arm the best usable weapon, or fists. */
-    private switchWeapons(state: { weapon: AnyCritter | null; hitMode: AiHitMode }, defender: AnyCritter): boolean {
+    private async switchWeapons(state: { weapon: AnyCritter | null; hitMode: AiHitMode }, defender: AnyCritter): Promise<boolean> {
         state.weapon = null
         state.hitMode = 0
-        const best = this.searchInventoryWeapon(true, defender)
+        let best = this.searchInventoryWeapon(true, defender)
         if (!best) {
-            return this.attackCost(null, 0) <= this.ap
+            const nearby = this.searchEnviron('weapon')
+            if (!nearby) {return this.attackCost(null, 0) <= this.ap}
+            best = await this.retrieve(nearby)
+            if (!best) {return false}
         }
         state.weapon = best
         state.hitMode = this.pickHitMode(best, defender)
         this.wield(best)
         return this.attackCost(best, state.hitMode) <= this.ap
+    }
+
+    // ── things on the floor ─────────────────────────────────────────────
+
+    /** Proto body type: 0 biped, 1 quadruped, 2 robotic. */
+    private get bodyType(): number {
+        const c = this.c
+        const t = c.pro?.extra?.bodyType ?? c.bodyType
+        return typeof t === 'number' ? t : 0
+    }
+
+    /** aiCanUseItem: wanted chems, or a healing item when hurt enough to want one. */
+    private canUseItem(item: AnyCritter): boolean {
+        const c = this.c
+        const ai = this.ai
+        if (ai.chemPrimaryDesire.includes(item?.pid)) {return true}
+        if (this.bodyType !== 0) {return false}
+        const killType = c.pro?.extra?.killType ?? 0
+        // man, woman, child, super mutant, ghoul
+        if (![0, 1, 2, 3, 4].includes(killType)) {return false}
+        if (statOf(c, 'INT') < 3) {return false}
+        if (!HEALING_PIDS.has(item?.pid)) {return false}
+        let hpRatio = STIMS_RATIO
+        if (ai.chemUse === ChemUse.CLEAN) {hpRatio = 0}
+        else if (ai.chemUse === ChemUse.STIMS_WHEN_HURT_LITTLE) {hpRatio = STIMS_WHEN_HURT_LITTLE_RATIO}
+        else if (ai.chemUse === ChemUse.STIMS_WHEN_HURT_LOTS) {hpRatio = STIMS_WHEN_HURT_LOTS_RATIO}
+        return statOf(c, 'HP') <= Math.trunc(statOf(c, 'Max HP') * hpRatio / 100)
+    }
+
+    /** _ai_search_environ: the nearest usable item of a kind within PER + 5 hexes. */
+    searchEnviron(kind: 'weapon' | 'ammo' | 'drug' | 'misc'): AnyCritter | null {
+        const c = this.c
+        if (this.bodyType !== 0 || !c.position) {return null}
+        const map: any = globalState.gMap
+        let objects: AnyCritter[] = []
+        try {
+            objects = typeof map?.getObjects === 'function' ? map.getObjects() : []
+        } catch {
+            objects = []
+        }
+        const items = objects
+            .filter((o) => o?.type === 'item' && o.position)
+            .sort((a, b) => dist(a, c) - dist(b, c))
+        const reach = statOf(c, 'PER') + 5
+        const held = this.equipped()
+        for (const item of items) {
+            if (dist(c, item) > reach) {break}
+            if (item.subtype !== kind) {continue}
+            if (kind === 'weapon' && item.weapon && this.canUseWeapon(item, 1)) {return item}
+            if (kind === 'ammo' && held && isRangedWeapon(held) && item.pid === weaponAmmoPid(held)) {return item}
+            if ((kind === 'drug' || kind === 'misc') && this.canUseItem(item)) {return item}
+        }
+        return null
+    }
+
+    /**
+     * _ai_retrieve_object: walk to the item and pick it up (3 AP in combat,
+     * _check_scenery_ap_cost). Short of AP, remember it for next turn.
+     */
+    async retrieve(item: AnyCritter): Promise<AnyCritter | null> {
+        const c = this.c
+        if (item?.position && dist(c, item) > 1) {
+            await this.walk(item.position, this.ap, false, true)
+        }
+        if (this.stale || !item?.position || dist(c, item) > 1 || this.ap < 3) {
+            c.aiLastItem = item
+            return null
+        }
+        this.spendAp(3)
+        try {
+            ;(globalState.gMap as any)?.removeObject?.(item)
+        } catch {
+            // already gone
+        }
+        const before = Array.isArray(c.inventory) ? c.inventory.length : 0
+        if (typeof c.addInventoryItem === 'function') {
+            c.addInventoryItem(item, typeof item.amount === 'number' && item.amount > 0 ? item.amount : 1)
+        } else if (Array.isArray(c.inventory)) {
+            c.inventory.push(item)
+        }
+        c.aiLastItem = null
+        const inv: AnyCritter[] = Array.isArray(c.inventory) ? c.inventory : []
+        return inv.length > before ? inv[inv.length - 1] : inv.find((o) => o?.pid === item.pid) ?? null
     }
 
     // ── attacking ───────────────────────────────────────────────────────
@@ -770,9 +856,9 @@ export class AiTurn {
         if (state.weapon || !defender.equippedWeapon) {
             const check = this.unsafe(state.weapon, state.hitMode, defender)
             safeDistance = check.safeDistance
-            if (check.unsafe) {this.switchWeapons(state, defender)}
+            if (check.unsafe) {await this.switchWeapons(state, defender)}
         } else {
-            this.switchWeapons(state, defender)
+            await this.switchWeapons(state, defender)
         }
 
         for (let attempt = 0; attempt < 10; attempt++) {
@@ -791,11 +877,20 @@ export class AiTurn {
                         this.spendAp(reloadApCost(perk))
                     }
                 } else {
-                    this.unwield()
-                    if (!this.switchWeapons(state, defender)) {return}
+                    const nearby = weapon ? this.searchEnviron('ammo') : null
+                    const ammo = nearby ? await this.retrieve(nearby) : null
+                    if (weapon && ammo) {
+                        if (reloadWeapon(c, weapon, { apCost: 0 }).loaded > 0) {
+                            const perk = typeof weapon.pro?.extra?.perk === 'number' ? weapon.pro.extra.perk : -1
+                            this.spendAp(reloadApCost(perk))
+                        }
+                    } else if (!nearby) {
+                        this.unwield()
+                        if (!await this.switchWeapons(state, defender)) {return}
+                    }
                 }
             } else if (reason === 'notEnoughAP' || reason === 'armCrippled' || reason === 'bothArmsCrippled') {
-                if (!this.switchWeapons(state, defender)) {return}
+                if (!await this.switchWeapons(state, defender)) {return}
             } else if (reason === 'outOfRange') {
                 if (this.toHit(defender, state.hitMode, { useDistance: false }) < minToHit) {
                     await this.runAway(defender)
@@ -803,7 +898,7 @@ export class AiTurn {
                 }
                 if (state.weapon) {
                     if (!await this.moveStepsCloser(defender, actionPoints, taunt)) {return}
-                } else if (!this.switchWeapons(state, defender) || !state.weapon) {
+                } else if (!await this.switchWeapons(state, defender) || !state.weapon) {
                     if (!await this.moveStepsCloser(defender, this.ap, taunt)) {return}
                 }
                 taunt = false
@@ -915,61 +1010,87 @@ export class AiTurn {
     }
 
     /** _ai_check_drugs: stimpaks when hurt, other chems by chem_use. */
-    checkDrugs(): void {
+    async checkDrugs(): Promise<void> {
         const c = this.c
         if (c.isPlayer || !Array.isArray(c.inventory)) {return}
-        if (typeof c.bodyType === 'number' && c.bodyType !== 0) {return}
+        if (this.bodyType !== 0) {return}
         const ai = this.ai
-        let hpRatio = STIMS_RATIO
-        let chance = 0
-        const turns = this.combat.combatNumTurns ?? 0
-        switch (ai.chemUse) {
-            case ChemUse.CLEAN:
-                return
-            case ChemUse.STIMS_WHEN_HURT_LITTLE:
-                hpRatio = STIMS_WHEN_HURT_LITTLE_RATIO
-                break
-            case ChemUse.STIMS_WHEN_HURT_LOTS:
-                hpRatio = STIMS_WHEN_HURT_LOTS_RATIO
-                break
-            case ChemUse.SOMETIMES:
-                if (turns % 3 === 0) {chance = SOMETIMES_CHANCE}
-                break
-            case ChemUse.ANYTIME:
-                if (turns % 3 === 0) {chance = ANYTIME_CHANCE}
-                break
-            case ChemUse.ALWAYS:
-                chance = ALWAYS_CHANCE
-                break
-        }
-
-        const drugs = () => (c.inventory as AnyCritter[]).filter((o) => o?.subtype === 'drug' || resolveDrugDef(o) !== null)
-        const minHp = Math.trunc(statOf(c, 'Max HP') * hpRatio / 100)
+        let lastItem: AnyCritter | null = c.aiLastItem ?? null
         let used = false
-        while (statOf(c, 'HP') < minHp && this.ap >= 2) {
-            const heal = drugs().find((d) => HEALING_PIDS.has(d.pid))
-            if (!heal) {break}
-            if (this.takeDrug(heal)) {used = true}
+        let searchCompleted = false
+
+        if (!lastItem) {
+            let hpRatio = STIMS_RATIO
+            let chance = 0
+            const turns = this.combat.combatNumTurns ?? 0
+            switch (ai.chemUse) {
+                case ChemUse.CLEAN:
+                    return
+                case ChemUse.STIMS_WHEN_HURT_LITTLE:
+                    hpRatio = STIMS_WHEN_HURT_LITTLE_RATIO
+                    break
+                case ChemUse.STIMS_WHEN_HURT_LOTS:
+                    hpRatio = STIMS_WHEN_HURT_LOTS_RATIO
+                    break
+                case ChemUse.SOMETIMES:
+                    if (turns % 3 === 0) {chance = SOMETIMES_CHANCE}
+                    break
+                case ChemUse.ANYTIME:
+                    if (turns % 3 === 0) {chance = ANYTIME_CHANCE}
+                    break
+                case ChemUse.ALWAYS:
+                    chance = ALWAYS_CHANCE
+                    break
+            }
+
+            const drugs = () => (c.inventory as AnyCritter[]).filter((o) => o?.subtype === 'drug' || resolveDrugDef(o) !== null)
+            const minHp = Math.trunc(statOf(c, 'Max HP') * hpRatio / 100)
+            while (statOf(c, 'HP') < minHp && this.ap >= 2) {
+                const heal = drugs().find((d) => HEALING_PIDS.has(d.pid))
+                if (!heal) {
+                    searchCompleted = true
+                    break
+                }
+                if (this.takeDrug(heal)) {used = true}
+            }
+
+            if (!used && chance > 0 && this.rng(0, 100) < chance) {
+                searchCompleted = true
+                const primary: AnyCritter[] = []
+                const secondary: AnyCritter[] = []
+                for (const d of drugs()) {
+                    if (HEALING_PIDS.has(d.pid)) {continue}
+                    const bucket = ai.chemPrimaryDesire.includes(d.pid) ? primary : secondary
+                    if (bucket.length < 3) {bucket.push(d)}
+                }
+                let count = 0
+                while (this.ap >= 2) {
+                    const bucket = primary.length > 0 ? primary : secondary.length > 0 ? secondary : null
+                    if (!bucket) {break}
+                    const i = this.rng(0, bucket.length - 1)
+                    const drug = bucket[i]
+                    bucket[i] = bucket[bucket.length - 1]
+                    bucket.pop()
+                    if (this.takeDrug(drug)) {
+                        used = true
+                        count++
+                    }
+                    if (ai.chemUse === ChemUse.SOMETIMES || (ai.chemUse === ChemUse.ANYTIME && count >= 2)) {break}
+                }
+            }
         }
 
-        if (used || chance <= 0 || this.rng(0, 100) >= chance) {return}
-        const primary: AnyCritter[] = []
-        const secondary: AnyCritter[] = []
-        for (const d of drugs()) {
-            if (HEALING_PIDS.has(d.pid)) {continue}
-            const bucket = ai.chemPrimaryDesire.includes(d.pid) ? primary : secondary
-            if (bucket.length < 3) {bucket.push(d)}
-        }
-        let count = 0
-        while (this.ap >= 2) {
-            const bucket = primary.length > 0 ? primary : secondary.length > 0 ? secondary : null
-            if (!bucket) {break}
-            const i = this.rng(0, bucket.length - 1)
-            const drug = bucket[i]
-            bucket[i] = bucket[bucket.length - 1]
-            bucket.pop()
-            if (this.takeDrug(drug)) {count++}
-            if (ai.chemUse === ChemUse.SOMETIMES || (ai.chemUse === ChemUse.ANYTIME && count >= 2)) {break}
+        // Nothing usable carried: fetch one off the floor (or the one aimed for last turn).
+        if (lastItem || (!used && searchCompleted)) {
+            do {
+                if (!lastItem) {
+                    lastItem = this.searchEnviron('drug') ?? this.searchEnviron('misc')
+                    if (!lastItem) {break}
+                }
+                const carried = await this.retrieve(lastItem)
+                if (!carried) {break}
+                lastItem = this.takeDrug(carried) ? null : carried
+            } while (lastItem && this.ap >= 2 && !this.stale)
         }
     }
 
@@ -984,7 +1105,8 @@ export class AiTurn {
             return
         }
 
-        this.checkDrugs()
+        await this.checkDrugs()
+        if (this.stale) {return}
         const target: AnyCritter | null = defenderHint && !defenderHint.dead ? defenderHint : this.dangerSource()
 
         await this.distancePrefs(target)
