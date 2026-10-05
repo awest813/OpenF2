@@ -60,6 +60,31 @@ export function isCarFueled(): boolean {
     return hasCar() && getCarFuel() > 0
 }
 
+/** wmCarFillGas: add fuel up to the tank's size; returns 0, or what did not fit. */
+export function fillCarGas(amount: number): number {
+    const fuel = getCarFuel()
+    if (amount + fuel <= CAR_FUEL_MAX) {
+        globalState.carFuel = fuel + amount
+        return 0
+    }
+    globalState.carFuel = CAR_FUEL_MAX
+    return CAR_FUEL_MAX - fuel
+}
+
+/** PROTO_ID_CAR_TRUNK: the trunk's container size (METARULE_GET/SET_CAR_CARRY_AMOUNT). */
+export const PID_CAR_TRUNK = 455
+let carTrunkMaxSize: number | null = null
+
+export function getCarTrunkMaxSize(): number {
+    if (carTrunkMaxSize !== null) {return carTrunkMaxSize}
+    const size = (globalState.proMap as any)?.items?.[PID_CAR_TRUNK]?.extra?.maxSize
+    return typeof size === 'number' ? size : 0
+}
+
+export function setCarTrunkMaxSize(size: number): void {
+    carTrunkMaxSize = size
+}
+
 /** Apply car speed bonus to a base world-map travel speed. */
 export function worldmapTravelSpeed(baseSpeed: number): number {
     if (!Number.isFinite(baseSpeed) || baseSpeed <= 0) return 0

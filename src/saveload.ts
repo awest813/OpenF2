@@ -511,6 +511,17 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     })
 }
 
+/** Restore a save; scripts see is_loading_game (METARULE_IS_LOADGAME) while it runs. */
+function applySave(save: SaveGame): void {
+    globalState.loadingGame = true
+    try {
+        hydrateStateFromSave(save, globalState, deserializeObj)
+        applyExtraSaveState(save)
+    } finally {
+        globalState.loadingGame = false
+    }
+}
+
 export function load(id: number): void {
     // Load stored savegame with id
 
@@ -526,8 +537,7 @@ export function load(id: number): void {
                 const save: SaveGame = migrateSave(rawSave)
 
                 console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
-                hydrateStateFromSave(save, globalState, deserializeObj)
-                applyExtraSaveState(save)
+                applySave(save)
                 EventBus.emit('game:loadComplete', { slot: id, name: save.name })
             } catch (error) {
                 console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {
@@ -557,8 +567,7 @@ export function load(id: number): void {
                     const save: SaveGame = migrateSave(rawSave)
 
                     console.log("[SaveLoad] Loading save #%d ('%s') from %s", id, save.name, formatSaveDate(save))
-                    hydrateStateFromSave(save, globalState, deserializeObj)
-                    applyExtraSaveState(save)
+                    applySave(save)
                     EventBus.emit('game:loadComplete', { slot: id, name: save.name })
                 } catch (error) {
                     console.error(`[SaveLoad] Could not load save #${id}; leaving current game state unchanged`, {

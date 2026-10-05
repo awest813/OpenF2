@@ -1199,44 +1199,35 @@ heart.draw = () => {
     globalState.lastDrawTime = Math.floor(window.performance.now() - time)
 }
 
-export function useElevator(): void {
-    // Player walked into an elevator
-    //
-    // We search for the Elevator Stub (Scenery PID 1293)
-    // in the range of 11. The original engine uses a square
-    // of size 11x11, but we don't do that.
-
-    console.log('[elevator]')
-
-    const center = globalState.player.position
-    const hexes = hexesInRadius(center, 11)
+/**
+ * scriptsRequestElevator: look for the elevator stub (scenery 1293) within
+ * five hexes of `source` (the player when none); its type wins, else the
+ * script's `type`. Returns -1 when there is no elevator to show.
+ */
+export function useElevator(source?: any, type = -1): number {
+    const center = source?.position ?? globalState.player.position
+    const hexes = hexesInRadius(center, 5)
     let elevatorStub = null
-    for (let i = 0; i < hexes.length; i++) {
-        const objs = globalState.gMap.objectsAtPosition(hexes[i])
-        for (let j = 0; j < objs.length; j++) {
-            const obj = objs[j]
+    for (let i = 0; i < hexes.length && elevatorStub === null; i++) {
+        for (const obj of globalState.gMap.objectsAtPosition(hexes[i])) {
             if (obj.type === 'scenery' && obj.pidID === 1293) {
-                console.log('elevator stub @ ' + hexes[i].x + ', ' + hexes[i].y)
                 elevatorStub = obj
                 break
             }
         }
     }
 
-    if (elevatorStub === null) {
-        console.warn("useElevator: couldn't find elevator stub near " + center.x + ', ' + center.y + ' — aborting')
-        return
-    }
+    const elevatorType = elevatorStub ? elevatorStub.extra.type : type
+    if (elevatorType === -1 || elevatorType === undefined) {return -1}
 
-    console.log('elevator type: ' + elevatorStub.extra.type + ', ' + 'level: ' + elevatorStub.extra.level)
-
-    const elevator = getElevator(elevatorStub.extra.type)
+    const elevator = getElevator(elevatorType)
     if (!elevator) {
-        console.warn('useElevator: no elevator definition for type: ' + elevatorStub.extra.type + ' — aborting')
-        return
+        console.warn('useElevator: no elevator definition for type: ' + elevatorType)
+        return -1
     }
 
     uiElevator(elevator)
+    return 0
 }
 
 Scripting.setUseElevatorHandler(useElevator)

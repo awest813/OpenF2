@@ -83,7 +83,7 @@ export interface AgingDeps {
 }
 
 /** itemDropAll: everything the critter carries lands on its hex. */
-function dropAll(critter: any, level: number, deps: AgingDeps): void {
+export function itemDropAll(critter: any, level: number, deps: Pick<AgingDeps, 'addObject'>): void {
     const items: any[] = critter.inventory ?? []
     if (!critter.position || items.length === 0) {return}
     for (const item of items) {
@@ -139,7 +139,7 @@ export function ageMapOnReentry(
                 (critterFlags(obj) & CRITTER_NO_HEAL) === 0
         )
         for (const corpse of corpses) {
-            if ((critterFlags(corpse) & CRITTER_NO_DROP) === 0) {dropAll(corpse, elevation, deps)}
+            if ((critterFlags(corpse) & CRITTER_NO_DROP) === 0) {itemDropAll(corpse, elevation, deps)}
 
             const blood = deps.createObject(BLOOD_PID)
             if (blood && corpse.position) {

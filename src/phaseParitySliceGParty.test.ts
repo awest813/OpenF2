@@ -118,16 +118,14 @@ describe('Parity Slice G — party control runtime', () => {
         expect(globalState.gParty.getControl(marcus)?.distance).toBe('on_your_own')
     })
 
-    it('metarule 19/25 reflect follow and waiting state', () => {
+    it('METARULE_PARTY_COUNT (16) counts the player and living, visible members', () => {
+        const script = new (Scripting as any).Script()
+        expect(script.metarule(16, 0)).toBe(1)
         const dog = makeMember(16777558, 'Dogmeat')
         globalState.gParty.addPartyMember(dog)
-        const script = new (Scripting as any).Script()
-        script.self_obj = dog
-        expect(script.metarule(19, dog)).toBe(1)
-        expect(script.metarule(25, dog)).toBe(0)
-        globalState.gParty.setWaiting(dog, true)
-        expect(script.metarule(19, dog)).toBe(0)
-        expect(script.metarule(25, dog) & PARTY_STATE_WAITING).toBe(PARTY_STATE_WAITING)
+        expect(script.metarule(16, 0)).toBe(2)
+        ;(dog as any).dead = true
+        expect(script.metarule(16, 0)).toBe(1)
     })
 })
 

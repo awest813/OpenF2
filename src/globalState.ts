@@ -45,6 +45,7 @@ export default {
     skillMode: Skills.None,
 
     isLoading: true, // are we currently loading a map?
+    loadingGame: false, // restoring a save (METARULE_IS_LOADGAME)
     isWaitingOnRemote: false, // are we waiting on the remote server to send critical info?
     isInitializing: true, // are we initializing the engine?
     loadingAssetsLoaded: 0, // how many images we've loaded
@@ -143,6 +144,7 @@ export default {
     skillMode: Skills
 
     isLoading: boolean
+    loadingGame: boolean
     isWaitingOnRemote: boolean
     isInitializing: boolean
     loadingAssetsLoaded: number

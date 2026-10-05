@@ -149,7 +149,7 @@ function parseAreas(data: string): AreaMap {
     return out
 }
 
-function areaContainingMap(mapName: string) {
+export function areaContainingMap(mapName: string) {
     if (!globalState.mapAreas) {
         console.warn('areaContainingMap: globalState.mapAreas not loaded — returning null')
         return null

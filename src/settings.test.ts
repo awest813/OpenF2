@@ -122,8 +122,15 @@ describe('settings overlay get_ini_setting / metarules', () => {
         patchSettings({ gameDifficulty: 0, combatDifficulty: 2 })
         expect(script.get_ini_setting('preferences.game_difficulty')).toBe(0)
         expect(script.get_ini_setting('preferences.combat_difficulty')).toBe(2)
-        expect(script.metarule(35, 0)).toBe(2)
+        // The engine has no difficulty metarules (35 and 55 are unused ids).
+        expect(script.metarule(35, 0)).toBe(0)
         expect(script.metarule(55, 0)).toBe(0)
+    })
+
+    it('METARULE_LANGUAGE_FILTER (47) follows the Options setting', () => {
+        expect(script.metarule(47, 0)).toBe(0)
+        patchSettings({ languageFilter: true })
+        expect(script.metarule(47, 0)).toBe(1)
     })
 
     it('get_violence_level_sfall follows the Options setting', () => {

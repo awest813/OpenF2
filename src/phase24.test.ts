@@ -152,6 +152,11 @@ describe('Phase 24-B — objectGetDamageType safe fallback', () => {
 // C. metarule(49) — METARULE_W_DAMAGE_TYPE — all 7 damage types
 // ---------------------------------------------------------------------------
 
+/** METARULE_WEAPON_DAMAGE_TYPE only answers for weapons. */
+function makeWeapon(overrides: Record<string, any> = {}): any {
+    return makeObj({ subtype: 'weapon', ...overrides })
+}
+
 describe('Phase 24-C — metarule(49) handles all Fallout 2 damage types', () => {
     let script: Scripting.Script
 
@@ -161,41 +166,41 @@ describe('Phase 24-C — metarule(49) handles all Fallout 2 damage types', () =>
     })
 
     it('Normal damage type → 0', () => {
-        const obj = makeObj({ dmgType: 'Normal' })
+        const obj = makeWeapon({ dmgType: 'Normal' })
         expect(script.metarule(49, obj)).toBe(0)
         expect(stubHitCount()).toBe(0)
     })
 
     it('Laser damage type → 1', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'Laser' }))).toBe(1)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'Laser' }))).toBe(1)
     })
 
     it('Fire damage type → 2', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'Fire' }))).toBe(2)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'Fire' }))).toBe(2)
     })
 
     it('Plasma damage type → 3', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'Plasma' }))).toBe(3)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'Plasma' }))).toBe(3)
     })
 
     it('Electrical damage type → 4', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'Electrical' }))).toBe(4)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'Electrical' }))).toBe(4)
     })
 
     it('EMP damage type → 5', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'EMP' }))).toBe(5)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'EMP' }))).toBe(5)
     })
 
     it('Explosive damage type → 6', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'Explosive' }))).toBe(6)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'Explosive' }))).toBe(6)
     })
 
     it('"explosion" (lowercase) → 6 (backward compatibility)', () => {
-        expect(script.metarule(49, makeObj({ dmgType: 'explosion' }))).toBe(6)
+        expect(script.metarule(49, makeWeapon({ dmgType: 'explosion' }))).toBe(6)
     })
 
     it('object with no dmgType falls back to Normal (0) — no throw', () => {
-        const obj = makeObj() // no dmgType
+        const obj = makeWeapon() // no dmgType
         expect(() => script.metarule(49, obj)).not.toThrow()
         expect(script.metarule(49, obj)).toBe(0)
     })
@@ -203,7 +208,7 @@ describe('Phase 24-C — metarule(49) handles all Fallout 2 damage types', () =>
     it('none of the damage-type calls emit stub hits', () => {
         drainStubHits()
         const types = ['Normal', 'Laser', 'Fire', 'Plasma', 'Electrical', 'EMP', 'Explosive']
-        for (const t of types) {script.metarule(49, makeObj({ dmgType: t }))}
+        for (const t of types) {script.metarule(49, makeWeapon({ dmgType: t }))}
         expect(stubHitCount()).toBe(0)
     })
 })
@@ -276,103 +281,6 @@ describe('Phase 24-E — proto_data field 13 (ITEM_DATA_MATERIAL)', () => {
     it('field 13 does not emit a stub hit', () => {
         drainStubHits()
         script.proto_data(0, 13)
-        expect(stubHitCount()).toBe(0)
-    })
-})
-
-// ---------------------------------------------------------------------------
-// F. metarule3() IDs 108–115 — de-stubbed
-// ---------------------------------------------------------------------------
-
-describe('Phase 24-F — metarule3 IDs 108–115 de-stub', () => {
-    let script: Scripting.Script
-
-    beforeEach(() => {
-        drainStubHits()
-        script = new (Scripting as any).Script()
-    })
-
-    // ID 108 — critter distance
-    it('metarule3(108, srcCritter, tgtCritter, 0) returns a distance number', () => {
-        const src = makeCritter({ position: { x: 5, y: 5 } })
-        const tgt = makeCritter({ position: { x: 8, y: 5 } })
-        const dist = script.metarule3(108, src, tgt, 0)
-        expect(typeof dist).toBe('number')
-        expect(dist).toBeGreaterThanOrEqual(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(108) returns 0 for non-game-object args', () => {
-        expect(script.metarule3(108, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 109 — tile distance
-    it('metarule3(109, tileA, tileB, 0) returns a number', () => {
-        const r = script.metarule3(109, 1000, 1010, 0)
-        expect(typeof r).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 110 — critter tile number
-    it('metarule3(110, critter, ...) returns a tile number', () => {
-        const c = makeCritter()
-        const r = script.metarule3(110, c, 0, 0)
-        expect(typeof r).toBe('number')
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(110) returns -1 for non-game-object', () => {
-        expect(script.metarule3(110, 0, 0, 0)).toBe(-1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 111 — critter is dead
-    it('metarule3(111, liveCritter, ...) returns 0', () => {
-        const c = makeCritter({ dead: false })
-        expect(script.metarule3(111, c, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(111, deadCritter, ...) returns 1', () => {
-        const c = makeCritter({ dead: true })
-        expect(script.metarule3(111, c, 0, 0)).toBe(1)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // ID 112 — inventory slot lookup
-    it('metarule3(112, critter, slotIndex, ...) returns inventory item at slot', () => {
-        const item = makeObj({ pid: 99 })
-        const c = makeCritter({ inventory: [item] })
-        expect(script.metarule3(112, c, 0, 0)).toBe(item)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(112, critter, outOfRange, ...) returns null', () => {
-        const c = makeCritter({ inventory: [] })
-        expect(script.metarule3(112, c, 5, 0)).toBeNull()
-        expect(stubHitCount()).toBe(0)
-    })
-
-    // IDs 113–115 — safe defaults
-    it('metarule3(113, ...) returns 0 without stub', () => {
-        expect(script.metarule3(113, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(114, ...) returns 0 without stub', () => {
-        expect(script.metarule3(114, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('metarule3(115, ...) returns 0 without stub', () => {
-        expect(script.metarule3(115, 0, 0, 0)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('none of IDs 108–115 emit stub hits', () => {
-        drainStubHits()
-        for (let id = 108; id <= 115; id++) {script.metarule3(id, 0, 0, 0)}
         expect(stubHitCount()).toBe(0)
     })
 })

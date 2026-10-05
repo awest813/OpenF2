@@ -113,6 +113,11 @@ function stateOf(critter: any): DrugState {
     return critter.drugState
 }
 
+/** queueHasEvent(critter, EVENT_TYPE_DRUG): a drug is still working on the critter. */
+export function hasDrugEvent(critter: any): boolean {
+    return (critter?.drugState?.drugEvents?.length ?? 0) > 0
+}
+
 /** The bonus drugs put on a stat (Critter.getStat adds it). */
 export function drugBonus(critter: any, stat: string): number {
     return critter?.drugState?.bonus?.[stat] ?? 0

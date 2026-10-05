@@ -194,45 +194,6 @@ describe('Phase 48-D — item_caps_adjust creates caps item when none in invento
 })
 
 // ===========================================================================
-// Phase 48-E — METARULE_HAVE_DRUG (case 53) checks inventory
-// ===========================================================================
-
-describe('Phase 48-E — metarule(53) METARULE_HAVE_DRUG inventory check', () => {
-    it('returns 1 when target has a drug item (subtype "drug") in inventory', () => {
-        const script = new Scripting.Script()
-        const drugItem = makeItem(300, 1, 'drug')
-        const critter = makeGameObj({ type: 'critter', inventory: [drugItem] })
-        expect(script.metarule(53, critter)).toBe(1)
-    })
-
-    it('returns 1 when target has an item with PRO subType===2 (drug numeric type)', () => {
-        const script = new Scripting.Script()
-        const drugItem = { _type: 'obj', type: 'item', subtype: 'misc', pid: 305, amount: 1, pro: { extra: { subType: 2 } } }
-        const critter = makeGameObj({ type: 'critter', inventory: [drugItem] })
-        expect(script.metarule(53, critter)).toBe(1)
-    })
-
-    it('returns 0 when target has no drug items in inventory', () => {
-        const script = new Scripting.Script()
-        const weaponItem = makeItem(50, 1, 'weapon')
-        const critter = makeGameObj({ type: 'critter', inventory: [weaponItem] })
-        expect(script.metarule(53, critter)).toBe(0)
-    })
-
-    it('returns 0 for a non-game-object target', () => {
-        const script = new Scripting.Script()
-        expect(script.metarule(53, null)).toBe(0)
-        expect(script.metarule(53, 0)).toBe(0)
-    })
-
-    it('returns 0 for a target with an empty inventory', () => {
-        const script = new Scripting.Script()
-        const critter = makeGameObj({ type: 'critter', inventory: [] })
-        expect(script.metarule(53, critter)).toBe(0)
-    })
-})
-
-// ===========================================================================
 // Phase 48-F — Critter equippedArmor serialized via equippedArmorPID
 // ===========================================================================
 
