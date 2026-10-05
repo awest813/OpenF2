@@ -218,22 +218,6 @@ describe('Phase 21-C — obj_item_subtype silent fallback', () => {
         script = new (Scripting as any).Script()
     })
 
-    it('returns 0 (no stub) for an item with no pro and no subtype', () => {
-        const item = makeObj({ type: 'item' })
-        delete item.subtype
-        drainStubHits()
-        const result = script.obj_item_subtype(item)
-        expect(result).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('returns 0 (no stub) for an item with undefined subtype', () => {
-        const item = makeObj({ type: 'item', subtype: undefined })
-        drainStubHits()
-        expect(script.obj_item_subtype(item)).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('still maps known string subtypes correctly', () => {
         const weapon = makeObj({ type: 'item', subtype: 'weapon' })
         drainStubHits()

@@ -165,12 +165,6 @@ describe('Phase 93-A — BLK-190: inven_cmds() null inventory guard', () => {
         expect(script.inven_cmds(NULL_OBJ, 0, 0)).toBeNull()
     })
 
-    it('returns first item normally when critter has a valid inventory', () => {
-        const item = { type: 'item', subtype: 'misc', pid: 0x1234, name: 'FlintPiece', visible: true, orientation: 0, position: { x: 10, y: 10 } }
-        const npc = makeCritter({ inventory: [item] })
-        expect(script.inven_cmds(npc, 0, 0)).toBe(item)
-    })
-
     it('returns null for INVEN_CMD_FIRST when critter has empty inventory', () => {
         const npc = makeCritter({ inventory: [] })
         expect(script.inven_cmds(npc, 0, 0)).toBeNull()

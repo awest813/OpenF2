@@ -264,10 +264,6 @@ describe('Phase 51-D — set_pc_stat scripting function', () => {
         }).not.toThrow()
     })
 
-    it('get_pc_stat(5) returns 5 (PCSTAT_max_pc_stat)', () => {
-        expect(script.get_pc_stat(5)).toBe(5)
-    })
-
     it('get_critter_stat_bonus with non-critter warns and returns 0', () => {
         expect(script.get_critter_stat_bonus({}, 0)).toBe(0)
     })
@@ -291,10 +287,6 @@ describe('Phase 51-D — set_pc_stat scripting function', () => {
 
     it('obj_art_name with null returns empty string', () => {
         expect(script.obj_art_name(null)).toBe('')
-    })
-
-    it('get_item_type_int with non-game-object returns 0 (fallback)', () => {
-        expect(script.get_item_type_int({})).toBe(0)
     })
 
     it('num_critters_in_radius with negative radius returns 0', () => {

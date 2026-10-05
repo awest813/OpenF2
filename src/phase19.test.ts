@@ -133,12 +133,6 @@ describe('Phase 19-B — get_pc_stat(5) returns 5 for PCSTAT_max_pc_stat', () =>
         script = new (Scripting as any).Script()
     })
 
-    it('returns 5 for PCSTAT_max_pc_stat (pcstat=5) and emits no stub', () => {
-        const result = script.get_pc_stat(5)
-        expect(result).toBe(5)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('returns correct values for pcstat 0-4 (existing cases)', () => {
         // These were already implemented; verify they still work
         expect(script.get_pc_stat(1)).toBe(1) // PCSTAT_level (default level is 1 when no player)
@@ -161,23 +155,9 @@ describe('Phase 19-C — inven_cmds navigation commands (FIRST/LAST/PREV/NEXT)',
         return makeObj({ type: 'item', pid })
     }
 
-    it('INVEN_CMD_FIRST (0) returns first inventory item', () => {
-        const items = [makeItemObj(10), makeItemObj(20), makeItemObj(30)]
-        const critter = makeCritter({ inventory: items })
-        const result = script.inven_cmds(critter, 0, 0)
-        expect(result).toBe(items[0])
-    })
-
     it('INVEN_CMD_FIRST (0) returns null for empty inventory', () => {
         const critter = makeCritter({ inventory: [] })
         expect(script.inven_cmds(critter, 0, 0)).toBeNull()
-    })
-
-    it('INVEN_CMD_LAST (1) returns last inventory item', () => {
-        const items = [makeItemObj(10), makeItemObj(20), makeItemObj(30)]
-        const critter = makeCritter({ inventory: items })
-        const result = script.inven_cmds(critter, 1, 0)
-        expect(result).toBe(items[2])
     })
 
     it('INVEN_CMD_LAST (1) returns null for empty inventory', () => {
@@ -185,24 +165,10 @@ describe('Phase 19-C — inven_cmds navigation commands (FIRST/LAST/PREV/NEXT)',
         expect(script.inven_cmds(critter, 1, 0)).toBeNull()
     })
 
-    it('INVEN_CMD_PREV (2) returns item before given index', () => {
-        const items = [makeItemObj(10), makeItemObj(20), makeItemObj(30)]
-        const critter = makeCritter({ inventory: items })
-        expect(script.inven_cmds(critter, 2, 2)).toBe(items[1])
-        expect(script.inven_cmds(critter, 2, 1)).toBe(items[0])
-    })
-
     it('INVEN_CMD_PREV (2) returns null when at start of list', () => {
         const items = [makeItemObj(10), makeItemObj(20)]
         const critter = makeCritter({ inventory: items })
         expect(script.inven_cmds(critter, 2, 0)).toBeNull()
-    })
-
-    it('INVEN_CMD_NEXT (3) returns item after given index', () => {
-        const items = [makeItemObj(10), makeItemObj(20), makeItemObj(30)]
-        const critter = makeCritter({ inventory: items })
-        expect(script.inven_cmds(critter, 3, 0)).toBe(items[1])
-        expect(script.inven_cmds(critter, 3, 1)).toBe(items[2])
     })
 
     it('INVEN_CMD_NEXT (3) returns null when at end of list', () => {

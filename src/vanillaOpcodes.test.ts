@@ -104,3 +104,41 @@ describe('has_trait / critter_add_trait / critter_state (interpreter_extra.cc)',
         expect(script.critter_state(critter({ blinded: true }))).toBe(0x40)
     })
 })
+
+describe('obj_type / obj_item_subtype / critter_inven_obj / inven_cmds / get_pc_stat', () => {
+    const script: any = new (Scripting as any).Script()
+
+    it('obj_type and obj_item_subtype give -1 when they do not apply', () => {
+        expect(script.obj_type(null)).toBe(-1)
+        expect(script.obj_type({ _type: 'obj', type: 'scenery', pid: 0x02000005 })).toBe(2)
+        expect(script.obj_item_subtype({ _type: 'obj', type: 'item', pro: { extra: { subType: 4 } } })).toBe(4)
+        expect(script.obj_item_subtype({ _type: 'obj', type: 'critter' })).toBe(-1)
+    })
+
+    it('critter_inven_obj: the player\'s hands answer only for the hand in use', () => {
+        const left = { id: 'L' }
+        const right = { id: 'R' }
+        const dude: any = { _type: 'obj', type: 'critter', isPlayer: true, leftHand: left, rightHand: right, activeHand: 0, inventory: [left, right] }
+        expect(script.critter_inven_obj(dude, 2)).toBe(left)
+        expect(script.critter_inven_obj(dude, 1)).toBe(0)
+        dude.activeHand = 1
+        expect(script.critter_inven_obj(dude, 1)).toBe(right)
+        expect(script.critter_inven_obj(dude, 2)).toBe(0)
+        expect(script.critter_inven_obj(dude, -2)).toBe(2)
+        const npc: any = { _type: 'obj', type: 'critter', leftHand: left, rightHand: right }
+        expect(script.critter_inven_obj(npc, 1)).toBe(right)
+        expect(script.critter_inven_obj(npc, 2)).toBe(left)
+        expect(script.critter_inven_obj({ _type: 'obj', type: 'item' }, 0)).toBe(0)
+    })
+
+    it('inven_cmds only knows INVEN_CMD_INDEX_PTR (13), on any object', () => {
+        const box: any = { _type: 'obj', type: 'item', inventory: ['a', 'b'] }
+        expect(script.inven_cmds(box, 13, 1)).toBe('b')
+        expect(script.inven_cmds(box, 13, 2)).toBeNull()
+        expect(script.inven_cmds(box, 0, 0)).toBeNull()
+    })
+
+    it('get_pc_stat has five stats', () => {
+        expect(script.get_pc_stat(5)).toBe(0)
+    })
+})

@@ -274,26 +274,6 @@ describe('Phase 25-G — metarule3() IDs >= 116 silent default', () => {
 })
 
 // ---------------------------------------------------------------------------
-// H. critter_inven_obj() unknown where → null silently
-// ---------------------------------------------------------------------------
-
-describe('Phase 25-H — critter_inven_obj() unknown where silent fallback', () => {
-    let script: any
-
-    beforeEach(() => {
-        drainStubHits()
-        script = new (Scripting as any).Script()
-    })
-
-    it('critter_inven_obj(critter, 99) returns null with no stub hit', () => {
-        const c = makeCritter()
-        const result = script.critter_inven_obj(c, 99)
-        expect(result).toBeNull()
-        expect(stubHitCount()).toBe(0)
-    })
-})
-
-// ---------------------------------------------------------------------------
 // I–M. sfall opcodes 0x818B–0x818F via Scripting.Script methods
 // ---------------------------------------------------------------------------
 

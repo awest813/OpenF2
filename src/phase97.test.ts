@@ -301,34 +301,6 @@ describe('Phase 97-D — BLK-213: mark_area_known() non-finite area ID guard', (
 // ---------------------------------------------------------------------------
 
 describe('Phase 97-E — BLK-214: critter_inven_obj() undefined hand-slot guard', () => {
-    it('returns null (not undefined) for right hand when rightHand is not set', () => {
-        const critter = makeCritter()
-        delete critter.rightHand
-        const result = script.critter_inven_obj(critter, 1)
-        expect(result).toBeNull()
-        expect(result).not.toBeUndefined()
-    })
-
-    it('returns null (not undefined) for left hand when leftHand is not set', () => {
-        const critter = makeCritter()
-        delete critter.leftHand
-        const result = script.critter_inven_obj(critter, 2)
-        expect(result).toBeNull()
-        expect(result).not.toBeUndefined()
-    })
-
-    it('returns null for unset right hand on bare critter (no rightHand property)', () => {
-        const critter = makeBareCritter()
-        const result = script.critter_inven_obj(critter, 1)
-        expect(result).toBeNull()
-    })
-
-    it('returns null for unset left hand on bare critter (no leftHand property)', () => {
-        const critter = makeBareCritter()
-        const result = script.critter_inven_obj(critter, 2)
-        expect(result).toBeNull()
-    })
-
     it('returns the item when rightHand is properly set', () => {
         const item = { type: 'item', pid: 0x0001001 }
         const critter = makeCritter({ rightHand: item })
@@ -731,11 +703,6 @@ describe('Phase 97-G — Arroyo start-to-end smoke tests', () => {
     /**
      * critter_inven_obj for a fresh spawned NPC (no hand properties).
      */
-    it('critter_inven_obj returns null for bare critter hand slots', () => {
-        const npc = makeBareCritter()
-        expect(script.critter_inven_obj(npc, 1)).toBeNull()
-        expect(script.critter_inven_obj(npc, 2)).toBeNull()
-    })
 })
 
 // ---------------------------------------------------------------------------

@@ -368,24 +368,6 @@ describe('Phase 18-C — inven_cmds LEFT_HAND (11) and RIGHT_HAND (12)', () => {
         }
     }
 
-    it('inven_cmds(critter, 11, 0) returns leftHand item', () => {
-        const script = new Scripting.Script()
-        const leftItem = { pid: 200, type: 'item', subtype: 'weapon' }
-        const critter = makeCritter(leftItem, null)
-        const result = script.inven_cmds(critter as any, 11, 0)
-        expect(result).toBe(leftItem)
-        expect(stubHitCount()).toBe(0)
-    })
-
-    it('inven_cmds(critter, 12, 0) returns rightHand item', () => {
-        const script = new Scripting.Script()
-        const rightItem = { pid: 300, type: 'item', subtype: 'weapon' }
-        const critter = makeCritter(null, rightItem)
-        const result = script.inven_cmds(critter as any, 12, 0)
-        expect(result).toBe(rightItem)
-        expect(stubHitCount()).toBe(0)
-    })
-
     it('inven_cmds(critter, 11, 0) returns null when no leftHand', () => {
         const script = new Scripting.Script()
         const critter = makeCritter(undefined, null)
@@ -464,13 +446,6 @@ describe('Phase 18-D — obj_item_subtype string subtype fallback', () => {
         expect(stubHitCount()).toBe(0)
     })
 
-    it('returns 0 without stub when subtype is unrecognized', () => {
-        const script = new Scripting.Script()
-        const obj: any = { type: 'item', pid: 1, inventory: [], visible: true, orientation: 0, subtype: 'unknown_type' }
-        const result = script.obj_item_subtype(obj)
-        expect(result).toBe(0)
-        expect(stubHitCount()).toBe(0)
-    })
 })
 
 // ---------------------------------------------------------------------------

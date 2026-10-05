@@ -1603,72 +1603,29 @@ export namespace Scripting {
         is_critical(roll: number) {
             return rollResultIsCritical(roll as any) ? 1 : 0
         }
+        /**
+         * opCritterGetInventoryObject: armor (0), right hand (1), left hand (2) or the
+         * number of stacks (-2). The player's hands answer only for the hand in use.
+         */
         critter_inven_obj(obj: Critter, where: number) {
-            if (!isGameObject(obj)) {
-                // Graceful fallback — return null instead of crashing the runtime when a
-                // script passes an unscripted or deleted object reference.
-                warn('critter_inven_obj: not game object — returning null', undefined, this)
-                return null
+            if (!isGameObject(obj) || obj.type !== 'critter') {return 0}
+            const c = obj as any
+            const isDude = c === globalState.player || c.isPlayer === true
+            const leftInUse = (c.activeHand ?? 0) === 0
+            switch (where) {
+                case 0: return c.equippedArmor ?? 0
+                case 1: return isDude && leftInUse ? 0 : (c.rightHand ?? 0)
+                case 2: return isDude && !leftInUse ? 0 : (c.leftHand ?? 0)
+                case -2: return Array.isArray(c.inventory) ? c.inventory.length : 0
+                default: return 0
             }
-            if (where === 0) {return obj.equippedArmor ?? null} // INVEN_TYPE_WORN
-            // BLK-214: Coerce undefined to null for hand slots — critters spawned via
-            // create_object_sid() during Arroyo temple initialisation may not have
-            // rightHand / leftHand properties initialised.  The existing code returns
-            // undefined when the property doesn't exist, which is falsy but not strictly
-            // null.  Scripts that compare with `== 0` receive a false negative because
-            // undefined == 0 is false in JavaScript.  Coerce to null so the result is
-            // consistent with the FO2 convention that an empty hand slot is null/0.
-            else if (where === 1) {return (obj.rightHand) ?? null} // INVEN_TYPE_RIGHT_HAND
-            else if (where === 2) {return (obj.leftHand) ?? null} // INVEN_TYPE_LEFT_HAND
-            else if (where === -2) {
-                // INVEN_TYPE_INV_COUNT — return the number of items in the critter's inventory
-                return obj.inventory ? obj.inventory.length : 0
-            }
-            // Unknown `where` value — log silently instead of emitting a stub hit.
-            // Scripts occasionally probe non-standard inventory slots; returning null
-            // (empty slot) is the safest semantics.
-            log('critter_inven_obj: unknown where=' + where + ' — returning null', arguments)
-            return null
         }
+        /** _op_inven_cmds: only INVEN_CMD_INDEX_PTR (13), the stack at an index of any object's inventory. */
         inven_cmds(obj: Critter, invenCmd: number, itemIndex: number): Obj | null {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('inven_cmds: not a critter: ' + obj, 'inventory', this)
-                return null
-            }
-            // BLK-190: Guard against null/undefined inventory array — critters spawned
-            // via create_object_sid() in the Arroyo temple have no inventory until their
-            // map_enter_p_proc runs.  Accessing obj.inventory.length directly on a null
-            // or undefined array throws TypeError.  Return null for all commands.
-            if (!Array.isArray(obj.inventory)) {
-                warn('inven_cmds: critter has no inventory — returning null', 'inventory', this)
-                return null
-            }
-
-            switch (invenCmd) {
-                case 0: // INVEN_CMD_FIRST
-                    return obj.inventory.length > 0 ? obj.inventory[0] : null
-                case 1: // INVEN_CMD_LAST
-                    return obj.inventory.length > 0 ? obj.inventory[obj.inventory.length - 1] : null
-                case 2: // INVEN_CMD_PREV — item before itemIndex; null when at the start
-                    if (itemIndex <= 0) {return null}
-                    return itemIndex - 1 < obj.inventory.length ? obj.inventory[itemIndex - 1] : null
-                case 3: // INVEN_CMD_NEXT — item after itemIndex; null when at the end
-                    if (itemIndex < 0 || itemIndex + 1 >= obj.inventory.length) {return null}
-                    return obj.inventory[itemIndex + 1]
-                case 11: // INVEN_CMD_LEFT_HAND
-                    return (obj as Critter).leftHand ?? null
-                case 12: // INVEN_CMD_RIGHT_HAND
-                    return (obj as Critter).rightHand ?? null
-                case 13: // INVEN_CMD_INDEX_PTR
-                    if (itemIndex < 0 || itemIndex >= obj.inventory.length) {return null}
-                    return obj.inventory[itemIndex]
-                default:
-                    // Unknown command index — log and return null rather than emitting
-                    // a stub warning so unexpected inventory command codes don't crash
-                    // or flood the console.
-                    warn('inven_cmds: unknown command ' + invenCmd + ' — returning null', 'inventory', this)
-                    return null
-            }
+            if (!isGameObject(obj) || invenCmd !== 13) {return null}
+            const inv = (obj as any).inventory
+            if (!Array.isArray(inv) || itemIndex < 0 || itemIndex >= inv.length) {return null}
+            return inv[itemIndex]
         }
         critter_attempt_placement(obj: Obj, tileNum: number, elevation: number) {
             // BLK-065: Guard against invalid (≤0) tile numbers and null objects.
@@ -1757,8 +1714,6 @@ export namespace Scripting {
                     // GVAR_PLAYER_REPUTATION (GVAR_0).  Scripts modify karma via
                     // set_global_var(0, ...) so globalVars[0] is always current.
                     return globalVars[0] !== undefined ? globalVars[0] : 0
-                case 5: // PCSTAT_max_pc_stat — the number of valid pcstat indices (0–4), so 5
-                    return 5
                 default:
                     // Unknown pcstat index — return 0 silently rather than throwing, so that
                     // scripts that probe sfall-extended or future pcstat indices do not crash.
@@ -2361,28 +2316,13 @@ export namespace Scripting {
             }
             (obj as any).name = String(name ?? '')
         }
+        /** opGetItemType: the item's type, or -1 for anything that is not an item. */
         obj_item_subtype(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_item_subtype: not game object: ' + obj)
-                return null
-            }
-
-            if (obj.type === 'item' && (obj as any).pro !== undefined) {return (obj as any).pro.extra.subtype}
-
-            // Fallback: map the string subtype to its Fallout 2 integer constant.
-            // 0=armor, 1=container, 2=drug, 3=weapon, 4=ammo, 5=misc, 6=key
-            const subtypeIntMap: { [name: string]: number } = {
-                armor: 0, container: 1, drug: 2, weapon: 3, ammo: 4, misc: 5, key: 6,
-            }
-            if (obj.subtype !== undefined && subtypeIntMap[obj.subtype] !== undefined) {
-                return subtypeIntMap[obj.subtype]
-            }
-
-            // Last-resort fallback: return 0 (armor/misc) without emitting a stub.
-            // Scripts that call obj_item_subtype on an object with no type information
-            // are handled gracefully rather than producing console noise.
-            log('obj_item_subtype: unknown subtype for pid=' + (obj.pid ?? '?'), arguments, 'inventory')
-            return 0
+            if (!isGameObject(obj) || obj.type !== 'item') {return -1}
+            const subType = (obj as any).pro?.extra?.subType
+            if (typeof subType === 'number') {return subType}
+            const byName: Record<string, number> = { armor: 0, container: 1, drug: 2, weapon: 3, ammo: 4, misc: 5, key: 6 }
+            return obj.subtype !== undefined && byName[obj.subtype] !== undefined ? byName[obj.subtype] : -1
         }
         anim_busy(obj: Obj) {
             log('anim_busy', arguments)
@@ -2575,16 +2515,12 @@ export namespace Scripting {
             }
             return objectOnScreen(obj) ? 1 : 0
         }
+        /** opGetObjectType: the art type of the object, or -1. */
         obj_type(obj: Obj) {
-            if (!isGameObject(obj)) {
-                warn('obj_type: not game object: ' + obj)
-                return null
-            } else if (obj.type === 'critter') {return 1} // critter
-            else if (obj.pid === undefined) {
-                warn('obj_type: no PID')
-                return null
-            }
-            return (obj.pid >> 24) & 0xff
+            if (!isGameObject(obj)) {return -1}
+            if (obj.type === 'critter') {return 1}
+            if (typeof obj.pid !== 'number') {return -1}
+            return (obj.pid >>> 24) & 0xff
         }
         destroy_object(obj: Obj) {
             // destroy object from world

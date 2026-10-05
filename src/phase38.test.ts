@@ -45,13 +45,6 @@ describe('Phase 38-A — get_pc_stat safe default for unknown pcstat', () => {
         expect(script.get_pc_stat(-1)).toBe(0)
     })
 
-    it('get_pc_stat still returns correct values for known indices', () => {
-        const script = new (Scripting as any).Script()
-        // Case 5 = PCSTAT_max_pc_stat → always 5
-        expect(script.get_pc_stat(5)).toBe(5)
-        // Case 1 = level; no player → 1 (default)
-        expect(script.get_pc_stat(1)).toBe(1)
-    })
 })
 
 // ===========================================================================
@@ -126,22 +119,6 @@ describe('Phase 38-D — critter_inven_obj safe default for non-game-object', ()
         expect(entry?.impact).toBe('high')
     })
 
-    it('critter_inven_obj with null does not throw, returns null', () => {
-        const script = new (Scripting as any).Script()
-        expect(() => script.critter_inven_obj(null, 0)).not.toThrow()
-        expect(script.critter_inven_obj(null, 0)).toBeNull()
-    })
-
-    it('critter_inven_obj with undefined does not throw, returns null', () => {
-        const script = new (Scripting as any).Script()
-        expect(() => script.critter_inven_obj(undefined, 1)).not.toThrow()
-        expect(script.critter_inven_obj(undefined, 1)).toBeNull()
-    })
-
-    it('critter_inven_obj with plain number (non-object) returns null', () => {
-        const script = new (Scripting as any).Script()
-        expect(script.critter_inven_obj(42 as any, 0)).toBeNull()
-    })
 })
 
 // ===========================================================================
