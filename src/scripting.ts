@@ -47,7 +47,8 @@ import { BinaryReader, getFileBinarySync, getFileText, getMessage, getRandomInt,
 import { aiPacketFor, isWithinPerception as perceives, playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
 import { SKILL_NAMES, skillRoll as engineSkillRoll } from './skillUse.js'
 import { adjustPoison, adjustRadiation } from './character/radiationPoison.js'
-import { installSfallFunctions, sfallSettings } from './sfallFunctions.js'
+import { installSfallFunctions, resetSfallState, sfallSettings } from './sfallFunctions.js'
+import { setPerkGvarReader } from './character/perks.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
@@ -644,6 +645,9 @@ export namespace Scripting {
     export function getGlobalVar(gvar: number): any {
         return globalVars[gvar] !== undefined ? globalVars[gvar] : 0
     }
+
+    // Perks whose requirement is a global variable (perk.cc perkCanAdd) read them here.
+    setPerkGvarReader((gvar) => Number(getGlobalVar(gvar)) || 0)
 
     export function getGlobalVars(): any {
         return globalVars
@@ -8558,6 +8562,7 @@ export namespace Scripting {
 
     /** A new game is starting: its global scripts start once its first map is in. */
     export function requestGlobalScriptsStart(): void {
+        resetSfallState()
         clearGlobalScripts()
         globalScriptsPending = true
     }

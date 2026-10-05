@@ -36,14 +36,16 @@ import { getRandomInt } from './util.js'
 import { getProtoData, setProtoData } from './protoOffsets.js'
 import { getObjectData, setObjectData } from './objectData.js'
 import { sfallSprintf } from './sfallPrintf.js'
-import { inventoryApCost, statMax, statMin } from './sfallSettings.js'
+import { inventoryApCost, STAT_BY_NAME, statMax, statMin } from './sfallSettings.js'
 import { inventorySize, itemWeight } from './critterInventory.js'
 import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
 import { loadMessage } from './data.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
-import { sfallSettings } from './sfallSettings.js'
+import { PERK_COUNT, PERK_DESCRIPTIONS, resetPerkDescriptions } from './character/perkTable.js'
+import { PERK_STAT_EFFECTS } from './character/perkIds.js'
+import { FakePerk, resetSfallSettings, sfallSettings } from './sfallSettings.js'
 
 export { sfallSettings }
 
@@ -120,7 +122,7 @@ function setFake(table: FakeTable, cap: number, owner: number, name: string, lev
         table.delete(key)
         return
     }
-    table.set(key, { level: Math.min(cap, Math.trunc(level)), image, desc: String(desc ?? ''), owner })
+    table.set(key, { name: String(name ?? ''), level: Math.min(cap, Math.trunc(level)), image, desc: String(desc ?? ''), owner })
 }
 
 let nextObjectId = 0x10000000
@@ -157,6 +159,70 @@ function skillMaxArg(v: number): number {
 function worldmapElement(): HTMLElement | null {
     return typeof document !== 'undefined' ? document.getElementById('worldmap') : null
 }
+
+type PerkField = 'frmId' | 'maxRank' | 'minLevel' | 'stat' | 'statModifier' | 'param1' | 'value1' | 'paramMode' | 'param2' | 'value2'
+
+/** Perks::SetPerkValue: one field of a perk (0–118); a number is a SPECIAL requirement. */
+function setPerkValue(perk: number, field: PerkField | number, value: number): void {
+    const d = PERK_DESCRIPTIONS[perk]
+    if (!d || !(perk >= 0 && perk < PERK_COUNT)) {return}
+    const v = Math.trunc(value)
+    if (typeof field === 'number') {d.stats[field] = v}
+    else {d[field] = v}
+    if (field === 'maxRank') {
+        const p = PERK_MAP.get(perk)
+        if (p) {p.ranks = v}
+    }
+    if (field === 'stat' || field === 'statModifier') {
+        const effects = PERK_STAT_EFFECTS as Map<number, { stat: string; perRank: number }>
+        const name = STAT_NAME_BY_NUMBER[d.stat]
+        if (d.stat === -1 || !name) {effects.delete(perk)}
+        else {effects.set(perk, { stat: name, perRank: d.statModifier })}
+    }
+}
+
+/** The perk box's names, descriptions, ranks and stat effects before any script changed them. */
+const PERK_DEFAULTS = new Map([...PERK_MAP].map(([id, p]) => [id, { name: p.name, description: p.description, ranks: p.ranks }]))
+const PERK_EFFECT_DEFAULTS = new Map(PERK_STAT_EFFECTS)
+
+/**
+ * Before a game starts or loads, sfall puts back what scripts changed:
+ * settings, the perk table and fake perks (which a load then restores).
+ */
+export function resetSfallState(): void {
+    resetSfallSettings()
+    resetPerkDescriptions()
+    for (const [id, d] of PERK_DEFAULTS) {
+        const p = PERK_MAP.get(id)
+        if (p) {Object.assign(p, d)}
+    }
+    const effects = PERK_STAT_EFFECTS as Map<number, { stat: string; perRank: number }>
+    effects.clear()
+    for (const [id, e] of PERK_EFFECT_DEFAULTS) {effects.set(id, e)}
+}
+
+/** Fake perks and traits are kept in sfall's saves (Perks::Save). */
+export function serializeFakePerks(): { perks: FakePerk[]; traits: FakePerk[]; selectable: FakePerk[] } {
+    return {
+        perks: [...sfallSettings.fakePerks.values()].map((p) => ({ ...p })),
+        traits: [...sfallSettings.fakeTraits.values()].map((p) => ({ ...p })),
+        selectable: [...sfallSettings.selectablePerks.values()].map((p) => ({ ...p })),
+    }
+}
+
+export function deserializeFakePerks(data: { perks?: FakePerk[]; traits?: FakePerk[]; selectable?: FakePerk[] } | undefined): void {
+    const fill = (table: FakeTable, list: FakePerk[] | undefined) => {
+        table.clear()
+        for (const p of list ?? []) {
+            if (p && typeof p.name === 'string') {table.set(fakeKey(p.owner ?? 0, p.name), { ...p, owner: p.owner ?? 0 })}
+        }
+    }
+    fill(sfallSettings.fakePerks, data?.perks)
+    fill(sfallSettings.fakeTraits, data?.traits)
+    fill(sfallSettings.selectablePerks, data?.selectable)
+}
+
+const STAT_NAME_BY_NUMBER = Object.fromEntries(Object.entries(STAT_BY_NAME).map(([k, v]) => [v, k])) as Record<number, string>
 
 function noop(): number {
     return 0
@@ -285,10 +351,32 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         const rank = (globalState.player as any)?.perkRanks?.[perk] ?? 0
         return isPerkAvailable(def, stats, skills, rank) ? 1 : 0
     },
-    set_perk_image: noop, set_perk_ranks: noop, set_perk_level: noop, set_perk_stat: noop, set_perk_stat_mag: noop,
-    set_perk_skill1: noop, set_perk_skill1_mag: noop, set_perk_type: noop, set_perk_skill2: noop, set_perk_skill2_mag: noop,
-    set_perk_str: noop, set_perk_per: noop, set_perk_end: noop, set_perk_chr: noop, set_perk_int: noop, set_perk_agl: noop,
-    set_perk_lck: noop, set_perk_name: noop, set_perk_desc: noop,
+    /** set_perk_*(perk, value): edit perk.cc's perk table (Perks::SetPerkValue). */
+    set_perk_image: (perk: number, v: number) => setPerkValue(perk, 'frmId', v),
+    set_perk_ranks: (perk: number, v: number) => setPerkValue(perk, 'maxRank', v),
+    set_perk_level: (perk: number, v: number) => setPerkValue(perk, 'minLevel', v),
+    set_perk_stat: (perk: number, v: number) => setPerkValue(perk, 'stat', v),
+    set_perk_stat_mag: (perk: number, v: number) => setPerkValue(perk, 'statModifier', v),
+    set_perk_skill1: (perk: number, v: number) => setPerkValue(perk, 'param1', v),
+    set_perk_skill1_mag: (perk: number, v: number) => setPerkValue(perk, 'value1', v),
+    set_perk_type: (perk: number, v: number) => setPerkValue(perk, 'paramMode', v),
+    set_perk_skill2: (perk: number, v: number) => setPerkValue(perk, 'param2', v),
+    set_perk_skill2_mag: (perk: number, v: number) => setPerkValue(perk, 'value2', v),
+    set_perk_str: (perk: number, v: number) => setPerkValue(perk, 0, v),
+    set_perk_per: (perk: number, v: number) => setPerkValue(perk, 1, v),
+    set_perk_end: (perk: number, v: number) => setPerkValue(perk, 2, v),
+    set_perk_chr: (perk: number, v: number) => setPerkValue(perk, 3, v),
+    set_perk_int: (perk: number, v: number) => setPerkValue(perk, 4, v),
+    set_perk_agl: (perk: number, v: number) => setPerkValue(perk, 5, v),
+    set_perk_lck: (perk: number, v: number) => setPerkValue(perk, 6, v),
+    set_perk_name(perk: number, name: string) {
+        const p = PERK_MAP.get(perk)
+        if (p && perk >= 0 && perk < PERK_COUNT) {p.name = String(name ?? '')}
+    },
+    set_perk_desc(perk: number, desc: string) {
+        const p = PERK_MAP.get(perk)
+        if (p && perk >= 0 && perk < PERK_COUNT) {p.description = String(desc ?? '')}
+    },
     set_fake_perk(name: string, level: number, image: number, desc: string) { setFake(sfallSettings.fakePerks, 100, 0, name, level, image, desc) },
     set_fake_trait(name: string, active: number, image: number, desc: string) { setFake(sfallSettings.fakeTraits, 1, 0, name, active, image, desc) },
     /** has_fake_perk(name), or by the number the perk box gives fake perks (119 and up). */
@@ -299,8 +387,17 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     has_fake_trait(name: unknown) {
         return sfallSettings.fakeTraits.has(fakeKey(0, name)) ? 1 : 0
     },
-    set_selectable_perk: noop, set_perkbox_title: noop, hide_real_perks: noop, show_real_perks: noop,
-    perk_add_mode: noop, clear_selectable_perks: noop,
+    set_selectable_perk(name: string, active: number, image: number, desc: string) {
+        setFake(sfallSettings.selectablePerks, 1, 0, name, active, image, desc)
+    },
+    set_perkbox_title(title: string) { sfallSettings.perkboxTitle = String(title ?? '') },
+    hide_real_perks() { sfallSettings.hideRealPerks = true },
+    show_real_perks() { sfallSettings.hideRealPerks = false },
+    perk_add_mode(mode: number) { sfallSettings.perkAddMode = Math.trunc(mode) },
+    clear_selectable_perks() {
+        sfallSettings.selectablePerks.clear()
+        sfallSettings.perkAddMode = 2
+    },
 
     // ── interface ──
     set_pipboy_available(v: number) { sfallSettings.pipboyAvailable = v },
@@ -893,7 +990,11 @@ export const sfallMetarules: Record<string, (this: any, ...args: any[]) => any> 
         const self = this.self_obj
         if (isObject(self)) {self.sfallName = name === undefined || name === '' ? undefined : String(name)}
     },
-    set_selectable_perk_npc: (obj: any) => (isCritter(obj) && isPartyMember(obj) ? 0 : -1),
+    set_selectable_perk_npc(obj: any, name: string, active: number, image: number, desc: string) {
+        if (!isCritter(obj) || !isPartyMember(obj)) {return -1}
+        setFake(sfallSettings.selectablePerks, 1, fakeOwner(obj), name, active, image, desc)
+        return 0
+    },
     set_spray_settings(centerMult: number, centerDiv: number, targetMult: number, targetDiv: number) {
         const cd = Math.max(1, Math.trunc(centerDiv))
         const td = Math.max(1, Math.trunc(targetDiv))

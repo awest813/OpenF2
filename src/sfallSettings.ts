@@ -6,65 +6,89 @@
 
 import { statDependencies } from './skills.js'
 
-export const sfallSettings = {
-    xpMod: 100,
-    perkLevelMod: 0,
-    perkFreq: 0,
-    /** The to-hit cap and bonus, for everyone (base) or one critter (Combat.cpp HitChanceMod). */
-    hitChance: { base: { max: 95, mod: 0 }, byCritter: new WeakMap<object, { max: number; mod: number }>() },
-    /** The skill cap (Skills.cpp skillMaxMods). */
-    skillMax: { base: 300, byCritter: new WeakMap<object, number>() },
-    /** The steal-chance cap and bonus (Skills.cpp pickpocketMods). */
-    pickpocket: { base: { max: 95, mod: 0 }, byCritter: new WeakMap<object, { max: number; mod: number }>() },
-    inventoryApCost: 4,
-    /** Perk level × this is taken off the inventory AP cost (Quick Pockets). */
-    inventoryApQuickPocketsReduction: 2,
-    unspentApBonus: 4,
-    unspentApPerkBonus: 4,
-    swiftLearnerMod: 5,
-    /** The constant in Max HP per level, END/2 + this (stat.cc; 2 unless set_hp_per_level_mod). */
-    hpPerLevelMod: 2,
-    pyromaniacMod: 5,
-    mapTimeMulti: 1,
-    combatBlocked: false,
-    combatBlockedMessage: '',
-    pcStatMax: {} as Record<number, number>,
-    pcStatMin: {} as Record<number, number>,
-    npcStatMax: {} as Record<number, number>,
-    npcStatMin: {} as Record<number, number>,
-    aimedShots: new Map<number, boolean>(),
-    /** Knockback modifiers (Combat.cpp mWeapons, mTargets, mAttackers): type 0 sets, 1 multiplies. */
-    knockback: {
-        weapons: new WeakMap<object, { type: number; value: number }>(),
-        targets: new WeakMap<object, { type: number; value: number }>(),
-        attackers: new WeakMap<object, { type: number; value: number }>(),
-    },
-    ifaceTags: new Set<number>(),
-    /** Fake perks and traits by owner id (0 for the player), then by name. */
-    fakePerks: new Map<string, { level: number; image: number; desc: string; owner: number }>(),
-    fakeTraits: new Map<string, { level: number; image: number; desc: string; owner: number }>(),
-    hooks: new Map<number, unknown>(),
-    forcedEncounter: null as null | { map: number; flags: number },
-    carTown: -1,
-    pipboyAvailable: 1,
-    /** The explosives item_make_explosive adds: pid → active pid and damage. */
-    explosives: new Map<number, { activePid: number; min: number; max: number }>(),
-    restHealTime: 180,
-    restMode: 0,
-    worldmapHealTime: 0,
-    unjamLocksTime: 24,
-    encounterDetection: true,
-    npcEngineLevelUp: true,
-    fo1HitChance: false,
-    townNames: true,
-    reactionThresholds: null as null | { neutral: number; good: number },
-    spray: { centerMult: 1, centerDiv: 3, targetMult: 1, targetDiv: 2 },
-    questFailureValues: new Map<number, number>(),
-    terrainNames: new Map<string, string>(),
-    townTitles: new Map<number, string>(),
-    canRestOnMap: new Map<string, number>(),
-    drugNumEffects: new Map<number, number>(),
-    drugAddictTimeOff: new Map<number, number>(),
+export interface FakePerk {
+    name: string
+    level: number
+    image: number
+    desc: string
+    owner: number
+}
+
+function defaultSettings() {
+    return {
+        xpMod: 100,
+        perkLevelMod: 0,
+        perkFreq: 0,
+        /** The to-hit cap and bonus, for everyone (base) or one critter (Combat.cpp HitChanceMod). */
+        hitChance: { base: { max: 95, mod: 0 }, byCritter: new WeakMap<object, { max: number; mod: number }>() },
+        /** The skill cap (Skills.cpp skillMaxMods). */
+        skillMax: { base: 300, byCritter: new WeakMap<object, number>() },
+        /** The steal-chance cap and bonus (Skills.cpp pickpocketMods). */
+        pickpocket: { base: { max: 95, mod: 0 }, byCritter: new WeakMap<object, { max: number; mod: number }>() },
+        inventoryApCost: 4,
+        /** Perk level × this is taken off the inventory AP cost (Quick Pockets). */
+        inventoryApQuickPocketsReduction: 2,
+        unspentApBonus: 4,
+        unspentApPerkBonus: 4,
+        swiftLearnerMod: 5,
+        /** The constant in Max HP per level, END/2 + this (stat.cc; 2 unless set_hp_per_level_mod). */
+        hpPerLevelMod: 2,
+        pyromaniacMod: 5,
+        mapTimeMulti: 1,
+        combatBlocked: false,
+        combatBlockedMessage: '',
+        pcStatMax: {} as Record<number, number>,
+        pcStatMin: {} as Record<number, number>,
+        npcStatMax: {} as Record<number, number>,
+        npcStatMin: {} as Record<number, number>,
+        aimedShots: new Map<number, boolean>(),
+        /** Knockback modifiers (Combat.cpp mWeapons, mTargets, mAttackers): type 0 sets, 1 multiplies. */
+        knockback: {
+            weapons: new WeakMap<object, { type: number; value: number }>(),
+            targets: new WeakMap<object, { type: number; value: number }>(),
+            attackers: new WeakMap<object, { type: number; value: number }>(),
+        },
+        ifaceTags: new Set<number>(),
+        /** Fake perks and traits by owner id (0 for the player), then by name. */
+        fakePerks: new Map<string, FakePerk>(),
+        fakeTraits: new Map<string, FakePerk>(),
+        /** Perks offered in the perk box (set_selectable_perk). */
+        selectablePerks: new Map<string, FakePerk>(),
+        /** hide_real_perks: the perk box offers only the selectable ones. */
+        hideRealPerks: false,
+        perkboxTitle: '',
+        /** perk_add_mode: 1 adds a chosen selectable perk as a trait, 2 as a perk, 4 removes it from the box. */
+        perkAddMode: 2,
+        hooks: new Map<number, unknown>(),
+        forcedEncounter: null as null | { map: number; flags: number },
+        carTown: -1,
+        pipboyAvailable: 1,
+        /** The explosives item_make_explosive adds: pid → active pid and damage. */
+        explosives: new Map<number, { activePid: number; min: number; max: number }>(),
+        restHealTime: 180,
+        restMode: 0,
+        worldmapHealTime: 0,
+        unjamLocksTime: 24,
+        encounterDetection: true,
+        npcEngineLevelUp: true,
+        fo1HitChance: false,
+        townNames: true,
+        reactionThresholds: null as null | { neutral: number; good: number },
+        spray: { centerMult: 1, centerDiv: 3, targetMult: 1, targetDiv: 2 },
+        questFailureValues: new Map<number, number>(),
+        terrainNames: new Map<string, string>(),
+        townTitles: new Map<number, string>(),
+        canRestOnMap: new Map<string, number>(),
+        drugNumEffects: new Map<number, number>(),
+        drugAddictTimeOff: new Map<number, number>(),
+    }
+}
+
+export const sfallSettings = defaultSettings()
+
+/** Back to the engine's values (sfall resets these when a game starts or loads). */
+export function resetSfallSettings(): void {
+    Object.assign(sfallSettings, defaultSettings())
 }
 
 /** Stat numbers 0–34 by OpenF2 stat name (stat.cc order). */

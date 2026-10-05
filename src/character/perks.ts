@@ -8,6 +8,7 @@
  */
 
 import { sfallSettings } from '../sfallSettings.js'
+import { perkCanAdd } from './perkTable.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { recomputeDerivedStats } from '../ecs/derivedStats.js'
 import { GAIN_STAT_PERKS, PERK_STAT_EFFECTS, PerkId, perkSkillBonusesFor } from './perkIds.js'
@@ -53,57 +54,37 @@ export interface Perk {
     apply(stats: StatsComponent, skills: SkillsComponent, rank: number): void
 }
 
-function checkPrereqs(
-    p: PerkPrerequisite,
-    stats: StatsComponent,
-    skills: SkillsComponent,
-): boolean {
-    if (p.minLevel !== undefined && stats.level + sfallSettings.perkLevelMod < p.minLevel) {return false}
-    const eff = {
-        strength: stats.strength + stats.strengthMod,
-        perception: stats.perception + stats.perceptionMod,
-        endurance: stats.endurance + stats.enduranceMod,
-        charisma: stats.charisma + stats.charismaMod,
-        intelligence: stats.intelligence + stats.intelligenceMod,
-        agility: stats.agility + stats.agilityMod,
-        luck: stats.luck + stats.luckMod,
-    }
-    if (p.minStrength !== undefined && eff.strength < p.minStrength) {return false}
-    if (p.minPerception !== undefined && eff.perception < p.minPerception) {return false}
-    if (p.minEndurance !== undefined && eff.endurance < p.minEndurance) {return false}
-    if (p.minCharisma !== undefined && eff.charisma < p.minCharisma) {return false}
-    if (p.minIntelligence !== undefined && eff.intelligence < p.minIntelligence) {return false}
-    if (p.minAgility !== undefined && eff.agility < p.minAgility) {return false}
-    if (p.minLuck !== undefined && eff.luck < p.minLuck) {return false}
-    if (p.maxStrength !== undefined && eff.strength >= p.maxStrength) {return false}
-    if (p.maxPerception !== undefined && eff.perception >= p.maxPerception) {return false}
-    if (p.maxEndurance !== undefined && eff.endurance >= p.maxEndurance) {return false}
-    if (p.maxCharisma !== undefined && eff.charisma >= p.maxCharisma) {return false}
-    if (p.maxIntelligence !== undefined && eff.intelligence >= p.maxIntelligence) {return false}
-    if (p.maxAgility !== undefined && eff.agility >= p.maxAgility) {return false}
-    if (p.maxLuck !== undefined && eff.luck >= p.maxLuck) {return false}
-    const skillOk = (req: { skill: SkillKey; value: number }) => ((skills as any)[req.skill] as number) >= req.value
-    if (p.minSkill !== undefined) {
-        const first = skillOk(p.minSkill)
-        if (p.minSkill2 === undefined) {
-            if (!first) {return false}
-        } else if (p.skillMode === 'or') {
-            if (!first && !skillOk(p.minSkill2)) {return false}
-        } else if (!first || !skillOk(p.minSkill2)) {
-            return false
-        }
-    }
-    return true
+const SKILL_ORDER = [
+    'smallGuns', 'bigGuns', 'energyWeapons', 'unarmed', 'meleeWeapons', 'throwing', 'firstAid', 'doctor', 'sneak',
+    'lockpick', 'steal', 'traps', 'science', 'repair', 'speech', 'barter', 'gambling', 'outdoorsman',
+] as const
+const SPECIAL_ORDER = ['strength', 'perception', 'endurance', 'charisma', 'intelligence', 'agility', 'luck'] as const
+
+let gvarReader: (index: number) => number = () => 0
+
+/** Global variables for perks whose requirement is a global variable (set by the script engine). */
+export function setPerkGvarReader(read: (index: number) => number): void {
+    gvarReader = read
 }
 
+/** perk.cc perkCanAdd for the player, from the ECS projection of their stats and skills. */
 export function isPerkAvailable(
     perk: Perk,
     stats: StatsComponent,
     skills: SkillsComponent,
     currentRank: number,
 ): boolean {
-    if (currentRank >= perk.ranks) {return false}
-    return checkPrereqs(perk.prerequisites, stats, skills)
+    return perkCanAdd({
+        isPlayer: true,
+        level: stats.level,
+        rank: currentRank,
+        stat: (i) => {
+            const key = SPECIAL_ORDER[i]
+            return ((stats as any)[key] ?? 0) + ((stats as any)[key + 'Mod'] ?? 0)
+        },
+        skill: (i) => ((skills as any)[SKILL_ORDER[i]] as number) ?? 0,
+        gvar: (i) => gvarReader(i),
+    }, perk.id, sfallSettings.perkLevelMod)
 }
 
 /**
@@ -657,10 +638,49 @@ export function getAvailablePerks(
     skills: SkillsComponent,
     currentPerks: Map<number, number>,  // perkId → current rank
 ): Perk[] {
-    return PERKS.filter((p) => {
+    const real = sfallSettings.hideRealPerks ? [] : PERKS.filter((p) => {
         const rank = currentPerks.get(p.id) ?? 0
         return isPerkAvailable(p, stats, skills, rank)
     })
+    return real.concat(selectablePerks())
+}
+
+/** The first number the perk box gives sfall's selectable perks (PERK_count). */
+export const FAKE_PERK_START = 119
+
+/** sfall set_selectable_perk entries for the player, as perks for the perk box. */
+export function selectablePerks(): Perk[] {
+    return [...sfallSettings.selectablePerks.values()]
+        .filter((p) => p.owner === 0)
+        .map((p, i) => ({
+            id: FAKE_PERK_START + i, name: p.name, description: p.desc, ranks: 1, prerequisites: {},
+            apply() {},
+        }))
+}
+
+export function isFakePerkId(id: number): boolean {
+    return id >= FAKE_PERK_START
+}
+
+/**
+ * Perks.cpp AddFakePerk: a chosen selectable perk becomes a fake trait
+ * (perk_add_mode bit 1), a fake perk or another level of it (bit 2), and
+ * leaves the box (bit 4).
+ */
+export function chooseSelectablePerk(id: number): boolean {
+    const entries = [...sfallSettings.selectablePerks.entries()].filter(([, p]) => p.owner === 0)
+    const entry = entries[id - FAKE_PERK_START]
+    if (!entry) {return false}
+    const [key, chosen] = entry
+    const mode = sfallSettings.perkAddMode
+    if (mode & 1 && !sfallSettings.fakeTraits.has(key)) {sfallSettings.fakeTraits.set(key, { ...chosen })}
+    if (mode & 2) {
+        const held = sfallSettings.fakePerks.get(key)
+        if (held) {held.level++}
+        else {sfallSettings.fakePerks.set(key, { ...chosen })}
+    }
+    if (mode & 4) {sfallSettings.selectablePerks.delete(key)}
+    return true
 }
 
 /**
@@ -672,6 +692,7 @@ export function grantPerk(
     skills: SkillsComponent,
     currentPerks: Map<number, number>,
 ): boolean {
+    if (isFakePerkId(perkId)) {return chooseSelectablePerk(perkId)}
     const perk = PERK_MAP.get(perkId)
     if (!perk) {return false}
 

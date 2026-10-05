@@ -7,9 +7,11 @@
 
 import { UIPanel, FALLOUT_GREEN, FALLOUT_AMBER, FALLOUT_DARK_GRAY, FALLOUT_RED, FALLOUT_BLACK, UIColor, cssColor, wrapText, drawUIFontText } from './uiPanel.js'
 import { EntityManager } from '../ecs/entityManager.js'
+import globalState from '../globalState.js'
+import { sfallSettings } from '../sfallSettings.js'
 import { StatsComponent, SkillsComponent } from '../ecs/components.js'
 import { getSkillPointCost } from '../character/leveling.js'
-import { getAvailablePerks, grantPerk, PERK_MAP, PERKS, Perk } from '../character/perks.js'
+import { getAvailablePerks, grantPerk, isFakePerkId, PERK_MAP, PERKS, Perk } from '../character/perks.js'
 import {
     syncPlayerEntityFromCritter,
     spendCritterSkillPoint,
@@ -224,7 +226,7 @@ export class CharacterScreen extends UIPanel {
 
         const listItems: ListItem[] = []
         if (player.perksAvailable > 0) {
-            listItems.push({ type: 'header', label: `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
+            listItems.push({ type: 'header', label: sfallSettings.perkboxTitle || `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
             if (available.length === 0) {
                 listItems.push({ type: 'header', label: '  No perks available' })
             } else {
@@ -401,7 +403,7 @@ export class CharacterScreen extends UIPanel {
 
                 const listItems: ListItem[] = []
                 if (player.perksAvailable > 0) {
-                    listItems.push({ type: 'header', label: `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
+                    listItems.push({ type: 'header', label: sfallSettings.perkboxTitle || `AVAILABLE PERKS (Points: ${player.perksAvailable})` })
                     if (available.length === 0) {
                         listItems.push({ type: 'header', label: '  No perks available' })
                     } else {
@@ -438,7 +440,11 @@ export class CharacterScreen extends UIPanel {
                                 // (drawn at x=290; bold 11px mono ≈ 53px wide).
                                 if (item.type === 'available' && x >= 288 && x < 348) {
                                     const success = grantPerk(item.perk.id, stats, skills, currentPerks)
-                                    if (success) {
+                                    if (success && isFakePerkId(item.perk.id)) {
+                                        // An sfall selectable perk: it costs the perk, nothing else is recorded.
+                                        player.perksAvailable = Math.max(0, player.perksAvailable - 1)
+                                        globalState.playerPerksOwed = Math.max(0, (globalState.playerPerksOwed ?? 0) - 1)
+                                    } else if (success) {
                                         player.acquiredPerks.push(item.perk.id)
                                         player.perksAvailable = Math.max(0, player.perksAvailable - 1)
                                         // Critter is source of truth for perk ranks / owed credits.

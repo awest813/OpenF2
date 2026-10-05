@@ -372,20 +372,20 @@ describe('Perk prerequisites — skill threshold', () => {
         expect(isPerkAvailable(ghost, stats, skills, 0)).toBe(true)
     })
 
-    it('Mr. Fixit needs Repair 40 AND Science 40; Master Thief Lockpick 50 OR Steal 50', () => {
+    it('perk.cc: Mr. Fixit needs Repair 40 OR Science 40; Master Thief Steal 50 AND Lockpick 50', () => {
         const fixit = PERK_MAP.get(PerkId.MR_FIXIT)!
         const thief = PERK_MAP.get(PerkId.MASTER_THIEF)!
         const stats = makeStats({ level: 12 })
         const skills = makeSkills(stats)
-        skills.repair = 40
+        skills.repair = 39
         skills.science = 39
         expect(isPerkAvailable(fixit, stats, skills, 0)).toBe(false)
         skills.science = 40
         expect(isPerkAvailable(fixit, stats, skills, 0)).toBe(true)
-        skills.lockpick = 10
+        skills.lockpick = 50
         skills.steal = 50
         expect(isPerkAvailable(thief, stats, skills, 0)).toBe(true)
-        skills.steal = 49
+        skills.lockpick = 49
         expect(isPerkAvailable(thief, stats, skills, 0)).toBe(false)
     })
 })

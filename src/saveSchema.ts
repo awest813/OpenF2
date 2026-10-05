@@ -115,6 +115,13 @@ export interface SaveGame {
         intIndexed?: Record<number, number>
     }
 
+    /** sfall fake perks, fake traits and selectable perks (sfall keeps them in its save). */
+    sfallFakePerks?: {
+        perks?: { name: string; level: number; image: number; desc: string; owner: number }[]
+        traits?: { name: string; level: number; image: number; desc: string; owner: number }[]
+        selectable?: { name: string; level: number; image: number; desc: string; owner: number }[]
+    }
+
     /**
      * Player character state flags bitfield (added in v12).
      *
