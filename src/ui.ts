@@ -29,7 +29,7 @@ import { SKILLDEX_ENTRIES, useSkilldexSkill } from './skilldex.js'
 import { fromTileNum } from './tile.js'
 import { $id, $img, $q, $qa, clearEl, show, hide, showv, hidev, off, appendHTML, makeEl, ElementOptions } from './dom.js'
 import { CSSBoundingBox, Widget, WindowFrame, SmallButton, Label, List, ListItem } from './widgets.js'
-import { pad, getProtoMsg } from './util.js'
+import { pad } from './util.js'
 import { Worldmap } from './worldmap.js'
 import { Config } from './config.js'
 import { Point } from './geometry.js'
@@ -99,37 +99,16 @@ function invSlotItem(obj: Obj | null | undefined): { name: string; amount: numbe
  * caller can fall back to generic item use.
  */
 function reloadPlayerWeapon(item: { pid?: number; name: string }): boolean {
+    // inventory.cc: loading ammo into the gun prints nothing; only a load
+    // that went in plays the weapon's ready sound.
     const player = globalState.player
     const weapon = player?.equippedWeapon
-    if (!player || !weapon) {
-        uiLog('You have no weapon to reload.')
-        return true
-    }
+    if (!player || !weapon) {return true}
     const ammoPid = weaponAmmoPid(weapon)
     if (item.pid !== undefined && item.pid !== ammoPid) {return false}
-
     const result = reloadWeapon(player, weapon)
-    switch (result.reason) {
-        case 'full':
-            uiLog('Your weapon is already fully loaded.')
-            return true
-        case 'no-ammo':
-            if (item.pid !== undefined && item.pid === ammoPid) {
-                // Matched the ammo type but the stack search failed — treat
-                // as reload attempt with nothing to load.
-                uiLog('Nothing to load.')
-                return true
-            }
-            uiLog('That is not the right ammunition.')
-            return true
-        case 'no-ap':
-            uiLog(getProtoMsg(700)!)
-            return true
-        default:
-            uiLog(`You reload your weapon (${result.loaded} round${result.loaded === 1 ? '' : 's'}).`)
-            EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })
-            return true
-    }
+    if (result.loaded > 0) {EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })}
+    return true
 }
 
 export function setPlayerUseHandler(handler: (obj?: Obj) => void): void {

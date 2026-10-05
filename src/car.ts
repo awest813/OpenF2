@@ -9,7 +9,6 @@ import globalState from './globalState.js'
 import { Critter, deserializeObj, Obj, SerializedObj } from './object.js'
 import { LootPanel } from './ui2/lootPanel.js'
 import { UIMode } from './uiMode.js'
-import { uiLog } from './ui.js'
 
 export const CAR_FUEL_MAX = 80000
 /** Fuel burned per world-map travel update tick while the car is moving. */
@@ -128,7 +127,6 @@ export function openCarTrunk(): boolean {
     if (panel && typeof panel.openWithLive === 'function') {
         panel.openWithLive(player.inventory as Obj[], carTrunk)
         globalState.uiMode = UIMode.loot
-        uiLog('Opened Highwayman trunk.')
         return true
     }
     console.warn('openCarTrunk: LootPanel unavailable')

@@ -9,7 +9,6 @@ import globalState from './globalState.js'
 import { Critter, Obj } from './object.js'
 import { LootPanel } from './ui2/lootPanel.js'
 import { UIMode } from './uiMode.js'
-import { uiLog } from './ui.js'
 
 export function canTradeWithPartyMember(obj: Critter | null | undefined): boolean {
     if (!obj || (obj as any).type !== 'critter') return false
@@ -34,7 +33,6 @@ export function openCompanionTrade(companion: Critter): boolean {
     if (panel && typeof panel.openWithLive === 'function') {
         panel.openWithLive(player.inventory as Obj[], companion.inventory as Obj[])
         globalState.uiMode = UIMode.loot
-        uiLog('Trading with ' + (companion.name || 'companion') + '.')
         return true
     }
 
