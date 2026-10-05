@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import globalState from './globalState.js'
+import { TICKS_PER_DAY } from './gameTime.js'
 import { Player } from './player.js'
 import { PERKS, PERK_MAP, educatedPerkRanks, EDUCATED_PERK_IDS } from './character/perks.js'
 import { TRAITS } from './character/traits.js'
@@ -20,9 +21,8 @@ import {
     applyRadiationGain,
     radiationBand,
     radiationGauge,
-    tickPoison,
-    tickRadiation,
-    resetRadiationPoisonClocks,
+    adjustPoison,
+    processRadPoisonUpTo,
     RAD_MINOR,
     RAD_CRITICAL,
 } from './character/radiationPoison.js'
@@ -115,57 +115,70 @@ describe('Parity Slice F — drugs and timed effects', () => {
     })
 })
 
-describe('Parity Slice F — radiation and poison', () => {
+describe('Parity Slice F — radiation and poison (critter.cc)', () => {
     let savedPlayer: typeof globalState.player
 
     beforeEach(() => {
         savedPlayer = globalState.player
-        resetRadiationPoisonClocks()
         globalState.player = new Player()
     })
 
     afterEach(() => {
         globalState.player = savedPlayer
-        resetRadiationPoisonClocks()
     })
 
-    it('maps radiation thresholds to bands and gauges', () => {
+    it('maps radiation counts to sickness levels (> 99, > 199, > 399, > 599, > 999)', () => {
         expect(radiationBand(0)).toBe('none')
         expect(radiationBand(RAD_MINOR)).toBe('minor')
         expect(radiationBand(RAD_CRITICAL)).toBe('critical')
         expect(radiationGauge(RAD_CRITICAL)).toBe(3)
+        expect(radiationGauge(1000)).toBe(5)
     })
 
-    it('applyRadiationGain is the resistance-aware path (Rad-X)', () => {
+    it('radiation resistance (with Rad-X) cuts every dose', () => {
         const player = globalState.player as Player
+        const plain = applyRadiationGain(player, 100)
+        player.stats.setBase('Radiation Level', 0)
         applyDrugToCritter(player, { name: 'Rad-X' })
         const taken = applyRadiationGain(player, 100)
-        expect(taken).toBeLessThanOrEqual(50)
+        expect(taken).toBeLessThan(plain)
         expect(player.stats.getBase('Radiation Level')).toBe(taken)
     })
 
-    it('tickPoison deals damage and decays poison level', () => {
+    it('a poison tick takes 1 HP and 2 poison, every 10 × (505 − 5 × poison) ticks', () => {
         const player = globalState.player as Player
-        player.stats.setBase('Poison Level', 100)
-        const hpBefore = player.getStat('HP')
-        const dmg = tickPoison(player)
-        expect(dmg).toBeGreaterThan(0)
-        expect(player.getStat('HP')).toBeLessThan(hpBefore)
-        expect(player.stats.getBase('Poison Level')).toBeLessThan(100)
+        player.stats.setBase('HP', player.getStat('Max HP'))
+        globalState.gameTickTime = 1000
+        processRadPoisonUpTo(1000)
+        adjustPoison(player, 100)
+        const poison = player.stats.getBase('Poison Level')
+        const hp = player.getStat('HP')
+        const due = 1000 + 10 * (505 - 5 * poison)
+        processRadPoisonUpTo(due - 1)
+        expect(player.getStat('HP')).toBe(hp)
+        processRadPoisonUpTo(due)
+        expect(player.getStat('HP')).toBe(hp - 1)
+        expect(player.stats.getBase('Poison Level')).toBe(poison - 2)
     })
 
-    it('tickRadiation damages at elevated bands', () => {
+    it('radiation sickness comes 4–18 hours after the midnight check and lifts after 7 days', () => {
         const player = globalState.player as Player
-        player.stats.setBase('Radiation Level', RAD_CRITICAL)
-        const hpBefore = player.getStat('HP')
-        expect(tickRadiation(player)).toBe(4)
-        expect(player.getStat('HP')).toBe(hpBefore - 4)
+        const strBefore = player.getStat('STR')
+        globalState.gameTickTime = 0
+        processRadPoisonUpTo(0)
+        player.stats.setBase('Radiation Level', 450) // critical
+        ;(player as any).radPoison.radiated = true
+        processRadPoisonUpTo(TICKS_PER_DAY + 19 * 36000)
+        expect(player.getStat('STR')).toBeLessThan(strBefore)
+        processRadPoisonUpTo(TICKS_PER_DAY * 9)
+        expect(player.getStat('STR')).toBe(strBefore)
     })
 
-    it('radiation_add opcode still applies the raw script amount', () => {
+    it('radiation_add goes through the engine (resistance applies)', () => {
         const player = globalState.player as Player
         const script = new (Scripting as any).Script()
         script.radiation_add(player, 20)
-        expect(player.stats.getBase('Radiation Level')).toBe(20)
+        const expected = 20 - Math.trunc((player.getStat('DR Radiation') * 20) / 100)
+        expect(player.stats.getBase('Radiation Level')).toBe(expected)
     })
 })

@@ -226,10 +226,10 @@ describe('Phase 87-C — BLK-163: poison non-finite amount guard', () => {
         expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
-    it('calls modifyBase for a valid negative amount (de-poisoning)', () => {
+    it('only the player can be poisoned (critterAdjustPoison)', () => {
         const critter: any = makeCritter()
-        script.poison(critter, -5)
-        expect(critter.stats.modifyBase).toHaveBeenCalledWith('Poison Level', -5)
+        script.poison(critter, 5)
+        expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
     it('does not throw for null critter', () => {
@@ -259,10 +259,10 @@ describe('Phase 87-D — BLK-164: radiation_add non-finite amount guard', () => 
         expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
-    it('calls modifyBase with the finite value', () => {
+    it('only the player takes radiation (critterAdjustRadiation)', () => {
         const critter: any = makeCritter()
         script.radiation_add(critter, 20)
-        expect(critter.stats.modifyBase).toHaveBeenCalledWith('Radiation Level', 20)
+        expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
     it('does not throw for null critter', () => {
@@ -292,10 +292,10 @@ describe('Phase 87-E — BLK-165: radiation_dec non-finite amount guard', () => 
         expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
-    it('calls modifyBase with negated finite value', () => {
+    it('only the player sheds radiation (critterAdjustRadiation)', () => {
         const critter: any = makeCritter()
         script.radiation_dec(critter, 10)
-        expect(critter.stats.modifyBase).toHaveBeenCalledWith('Radiation Level', -10)
+        expect(critter.stats.modifyBase).not.toHaveBeenCalled()
     })
 
     it('does not throw for null critter', () => {

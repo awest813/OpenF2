@@ -45,6 +45,7 @@ import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
 import { isWithinPerception as perceives, playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
 import { skillRoll as engineSkillRoll } from './skillUse.js'
+import { adjustPoison, adjustRadiation } from './character/radiationPoison.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
@@ -2298,7 +2299,8 @@ export namespace Scripting {
                 warn('poison: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
-            (obj as Critter).stats.modifyBase('Poison Level', amount)
+            // opPoison → critterAdjustPoison (the player only; resistance, messages, ticks).
+            adjustPoison(obj, amount)
         }
         radiation_dec(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -2313,7 +2315,8 @@ export namespace Scripting {
                 warn('radiation_dec: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
-            (obj as Critter).stats.modifyBase('Radiation Level', -amount)
+            // opRadiationDecrease → critterAdjustRadiation(−amount).
+            adjustRadiation(obj, -amount)
         }
         radiation_add(obj: Obj, amount: number) {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -2329,9 +2332,8 @@ export namespace Scripting {
                 warn('radiation_add: non-finite amount (' + amount + ') — no-op', undefined, this)
                 return
             }
-            // Scripts pass absolute increments; resistance is applied by engine helpers
-            // (applyRadiationGain / irradiated hexes), not inside this opcode.
-            (obj as Critter).stats.modifyBase('Radiation Level', amount)
+            // opRadiationIncrease → critterAdjustRadiation: resistance, messages, the midnight check.
+            adjustRadiation(obj, amount)
         }
 
         // combat

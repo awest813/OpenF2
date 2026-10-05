@@ -25,8 +25,7 @@ import {
 } from './car.js'
 import { migrateSave, SAVE_VERSION } from './saveSchema.js'
 import {
-    resetRadiationPoisonClocks,
-    tickRadiationAndPoison,
+    processRadPoisonUpTo,
     readPlayerPoisonLevel,
 } from './character/radiationPoison.js'
 import { Worldmap } from './worldmap.js'
@@ -64,22 +63,22 @@ describe('Pip-Boy rest (pipboy.cc pipboyRest)', () => {
         spy.mockRestore()
     })
 
-    it('advanceGameTime does not double-apply poison DoT on the next live tick', () => {
+    it('advanceGameTime runs poison ticks once, in time order', () => {
         const player = globalState.player as Player
-        player.stats.setBase('Poison Level', 200)
         player.stats.setBase('Max HP', 100)
         player.stats.setBase('HP', 100)
-        resetRadiationPoisonClocks()
         globalState.gameTickTime = 0
+        processRadPoisonUpTo(0)
+        player.stats.setBase('Poison Level', 50)
+        ;(player as any).radPoison.poisonTick = 100
 
-        const beforeHp = player.stats.get('HP') ?? 100
         advanceGameTime(TICKS_PER_HOUR, { heal: false, tickEffects: true })
         const afterRestHp = player.stats.get('HP') ?? 100
-        expect(afterRestHp).toBeLessThan(beforeHp)
+        expect(afterRestHp).toBeLessThan(100)
 
-        tickRadiationAndPoison(globalState.gameTickTime)
+        processRadPoisonUpTo(globalState.gameTickTime)
         expect(player.stats.get('HP')).toBe(afterRestHp)
-        expect(readPlayerPoisonLevel()).toBeLessThan(200)
+        expect(readPlayerPoisonLevel()).toBeLessThan(50)
     })
 })
 

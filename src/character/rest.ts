@@ -9,11 +9,7 @@
 import globalState from '../globalState.js'
 import { Critter } from '../object.js'
 import { tickTimedEffects } from './timedEffects.js'
-import {
-    tickPoison,
-    tickRadiation,
-    syncRadiationPoisonClocksAfterAdvance,
-} from './radiationPoison.js'
+import { processRadPoisonUpTo } from './radiationPoison.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 import { EventBus } from '../eventBus.js'
 import { Config } from '../config.js'
@@ -47,6 +43,8 @@ export interface TimeAdvanceResult {
     refusedReason?: 'combat' | 'no_player' | 'invalid' | 'unsafe'
     /** Whole hours rested. */
     hoursCompleted?: number
+    /** A queued event stopped the rest (poison has the player at 5 HP or less). */
+    interrupted?: boolean
 }
 
 export interface AdvanceOptions {
@@ -148,19 +146,15 @@ export function partyRestingHeal(hours: number): void {
 /**
  * Simulate chem/rad/poison clocks across a large jump without stepping every tick.
  */
-function simulateEffectsAcrossAdvance(ticks: number): void {
+function simulateEffectsAcrossAdvance(): boolean {
     const player = globalState.player as Critter | null
-    if (!player?.stats) return
+    if (!player?.stats) return false
 
     // Chem expiry is absolute (expiresAt vs gameTickTime) — one pass after the clock jumps.
     tickTimedEffects(player)
 
-    // Poison ~every 600 ticks, radiation DoT ~every 1800 ticks (see radiationPoison.ts).
-    const poisonRounds = Math.floor(ticks / 600)
-    const radRounds = Math.floor(ticks / 1800)
-    for (let i = 0; i < poisonRounds; i++) tickPoison(player)
-    for (let i = 0; i < radRounds; i++) tickRadiation(player)
-    syncRadiationPoisonClocksAfterAdvance(ticks)
+    // Poison ticks, radiation sickness and the midnight radiation check, in time order.
+    return processRadPoisonUpTo(globalState.gameTickTime)
 }
 
 /**
@@ -183,6 +177,8 @@ export function advanceGameTime(ticks: number, opts: AdvanceOptions = {}): TimeA
 
     const amount = Math.floor(ticks)
     const eventsFired = processTimedEventsForAdvance(amount)
+    // Settle the poison/radiation clock to now before jumping.
+    if (tickEffects && globalState.player) processRadPoisonUpTo(globalState.gameTickTime)
     const before = globalState.gameTickTime
     globalState.gameTickTime += amount
     midnightCheck(before, globalState.gameTickTime, globalState.gMap?.objects)
@@ -191,14 +187,15 @@ export function advanceGameTime(ticks: number, opts: AdvanceOptions = {}): TimeA
     if (heal) {
         hpHealed = applyRestHealing(amount)
     }
+    let interrupted = false
     if (tickEffects && globalState.player) {
-        simulateEffectsAcrossAdvance(amount)
+        interrupted = simulateEffectsAcrossAdvance()
     }
 
     if (globalState.player) {
         syncPlayerEntityFromCritter()
     }
-    return { ticksAdvanced: amount, eventsFired, hpHealed }
+    return { ticksAdvanced: amount, eventsFired, hpHealed, interrupted }
 }
 
 /**
@@ -269,6 +266,9 @@ export function restForHours(hours: number): TimeAdvanceResult {
         ticksAdvanced += chunk.ticksAdvanced
         eventsFired += chunk.eventsFired
         hoursCompleted++
+        if (chunk.interrupted) {
+            return { ticksAdvanced, eventsFired, hpHealed: applyRestHealing(ticksAdvanced), hoursCompleted, interrupted: true }
+        }
     }
 
     if (frac > 0.001) {

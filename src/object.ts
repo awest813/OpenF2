@@ -39,6 +39,8 @@ import { explode } from './explosion.js'
 import { skillRoll, SKILL_TRAPS } from './skillUse.js'
 import { statDependencies } from './skills.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
+import { radiationPenalty } from './character/radiationPoison.js'
+import { getActiveRadResistBonus } from './character/timedEffects.js'
 import { uiLog } from './ui.js'
 
 const SPECIAL_STATS = new Set(['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK'])
@@ -1626,6 +1628,7 @@ export class Critter extends Obj {
         }
         if (this.isPlayer) {value += gainPerkSpecialBonus(this, stat)}
         value += armorPerkStatBonus(this.equippedArmor, stat)
+        value += radiationPenalty(this, stat)
         if (stat === 'PER' && this.blinded) {value -= 5}
         if (includeTransient && stat === 'STR' && this.isPlayer) {
             value += adrenalineRushBonus(this, this.stats.get('HP'), this.getStat('Max HP'))
@@ -1647,6 +1650,9 @@ export class Critter extends Obj {
         statValue += traitStatModifier(this, stat, (st) => this.stats.get(st))
         statValue += perkStatModifier(this, stat)
         statValue += armorPerkStatBonus(this.equippedArmor, stat)
+        // Radiation sickness and Rad-X work on the critter's bonus stats.
+        statValue += radiationPenalty(this, stat)
+        if (stat === 'DR Radiation') {statValue += getActiveRadResistBonus(this)}
 
         // Add armor bonuses for DT/DR stats if armor is equipped
         if (this.equippedArmor && this.equippedArmor.pro && this.equippedArmor.pro.extra) {

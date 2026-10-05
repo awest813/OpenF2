@@ -132,6 +132,8 @@ export interface SaveGame {
     skillUsage?: number[][]
     /** wmGenData.didMeetFrankHorrigan. */
     metFrankHorrigan?: boolean
+    /** The player's poison ticks and radiation sickness events (critter.cc queue events). */
+    playerRadPoison?: unknown
 
     /**
      * Currently active weapon hand (added in v13 / BLK-034).
