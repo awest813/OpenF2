@@ -16,6 +16,7 @@
  */
 
 import globalState from '../globalState.js'
+import { reloadApCost } from './fo2Formulas.js'
 import { Critter, Obj } from '../object.js'
 
 /** True when the weapon is a ranged weapon that consumes ammo. */
@@ -85,8 +86,8 @@ export function reloadWeapon(
     })
     if (!ammoStack) {return { loaded: 0, reason: 'no-ammo' }}
 
-    // In combat, reloading costs AP (FO2: 2). Out of combat it is free.
-    const apCost = opts.apCost ?? 2
+    // In combat, reloading costs AP (item.cc: 2, 1 with Fast Reload). Out of combat it is free.
+    const apCost = opts.apCost ?? reloadApCost(typeof (weapon as any).pro?.extra?.perk === 'number' ? (weapon as any).pro.extra.perk : -1)
     if (globalState.inCombat && (critter as any).AP) {
         const ap = (critter as any).AP
         const available = typeof ap.getAvailableCombatAP === 'function'
@@ -112,4 +113,20 @@ export function reloadWeapon(
         if (idx >= 0) {inventory.splice(idx, 1)}
     }
     return { loaded: moved }
+}
+
+/**
+ * interface.cc _intface_item_reload: keep loading from matching stacks until
+ * the weapon is full or the ammo runs out, paying the reload AP once.
+ */
+export function reloadWeaponFully(critter: Critter, weapon: Obj): { loaded: number; reason?: 'full' | 'no-ammo' | 'no-ap' } {
+    const first = reloadWeapon(critter, weapon)
+    if (first.loaded === 0) {return first}
+    let total = first.loaded
+    for (;;) {
+        const next = reloadWeapon(critter, weapon, { apCost: 0 })
+        if (next.loaded === 0) {break}
+        total += next.loaded
+    }
+    return { loaded: total }
 }

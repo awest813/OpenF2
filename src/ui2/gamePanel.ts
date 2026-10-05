@@ -30,6 +30,8 @@ import globalState from '../globalState.js'
 import { syncPlayerEntityFromCritter, readPlayerHudSnapshot } from '../playerProjection.js'
 import { attackApCostFor, getAttackWeaponInfo } from '../combat/attackInfo.js'
 import { reloadApCost } from '../combat/fo2Formulas.js'
+import { reloadWeaponFully } from '../combat/ammo.js'
+import { PerkId, perkRank } from '../character/perkIds.js'
 
 const PANEL_HEIGHT = 99
 const BAR_WIDTH = 640
@@ -435,8 +437,33 @@ export class GamePanel extends UIPanel {
     }
 
     private _open(panelName: string, openAs?: string): boolean {
+        if (panelName === 'inventory' && !this._payInventoryAP()) {return true}
         EventBus.emit('audio:playSound', { soundId: 'ui_click' })
         EventBus.emit('ui:openPanel', openAs ? { panelName, openAs } : { panelName })
+        return true
+    }
+
+    /**
+     * inventory.cc inventoryOpen: during combat the inventory costs 4 AP
+     * (2 with Quick Pockets); refused with inventory.msg 19 when short.
+     */
+    private _payInventoryAP(): boolean {
+        if (!globalState.inCombat) {return true}
+        const player: any = globalState.player
+        if (!player?.AP) {return true}
+        if (!(globalState.combat?.inPlayerTurn ?? false)) {return false}
+        const required = Math.max(0, 4 - 2 * perkRank(player, PerkId.QUICK_POCKETS))
+        if (required > player.AP.getAvailableCombatAP()) {
+            let text: string | null = null
+            try {
+                text = getMessage('inventory', 19)
+            } catch {
+                text = null
+            }
+            EventBus.emit('ui:message', { text: text || "You don't have enough action points to use inventory." })
+            return false
+        }
+        player.AP.subtractCombatAP(required)
         return true
     }
 
@@ -463,10 +490,34 @@ export class GamePanel extends UIPanel {
         }
     }
 
-    /** Left click on the item button: the next critter clicked is attacked. */
+    /**
+     * Left click on the item button (interface.cc): RELOAD reloads (paying the
+     * reload AP in combat) and moves to the next action; an attack action arms
+     * the crosshair and starts combat when not already fighting.
+     */
     private _armAttackCursor(): void {
+        const player: any = globalState.player
+        const weapon = player?.equippedWeapon
+        const action = weapon?.weapon
         EventBus.emit('audio:playSound', { soundId: 'ui_click' })
+        if (action?.mode === 'reload') {
+            if (globalState.inCombat && !(globalState.combat?.inPlayerTurn ?? false)) {return}
+            const result = reloadWeaponFully(player, weapon)
+            if (result.loaded > 0) {
+                EventBus.emit('audio:playSound', { soundId: 'weapon_reload' })
+                if (typeof action.cycleMode === 'function') {action.cycleMode(player)}
+            } else if (result.reason === 'no-ap') {
+                const cost = reloadApCost(weapon?.pro?.extra?.perk ?? -1)
+                EventBus.emit('ui:message', { text: `You need ${cost} action points.` })
+            }
+            return
+        }
         globalState.attackCursor = true
+        if (!globalState.inCombat && player) {
+            void import('../combat.js').then(({ Combat }) => {
+                if (!globalState.inCombat) {Combat.start()}
+            })
+        }
     }
 
     private _endPlayerTurn(): void {
