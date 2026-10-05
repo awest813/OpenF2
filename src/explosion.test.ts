@@ -106,3 +106,21 @@ describe('explode (actionExplode / _report_explosion)', () => {
         expect(messages).toEqual(['Guard was hit for 5 hit points.'])
     })
 })
+
+describe('knockback (actionKnockdown)', () => {
+    it('stops before a wall or a living critter', async () => {
+        const { knockBack } = await import('./explosion.js')
+        const victim = critter('V', 50, 51)
+        const wall = { type: 'wall', position: { x: 50, y: 53 }, flags: 0, blocks: () => true }
+        knockBack(mapOf([victim, wall]), victim, { x: 50, y: 50 }, 5)
+        expect(victim.position).toEqual({ x: 50, y: 52 })
+    })
+
+    it('NO_KNOCKBACK critters stay put', async () => {
+        const { knockBack } = await import('./explosion.js')
+        const victim = critter('V', 50, 51)
+        victim.pro.extra.flags = 0x4000
+        knockBack(mapOf([victim]), victim, { x: 50, y: 50 }, 3)
+        expect(victim.position).toEqual({ x: 50, y: 51 })
+    })
+})

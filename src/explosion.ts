@@ -50,7 +50,7 @@ export interface ExplosionMap {
     critters(): any[]
 }
 
-function liveMap(): ExplosionMap | null {
+export function liveMap(): ExplosionMap | null {
     const map: any = globalState.gMap
     if (!map) {return null}
     return {
@@ -92,12 +92,15 @@ export function explosionVictims(center: Point, map: ExplosionMap): { main: any;
     return { main, extras }
 }
 
-/** actionKnockdown: slide back up to `distance` hexes, stopping before anything solid. */
-function knockBack(map: ExplosionMap, critter: any, center: Point, distance: number): void {
-    if (distance <= 0 || !critter.position) {return}
+/**
+ * actionKnockdown: slide up to `distance` hexes (at most 20) away from
+ * `from`, stopping before anything solid.
+ */
+export function knockBack(map: ExplosionMap | null, critter: any, from: Point, distance: number): void {
+    if (!map || distance <= 0 || !critter?.position) {return}
     if (((critter.pro?.extra?.flags ?? 0) & CRITTER_NO_KNOCKBACK) !== 0) {return}
-    if (critter.position.x === center.x && critter.position.y === center.y) {return}
-    const dir = hexDirectionTo(center, critter.position)
+    if (critter.position.x === from.x && critter.position.y === from.y) {return}
+    const dir = hexDirectionTo(from, critter.position)
     if (dir === null || dir === undefined) {return}
     let dest: Point | null = null
     for (let step = 1; step <= Math.min(distance, 20); step++) {

@@ -56,6 +56,7 @@ import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
 import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
 import { AI_MESSAGE, AiTurn, combatTaunt } from './combat/aiTurn.js'
+import { knockBack, liveMap } from './explosion.js'
 import {
     checkRetaliation,
     isFleeing,
@@ -726,13 +727,7 @@ export class Combat {
                 if (this.random(0, 100) < 50) {return}
             }
             const dist = knockbackDistance(damage, info.perk, stonewall)
-            if (dist > 0 && attacker.position && victim.position) {
-                const dir = hexDirectionTo(attacker.position, victim.position)
-                const newPos = hexInDirectionDistance(victim.position, dir, dist)
-                if (newPos && newPos.x >= 0 && newPos.x < 200 && newPos.y >= 0 && newPos.y < 200) {
-                    victim.move(newPos)
-                }
-            }
+            if (dist > 0 && attacker.position) {knockBack(liveMap(), victim, attacker.position, dist)}
         }
     }
 
