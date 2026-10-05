@@ -140,7 +140,8 @@ export namespace Scripting {
         }
     }
 
-    function getTileFID(tile: number, elevation: number): number {
+    /** The art index of the floor or roof square under a tile (tiles.lst line), 0 for none. */
+    function getTileIndex(tile: number, elevation: number, layer: 'floor' | 'roof'): number {
         if (!isValidTileNum(tile)) {
             return 0
         }
@@ -148,33 +149,22 @@ export namespace Scripting {
         if (!map || !map.mapObj || elevation < 0 || elevation >= map.numLevels) {
             return 0
         }
-        const level = map.mapObj.levels[elevation]
-        if (!level || !level.tiles || !level.tiles.floor) {
+        const squares = map.mapObj.levels[elevation]?.tiles?.[layer]
+        if (!squares) {
             return 0
         }
-        const hexPos = fromTileNum(tile)
-        const tilePos = hexToTile(hexPos)
-        const floor = level.tiles.floor
-        if (tilePos.y < 0 || tilePos.y >= floor.length) {
-            return 0
-        }
-        const row = floor[tilePos.y]
-        if (tilePos.x < 0 || tilePos.x >= row.length) {
-            return 0
-        }
-        const tileName = row[tilePos.x]
+        const tilePos = hexToTile(fromTileNum(tile))
+        const tileName = squares[tilePos.y]?.[tilePos.x]
         if (!tileName) {
             return 0
         }
         loadTilesList()
-        if (!tilesIndexMap) {
-            return 0
-        }
-        const index = tilesIndexMap.get(tileName.toLowerCase())
-        if (index === undefined) {
-            return 0
-        }
-        return 0x04000000 | index
+        return tilesIndexMap?.get(tileName.toLowerCase()) ?? 0
+    }
+
+    function getTileFID(tile: number, elevation: number): number {
+        const index = getTileIndex(tile, elevation, 'floor')
+        return index ? 0x04000000 | index : 0
     }
 
     /** Patch the live map floor name from an FID (script-visible; renderer may lag). */
@@ -3273,13 +3263,15 @@ export namespace Scripting {
                 critter.AP.combat = Math.max(0, ap)
             }
         }
-        get_npc_level(obj: Obj): number {
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('get_npc_level: not a critter: ' + obj, undefined, this)
-                return 0
-            }
-            const critter = obj as Critter
-            return critter.stats.getBase('Level')
+        /** get_npc_level(name or pid): how many levels the party member has gone up; -1 if not in the party. */
+        get_npc_level(who: unknown): number {
+            const party: any = globalState.gParty
+            const members: any[] = party?.getPartyMembers?.() ?? []
+            const member = members.find((m) => typeof who === 'number'
+                ? m.pid === who
+                : String(m.name ?? '').toLowerCase() === String(who ?? '').toLowerCase())
+            if (!member || (typeof who !== 'number' && !who)) {return -1}
+            return party.getControl?.(member)?.levelIndex ?? -1
         }
         get_critter_current_ap(obj: Obj): number {
             if (!isGameObject(obj) || obj.type !== 'critter') {
@@ -3423,13 +3415,21 @@ export namespace Scripting {
         }
 
         // sfall extended opcodes — substring extraction (0x8176)
+        /** substr(str, start, len) (Utils.cpp SubString): negatives count from the end. */
         substr(str: string, start: number, len: number): string {
-            // Returns a substring of `str` starting at `start` with length `len`.
-            // Negative `len` means "to end of string".  Mirrors sfall substr().
-            if (typeof str !== 'string') {return ''}
-            const s = start < 0 ? Math.max(0, str.length + start) : start
-            if (len < 0) {return str.slice(s)}
-            return str.slice(s, s + len)
+            const text = String(str ?? '')
+            const n = text.length
+            let pos = Math.trunc(start) || 0
+            let length = Math.trunc(len) || 0
+            if (pos < 0) {pos = Math.max(0, pos + n)}
+            if (length < 0) {
+                length += n - pos
+                if (length === 0) {return ''}
+                length = Math.abs(length)
+            }
+            if (pos >= n) {return ''}
+            if (length === 0 || length + pos > n) {length = n - pos}
+            return text.substr(pos, length)
         }
 
         // sfall extended opcodes — session uptime (0x8177)
@@ -3476,12 +3476,21 @@ export namespace Scripting {
             return (obj as any)._script ? 1 : 0
         }
 
-        // sfall extended opcode — get tile FID at tile/elevation (0x8194).
-        // get_tile_fid(tile, elevation) → FID value of the floor tile, or 0 if unavailable.
-        // Used by map scripts that inspect or modify the visual appearance of tiles.
-        get_tile_fid(tile: number, elevation: number): number {
-            log('get_tile_fid', arguments, 'tiles')
-            return getTileFID(tile, elevation)
+        /**
+         * get_tile_fid(tile | elevation << 24 | mode << 28): the floor square's
+         * art number, the roof's (mode 1), or both as the map stores them
+         * (mode 2: roof << 16 | floor).
+         */
+        get_tile_fid(tileAndElev: number): number {
+            const tile = tileAndElev & 0xffffff
+            const elevation = (tileAndElev >> 24) & 0x0f
+            const mode = tileAndElev >>> 28
+            if (tile >= 40000 || elevation > 2) {return 0}
+            const floor = getTileIndex(tile, elevation, 'floor') & 0x3fff
+            const roof = getTileIndex(tile, elevation, 'roof') & 0x3fff
+            if (mode === 1) {return roof}
+            if (mode === 2) {return ((roof << 16) | floor) | 0}
+            return floor
         }
 
         // sfall extended opcode — set tile FID at tile/elevation (0x8195).

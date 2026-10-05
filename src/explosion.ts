@@ -15,6 +15,7 @@ import { getRandomInt } from './util.js'
 import type { Rng } from './combat/fo2Formulas.js'
 import { describeAttack } from './combat/combatMessages.js'
 import { setWhoHitMe } from './combat/aiPacket.js'
+import { sfallSettings } from './sfallSettings.js'
 
 /** item.cc gRocketExplosionRadius: the reach of a free-standing blast. */
 export const EXPLOSION_RADIUS = 3
@@ -85,10 +86,10 @@ export function explosionVictims(center: Point, map: ExplosionMap): { main: any;
     const living = map.critters().filter((c) => !c.dead && c.position)
     const main = living.find((c) => c.position.x === center.x && c.position.y === center.y) ?? null
     const extras = living
-        .filter((c) => c !== main && hexDistance(center, c.position) <= EXPLOSION_RADIUS)
+        .filter((c) => c !== main && hexDistance(center, c.position) <= sfallSettings.explosionRadiusRocket)
         .filter((c) => ((c.flags ?? 0) & OBJECT_SHOOT_THRU) === 0 && !lineBlocked(map, c.position, center))
         .sort((a, b) => hexDistance(center, a.position) - hexDistance(center, b.position))
-        .slice(0, EXPLOSION_MAX_TARGETS)
+        .slice(0, sfallSettings.explosionMaxTargets)
     return { main, extras }
 }
 
@@ -186,5 +187,5 @@ export function explode(
 
 function allObjectsNear(center: Point): any[] {
     const objects: any[] = (globalState.gMap as any)?.getObjects?.() ?? []
-    return objects.filter((o) => o?.position && hexDistance(center, o.position) <= EXPLOSION_RADIUS)
+    return objects.filter((o) => o?.position && hexDistance(center, o.position) <= sfallSettings.explosionRadiusRocket)
 }

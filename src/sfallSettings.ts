@@ -18,6 +18,8 @@ function defaultSettings() {
     return {
         xpMod: 100,
         perkLevelMod: 0,
+        /** Skill points each level gives before INT (character_editor.cc 5; mod_skill_points_per_level). */
+        skillPointsPerLevel: 5,
         perkFreq: 0,
         /** The to-hit cap and bonus, for everyone (base) or one critter (Combat.cpp HitChanceMod). */
         hitChance: { base: { max: 95, mod: 0 }, byCritter: new WeakMap<object, { max: number; mod: number }>() },
@@ -67,6 +69,12 @@ function defaultSettings() {
         forcedEncounter: null as null | { map: number; flags: number },
         carTown: -1,
         pipboyAvailable: 1,
+        /** Explosion damage (metarule2_explosions 7 and 8) and limits (5 and 9). */
+        dynamiteDamage: { min: 30, max: 50 },
+        plasticDamage: { min: 40, max: 80 },
+        explosionMaxTargets: 6,
+        explosionRadiusGrenade: 2,
+        explosionRadiusRocket: 3,
         /** The explosives item_make_explosive adds: pid → active pid and damage. */
         explosives: new Map<number, { activePid: number; min: number; max: number }>(),
         restHealTime: 180,

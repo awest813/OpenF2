@@ -83,7 +83,7 @@ describe('Parity Slice A — get_tile_fid with lut fixture', () => {
             mapObj: { levels: [{ tiles: { floor: floorGrid } }] },
         }
         try {
-            expect(script.get_tile_fid(20100, 0)).toBe(0x04000000 | 2)
+            expect(script.get_tile_fid(20100)).toBe(2) // sfall: the square's art number
         } finally {
             ;(globalState as any).gMap = savedMap
         }

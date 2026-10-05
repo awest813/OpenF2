@@ -514,9 +514,10 @@ describe('Phase 18-H — sfall opcodes 0x8175–0x8177', () => {
         expect(script.substr('fallout', 0, 4)).toBe('fall')
     })
 
-    it('substr: negative len returns rest of string', () => {
+    it('substr: a negative len leaves that many characters off the end (sfall SubString)', () => {
         const script = new Scripting.Script()
-        expect(script.substr('fallout', 4, -1)).toBe('out')
+        expect(script.substr('fallout', 4, -1)).toBe('ou')
+        expect(script.substr('fallout', -3, 0)).toBe('out')
     })
 
     it('substr: start beyond string length returns empty string', () => {

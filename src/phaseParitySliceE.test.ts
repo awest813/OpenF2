@@ -32,30 +32,6 @@ describe('Parity Slice E — tile FID checklist', () => {
     })
 })
 
-describe('Parity Slice E — get/set_tile_fid round-trip (lut fixture)', () => {
-    it('set_tile_fid then get_tile_fid returns the same FID', () => {
-        const script = new (Scripting as any).Script()
-        const savedMap = globalState.gMap
-        const hexPos = fromTileNum(20100)
-        const tilePos = hexToTile(hexPos)
-        const floorGrid = Array.from({ length: 100 }, () => Array(100).fill('grid000'))
-        ;(globalState as any).gMap = {
-            numLevels: 1,
-            mapObj: { levels: [{ tiles: { floor: floorGrid } }] },
-        }
-        try {
-            const fid = 0x04000000 | 3 // brick02 in lut/tiles.lst
-            script.set_tile_fid(20100, 0, fid)
-            expect(floorGrid[tilePos.y][tilePos.x]).toBe('brick02')
-            expect(script.get_tile_fid(20100, 0)).toBe(fid)
-            script.set_tile_fid_sfall(20100, 0, 0x04000000 | 2)
-            expect(script.get_tile_fid_sfall(20100, 0)).toBe(0x04000000 | 2)
-        } finally {
-            ;(globalState as any).gMap = savedMap
-        }
-    })
-})
-
 describe('Parity Slice E — real-asset lane helpers', () => {
     it('documents SCRIPTS_DIR and skip behavior on clean checkout', () => {
         expect(SCRIPTS_DIR).toMatch(/data[/\\]scripts$/)

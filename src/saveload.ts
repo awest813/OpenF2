@@ -25,6 +25,7 @@ import { hydrateStateFromSave, snapshotSaveData } from './saveStateFidelity.js'
 import { Scripting } from './scripting.js'
 import { serializeSfallGlobals, deserializeSfallGlobals } from './sfallGlobals.js'
 import { deserializeFakePerks, resetSfallState, serializeFakePerks } from './sfallFunctions.js'
+import { markMoviePlayed, playedMovies } from './movies.js'
 import { serializeTimedEffects, hydrateTimedEffects } from './character/timedEffects.js'
 import { serializeAutomap, hydrateAutomap } from './character/automap.js'
 import { setHasCar, serializeCarTrunk, hydrateCarTrunk, serializeCarPark, hydrateCarPark } from './car.js'
@@ -79,6 +80,8 @@ function applyExtraSaveState(save: SaveGame): void {
         deserializeSfallGlobals(save.sfallGlobals)
     }
     deserializeFakePerks(save.sfallFakePerks)
+    playedMovies.clear()
+    for (const id of save.playedMovies ?? []) {markMoviePlayed(id)}
     // Restore player character state flags (sneak mode, etc.).
     if (globalState.player && typeof save.playerPcFlags === 'number') {
         globalState.player.pcFlags = save.playerPcFlags
@@ -346,6 +349,7 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     // set_sfall_global / get_sfall_global survive across save/load cycles.
     save.sfallGlobals = serializeSfallGlobals()
     save.sfallFakePerks = serializeFakePerks()
+    save.playedMovies = [...playedMovies]
 
     // Snapshot player character state flags (pc_flag_on/pc_flag_off) so that
     // sneak mode and other PC flags survive save/load cycles.

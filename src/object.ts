@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { apToAcBonus, capSkill, clampStatValue } from './sfallSettings.js'
+import { apToAcBonus, capSkill, clampStatValue, sfallSettings } from './sfallSettings.js'
 import { Weapon } from './critter.js'
 import { critterDamage } from './critter.js'
 import { getLstId, lookupScriptName } from './data.js'
@@ -215,8 +215,10 @@ export function detonateExplosive(explosive: Obj): void {
     const owner = explosiveOwner(explosive)
     const position = owner?.position ?? explosive.position
     const dynamite = explosive.pid === 51 || explosive.pid === 206
-    let minDamage = dynamite ? 30 : 40
-    let maxDamage = dynamite ? 50 : 80
+    const custom = sfallSettings.explosives.get(explosive.pid)
+    const range = custom ?? (dynamite ? sfallSettings.dynamiteDamage : sfallSettings.plasticDamage)
+    let minDamage = range.min
+    let maxDamage = range.max
     if (globalState.player && perkRank(globalState.player, PerkId.DEMOLITION_EXPERT) > 0) {
         minDamage += 10
         maxDamage += 10
@@ -915,6 +917,7 @@ export class Obj {
 
     get isExplosive(): boolean {
         return this.pid === 85 /* Plastic Explosives */ || this.pid === 51 /* Dynamite */
+            || sfallSettings.explosives.has(this.pid) // sfall item_make_explosive
     }
 
     get isSelectable(): boolean {

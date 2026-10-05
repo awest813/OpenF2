@@ -82,3 +82,31 @@ describe('item weight and size (item.cc)', () => {
         expect(itemWeight(hidden)).toBe(0)
     })
 })
+
+describe('explosions and aimed shots (Explosions.cpp, Combat.cpp)', () => {
+    afterEach(async () => (await import('./sfallFunctions.js')).resetSfallState())
+
+    it('metarule2_explosions reads and sets explosive damage and the target limit', async () => {
+        const { getArray } = await import('./sfallArrays.js')
+        const dmg = getArray(sfallMethods.metarule2_explosions(6, 51, 0))!
+        expect([dmg.get(0), dmg.get(1)]).toEqual([30, 50])
+        sfallMethods.metarule2_explosions(8, 60, 90)
+        expect(sfallSettings.plasticDamage).toEqual({ min: 60, max: 90 })
+        sfallMethods.metarule2_explosions(9, 3, 0)
+        expect(sfallSettings.explosionMaxTargets).toBe(3)
+        sfallMethods.metarule2_explosions(9, 9, 0)
+        expect(sfallSettings.explosionMaxTargets).toBe(3)
+        expect(sfallMethods.metarule2_explosions(42, 0, 0)).toBe(-1)
+    })
+
+    it('force_aimed_shots / disable_aimed_shots replace the damage-type test', async () => {
+        const { canAimAttack } = await import('./combat/attackInfo.js')
+        const info: any = { weapon: { pid: 13 }, isBurst: false, mode: 6, damageType: 'Explosive', attackType: 'ranged' }
+        expect(canAimAttack({}, info)).toBe(false)
+        sfallMethods.force_aimed_shots(13)
+        expect(canAimAttack({}, info)).toBe(true)
+        expect(canAimAttack({}, { ...info, isBurst: true })).toBe(false)
+        sfallMethods.disable_aimed_shots(13)
+        expect(canAimAttack({}, { ...info, damageType: 'Normal' })).toBe(false)
+    })
+})

@@ -42,6 +42,7 @@ import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
 import { loadMessage, scriptListIndex } from './data.js'
 import { keyDown, mouseButtonsDown } from './inputState.js'
+import { markMoviePlayed } from './movies.js'
 import { IniSection, parseIniSetting, readIniFile, setIniString } from './iniFiles.js'
 import { EntityManager } from './ecs/entityManager.js'
 import { isPerkAvailable, PERK_MAP } from './character/perks.js'
@@ -355,7 +356,8 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         if (skills) {skills.skillPoints = Math.max(0, Math.trunc(v))}
     },
     get_available_skill_points: () => (globalState.player as any)?.skills?.skillPoints ?? 0,
-    mod_skill_points_per_level: noop,
+    /** mod_skill_points_per_level(-100…100): added to the 5 skill points every level brings. */
+    mod_skill_points_per_level(v: number) { sfallSettings.skillPointsPerLevel = 5 + clampInt(v, -100, 100) },
     /** set_skill_max: an unsigned compare, so anything outside 0–300 becomes 300. */
     set_skill_max(v: number) { sfallSettings.skillMax.base = skillMaxArg(v) },
     set_base_skill_mod(v: number) { sfallSettings.skillMax.base = skillMaxArg(v) },
@@ -500,7 +502,8 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     create_message_window(text: string) {
         if (typeof text === 'string' && text !== '') {EventBus.emit('ui:messageBox', { text })}
     },
-    mark_movie_played: noop,
+    /** mark_movie_played(0–16): the movie joins the Pip-Boy's archive. */
+    mark_movie_played: (id: number) => markMoviePlayed(Math.trunc(id)),
     block_combat(v: number) { sfallSettings.combatBlocked = v !== 0 },
     set_inven_ap_cost(v: number) { sfallSettings.inventoryApCost = v },
     set_unspent_ap_bonus(v: number) { sfallSettings.unspentApBonus = v },
@@ -787,13 +790,33 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         return typeof fid === 'number' && fid > 0 ? 1 : 0
     },
 
-    /** metarule2_explosions: only the queries this port can answer. */
-    metarule2_explosions(rule: number, p1: number) {
-        if (rule === 6) {
-            const dynamite = p1 === 51 || p1 === 206
-            return arrayOf(dynamite ? [30, 50] : [40, 80])
+    /**
+     * metarule2_explosions(mode, a, b) (Explosions.cpp): 5 sets the grenade and
+     * rocket blast radii, 6 gives an explosive's damage as [min, max], 7 and 8
+     * set dynamite's and plastic's, 9 the most critters a blast catches (1–6).
+     * The one-attack overrides (1–4) are accepted; -1 for anything else.
+     */
+    metarule2_explosions(mode: number, a: number, b: number) {
+        switch (mode) {
+            case 1: case 2: case 3: case 4:
+                return 0
+            case 5:
+                if (a > 0) {sfallSettings.explosionRadiusGrenade = a}
+                if (b > 0) {sfallSettings.explosionRadiusRocket = b}
+                return 0
+            case 6: {
+                const r = a === 51 || a === 206 ? sfallSettings.dynamiteDamage
+                    : a === 85 || a === 209 ? sfallSettings.plasticDamage
+                    : sfallSettings.explosives.get(a) ?? { min: 0, max: 0 }
+                return arrayOf([r.min, r.max])
+            }
+            case 7: sfallSettings.dynamiteDamage = { min: a, max: b }; return 0
+            case 8: sfallSettings.plasticDamage = { min: a, max: b }; return 0
+            case 9:
+                if (a > 0 && a < 7) {sfallSettings.explosionMaxTargets = a}
+                return 0
         }
-        return 0
+        return -1
     },
 }
 

@@ -41,6 +41,14 @@ export function setMovieCinematicPlayer(player: CinematicPlayer | null): void {
     moviePlayer = player
 }
 
+/** gMoviePlayed: the movies the Pip-Boy's video archive offers (game_movie.cc, 17 slots). */
+export const playedMovies = new Set<number>()
+
+/** gameMovieMarkPlayed (also sfall mark_movie_played). */
+export function markMoviePlayed(movieID: number): void {
+    if (movieID >= 0 && movieID < 17) {playedMovies.add(movieID)}
+}
+
 export function resolveMovie(movieID: number): MovieDef {
     const known = FO2_MOVIE_CATALOG[movieID]
     if (known) return known
@@ -62,6 +70,7 @@ export function playMovie(movieID: number, opts: { playCinematic?: boolean } = {
     const id = typeof movieID === 'number' && Number.isFinite(movieID) ? Math.floor(movieID) : -1
     const def = resolveMovie(id)
     lastMovieId = id
+    markMoviePlayed(id)
     EventBus.emit('movie:play', { movieID: id, movieId: def.id, title: def.title })
 
     if (def.videoPath) {

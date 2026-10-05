@@ -87,7 +87,7 @@ export function awardCritterXp(
         // (+5 Skilled, −5 Gifted), clamped to [0, 99] unspent points.
         if (player.skills) {
             const baseInt = baseStat(player, 'INT')
-            let sp = player.skills.skillPoints + 5 + baseInt * 2
+            let sp = player.skills.skillPoints + sfallSettings.skillPointsPerLevel + baseInt * 2
             sp += educatedPerkRanks((player as any).perkRanks) * 2
             if (hasSkilled) {sp += 5}
             if (hasGifted) {sp = Math.max(0, sp - 5)}

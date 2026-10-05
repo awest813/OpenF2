@@ -206,6 +206,9 @@ export function canAimAttack(critter: any, info: AttackWeaponInfo): boolean {
     // Fast Shot: the player can never aim.
     if (critter?.isPlayer && critter?.charTraits?.has?.(TraitId.FAST_SHOT)) {return false}
     if (info.isBurst || info.mode === 8) {return false}
+    // sfall force_aimed_shots / disable_aimed_shots take the place of the damage-type test.
+    const scripted = sfallSettings.aimedShots.get((info.weapon as any)?.pid ?? 0)
+    if (scripted !== undefined) {return scripted}
     const t = info.damageType
     if (t === 'Explosive' || t === 'Fire' || t === 'EMP') {return false}
     if (t === 'Plasma' && info.attackType === 'throw') {return false}

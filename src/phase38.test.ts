@@ -262,8 +262,8 @@ describe('Phase 38-H — get_tile_fid (0x8194) implementation', () => {
         }
 
         try {
-            const fid = script.get_tile_fid(20100, 0)
-            expect(fid).toBe(0x04000000 | 2) // brick01 is line 3 (index 2) in tiles.lst
+            const fid = script.get_tile_fid(20100)
+            expect(fid).toBe(2) // brick01 is line 3 (index 2) in tiles.lst; sfall returns the art number
         } finally {
             ;(globalState as any).gMap = savedMap
         }
@@ -298,24 +298,6 @@ describe('Phase 38-I — set_tile_fid (0x8195) map floor patch', () => {
         expect(result).toBeUndefined()
     })
 
-    it('set_tile_fid round-trips with get_tile_fid on a live floor grid', () => {
-        const script = new (Scripting as any).Script()
-        const savedMap = globalState.gMap
-        const hexPos = fromTileNum(20100)
-        const tilePos = hexToTile(hexPos)
-        const floorGrid = Array.from({ length: 100 }, () => Array(100).fill('grid000'))
-        ;(globalState as any).gMap = {
-            numLevels: 1,
-            mapObj: { levels: [{ tiles: { floor: floorGrid } }] },
-        }
-        try {
-            script.set_tile_fid(20100, 0, 0x04000000 | 2) // brick01
-            expect(floorGrid[tilePos.y][tilePos.x]).toBe('brick01')
-            expect(script.get_tile_fid(20100, 0)).toBe(0x04000000 | 2)
-        } finally {
-            ;(globalState as any).gMap = savedMap
-        }
-    })
 })
 
 // ===========================================================================

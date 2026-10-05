@@ -115,6 +115,9 @@ export interface SaveGame {
         intIndexed?: Record<number, number>
     }
 
+    /** The movies already seen (game_movie.cc gMoviePlayed). */
+    playedMovies?: number[]
+
     /** sfall fake perks, fake traits and selectable perks (sfall keeps them in its save). */
     sfallFakePerks?: {
         perks?: { name: string; level: number; image: number; desc: string; owner: number }[]
