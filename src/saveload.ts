@@ -16,6 +16,7 @@ limitations under the License.
 
 import { getSkillUsage, setSkillUsage } from './skillUse.js'
 import { deserializeRadPoison, serializeRadPoison } from './character/radiationPoison.js'
+import { deserializeSfallArrays, serializeSfallArrays } from './sfallArrays.js'
 import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { deserializeObj } from './object.js'
@@ -84,6 +85,7 @@ function applyExtraSaveState(save: SaveGame): void {
     setSkillUsage(save.skillUsage)
     globalState.metFrankHorrigan = save.metFrankHorrigan === true
     deserializeRadPoison(globalState.player, save.playerRadPoison)
+    deserializeSfallArrays(save.sfallArrays as any)
     // Restore active hand selection (BLK-034).
     if (globalState.player && typeof save.playerActiveHand === 'number') {
         (globalState.player as any).activeHand = save.playerActiveHand
@@ -350,6 +352,7 @@ export function save(name: string, slot = -1, callback?: () => void): void {
     save.skillUsage = getSkillUsage()
     save.metFrankHorrigan = globalState.metFrankHorrigan === true
     save.playerRadPoison = serializeRadPoison(globalState.player)
+    save.sfallArrays = serializeSfallArrays()
 
     // Snapshot active hand state (BLK-034) so the player's current weapon slot
     // selection survives across save/load cycles.

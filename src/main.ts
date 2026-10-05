@@ -26,6 +26,7 @@ import { shouldSkipMainMenu } from './character/chargen.js'
 import { tickTimedEffects } from './character/timedEffects.js'
 import { processRadPoisonUpTo } from './character/radiationPoison.js'
 import { processChargedItemsUpTo } from './chargedItems.js'
+import { deleteTempArrays } from './sfallArrays.js'
 import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -765,6 +766,11 @@ heart.mousepressed = (x: number, y: number, btn: string) => {
     }
 }
 
+heart.mousemoved = (x: number, y: number) => {
+    ;(globalState as any).mouseX = x
+    ;(globalState as any).mouseY = y
+}
+
 heart.mousereleased = (x: number, y: number, btn: string) => {
     if (btn !== 'l' || !leftPress) {return}
     const press = leftPress
@@ -1151,6 +1157,8 @@ heart.update = function () {
         }
 
         globalState.audioEngine.tick()
+        // DeleteAllTempArrays: sfall temporary arrays live for one frame.
+        deleteTempArrays()
 
         // Slice F / P1-4 / P1-5: drug expiry + rad/poison DoT on the player.
         if (globalState.player && (globalState.player as Critter).stats) {

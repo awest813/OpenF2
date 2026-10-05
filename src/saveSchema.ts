@@ -134,6 +134,8 @@ export interface SaveGame {
     metFrankHorrigan?: boolean
     /** The player's poison ticks and radiation sickness events (critter.cc queue events). */
     playerRadPoison?: unknown
+    /** sfall arrays kept with save_array. */
+    sfallArrays?: unknown
 
     /**
      * Currently active weapon hand (added in v13 / BLK-034).

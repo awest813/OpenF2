@@ -33,6 +33,7 @@ import { awardCritterXp } from './character/xp.js'
 import { gameTimeHour, TICKS_PER_DAY } from './gameTime.js'
 import { partyBestInSkill, skillValue } from './skillUse.js'
 import { EventBus } from './eventBus.js'
+import { sfallSettings } from './sfallFunctions.js'
 import { getMessage } from './util.js'
 import {
     dayPart,
@@ -876,6 +877,13 @@ export namespace Worldmap {
         if (!encounterCheckDue(travel, nowMs, withinArea(pos) !== null)) {return false}
 
         const ticks = globalState.gameTickTime ?? 0
+        if (sfallSettings.forcedEncounter) {
+            // sfall force_encounter: the next check takes the party to that map.
+            const { map } = sfallSettings.forcedEncounter
+            sfallSettings.forcedEncounter = null
+            beginEncounter(() => globalState.gMap.loadMapByID(map))
+            return true
+        }
         if (!globalState.metFrankHorrigan && Math.floor(ticks / TICKS_PER_DAY) > 35) {
             globalState.metFrankHorrigan = true
             beginEncounter(() => globalState.gMap.loadMapByID(MAP_HORRIGAN_MOVIE))

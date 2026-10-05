@@ -281,77 +281,56 @@ describe('Phase 55-C — BLK-047: Perk owed tracking on level-up', () => {
         expect(gs.playerPerksOwed).toBe(2)
     })
 
-    it('set_perk_owed via get_perk_owed returns correct value', () => {
-        globalState.playerPerksOwed = 3
+    // sfall numbers get_perk_owed 0x818E and set_perk_owed 0x818F.
+    const vmFor = (stack: any[]) => ({
+        stack,
+        scriptObj: new (Scripting as any).Script(),
+        lastOpcode: 0,
+        intfile: { name: 'test', identifiers: {} },
+        recordUnsupportedProcedure() {},
+        push(v: any) { this.stack.push(v) },
+        pop() { return this.stack.pop() },
+    })
 
-        // Check opMap 0x81AE (get_perk_owed) returns actual count
-        const vm: any = { stack: [] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81AE].call(vm)
+    it('get_perk_owed (0x818E) returns the count', () => {
+        globalState.playerPerksOwed = 3
+        const vm: any = vmFor([])
+        opMap[0x818E].call(vm)
         expect(vm.stack[0]).toBe(3)
     })
 
-    it('set_perk_owed via opMap 0x81AF writes actual count', () => {
+    it('set_perk_owed (0x818F) writes the count', () => {
         globalState.playerPerksOwed = 0
-
-        const vm: any = { stack: [5] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81AF].call(vm)
+        const vm: any = vmFor([5])
+        opMap[0x818F].call(vm)
         expect(globalState.playerPerksOwed).toBe(5)
     })
 
     it('set_perk_owed clamps negative values to 0', () => {
         globalState.playerPerksOwed = 2
-
-        const vm: any = { stack: [-1] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81AF].call(vm)
+        const vm: any = vmFor([-1])
+        opMap[0x818F].call(vm)
         expect(globalState.playerPerksOwed).toBe(0)
     })
 })
 
 // ===========================================================================
-// Phase 55-D — sfall opcodes 0x81D8–0x81DF present in opMap
+// Phase 55-D — sfall opcode numbers follow sfall's table
 // ===========================================================================
 
-describe('Phase 55-D — sfall opcodes 0x81D8–0x81DF in opMap', () => {
-    const expectedOpcodes = [0x81D8, 0x81D9, 0x81DA, 0x81DB, 0x81DC, 0x81DD, 0x81DE, 0x81DF]
-
-    for (const opcode of expectedOpcodes) {
-        it(`opMap[0x${opcode.toString(16)}] is defined`, () => {
-            expect(opMap[opcode]).toBeDefined()
-            expect(typeof opMap[opcode]).toBe('function')
-        })
-    }
-
-    it('0x81D8 get_drop_amount pops obj and pushes 0', () => {
-        const vm: any = { stack: ['obj'] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81D8].call(vm)
-        expect(vm.stack).toHaveLength(1)
-        expect(vm.stack[0]).toBe(0)
-    })
-
-    it('0x81D9 set_drop_amount is a no-op (pops both args)', () => {
-        const vm: any = { stack: ['obj', 5] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81D9].call(vm)
-        expect(vm.stack).toHaveLength(0)
-    })
-
-    it('0x81DA art_exists pops artPath and pushes 0', () => {
-        const vm: any = { stack: ['art/critters/test'] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81DA].call(vm)
-        expect(vm.stack).toHaveLength(1)
-        expect(vm.stack[0]).toBe(0)
-    })
-
-    it('0x81DD hero_art_id pops type and pushes 0', () => {
-        const vm: any = { stack: [0] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
-        opMap[0x81DD].call(vm)
-        expect(vm.stack).toHaveLength(1)
-        expect(vm.stack[0]).toBe(0)
-    })
-
-    it('0x81DF set_critter_burst_disable is a no-op', () => {
-        const vm: any = { stack: ['critter', 1] as any[], push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
+describe('Phase 55-D — sfall opcode numbers (sfall Opcodes.cpp)', () => {
+    it('0x81DF and 0x81E0 are get/set_bodypart_hit_modifier', () => {
+        const vm: any = { stack: [0] as any[], scriptObj: new (Scripting as any).Script(), lastOpcode: 0x81DF, intfile: { name: 't', identifiers: {} }, recordUnsupportedProcedure() {}, push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
         opMap[0x81DF].call(vm)
+        expect(vm.stack).toEqual([-40]) // head
+    })
+
+    it('0x8216 set_critter_burst_disable pops its two arguments', () => {
+        const critter: any = { type: 'critter' }
+        const vm: any = { stack: [critter, 1] as any[], scriptObj: new (Scripting as any).Script(), lastOpcode: 0x8216, intfile: { name: 't', identifiers: {} }, recordUnsupportedProcedure() {}, push(v: any) { this.stack.push(v) }, pop() { return this.stack.pop() } }
+        opMap[0x8216].call(vm)
         expect(vm.stack).toHaveLength(0)
+        expect(critter.burstDisabled).toBe(true)
     })
 })
 

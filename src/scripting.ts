@@ -46,6 +46,7 @@ import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake
 import { isWithinPerception as perceives, playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
 import { skillRoll as engineSkillRoll } from './skillUse.js'
 import { adjustPoison, adjustRadiation } from './character/radiationPoison.js'
+import { installSfallFunctions } from './sfallFunctions.js'
 import { EventBus } from './eventBus.js'
 import { gameDate } from './gameTime.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
@@ -9374,3 +9375,6 @@ Promise.resolve().then(() => {
         pullReputationFromGvars(globalState.reputation, Scripting.getGlobalVars())
     }
 })
+
+// sfall functions the Script class does not define itself (sfallFunctions.ts).
+installSfallFunctions(Scripting.Script.prototype as unknown as Record<string, unknown>)

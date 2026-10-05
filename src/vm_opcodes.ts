@@ -55,6 +55,13 @@ export const opMap: { [opcode: number]: (this: VMContext) => void } = {
     0xc001: function () {
         this.push(this.script.read32())
     }, // op_push_d
+    0xa001: function () {
+        // op_push_d with a float literal: the 32 bits are an IEEE float.
+        const bits = this.script.read32()
+        const view = new DataView(new ArrayBuffer(4))
+        view.setInt32(0, bits)
+        this.push(view.getFloat32(0))
+    }, // op_push_d (float)
     0x800d: function () {
         this.retStack.push(this.pop())
     }, // op_d_to_a
