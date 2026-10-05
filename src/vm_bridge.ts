@@ -63,8 +63,8 @@ export namespace ScriptVMBridge {
 
     /**
      * sfall_func0 … sfall_func8 (HandleMetarule): the first argument names the
-     * function; the rest are its arguments. Calls the Script method of that
-     * name (or sfall_<name>), else returns 0.
+     * function in sfall's metarule table; the rest are its arguments. An
+     * unknown name returns 0.
      */
     function sfallFunc(argc: number) {
         return function(this: GameScriptVM) {
@@ -74,7 +74,12 @@ export namespace ScriptVMBridge {
             args.reverse()
             const name = String(varName.call(this, args.shift()))
             const obj = <any>this.scriptObj
-            const fn = obj[name] ?? obj['sfall_' + name] ?? sfallMetarules[name]
+            if (name === 'opcode_exists') {
+                // Opcodes::OpcodeExists: whether this interpreter handles the opcode.
+                this.push(typeof opMap[Number(args[0])] === 'function' ? 1 : 0)
+                return
+            }
+            const fn = sfallMetarules[name]
             if(typeof fn !== "function") {
                 this.recordUnsupportedProcedure(this.lastOpcode, name)
                 this.push(0)

@@ -126,9 +126,15 @@ export default {
      * Returns 0 when no object is under the cursor.
      */
     objUnderCursor: null,
+    dialogueObject: null,
+    lootObject: null,
 
     newObjCounter: 0, // count of objects created via create_object_sid since last map load
 } as {
+    /** The critter the player is talking to (sfall dialog_obj). */
+    dialogueObject: any
+    /** The object whose loot screen is open (sfall loot_obj). */
+    lootObject: any
     gMap: GameMap | null
     combat: Combat | null
     inCombat: boolean

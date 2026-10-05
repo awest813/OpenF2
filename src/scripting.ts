@@ -55,6 +55,7 @@ import { skillDependencies } from './skills.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
+import { sfallSprintf } from './sfallPrintf.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt, SFALL_VER, resetSfallGlobals } from './sfallGlobals.js'
 import { recordStubHit } from './scriptingChecklist.js'
 import { PERK_MAP } from './character/perks.js'
@@ -813,6 +814,7 @@ export namespace Scripting {
         }
 
         currentDialogueObject = null
+        globalState.dialogueObject = null
     }
 
     function canSee(obj: Obj, target: Obj): boolean {
@@ -2654,6 +2656,7 @@ export namespace Scripting {
             // opStartGameDialog: no conversation during combat.
             if (globalState.inCombat) {return}
             currentDialogueObject = this.self_obj as Critter
+            globalState.dialogueObject = currentDialogueObject
             // gameDialogEnter clears the barter modifier.
             this._barterMod = 0
             uiStartDialogue(false, this.self_obj as Critter)
@@ -3412,27 +3415,9 @@ export namespace Scripting {
         // Supports: %d/%i (decimal int), %s (string), %x (hex int), %c (char), %% (literal %).
         // This is one of the most commonly used sfall opcodes; many scripts use it for
         // display messages, UI labels, and debug output.
+        /** sprintf(format, value): sfall's sprintf_lite with one value. */
         sprintf(fmt: any, arg: any): string {
-            if (typeof fmt !== 'string') {return String(fmt ?? '')}
-            // Replace each format specifier with the corresponding formatted value.
-            // The %%|%([disxci]) pattern handles: %% → literal %, and %d/%i/%s/%x/%c specifiers.
-            return fmt.replace(/%%|%([disxci])/g, (match: string, spec?: string) => {
-                if (!spec) {return '%'}
-                const n = typeof arg === 'number' ? Math.trunc(arg) : (parseInt(String(arg), 10) || 0)
-                switch (spec) {
-                    case 'd':
-                    case 'i':
-                        return n.toString()
-                    case 's':
-                        return typeof arg === 'string' ? arg : String(arg ?? '')
-                    case 'x':
-                        return (n >>> 0).toString(16)
-                    case 'c':
-                        return typeof arg === 'number' ? String.fromCharCode(arg) : ''
-                    default:
-                        return match
-                }
-            })
+            return sfallSprintf(fmt, [arg])
         }
 
         // sfall extended opcode — check whether an object has a script attached (0x8193).

@@ -512,6 +512,7 @@ export function initUI() {
         if (panelName === 'inventory') {refreshInventoryPanel()}
     })
     EventBus.on('loot:closed', () => {
+        globalState.lootObject = null
         // Live inventories were mutated in place by the panel (openWithLive);
         // a looted critter loses the slots of what was taken.
         reconcileSlots(globalState.player)
@@ -1570,6 +1571,7 @@ function uiEndLoot() {
 
 export function uiLoot(object: Obj) {
     globalState.uiMode = UIMode.loot
+    globalState.lootObject = object
 
     // Prefer the ui2 LootPanel: openWithLive mutates the real inventories in
     // lockstep (same semantics as the DOM path below), and its CLOSE /
