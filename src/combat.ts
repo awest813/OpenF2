@@ -53,7 +53,8 @@ import { TraitId } from './character/statModifiers.js'
 import { Lightmap } from './lightmap.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, hexNearestNeighbor, Point } from './geometry.js'
 import globalState from './globalState.js'
-import { cloneItem, Critter, Obj } from './object.js'
+import { cloneItem, createObjectWithPID, Critter, Obj } from './object.js'
+import { lazyLoadImage } from './images.js'
 import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
@@ -72,8 +73,12 @@ import {
 import { awardCritterXp } from './character/xp.js'
 import { isProne } from './animSequence.js'
 import { loadPRO } from './pro.js'
-import { attackAnimationForMode, deathAnimationFor, isHitFromFront } from './combat/deathAnim.js'
-import { beginReactionBatch, dodgeAnimation, endReactionBatch, showDamageReaction, standUpAnimation } from './combat/damageAnim.js'
+import {
+    ANIM_FIRE_CONTINUOUS, ANIM_FIRE_SINGLE, ANIM_THROW_ANIM, attackAnimationForMode, deathAnimationFor, isHitFromFront,
+} from './combat/deathAnim.js'
+import {
+    beginReactionBatch, dodgeAnimation, endReactionBatch, showDamageReaction, standUpAnimation, type AttackSequenceOptions,
+} from './combat/damageAnim.js'
 
 // Turn-based combat system
 
@@ -798,11 +803,62 @@ export class Combat {
      * The attacker's swing with the defenders' reactions timed to its action
      * frame (_action_melee / _action_ranged), then `callback`.
      */
-    private playAttack(obj: Critter, info: AttackWeaponInfo, hitMode: HitMode, callback?: () => void): void {
+    private playAttack(
+        obj: Critter, info: AttackWeaponInfo, hitMode: HitMode, callback?: () => void,
+        target?: Critter, report?: AttackReport
+    ): void {
         const kick = (obj as any).unarmedAttackAnim === 'r' || (!info.weapon && info.mode === 2)
         const anim = attackAnimationForMode(info.mode, kick)
         const done = () => { if (callback) {callback()} }
-        endReactionBatch(obj, anim, done, (finish) => obj.staticAnimation('attack', finish))
+        const opts: AttackSequenceOptions = {}
+        const ranged = anim === ANIM_THROW_ANIM || anim >= ANIM_FIRE_SINGLE
+        if (ranged && target && report) {
+            // _action_ranged: raise the weapon (not for a throw); a projectile
+            // with art flies to whoever was hit, or to where the miss landed;
+            // a miss with nothing to see flying is dodged.
+            opts.point = anim !== ANIM_THROW_ANIM
+            const fired = anim !== ANIM_FIRE_CONTINUOUS && (report.hit || !report.critical)
+            const projectile = fired ? this.projectileFor(obj, target, report, info) : null
+            if (projectile) {
+                opts.projectile = projectile
+            } else if (fired && !report.hit) {
+                dodgeAnimation(target)
+            }
+        }
+        endReactionBatch(obj, anim, done, (finish) => obj.staticAnimation('attack', finish), opts)
+    }
+
+    /** The weapon's projectile (its proto's art), on its way from beside the attacker. */
+    private projectileFor(obj: Critter, target: Critter, report: AttackReport, info: AttackWeaponInfo): AttackSequenceOptions['projectile'] | null {
+        const pid = info.weapon?.pro?.extra?.projPID
+        if (typeof pid !== 'number' || pid <= 0 || !obj.position || !target.position || !globalState.gMap) {return null}
+        let projectile: Obj | null = null
+        try {
+            projectile = createObjectWithPID(pid, -1)
+        } catch {
+            projectile = null
+        }
+        if (!projectile || typeof (projectile as any).art !== 'string') {return null}
+        const dir = hexDirectionTo(obj.position, target.position)
+        if (dir === null || dir === undefined) {return null}
+        // _combat_bullet_start: the hex next to the attacker, toward the target.
+        const start = hexInDirectionDistance(obj.position, dir, 1)
+        const defender = report.hit ? report.defender as Critter | null : null
+        const end = defender?.position ?? this.flightEnd(obj, target, info.range)
+        if (!start || !end) {return null}
+        const path = hexLine(start, end)
+        if (path.length === 0) {return null}
+        projectile.orientation = dir
+        projectile.position = { ...path[0] }
+        const map = globalState.gMap
+        const shot = projectile
+        try { lazyLoadImage((shot as any).art) } catch { /* no images headless */ }
+        return {
+            obj: shot,
+            path,
+            show: () => map.addObject(shot),
+            remove: () => map.removeObject(shot),
+        }
     }
 
     /** _show_damage_to_object's pick of the death animation (with sfall's DeathAnim hooks). */
@@ -1281,7 +1337,7 @@ export class Combat {
         this.attackTaunts(obj, target, report, info)
 
         // attack!
-        this.playAttack(obj, info, hitMode, callback)
+        this.playAttack(obj, info, hitMode, callback, target, report)
     }
 
     /**
@@ -1502,7 +1558,7 @@ export class Combat {
         this.recordAttack(obj, target, report)
         this.attackTaunts(obj, target, report, info)
 
-        this.playAttack(obj, info, hitMode, callback)
+        this.playAttack(obj, info, hitMode, callback, target, report)
     }
 
     perish(obj: Critter) {

@@ -19,6 +19,7 @@ import globalState from './globalState.js'
 import { EventBus } from './eventBus.js'
 import { Config } from './config.js'
 import { fromTileNum } from './tile.js'
+import type { Point } from './geometry.js'
 
 export const ANIM_STAND = 0
 export const ANIM_WALK = 1
@@ -104,7 +105,7 @@ export function isProne(critter: any): boolean {
     return (anim >= ANIM_FALL_BACK && anim <= ANIM_FALL_FRONT_BLOOD) || (anim >= ANIM_FALL_BACK_SF && anim <= ANIM_FALL_FRONT_BLOOD_SF)
 }
 
-type StepKind = 'animate' | 'reverse' | 'forever' | 'moveTile' | 'runTile' | 'moveObj' | 'runObj' | 'sfx' | 'callback' | 'setArt'
+type StepKind = 'animate' | 'reverse' | 'forever' | 'moveTile' | 'runTile' | 'moveObj' | 'runObj' | 'sfx' | 'callback' | 'setArt' | 'fly'
 
 interface Step {
     kind: StepKind
@@ -115,6 +116,8 @@ interface Step {
     target?: any
     sound?: string
     fn?: () => void
+    /** 'fly': the hexes a projectile crosses, in order. */
+    path?: Point[]
 }
 
 interface Sequence {
@@ -147,6 +150,7 @@ export function regAnimBlocked(): boolean {
 }
 
 export function resetAnimSequences(): void {
+    flights.length = 0
     building = null
     active = []
 }
@@ -201,6 +205,8 @@ export const regAnimMoveToObject = (owner: any, target: any, delay: number) => r
 export const regAnimRunToObject = (owner: any, target: any, delay: number) => register({ kind: 'runObj', owner, target, delay })
 export const regAnimPlaySfx = (owner: any, sound: string, delay: number) => register({ kind: 'sfx', owner, sound, delay })
 export const regAnimCallback = (owner: any, fn: () => void, delay: number) => register({ kind: 'callback', owner, fn, delay })
+/** animationRegisterMoveToTileStraight for a projectile: along `path`, a few hexes a tick. */
+export const regAnimFly = (owner: any, path: Point[], delay: number) => register({ kind: 'fly', owner, path, delay })
 /** animationRegisterSetFid with a critter animation's art (the frame stays first). */
 export const regAnimSetArt = (owner: any, anim: number, delay: number) => register({ kind: 'setArt', owner, anim, delay })
 
@@ -264,8 +270,32 @@ function runSequence(seq: Sequence): void {
     }
 }
 
+/**
+ * Projectiles in flight (animationRegisterMoveToTileStraight on a misc
+ * object): hexes crossed per animation tick.
+ */
+export const PROJECTILE_HEXES_PER_TICK = 4
+const flights: Array<{ step: Step; seq: Sequence; at: number; finish: () => void }> = []
+
+function advanceFlights(): void {
+    for (const flight of [...flights]) {
+        const path = flight.step.path ?? []
+        if (flight.seq.ended) {
+            flights.splice(flights.indexOf(flight), 1)
+            continue
+        }
+        flight.at = Math.min(path.length - 1, flight.at + PROJECTILE_HEXES_PER_TICK)
+        if (path[flight.at]) {flight.step.owner.position = { ...path[flight.at] }}
+        if (flight.at >= path.length - 1) {
+            flights.splice(flights.indexOf(flight), 1)
+            flight.finish()
+        }
+    }
+}
+
 /** One animation tick: count down the delays of waiting steps. */
 export function tickAnimSequences(): void {
+    advanceFlights()
     for (const seq of [...active]) {
         if (seq.ended || seq.started >= seq.steps.length || seq.started <= seq.done) {continue}
         const step = seq.steps[seq.started]
@@ -315,6 +345,18 @@ function startStep(seq: Sequence, step: Step): boolean {
             step.fn?.()
             proceed(seq, false)
             return true
+        case 'fly': {
+            const path = step.path ?? []
+            if (path.length === 0 || !step.owner) {return false}
+            step.owner.position = { ...path[0] }
+            if (path.length === 1) {
+                proceed(seq, false)
+                return true
+            }
+            seq.running.add(step)
+            flights.push({ step, seq, at: 0, finish })
+            return true
+        }
         case 'setArt': {
             const art = step.owner?.type === 'critter' ? critterArt(step.owner, step.anim!) : null
             if (art) {

@@ -8,7 +8,7 @@ import globalState from '../globalState.js'
 import { hexInDirectionDistance, type Point } from '../geometry.js'
 import {
     ANIMATION_REQUEST_RESERVED, critterArt, regAnimAnimate, regAnimBegin, regAnimCallback, regAnimClear, regAnimEnd,
-    regAnimSetArt,
+    PROJECTILE_HEXES_PER_TICK, regAnimFly, regAnimSetArt,
 } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 
@@ -22,6 +22,8 @@ export const ANIM_FIRE_DANCE = 33
 export const ANIM_BURNED_TO_NOTHING = 29
 export const ANIM_PRONE_TO_STANDING = 36
 export const ANIM_BACK_TO_STANDING = 37
+export const ANIM_POINT = 43
+export const ANIM_UNPOINT = 44
 /** A fall's single-frame lying-down version (ANIM_FALL_BACK_SF − ANIM_FALL_BACK). */
 const SINGLE_FRAME_OFFSET = 28
 
@@ -101,13 +103,28 @@ export function beginReactionBatch(): void {
     batch = []
 }
 
+export interface AttackSequenceOptions {
+    /** _action_ranged: raise the weapon first (ANIM_POINT) and lower it after (ANIM_UNPOINT). */
+    point?: boolean
+    /**
+     * A projectile with art of its own: shown at the swing's action frame on
+     * `path[0]`, it flies along `path`; the hits land when it arrives, then
+     * `remove` takes it off the map.
+     */
+    projectile?: { obj: any; path: Array<{ x: number; y: number }>; show: () => void; remove: () => void }
+}
+
 /**
- * The attack's sequence: the attacker's swing, each reaction starting at the
- * swing's action frame (the attacker's own after the swing), then `onDone`.
+ * The attack's sequence (_action_melee / _action_ranged): the attacker's
+ * swing, each reaction starting at the swing's action frame (or when the
+ * projectile arrives; the attacker's own after the swing), then `onDone`.
  * Without the swing's art, or when the sequence cannot be registered, the
  * reactions play at once and `fallback(onDone)` animates the attacker.
  */
-export function endReactionBatch(attacker: any, attackAnim: number, onDone: () => void, fallback: (done: () => void) => void): void {
+export function endReactionBatch(
+    attacker: any, attackAnim: number, onDone: () => void, fallback: (done: () => void) => void,
+    opts: AttackSequenceOptions = {}
+): void {
     // A critter hit twice shows only its last reaction (one animation at a time).
     const latest = new Map<any, Step[]>()
     for (const p of batch ?? []) {
@@ -128,11 +145,25 @@ export function endReactionBatch(attacker: any, attackAnim: number, onDone: () =
     regAnimClear(attacker)
     for (const p of pending) {regAnimClear(p.owner)}
     const actionFrame = Math.max(0, globalState.imageInfo?.[art]?.actionFrame ?? 0)
-    let ok = regAnimBegin(ANIMATION_REQUEST_RESERVED) !== -1 && regAnimAnimate(attacker, attackAnim, 0) !== -1
+    const point = opts.point === true && critterArt(attacker, ANIM_POINT) !== null
+    const projectile = opts.projectile && opts.projectile.path.length > 0 ? opts.projectile : null
+
+    let ok = regAnimBegin(ANIMATION_REQUEST_RESERVED) !== -1
+    if (ok && point) {ok = regAnimAnimate(attacker, ANIM_POINT, 0) !== -1}
+    ok = ok && regAnimAnimate(attacker, attackAnim, point ? -1 : 0) !== -1
+
+    // When the first hit lands, counted from the swing (or the flight).
+    let hitDelay = actionFrame > 0 ? actionFrame : 0
+    if (ok && projectile) {
+        ok = regAnimCallback(projectile.obj, projectile.show, actionFrame > 0 ? actionFrame : 0) !== -1
+            && regAnimFly(projectile.obj, projectile.path, 0) !== -1
+        hitDelay = Math.ceil((projectile.path.length - 1) / PROJECTILE_HEXES_PER_TICK)
+    }
+
     let first = true
     for (const p of pending) {
         if (!ok) {break}
-        let delay = p.owner === attacker ? -1 : first && actionFrame > 0 ? actionFrame : 0
+        let delay = p.owner === attacker ? -1 : first && hitDelay > 0 ? hitDelay : 0
         if (p.owner !== attacker) {first = false}
         for (const step of p.steps) {
             if (registerStep(p.owner, step, delay) === -1) {
@@ -142,8 +173,16 @@ export function endReactionBatch(attacker: any, attackAnim: number, onDone: () =
             delay = -1
         }
     }
+    if (ok && projectile) {ok = regAnimCallback(projectile.obj, projectile.remove, -1) !== -1}
+    const attackerStanding = !attacker.dead && !attacker.knockedDown && !attacker.knockedOut
+    if (ok && point && attackerStanding && critterArt(attacker, ANIM_UNPOINT)) {
+        ok = regAnimAnimate(attacker, ANIM_UNPOINT, -1) !== -1
+    }
     ok = ok && regAnimCallback(attacker, onDone, -1) !== -1 && regAnimEnd() !== -1
-    if (!ok) {immediate()}
+    if (!ok) {
+        projectile?.remove()
+        immediate()
+    }
 }
 
 /**

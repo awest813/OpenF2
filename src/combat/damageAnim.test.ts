@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import globalState from '../globalState.js'
+import { Config } from '../config.js'
 import { resetAnimSequences, tickAnimSequences } from '../animSequence.js'
 import { Dam } from './criticalTables.js'
 import {
@@ -124,5 +125,48 @@ describe('an attack as one sequence (_action_melee)', () => {
         endReactionBatch(attacker, 16, () => {}, (finish) => { fellBack = true; finish() })
         expect(fellBack).toBe(true)
         expect(defender.animCode).toBe(ANIM_HIT_FROM_FRONT)
+    })
+})
+
+describe('a ranged attack (_action_ranged)', () => {
+    it('raises the gun, fires, the projectile flies and the hit lands on arrival, then lowers it', () => {
+        const saved = Config.engine.doUseWeaponModel
+        Config.engine.doUseWeaponModel = true
+        try {
+            for (const code of ['dh', 'di']) {globalState.imageInfo[BASE + code] = { numFrames: 2, fps: 10 } as any}
+            globalState.imageInfo[BASE + 'dj'] = { numFrames: 4, fps: 10, actionFrame: 1 } as any
+            const attacker = critter([])
+            attacker.equippedWeapon = { pro: { extra: { animCode: 1 } } }
+            const defender = critter([ANIM_HIT_FROM_FRONT], { x: 50, y: 59 })
+            const path = Array.from({ length: 9 }, (_, i) => ({ x: 50, y: 51 + i }))
+            const rocket: any = { type: 'misc' }
+            const log: string[] = []
+            let done = false
+            beginReactionBatch()
+            showDamageReaction(defender, 0, true, 0)
+            endReactionBatch(attacker, 45, () => { done = true }, () => { throw new Error('no fallback expected') }, {
+                point: true,
+                projectile: { obj: rocket, path, show: () => log.push('show'), remove: () => log.push('remove') },
+            })
+            expect(attacker.animCode).toBe(43) // ANIM_POINT
+            attacker.animCallback()
+            expect(attacker.animCode).toBe(45) // ANIM_FIRE_SINGLE
+            expect(log).toEqual([])
+            tickAnimSequences()
+            expect(log).toEqual(['show'])
+            expect(rocket.position).toEqual(path[0])
+            for (let i = 0; i < 4 && defender.animCode === undefined; i++) {tickAnimSequences()}
+            expect(rocket.position).toEqual(path[8])
+            expect(defender.animCode).toBe(ANIM_HIT_FROM_FRONT)
+            attacker.animCallback()
+            defender.animCallback()
+            expect(log).toEqual(['show', 'remove'])
+            expect(attacker.animCode).toBe(44) // ANIM_UNPOINT
+            expect(done).toBe(false)
+            attacker.animCallback()
+            expect(done).toBe(true)
+        } finally {
+            Config.engine.doUseWeaponModel = saved
+        }
     })
 })
