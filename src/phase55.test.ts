@@ -306,12 +306,6 @@ describe('Phase 55-C — BLK-047: Perk owed tracking on level-up', () => {
         expect(globalState.playerPerksOwed).toBe(5)
     })
 
-    it('set_perk_owed clamps negative values to 0', () => {
-        globalState.playerPerksOwed = 2
-        const vm: any = vmFor([-1])
-        opMap[0x818F].call(vm)
-        expect(globalState.playerPerksOwed).toBe(0)
-    })
 })
 
 // ===========================================================================

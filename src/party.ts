@@ -213,6 +213,16 @@ export class Party {
         return advanced
     }
 
+    /** sfall inc_npc_level: this member takes its next level now, whatever the player's level. */
+    incMemberLevel(member: Critter): boolean {
+        const def = getPartyMemberDef(member.pid)
+        const ctrl = this.getControl(member)
+        if (!def || !ctrl || ctrl.levelIndex >= def.levelPids.length) return false
+        ctrl.appliedLevelPid = def.levelPids[ctrl.levelIndex]
+        ctrl.levelIndex++
+        return true
+    }
+
     serialize(): SerializedObj[] {
         return this.party.map((obj) => obj.serialize())
     }

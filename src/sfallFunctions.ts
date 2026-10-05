@@ -41,6 +41,8 @@ import { inventorySize, itemWeight } from './critterInventory.js'
 import { aiPacketFor } from './combat/aiPacket.js'
 import { unequipSlot } from './equipment.js'
 import { loadMessage } from './data.js'
+import { EntityManager } from './ecs/entityManager.js'
+import { isPerkAvailable, PERK_MAP } from './character/perks.js'
 import { sfallSettings } from './sfallSettings.js'
 
 export { sfallSettings }
@@ -147,6 +149,15 @@ function clampInt(v: number, min: number, max: number): number {
     return n < min ? min : n > max ? max : n
 }
 
+function skillMaxArg(v: number): number {
+    const n = Math.trunc(Number(v) || 0)
+    return n < 0 || n > 300 ? 300 : n
+}
+
+function worldmapElement(): HTMLElement | null {
+    return typeof document !== 'undefined' ? document.getElementById('worldmap') : null
+}
+
 function noop(): number {
     return 0
 }
@@ -225,8 +236,9 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     },
     get_available_skill_points: () => (globalState.player as any)?.skills?.skillPoints ?? 0,
     mod_skill_points_per_level: noop,
-    set_skill_max(v: number) { sfallSettings.skillMax.base = clampInt(v, 0, 300) },
-    set_base_skill_mod(v: number) { sfallSettings.skillMax.base = clampInt(v, 0, 300) },
+    /** set_skill_max: an unsigned compare, so anything outside 0–300 becomes 300. */
+    set_skill_max(v: number) { sfallSettings.skillMax.base = skillMaxArg(v) },
+    set_base_skill_mod(v: number) { sfallSettings.skillMax.base = skillMaxArg(v) },
     set_critter_skill_mod(obj: any, max: number) { if (isCritter(obj)) {sfallSettings.skillMax.byCritter.set(obj, Math.trunc(max))} },
     set_hit_chance_max(v: number) { sfallSettings.hitChance.base = { max: clampInt(v, 0, 999), mod: 0 } },
     set_base_hit_chance_mod(max: number, mod: number) { sfallSettings.hitChance.base = { max: Math.trunc(max), mod: Math.trunc(mod) } },
@@ -246,14 +258,32 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_pyromaniac_mod(v: number) { sfallSettings.pyromaniacMod = (Math.trunc(v) << 24) >> 24 },
     apply_heaveho_fix: noop,
     remove_trait(trait: number) { (globalState.player as any)?.charTraits?.delete?.(trait) },
-    inc_npc_level: noop,
+    /** inc_npc_level(name or pid): the party member goes up its next level now (partyMemberIncLevels). */
+    inc_npc_level(who: unknown) {
+        const party: any = globalState.gParty
+        if (!party || (who === 0 || who === '')) {return}
+        const member = (party.getPartyMembers?.() ?? []).find((m: any) =>
+            typeof who === 'number' ? m.pid === who : String(m.name ?? '').toLowerCase() === String(who).toLowerCase())
+        if (member) {party.incMemberLevel?.(member)}
+    },
 
     // ── perks ──
     get_perk_owed: () => globalState.playerPerksOwed ?? 0,
-    set_perk_owed(v: number) { globalState.playerPerksOwed = Math.max(0, Math.min(250, Math.trunc(v))) },
+    /** set_perk_owed: the low byte, ignored when over 250. */
+    set_perk_owed(v: number) {
+        const n = Math.trunc(v) & 0xff
+        if (n <= 250) {globalState.playerPerksOwed = n}
+    },
+    /** get_perk_available: perk_can_add for the player (ranks left and requirements met). */
     get_perk_available(perk: number) {
-        const ranks = (globalState.player as any)?.perkRanks ?? {}
-        return typeof perk === 'number' && (ranks[perk] ?? 0) === 0 ? 1 : 0
+        if (!(perk >= 0 && perk < 256)) {return 0}
+        const def = PERK_MAP.get(perk)
+        const id = (globalState as any).playerEntityId
+        const stats = id ? EntityManager.get<'stats'>(id, 'stats') : undefined
+        const skills = id ? EntityManager.get<'skills'>(id, 'skills') : undefined
+        if (!def || !stats || !skills) {return 0}
+        const rank = (globalState.player as any)?.perkRanks?.[perk] ?? 0
+        return isPerkAvailable(def, stats, skills, rank) ? 1 : 0
     },
     set_perk_image: noop, set_perk_ranks: noop, set_perk_level: noop, set_perk_stat: noop, set_perk_stat_mag: noop,
     set_perk_skill1: noop, set_perk_skill1_mag: noop, set_perk_type: noop, set_perk_skill2: noop, set_perk_skill2_mag: noop,
@@ -282,10 +312,11 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         if (tag === 0) {return playerInSneakMode(player) ? 1 : 0}
         return sfallSettings.ifaceTags.has(tag) ? 1 : 0
     },
-    get_viewport_x: () => globalState.cameraPosition?.x ?? 0,
-    get_viewport_y: () => globalState.cameraPosition?.y ?? 0,
-    set_viewport_x(v: number) { if (globalState.cameraPosition) {globalState.cameraPosition.x = v} },
-    set_viewport_y(v: number) { if (globalState.cameraPosition) {globalState.cameraPosition.y = v} },
+    /** get_viewport_x/y, set_viewport_x/y: the world map's scroll offset (wmWorldOffsetX/Y). */
+    get_viewport_x: () => worldmapElement()?.scrollLeft ?? 0,
+    get_viewport_y: () => worldmapElement()?.scrollTop ?? 0,
+    set_viewport_x(v: number) { const el = worldmapElement(); if (el) {el.scrollLeft = Math.trunc(v)} },
+    set_viewport_y(v: number) { const el = worldmapElement(); if (el) {el.scrollTop = Math.trunc(v)} },
     get_mouse_x: () => (globalState as any).mouseX ?? 0,
     get_mouse_y: () => (globalState as any).mouseY ?? 0,
     get_screen_width: () => (globalState as any).screenWidth ?? 640,
@@ -317,10 +348,15 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
     set_car_current_town(town: number) { sfallSettings.carTown = town },
 
     // ── combat ──
-    get_kill_counter(this: any, type: number) { return this.get_critter_kills?.(type) ?? 0 },
-    mod_kill_counter(this: any, type: number, amount: number) {
-        const current = this.get_critter_kills?.(type) ?? 0
-        this.set_critter_kills?.(type, current + amount)
+    /** get_kill_counter / mod_kill_counter: the player's kills of one of the 19 kill types. */
+    get_kill_counter(type: number) {
+        if (!(type >= 0 && type < 19)) {return 0}
+        return (globalState as any).critterKillCounts?.[type] ?? 0
+    },
+    mod_kill_counter(type: number, amount: number) {
+        if (!(type >= 0 && type < 19)) {return}
+        const counts = ((globalState as any).critterKillCounts ??= {})
+        counts[type] = (counts[type] ?? 0) + Math.trunc(amount)
     },
     get_last_attacker(obj: any) { return isObject(obj) ? (obj.lastCombatAttacker ?? obj.whoHitMe ?? 0) : 0 },
     get_last_target(obj: any) { return isObject(obj) ? (obj.aiLastTarget ?? obj.lastCombatTarget ?? 0) : 0 },
@@ -329,12 +365,19 @@ export const sfallMethods: Record<string, (this: any, ...args: any[]) => any> = 
         const p: any = globalState.player
         if (p) {p.activeHand = p.activeHand === 1 ? 0 : 1}
     },
-    set_weapon_knockback(obj: any, type: number, value: number) { if (isObject(obj)) {obj.sfallWeaponKnockback = { type, value }} },
-    set_target_knockback(obj: any, type: number, value: number) { if (isObject(obj)) {obj.sfallTargetKnockback = { type, value }} },
-    set_attacker_knockback(obj: any, type: number, value: number) { if (isObject(obj)) {obj.sfallAttackerKnockback = { type, value }} },
-    remove_weapon_knockback(obj: any) { if (isObject(obj)) {delete obj.sfallWeaponKnockback} },
-    remove_target_knockback(obj: any) { if (isObject(obj)) {delete obj.sfallTargetKnockback} },
-    remove_attacker_knockback(obj: any) { if (isObject(obj)) {delete obj.sfallAttackerKnockback} },
+    /** set_*_knockback(obj, type, value): type 0 sets the distance, 1 multiplies it (KnockbackSetMod). */
+    set_weapon_knockback(obj: any, type: number, value: number) {
+        if (isObject(obj) && obj.type === 'item') {sfallSettings.knockback.weapons.set(obj, { type, value: Number(value) })}
+    },
+    set_target_knockback(obj: any, type: number, value: number) {
+        if (isCritter(obj)) {sfallSettings.knockback.targets.set(obj, { type, value: Number(value) })}
+    },
+    set_attacker_knockback(obj: any, type: number, value: number) {
+        if (isCritter(obj)) {sfallSettings.knockback.attackers.set(obj, { type, value: Number(value) })}
+    },
+    remove_weapon_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.weapons.delete(obj)} },
+    remove_target_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.targets.delete(obj)} },
+    remove_attacker_knockback(obj: any) { if (isObject(obj)) {sfallSettings.knockback.attackers.delete(obj)} },
     set_critter_burst_disable(obj: any, v: number) { if (isObject(obj)) {obj.burstDisabled = v !== 0} },
     force_aimed_shots(pid: number) { sfallSettings.aimedShots.set(pid, true) },
     disable_aimed_shots(pid: number) { sfallSettings.aimedShots.set(pid, false) },

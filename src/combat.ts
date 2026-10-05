@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { capHitChance, sfallSettings } from './sfallSettings.js'
+import { capHitChance, knockbackModifier, sfallSettings } from './sfallSettings.js'
 import { Config } from './config.js'
 import { EventBus, DamageType } from './eventBus.js'
 import { CriticalEffects } from './criticalEffects.js'
@@ -743,7 +743,7 @@ export class Combat {
                 stonewall = true
                 if (this.random(0, 100) < 50) {return}
             }
-            const dist = knockbackDistance(damage, info.perk, stonewall)
+            const dist = knockbackDistance(damage, info.perk, stonewall, knockbackModifier(info.weapon, attacker, victim))
             if (dist > 0 && attacker.position) {knockBack(liveMap(), victim, attacker.position, dist)}
         }
     }

@@ -3554,10 +3554,26 @@ export namespace Scripting {
         //   0x04 = world map is open
         //   0x08 = barter mode is active
         // Scripts use this to gate combat-only or dialogue-only code paths.
+        /** get_game_mode: sfall's loop flags (LoadGameHook.h LoopFlag) for the screens open now. */
         get_game_mode(): number {
+            const ui: any = globalState.uiManager
+            const open = (name: string): boolean => ui?.tryGet?.(name)?.visible === true
             let mode = 0
-            if (globalState.inCombat) {mode |= 1}
-            if (currentDialogueObject !== null) {mode |= 2}
+            if (globalState.uiMode === UIMode.worldMap || open('worldMap')) {mode |= 0x1}
+            if (currentDialogueObject !== null || open('dialogue')) {mode |= 0x4}
+            if (open('options')) {mode |= 0x8}
+            if (open('saveLoad')) {mode |= ui.tryGet('saveLoad').isSave ? 0x10 : 0x20}
+            if (globalState.inCombat) {
+                mode |= 0x40
+                if (globalState.combat?.inPlayerTurn) {mode |= 0x800}
+            }
+            if (open('characterScreen')) {mode |= 0x200}
+            if (open('pipboy')) {mode |= 0x400}
+            if (open('inventory')) {mode |= 0x1000}
+            if (open('mapViewer')) {mode |= 0x2000}
+            if (open('skilldex')) {mode |= 0x4000}
+            if (open('loot')) {mode |= 0x10000}
+            if (open('barter')) {mode |= 0x20000}
             return mode
         }
 

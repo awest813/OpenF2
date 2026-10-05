@@ -337,9 +337,10 @@ export function difficultyDamagePercent(combatDifficulty: number, attackerIsHost
  * single-hex critter: damage / 10 (Knockback weapon perk: / 5); Stonewall
  * halves it and has already had its 50% chance to cancel it.
  */
-export function knockbackDistance(damage: number, weaponPerk: number, stonewall: boolean): number {
+export function knockbackDistance(damage: number, weaponPerk: number, stonewall: boolean, modify?: (value: number) => number): number {
     const divisor = weaponPerk === PerkId.WEAPON_KNOCKBACK ? 5 : 10
-    let dist = idiv(damage, divisor)
+    // sfall CalcKnockbackMod: script modifiers act on damage / divisor before it is floored.
+    let dist = modify ? Math.floor(modify(damage / divisor)) : idiv(damage, divisor)
     if (stonewall) {dist = idiv(dist, 2)}
     return dist
 }

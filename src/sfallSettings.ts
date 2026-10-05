@@ -33,6 +33,12 @@ export const sfallSettings = {
     npcStatMax: {} as Record<number, number>,
     npcStatMin: {} as Record<number, number>,
     aimedShots: new Map<number, boolean>(),
+    /** Knockback modifiers (Combat.cpp mWeapons, mTargets, mAttackers): type 0 sets, 1 multiplies. */
+    knockback: {
+        weapons: new WeakMap<object, { type: number; value: number }>(),
+        targets: new WeakMap<object, { type: number; value: number }>(),
+        attackers: new WeakMap<object, { type: number; value: number }>(),
+    },
     ifaceTags: new Set<number>(),
     /** Fake perks and traits by owner id (0 for the player), then by name. */
     fakePerks: new Map<string, { level: number; image: number; desc: string; owner: number }>(),
@@ -128,4 +134,19 @@ export function capSkill(value: number, critter: object | null | undefined): num
 export function capPickpocket(chance: number, thief: object | null | undefined): number {
     const m = (thief && sfallSettings.pickpocket.byCritter.get(thief)) || sfallSettings.pickpocket.base
     return Math.min(chance + m.mod, m.max)
+}
+
+/** CalcKnockbackMod's modifiers on damage / knockValue: the weapon's, the attacker's, then the target's. */
+export function knockbackModifier(weapon: object | null | undefined, attacker: object | null | undefined, target: object | null | undefined): (value: number) => number {
+    return (value) => {
+        const apply = (map: WeakMap<object, { type: number; value: number }>, o: object | null | undefined) => {
+            const mod = o ? map.get(o) : undefined
+            if (mod?.type === 0) {value = mod.value}
+            else if (mod?.type === 1) {value *= mod.value}
+        }
+        apply(sfallSettings.knockback.weapons, weapon)
+        apply(sfallSettings.knockback.attackers, attacker)
+        apply(sfallSettings.knockback.targets, target)
+        return value
+    }
 }
