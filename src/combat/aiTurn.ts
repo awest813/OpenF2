@@ -56,7 +56,38 @@ const HEALING_PIDS = new Set([40, 144, 273])
 /** _combat_ai: how far each party distance setting lets a follower stray. */
 const PARTY_MEMBER_DISTANCES = [5, 7, 7, 7, 50000]
 
-const AI_MESSAGE = { RUN: 0, MOVE: 1, ATTACK: 2, MISS: 3, HIT: 4 } as const
+export const AI_MESSAGE = { RUN: 0, MOVE: 1, ATTACK: 2, MISS: 3, HIT: 4 } as const
+
+/**
+ * _combatai_msg: a floating taunt above the critter, its packet's `chance`
+ * percent of the time, and only when no other floating text is showing
+ * (_ai_print_msg).
+ */
+export function combatTaunt(c: AnyCritter, type: number, rng: Rng, hitLocation = 3): void {
+    if (!c || c.isPlayer || c.dead || c.knockedOut || !c.ai) {return}
+    if ((globalState as any).combatTaunts === false) {return}
+    const ai = aiPacketFor(c)
+    if (rng(1, 100) > ai.chance) {return}
+    const range = type === AI_MESSAGE.RUN ? ai.run
+        : type === AI_MESSAGE.MOVE ? ai.move
+            : type === AI_MESSAGE.ATTACK ? ai.attack
+                : type === AI_MESSAGE.MISS ? ai.miss
+                    : ai.hit[hitLocation] ?? ai.hit[3]
+    if (!range || range.end < range.start) {return}
+    let text: string | null = null
+    try {
+        text = getMessage('combatai', rng(range.start, range.end))
+    } catch {
+        text = null
+    }
+    if (!text || !Array.isArray(globalState.floatMessages) || globalState.floatMessages.length > 0) {return}
+    globalState.floatMessages.push({
+        msg: text,
+        obj: c,
+        startTime: typeof performance !== 'undefined' ? performance.now() : 0,
+        color: 'white',
+    } as any)
+}
 
 type AnyCritter = any
 
@@ -175,32 +206,8 @@ export class AiTurn {
 
     // ── taunts ──────────────────────────────────────────────────────────
 
-    /** _combatai_msg: a floating taunt above the critter, `chance` percent of the time. */
     taunt(type: number, hitLocation = 3): void {
-        const c = this.c
-        if (c.isPlayer || c.dead || c.knockedOut) {return}
-        if ((globalState as any).combatTaunts === false) {return}
-        const ai = this.ai
-        if (this.rng(1, 100) > ai.chance) {return}
-        const range = type === AI_MESSAGE.RUN ? ai.run
-            : type === AI_MESSAGE.MOVE ? ai.move
-                : type === AI_MESSAGE.ATTACK ? ai.attack
-                    : type === AI_MESSAGE.MISS ? ai.miss
-                        : ai.hit[hitLocation] ?? ai.hit[3]
-        if (!range || range.end < range.start) {return}
-        let text: string | null = null
-        try {
-            text = getMessage('combatai', this.rng(range.start, range.end))
-        } catch {
-            text = null
-        }
-        if (!text || !Array.isArray(globalState.floatMessages)) {return}
-        globalState.floatMessages.push({
-            msg: text,
-            obj: c,
-            startTime: typeof performance !== 'undefined' ? performance.now() : 0,
-            color: 'white',
-        } as any)
+        combatTaunt(this.c, type, this.rng, hitLocation)
     }
 
     // ── movement ────────────────────────────────────────────────────────

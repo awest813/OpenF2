@@ -55,7 +55,7 @@ import { Player } from './player.js'
 import { Scripting } from './scripting.js'
 import { uiEndCombat, uiStartCombat, uiUpdateCombatHUD, uiLog } from './ui.js'
 import { getFileText, getMessage, getRandomInt, parseIni, rollSkillCheck } from './util.js'
-import { AiTurn } from './combat/aiTurn.js'
+import { AI_MESSAGE, AiTurn, combatTaunt } from './combat/aiTurn.js'
 import {
     checkRetaliation,
     isFleeing,
@@ -938,6 +938,20 @@ export class Combat {
         }
     }
 
+    /**
+     * actions.cc taunts: the attacker on attacking; then, hand to hand, the
+     * attacker on its hit or miss, otherwise the defender reacting to it.
+     */
+    private attackTaunts(obj: Critter, target: Critter, report: AttackReport, info: AttackWeaponInfo): void {
+        const rng = this.random
+        combatTaunt(obj, AI_MESSAGE.ATTACK, rng)
+        const location = hitLocationIndex(report.region === 'uncalled' ? 'torso' : report.region)
+        const defender = (report.hit && report.defender ? report.defender : target) as Critter
+        const speaker = info.attackType === 'melee' || info.attackType === 'unarmed' ? obj : defender
+        if (!report.hit) {combatTaunt(speaker, AI_MESSAGE.MISS, rng)}
+        else if (!defender.dead) {combatTaunt(speaker, AI_MESSAGE.HIT, rng, location)}
+    }
+
     /** Print attack lines to the display monitor. */
     private announce(lines: string[]): void {
         for (const line of lines) {uiLog(line)}
@@ -1146,6 +1160,7 @@ export class Combat {
 
         this.announce(describeAttack(report))
         this.recordAttack(obj, target, report)
+        this.attackTaunts(obj, target, report, info)
 
         // attack!
         obj.staticAnimation('attack', callback)
@@ -1197,8 +1212,33 @@ export class Combat {
         const info = getAttackWeaponInfo(obj, hitMode)
         if (info.isBurst || info.mode === 8) {
             this.burstAttack(obj, target, callback, hitMode)
-        } else {
-            this.attack(obj, target, region, callback, hitMode)
+            return
+        }
+        if (info.weapon === null) {
+            // combat.cc _combat_attack: an NPC's punch is a kick one time in
+            // four when it has kick art (same damage and AP).
+            let blow: 'q' | 'r' = 'q'
+            if (!obj.isPlayer && this.random(1, 4) === 1 && this.hasKickArt(obj)) {blow = 'r'}
+            const c = obj as any
+            c.unarmedAttackAnim = blow
+            this.attack(obj, target, region, () => {
+                c.unarmedAttackAnim = undefined
+                callback()
+            }, hitMode)
+            return
+        }
+        this.attack(obj, target, region, callback, hitMode)
+    }
+
+    /** artExists(ANIM_KICK_LEG) for the critter's current weapon art. */
+    private hasKickArt(obj: Critter): boolean {
+        const info = globalState.imageInfo
+        if (!info || typeof obj.getBase !== 'function') {return false}
+        try {
+            const skin = obj.equippedWeapon?.weapon?.getSkin?.() ?? 'a'
+            return info[obj.getBase() + skin + 'r'] !== undefined
+        } catch {
+            return false
         }
     }
 
@@ -1342,6 +1382,7 @@ export class Combat {
 
         this.announce(describeAttack(report))
         this.recordAttack(obj, target, report)
+        this.attackTaunts(obj, target, report, info)
 
         obj.staticAnimation('attack', callback)
     }
@@ -1601,6 +1642,21 @@ export class Combat {
             }
             // DAM_ON_FIRE only selects the burning death animation.
             if (x.onFire) {x.onFire = false}
+        }
+
+        // _combat_over: the player gets a full AP bar back, and a knocked-out
+        // or knocked-down (but living) player comes to at once.
+        const player = this.player as any
+        if (player && !player.dead) {
+            if (player.AP?.resetAP) {
+                player.AP.resetAP()
+                player.AP.move = 0
+            }
+            if (player.knockedOut || player.knockedDown) {
+                player.knockedOut = false
+                player.knockedDown = false
+                player.knockoutWakeTick = undefined
+            }
         }
 
         console.log('[end combat]')

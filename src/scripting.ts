@@ -43,6 +43,7 @@ import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getRandomInt, fixMojibake } from './util.js'
+import { isWithinPerception as perceives } from './combat/aiPacket.js'
 import { rollSkillCheck, RollResult, toRollResult, rollResultIsSuccess, rollResultIsCritical } from './skillCheck.js'
 import { ScriptVM } from './vm.js'
 import { ScriptVMBridge } from './vm_bridge.js'
@@ -689,74 +690,18 @@ export namespace Scripting {
         return [0, 1, 5].indexOf(dir) !== -1
     }
 
-    // Line-of-sight and perception helpers.  These are heuristic — FO2's
-    // official LOS uses per-tile light levels, but we approximate via
-    // direction + perception radius + light factor in isWithinPerception.
+    // combat_ai.cc isWithinPerception: seen within PER×5 in the forward arc,
+    // heard within PER (PER×2 in combat); a sneaking player is harder to notice.
     function isWithinPerception(obj: Critter, target: Critter): boolean {
-        // BLK-087: Guard against null positions — critters without positions cannot
-        // perceive or be perceived.  Return false (not within perception) rather than crash.
-        if (!obj.position || !target.position) {return false}
-        // BLK-210: Guard against missing getStat/getSkill methods — critters spawned
-        // via create_object_sid() during Arroyo temple and end-of-arroyo scripts may
-        // not have a full stats/skills component initialized.  Calling getStat/getSkill
-        // on such objects throws TypeError and halts the VM.  Fall back to returning
-        // false (not within perception) so the calling script can continue safely.
-        if (typeof (obj as any).getStat !== 'function' || typeof (target as any).getSkill !== 'function') {
-            return false
-        }
-        const dist = hexDistance(obj.position, target.position)
-        const perception = obj.getStat('PER')
-        const sneakSkill = target.getSkill('Sneak')
-        let reqDist
-
-        if (canSee(obj, target)) {
-            reqDist = perception * 5
-
-            // FO2 critter flags bit 2: sneaky/hard-to-perceive targets halve perception range.
-            if ((target as any).critterFlags & 2) {reqDist = Math.max(1, (reqDist / 2) | 0)}
-
-            if (target === globalState.player) {
-                // SNK_MODE (bit 3) set via pc_flag_on(3) means sneak mode is active.
-                const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
-                if (isSneaking) {
-                    reqDist /= 4
-                    if (sneakSkill > 120) {reqDist--}
-                }
-
-                // Lighting condition: targets in the dark are harder to spot.
-                // lightLevel ranges 0 (total darkness) to 65536 (fully lit).
-                const targetLight = (target as any).lightLevel ?? 65536
-                if (targetLight < 65536 / 4) {reqDist /= 2}
-                else if (targetLight < 65536 / 2) {reqDist = Math.max(1, (reqDist * 3 / 4) | 0)}
-            }
-
-            if (dist <= reqDist) {return true}
-        }
-
-        reqDist = globalState.inCombat ? perception * 2 : perception
-
-        // FO2 critter flags bit 2: sneaky/hard-to-perceive targets halve perception range.
-        if ((target as any).critterFlags & 2) {reqDist = Math.max(1, (reqDist / 2) | 0)}
-
-        if (target === globalState.player) {
-            const isSneaking = !!(globalState.player.pcFlags & (1 << 3))
-            if (isSneaking) {
-                reqDist /= 4
-                if (sneakSkill > 120) {reqDist--}
-            }
-
-            // Lighting condition: targets in the dark are harder to spot via hearing too.
-            const targetLight = (target as any).lightLevel ?? 65536
-            if (targetLight < 65536 / 4) {reqDist /= 2}
-            else if (targetLight < 65536 / 2) {reqDist = Math.max(1, (reqDist * 3 / 4) | 0)}
-        }
-
-        return dist <= reqDist
+        if (!obj?.position || !target?.position) {return false}
+        // BLK-210: a critter spawned without stats cannot perceive anything.
+        if (typeof (obj as any).getStat !== 'function') {return false}
+        return perceives(obj, target, (min, max) => getRandomInt(min, max))
     }
 
     function objCanSeeObj(obj: Critter, target: Obj): boolean {
-        // Is target within obj's perception, or is it a non-critter object (without perception)?
-        if (target.type !== 'critter' || isWithinPerception(obj, target as Critter)) {
+        // opObjectCanSeeObject: within perception, and nothing in the way.
+        if (isWithinPerception(obj, target as Critter)) {
             // BLK-076: Guard against null gMap (during map transitions or before a map
             // is loaded) and null/missing positions on either critter.  When the map or
             // positions are unavailable we conservatively treat the line-of-sight check

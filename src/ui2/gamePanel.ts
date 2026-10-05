@@ -199,8 +199,21 @@ export class GamePanel extends UIPanel {
     private _monitorScroll = 0
     /** True when the engine has indicated we are inside a combat encounter. */
     private _isInCombat = false
-    /** True when it is the player's turn (controls END TURN availability). */
-    private _isPlayerTurn = false
+    private _isPlayerTurnEvent = false
+
+    /**
+     * True when it is the player's turn (controls END TURN availability).
+     * The live combat state wins over the last turn event, since skipped
+     * turns (knocked out, losing a turn) announce a start but no end.
+     */
+    private get _isPlayerTurn(): boolean {
+        const combat = globalState.combat
+        return combat ? combat.inPlayerTurn === true : this._isPlayerTurnEvent
+    }
+
+    private set _isPlayerTurn(v: boolean) {
+        this._isPlayerTurnEvent = v
+    }
 
     constructor(screenWidth: number, screenHeight: number, playerEntityId: number, playerName = 'VAULT DWELLER') {
         super('gamePanel', {
@@ -313,7 +326,7 @@ export class GamePanel extends UIPanel {
         let ap = 0
         let freeMove = 0
         if (this._isInCombat || globalState.inCombat) {
-            const playersTurn = this._isPlayerTurn || (globalState.combat?.inPlayerTurn ?? false)
+            const playersTurn = this._isPlayerTurn
             if (playersTurn) {
                 ap = player?.AP?.getAvailableCombatAP?.() ?? live?.currentAP ?? 0
                 freeMove = player?.AP?.move ?? 0

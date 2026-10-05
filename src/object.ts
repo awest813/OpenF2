@@ -1581,6 +1581,15 @@ export class Critter extends Obj {
     getAnimation(anim: string): string {
         const base = this.getBase()
 
+        // A hand-to-hand blow thrown while holding something (HIT_MODE_PUNCH /
+        // HIT_MODE_KICK) plays the unarmed art for the weapon in hand.
+        const unarmed = (this as any).unarmedAttackAnim as 'q' | 'r' | undefined
+        if (anim === 'attack' && unarmed) {
+            const skin = this.equippedWeapon?.weapon?.getSkin?.() ?? 'a'
+            const withSkin = base + skin + unarmed
+            return globalState.imageInfo?.[withSkin] !== undefined || skin === 'a' ? withSkin : base + 'a' + unarmed
+        }
+
         // try weapon animation first
         const weaponObj = this.equippedWeapon
         if (weaponObj !== null && Config.engine.doUseWeaponModel === true) {
@@ -1597,8 +1606,8 @@ export class Critter extends Obj {
         const wep = 'a'
         switch (anim) {
             case 'attack':
-                console.log('default attack animation instead of weapon animation.')
-                return base + wep + 'a'
+                // Bare hands: ANIM_THROW_PUNCH.
+                return base + wep + 'q'
             case 'idle':
                 return base + wep + 'a'
             case 'walk':
