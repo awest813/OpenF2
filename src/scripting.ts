@@ -34,7 +34,7 @@ import {
 import { Spatial } from './map.js'
 import globalState from './globalState.js'
 import { parseIntFile } from './intfile.js'
-import { Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
+import { actionExplode, Critter, createObjectWithPID, Obj, objectGetDamageType } from './object.js'
 import { Player } from './player.js'
 import { makePID, loadPRO } from './pro.js'
 import { centerCamera, objectOnScreen } from './renderer.js'
@@ -3831,16 +3831,10 @@ export namespace Scripting {
                 return
             }
 
-            // Make a transient object so we can explode at the tile.
-            const explosives = createObjectWithPID(makePID(0 /* items */, 85 /* Plastic Explosives */), -1)
-            explosives.position = fromTileNum(tile)
-            globalState.gMap.addObject(explosives)
-            // Use the script-supplied damage value: half as min, full as max.
-            // Allow 0 for scripts that trigger a visual-only explosion.
-            const minDmg = Math.floor(damage / 2)
-            const maxDmg = damage
-            explosives.explode(explosives, minDmg, maxDmg)
-            globalState.gMap.removeObject(explosives)
+            // opExplosion: 1 to `damage` (0 to 0 for a harmless blast), blamed on no one.
+            if (tile === -1) {return}
+            const maxDamage = typeof damage === 'number' && isFinite(damage) ? damage : 0
+            actionExplode(fromTileNum(tile), maxDamage === 0 ? 0 : 1, maxDamage, null)
         }
 
         gfade_out(time: number) {

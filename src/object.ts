@@ -18,7 +18,7 @@ import { Weapon } from './critter.js'
 import { critterDamage } from './critter.js'
 import { getLstId, lookupScriptName } from './data.js'
 import { Events } from './events.js'
-import { directionOfDelta, hexDistance, hexesInRadius, hexToScreen, Point } from './geometry.js'
+import { directionOfDelta, hexDistance, hexToScreen, Point } from './geometry.js'
 import globalState from './globalState.js'
 import { lazyLoadImage } from './images.js'
 import { Lightmap } from './lightmap.js'
@@ -29,12 +29,14 @@ import { uiLoot } from './ui.js'
 import { deepClone, getMessage } from './util.js'
 import { Config } from './config.js'
 import { SkillSet, StatSet } from './char.js'
-import { ActionPoints, AI } from './combat.js'
+import { ActionPoints, AI, Combat } from './combat.js'
 import { markPlayerExplored } from './character/automap.js'
 import { canCritterCarryMore, getCritterInventoryWeightLbs } from './critterInventory.js'
 import { adrenalineRushBonus, gainPerkSpecialBonus, perkStatModifier, playerSkillModifier, traitStatModifier } from './character/statModifiers.js'
 import { PerkId, perkRank } from './character/perkIds.js'
-import { overloadApPenalty } from './combat/fo2Formulas.js'
+import { overloadApPenalty, Roll } from './combat/fo2Formulas.js'
+import { explode } from './explosion.js'
+import { skillRoll, SKILL_TRAPS } from './skillUse.js'
 import { statDependencies } from './skills.js'
 import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { uiLog } from './ui.js'
@@ -127,50 +129,140 @@ export function objectGetDamageType(obj: { dmgType?: number | string } | null | 
     return 'Normal'
 }
 
+/** inven_set_timer: 10 to 180 seconds in steps of 10, or -1 when cancelled. */
+function askExplosiveTimer(): number {
+    if (typeof prompt !== 'function') {return 10}
+    for (;;) {
+        const text = prompt('Time to detonate? (10–180 seconds)', '10')
+        if (text === null) {return -1}
+        const parts = text.split(':').map((p) => parseInt(p, 10))
+        const seconds = parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0]
+        if (Number.isFinite(seconds)) {return Math.max(10, Math.min(180, Math.round(seconds / 10) * 10))}
+    }
+}
+
+function protoMessage(id: number, fallback: string): string {
+    let text: string | null = null
+    try {
+        text = getMessage('proto', id)
+    } catch {
+        text = null
+    }
+    return text ?? fallback
+}
+
+/**
+ * _obj_use_explosive: set the timer, then a Traps roll (Demolition Expert
+ * never fails): a failure goes off in half the time, a critical failure at
+ * once, each with misc.msg 4000.
+ */
 function useExplosive(obj: Obj, source: Critter): void {
-    if (source.isPlayer !== true) {
+    if (source?.isPlayer !== true) {return}
+    const explosive = obj as any
+    if (explosive.explosiveArmed) {
+        uiLog(protoMessage(590, 'The timer is already ticking.'))
         return
-    } // ?
-    let mins, secs
+    }
+    const seconds = askExplosiveTimer()
+    if (seconds === -1) {return}
+    uiLog(protoMessage(589, 'You set the timer.'))
+    explosive.explosiveArmed = true
 
-    const forever = true
-
-    while (forever) {
-        const time = prompt('Time to detonate?', '1:00')
-        if (time === null) {
-            return
-        } // cancel
-        const s = time.split(':')
-        if (s.length !== 2) {
-            continue
-        }
-
-        mins = parseInt(s[0])
-        secs = parseInt(s[1])
-
-        if (isNaN(mins) || isNaN(secs)) {
-            continue
-        }
-        break
+    let delay = 10 * seconds
+    const roll = perkRank(source, PerkId.DEMOLITION_EXPERT) > 0
+        ? Roll.Success
+        : skillRoll(source, SKILL_TRAPS, 0).roll
+    let failure = false
+    if (roll === Roll.CriticalFailure) {
+        delay = 0
+        failure = true
+    } else if (roll === Roll.Failure) {
+        delay = Math.trunc(delay / 2)
+        failure = true
     }
 
-    // NOTE: FO2 rolls Traps skill vs. difficulty to determine whether the
-    // explosive is armed correctly or detonates immediately / fails.  We
-    // currently skip the roll and always arm — a future improvement would
-    // import skillCheck.ts and roll against pro.extra.difficulty.
-
-    const ticks = mins * 60 * 10 + secs * 10 // game ticks until detonation
-
-    console.log('arming explosive for ' + ticks + ' ticks')
-
     Scripting.timeEventList.push({
-        ticks: ticks,
+        ticks: Math.max(1, delay),
         obj: null,
         userdata: null,
         fn: function () {
-            // Explosion with proper damage calculations
-            obj.explode(source, 10 /* min dmg */, 25 /* max dmg */)
+            if (failure) {
+                let text: string | null = null
+                try {
+                    text = getMessage('misc', 4000)
+                } catch {
+                    text = null
+                }
+                uiLog(text ?? 'Due to your inept handling, the explosive detonates prematurely.')
+            }
+            detonateExplosive(explosive)
         },
+    })
+}
+
+/** Whoever is carrying `item`, if anyone (objectGetOwner). */
+function explosiveOwner(item: Obj): Critter | null {
+    const holders: any[] = [globalState.player, ...((globalState.gMap?.getObjects?.() ?? []) as any[])]
+    for (const holder of holders) {
+        if (holder?.type === 'critter' && Array.isArray(holder.inventory) && holder.inventory.includes(item)) {return holder}
+    }
+    return null
+}
+
+/**
+ * _queue_do_explosion_: dynamite does 30–50, plastic explosives 40–80
+ * (+10 each with the player's Demolition Expert), centred on whoever holds
+ * it or where it lies; the player is the source. The explosive is used up.
+ */
+export function detonateExplosive(explosive: Obj): void {
+    const owner = explosiveOwner(explosive)
+    const position = owner?.position ?? explosive.position
+    const dynamite = explosive.pid === 51 || explosive.pid === 206
+    let minDamage = dynamite ? 30 : 40
+    let maxDamage = dynamite ? 50 : 80
+    if (globalState.player && perkRank(globalState.player, PerkId.DEMOLITION_EXPERT) > 0) {
+        minDamage += 10
+        maxDamage += 10
+    }
+    if (owner) {
+        const idx = owner.inventory.indexOf(explosive)
+        if (idx >= 0) {owner.inventory.splice(idx, 1)}
+    } else if (globalState.gMap) {
+        globalState.gMap.removeObject(explosive)
+    }
+    if (position) {actionExplode(position, minDamage, maxDamage, globalState.player ?? null)}
+}
+
+/**
+ * actionExplode: the blast animation on the hex, then the damage
+ * (explosion.ts). `source` is blamed for it; null for a scripted blast.
+ */
+export function actionExplode(center: Point, minDamage: number, maxDamage: number, source: Critter | null): void {
+    const detonate = (fx: Obj | null) => {
+        explode({ x: center.x, y: center.y }, minDamage, maxDamage, source, {
+            damage: (critter, amount, by) => critterDamage(critter, amount, by, true, true, 'Explosive'),
+            damageScenery: (obj) => Scripting.damage(obj, fx ?? obj, null as unknown as Obj, 20),
+            startCombat: (attacker, defender) => Combat.start(attacker, defender),
+        })
+    }
+    let fx: Obj | null = null
+    try {
+        fx = createObjectWithPID(makePID(5 /* misc */, 14 /* Explosion */), -1)
+    } catch {
+        fx = null
+    }
+    if (!fx || !globalState.gMap || typeof (fx as any).singleAnimation !== 'function') {
+        detonate(fx)
+        return
+    }
+    fx.position = { x: center.x, y: center.y }
+    const blast = fx
+    lazyLoadImage(blast.art, () => {
+        globalState.gMap.addObject(blast)
+        blast.singleAnimation(false, () => {
+            globalState.gMap.removeObject(blast)
+            detonate(blast)
+        })
     })
 }
 
@@ -839,59 +931,6 @@ export class Obj {
 
         globalState.gMap.updateMap()
         return true
-    }
-
-    explode(source: Obj, minDmg: number, maxDmg: number): void {
-        // Calculate explosion radius based on damage
-        // In Fallout, typical explosive radius is 2-4 hexes
-        const explosionRadius = Math.min(8, Math.max(2, Math.floor(maxDmg / 10)))
-        const damage = Math.floor((minDmg + maxDmg) / 2) // Average damage at center
-        
-        // BLK-115: Guard against null position — this.position may be null for
-        // objects in inventory or mid-map-transition.  Skip the explosion rather
-        // than crashing with a TypeError on this.position.x.
-        if (!this.position) {
-            console.warn('explode: source object has no position — skipping explosion')
-            return
-        }
-        const explosion = createObjectWithPID(makePID(5 /* misc */, 14 /* Explosion */), -1)
-        explosion.position = { x: this.position.x, y: this.position.y }
-        ;(<any>this).dmgType = 'Explosive' // Explosive damage type
-
-        lazyLoadImage(explosion.art, () => {
-            globalState.gMap.addObject(explosion)
-
-            explosion.singleAnimation(false, () => {
-                globalState.gMap.destroyObject(explosion)
-
-                // Damage critters in a radius with falloff
-                const hexes = hexesInRadius(this.position, explosionRadius)
-                for (let i = 0; i < hexes.length; i++) {
-                    const distance = hexDistance(this.position, hexes[i])
-                    
-                    // Calculate damage falloff: full damage at center, linear decrease with distance
-                    // Damage = baseDamage * (1 - distance / (radius + 1))
-                    const damageFalloff = Math.max(0, 1 - distance / (explosionRadius + 1))
-                    const adjustedDamage = Math.max(1, Math.floor(damage * damageFalloff))
-                    
-                    const objs = globalState.gMap.objectsAtPosition(hexes[i])
-                    for (let j = 0; j < objs.length; j++) {
-                        if (objs[j].type === 'critter') {
-                            const critter = <Critter>objs[j]
-                            
-                            // Apply damage with explosive type (imported at module level)
-                            critterDamage(critter, adjustedDamage, source as Critter, false, true, 'Explosive')
-                        }
-
-                        // Also notify scripts
-                        Scripting.damage(objs[j], this, this /*source*/, adjustedDamage)
-                    }
-                }
-
-                // Remove explosive
-                globalState.gMap.destroyObject(this)
-            })
-        })
     }
 
     pickup(source: Critter) {
