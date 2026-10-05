@@ -64,3 +64,27 @@ describe('sfall hook scripts (HookScripts/Common.cpp)', () => {
         expect(hookReturn(runHook(HOOK.TOHIT, [100]), 0, 0)).toBe(111)
     })
 })
+
+describe('engine events reach the hooks', () => {
+    it('SetGlobalVar can change the value; RollCheck can change a skill roll', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const script: any = new (Scripting as any).Script()
+        const g: any = { start() { setHookReturn(Number(getHookArgAt(1)) * 2) } }
+        registerHook(g, HOOK.SETGLOBALVAR, null, false)
+        script.set_global_var(77, 21)
+        expect(script.global_var(77)).toBe(42)
+
+        const { skillRoll } = await import('./skillUse.js')
+        const r: any = { start() { setHookReturn(3) } }
+        registerHook(r, HOOK.ROLLCHECK, null, false)
+        const critter: any = { getSkill: () => 0, getStat: () => 0, skills: {} }
+        expect(skillRoll(critter, 0, 0, () => 100).roll).toBe(3)
+    })
+
+    it('DescriptionObj replaces the examine text', async () => {
+        const { examineLines } = await import('./examine.js')
+        const d: any = { start() { setHookReturn('A strange rock.') } }
+        registerHook(d, HOOK.DESCRIPTIONOBJ, null, false)
+        expect(examineLines(null, { type: 'scenery', getDescription: () => 'A rock.' })).toEqual(['A strange rock.'])
+    })
+})

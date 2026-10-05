@@ -15,6 +15,7 @@
  * extra.ammoType (PID actually loaded — sfall get/set_weapon_ammo_pid).
  */
 
+import { HOOK, hookReturn, runHook } from '../hookScripts.js'
 import globalState from '../globalState.js'
 import { reloadApCost } from './fo2Formulas.js'
 import { Critter, Obj } from '../object.js'
@@ -54,6 +55,9 @@ export function weaponNeedsReload(weapon: Obj | null | undefined): boolean {
 export function consumeRounds(weapon: Obj, rounds = 1): boolean {
     const loaded = getLoadedAmmo(weapon)
     if (loaded < rounds) {return false}
+    // sfall HOOK_AMMOCOST (0 after a single shot, 3 after a burst): the rounds spent.
+    const hook = runHook(HOOK.AMMOCOST, [weapon, rounds, rounds, rounds > 1 ? 3 : 0])
+    if (hook) {rounds = Math.max(0, Math.min(loaded, hookReturn(hook, 0, rounds)))}
     if (!(weapon as any).extra) {(weapon as any).extra = {}}
     ;(weapon as any).extra.ammoLoaded = loaded - rounds
     return true

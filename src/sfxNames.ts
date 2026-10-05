@@ -4,6 +4,7 @@
  * pads short names on the left with spaces, and the result is upper case.
  */
 
+import { HOOK, runHook } from './hookScripts.js'
 import { artCode, weaponAnimationCode } from './animSequence.js'
 
 /** _snd_lookup_scenery_action: open, close, lock, unlock, use. */
@@ -99,6 +100,14 @@ function materialCode(target: any): string {
 
 /** sfxBuildWeaponName. */
 export function sfxWeaponName(effectType: number, weapon: any, hitMode: number, target: any): string {
+    // sfall HOOK_BUILDSFXWEAPON: a script may name the sound itself.
+    const hook = runHook(HOOK.BUILDSFXWEAPON, [effectType, weapon ?? 0, hitMode, target ?? 0], { allowNonIntReturn: true })
+    const named = hook?.rets[0]
+    if (typeof named === 'string' && named !== '') {return named.toUpperCase()}
+    return engineWeaponSfx(effectType, weapon, hitMode, target)
+}
+
+function engineWeaponSfx(effectType: number, weapon: any, hitMode: number, target: any): string {
     const weaponCode = charOf(weapon?.pro?.extra?.soundID, '')
     const effect = WEAPON_EFFECT[effectType] ?? ''
     let variant = 1

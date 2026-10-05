@@ -318,6 +318,15 @@ export function lookupMapFromLookup(lookupName: string) {
     return null
 }
 
+/** A map's index in maps.txt by its lookup name (-1 when unknown). */
+export function lookupMapIdFromLookup(lookupName: string): number {
+    if (mapInfo === null) {parseMapInfo()}
+    for (const mapID in mapInfo!) {
+        if (mapInfo![mapID].lookupName.toLowerCase() === String(lookupName ?? '').toLowerCase()) {return Number(mapID)}
+    }
+    return -1
+}
+
 export function lookupMapNameFromLookup(lookupName: string) {
     if (mapInfo === null) {parseMapInfo()}
 

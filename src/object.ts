@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import { apToAcBonus, capSkill, clampStatValue, sfallSettings } from './sfallSettings.js'
 import { Weapon } from './critter.js'
 import { critterDamage } from './critter.js'
@@ -176,6 +177,13 @@ function useExplosive(obj: Obj, source: Critter): void {
     } else if (roll === Roll.Failure) {
         delay = Math.trunc(delay / 2)
         failure = true
+    }
+    // sfall HOOK_EXPLOSIVETIMER: scripts may change the time (up to 18000 ticks) and the outcome.
+    const hook = runHook(HOOK.EXPLOSIVETIMER, [delay, obj, failure ? 1 : 2])
+    if (hook) {
+        delay = Math.max(0, Math.min(18000, hookReturn(hook, 0, delay)))
+        const result = hookReturn(hook, 1, -1)
+        if (result >= 0 && result <= 3) {failure = result < 2}
     }
 
     Scripting.timeEventList.push({

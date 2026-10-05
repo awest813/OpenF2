@@ -676,7 +676,7 @@ export class Combat {
         const isPlayer = obj.isPlayer === true
 
         let maxDamage = info.maxDamage
-        const minDamage = info.minDamage
+        let minDamage = info.minDamage
         if (melee && typeof obj.getStat === 'function') {
             // weaponGetDamage: Melee Damage widens the top of the range.
             const meleeDamage = obj.getStat('Melee')
@@ -691,6 +691,13 @@ export class Combat {
         if (isPlayer && perkRank(obj, PerkId.PYROMANIAC) > 0 && info.damageType === 'Fire') {flatAfter += sfallSettings.pyromaniacMod}
 
         if (maxDamage < minDamage) {maxDamage = minDamage}
+
+        // sfall HOOK_ITEMDAMAGE: one return fixes the damage, two set the range.
+        const dmgRange = runHook(HOOK.ITEMDAMAGE, [minDamage, maxDamage, info.weapon ?? 0, obj, attackTypeId(obj, hitMode), melee ? 1 : 0])
+        if (dmgRange && dmgRange.rets.length > 0) {
+            minDamage = hookReturn(dmgRange, 0, minDamage)
+            maxDamage = dmgRange.rets.length > 1 ? hookReturn(dmgRange, 1, maxDamage) : minDamage
+        }
 
         return computeDamage({
             minDamage,
@@ -1596,7 +1603,11 @@ export class Combat {
             return false
         }
 
-        const moveCost = movementApCost(this.player, Math.max(0, this.player.path.path.length - 1))
+        const hexes = Math.max(0, this.player.path.path.length - 1)
+        let moveCost = movementApCost(this.player, hexes)
+        // sfall HOOK_MOVECOST.
+        const moveHook = runHook(HOOK.MOVECOST, [this.player, hexes, moveCost])
+        if (moveHook) {moveCost = Math.max(0, hookReturn(moveHook, 0, moveCost))}
         if (!this.player.AP.subtractMoveAP(moveCost)) {
             console.warn(
                 'playerWalkTo: AP desync — has AP: ' +

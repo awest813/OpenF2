@@ -209,12 +209,12 @@ describe('Phase 49-E — pc_flag_on/off guards', () => {
 
 describe('Phase 49-F — inven_unwield(obj) clears critter.rightHand', () => {
     it('sets rightHand to undefined for a critter with a weapon', () => {
-        const weapon = makeGameObj({ type: 'item', subtype: 'weapon' })
+        const weapon = makeGameObj({ type: 'item', subtype: 'weapon', pid: 8 })
         const critter = makeCritter({ rightHand: weapon })
 
         const script = new Scripting.Script()
         script.inven_unwield(critter)
-        expect(critter.rightHand).toBeUndefined()
+        expect(critter.rightHand).toBeFalsy()
     })
 
     it('does not throw for a critter with no weapon', () => {

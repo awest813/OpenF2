@@ -34,7 +34,7 @@ import { processRadPoisonUpTo } from './character/radiationPoison.js'
 import { processChargedItemsUpTo } from './chargedItems.js'
 import { deleteTempArrays } from './sfallArrays.js'
 import { globalScriptList, runGlobalScripts } from './globalScripts.js'
-import { HOOK, hookHasScript, runHook } from './hookScripts.js'
+import { HOOK, hookHasScript, hookReturn, runHook } from './hookScripts.js'
 import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
@@ -357,6 +357,11 @@ function pushCritter(who: Critter): void {
  */
 function useItemOn(item: Obj, target: Obj): void {
     actOnObject(target, () => {
+        // sfall HOOK_USEOBJON: 0 keeps the item, 1 uses it up, -1 goes on as usual.
+        const hook = runHook(HOOK.USEOBJON, [target, globalState.player, item])
+        const choice = hook && hook.rets.length > 0 ? hookReturn(hook, 0, -1) : -1
+        if (choice === 1) {removeItem(globalState.player, item, 1)}
+        if (choice === 0 || choice === 1) {return}
         if (Scripting.useObjOn(target, item) === true) {return}
         const player = globalState.player
         if (isDrug(item)) {

@@ -35,7 +35,7 @@ import { fromTileNum, hexToTile, isValidTileNum, toTileNum } from './tile.js'
 import { uiAddDialogueOption, uiBarterMode, uiEndDialogue, uiLog, uiSetDialogueReply, uiStartDialogue } from './ui.js'
 import { UIMode } from './uiMode.js'
 import { BinaryReader, getFileBinarySync, getFileText, getMessage, getRandomInt, fixMojibake } from './util.js'
-import { aiPacketFor, isWithinPerception as perceives, playerInSneakMode } from './combat/aiPacket.js'
+import { aiPacketFor, perceptionLevel, playerInSneakMode } from './combat/aiPacket.js'
 import { SKILL_NAMES, skillRoll as engineSkillRoll } from './skillUse.js'
 import { adjustPoison, adjustRadiation } from './character/radiationPoison.js'
 import { installSfallFunctions, resetSfallState, sfallSettings } from './sfallFunctions.js'
@@ -70,7 +70,7 @@ import { fadeIn, fadeOut } from './fade.js'
 import { getSettings, iniOverride, violenceToIni } from './settings.js'
 import { itemDropAll } from './mapAging.js'
 import { sfxAmbientName, sfxCharName, sfxInterfaceName, sfxOpenName, sfxSceneryName, sfxWeaponName } from './sfxNames.js'
-import { equipItem, isRealItem, removeItem } from './equipment.js'
+import { equipItem, isRealItem, removeItem, unequipSlot } from './equipment.js'
 import { hasDrugEvent, isDrug, takeDrug } from './character/timedEffects.js'
 import {
     ANIM_COUNT, ANIM_FALL_BACK, ANIM_FALL_BACK_SF, ANIM_FALL_FRONT, ANIM_FALL_FRONT_BLOOD, ANIM_FALL_FRONT_SF,
@@ -770,16 +770,20 @@ export namespace Scripting {
 
     // combat_ai.cc isWithinPerception: seen within PER×5 in the forward arc,
     // heard within PER (PER×2 in combat); a sneaking player is harder to notice.
-    function isWithinPerception(obj: Critter, target: Critter): boolean {
-        if (!obj?.position || !target?.position) {return false}
+    /** hookType: 1 obj_can_see_obj, 2 obj_can_hear_obj (sfall HOOK_WITHINPERCEPTION). */
+    function isWithinPerception(obj: Critter, target: Critter, hookType = 0): number {
+        if (!obj?.position || !target?.position) {return 0}
         // BLK-210: a critter spawned without stats cannot perceive anything.
-        if (typeof (obj as any).getStat !== 'function') {return false}
-        return perceives(obj, target, (min, max) => getRandomInt(min, max))
+        if (typeof (obj as any).getStat !== 'function') {return 0}
+        return perceptionLevel(obj, target, (min, max) => getRandomInt(min, max), hookType)
     }
 
     function objCanSeeObj(obj: Critter, target: Obj): boolean {
-        // opObjectCanSeeObject: within perception, and nothing in the way.
-        if (isWithinPerception(obj, target as Critter)) {
+        // opObjectCanSeeObject: within perception, and nothing in the way
+        // (a hook's 2 means seen regardless).
+        const level = isWithinPerception(obj, target as Critter, 1)
+        if (level === 2) {return true}
+        if (level !== 0) {
             // BLK-076: Guard against null gMap (during map transitions or before a map
             // is loaded) and null/missing positions on either critter.  When the map or
             // positions are unavailable we conservatively treat the line-of-sight check
@@ -1465,7 +1469,7 @@ export namespace Scripting {
         obj_can_hear_obj(a: Obj, b: Obj) {
             if (!isGameObject(a) || !isGameObject(b) || !a.position || !b.position) {return 0}
             if (elevationOf(a) !== elevationOf(b)) {return 0}
-            return isWithinPerception(a as Critter, b as Critter) ? 1 : 0
+            return isWithinPerception(a as Critter, b as Critter, 2) !== 0 ? 1 : 0
         }
         /**
          * opCritterModifySkill: only the player. Adds or takes skill points one at
@@ -1717,6 +1721,9 @@ export namespace Scripting {
             let slot: 'leftHand' | 'rightHand' | 'equippedArmor' = 'rightHand'
             if (item.subtype === 'armor') {slot = 'equippedArmor'}
             else if (critter === globalState.player && (critter.activeHand ?? 0) === 0) {slot = 'leftHand'}
+            // sfall HOOK_INVENWIELD (slot: 0 armor, 1 right hand, 2 left hand): anything but -1 stops it.
+            const hook = runHook(HOOK.INVENWIELD, [critter, item, slot === 'equippedArmor' ? 0 : slot === 'rightHand' ? 1 : 2, 1, 0])
+            if (hook && hook.rets.length > 0 && hookReturn(hook, 0, -1) !== -1) {return}
             equipItem(critter, item, slot)
             if (critter === globalState.player) {syncPlayerEntityFromCritter()}
         }
@@ -1965,26 +1972,18 @@ export namespace Scripting {
         // untouched.  Now clears the appropriate slot so scripts that call
         // inven_unwield() actually remove the weapon from the critter's combat view.
         // ---------------------------------------------------------------------------
+        /** opInvenUnwield: the player's active hand, anyone else's right hand, is emptied (the item stays carried). */
         inven_unwield(obj: Obj) {
-            log('inven_unwield', arguments)
-            if (!isGameObject(obj) || obj.type !== 'critter') {
-                warn('inven_unwield: not a critter: ' + obj, undefined, this)
-                return
-            }
-            const critter = obj as Critter
-            if (critter.isPlayer) {
-                // For the player, clear the currently active hand slot.
-                // activeHand: 0 = leftHand (primary), 1 = rightHand (secondary).
-                const activeHand = (critter as any).activeHand ?? 0
-                if (activeHand === 1) {
-                    critter.rightHand = undefined
-                } else {
-                    critter.leftHand = undefined
-                }
-            } else {
-                // For NPCs, clear rightHand (always their primary equipped weapon slot).
-                critter.rightHand = undefined
-            }
+            if (!isGameObject(obj) || obj.type !== 'critter') {return}
+            const critter = obj as any
+            const slot = critter.isPlayer && (critter.activeHand ?? 0) === 0 ? 'leftHand' : 'rightHand'
+            const item = critter[slot]
+            if (!item || !isRealItem(item)) {return}
+            // sfall HOOK_INVENWIELD: anything but -1 stops it.
+            const hook = runHook(HOOK.INVENWIELD, [critter, item, slot === 'leftHand' ? 2 : 1, 0, 0])
+            if (hook && hook.rets.length > 0 && hookReturn(hook, 0, -1) !== -1) {return}
+            unequipSlot(critter, slot)
+            if (critter === globalState.player) {syncPlayerEntityFromCritter()}
         }
 
         // ---------------------------------------------------------------------------
@@ -2313,6 +2312,9 @@ export namespace Scripting {
         // environment
         set_light_level(level: number) {
             log('set_light_level', arguments)
+            // sfall HOOK_SETLIGHTING (the map: object -1, radius -1).
+            const hook = runHook(HOOK.SETLIGHTING, [-1, level, -1], { noRecursion: true })
+            if (hook) {level = hookReturn(hook, 0, level)}
             // Clamp to the valid range 0–65536 and store on globalState.
             globalState.ambientLightLevel = Math.max(0, Math.min(65536, level))
             Lightmap.applyAmbientLight()
@@ -2321,8 +2323,14 @@ export namespace Scripting {
         obj_set_light_level(obj: Obj, intensity: number, distance: number) {
             if (!isGameObject(obj)) {return}
             const pct = Number.isFinite(intensity) ? intensity : 0
-            const value = pct !== 0 ? Math.trunc((pct * 65636) / 100) : 0
-            const dist = Number.isFinite(distance) ? Math.max(0, distance) : 0
+            let value = pct !== 0 ? Math.trunc((pct * 65636) / 100) : 0
+            let dist = Number.isFinite(distance) ? Math.max(0, distance) : 0
+            // sfall HOOK_SETLIGHTING: scripts may change the intensity (0–65536) and radius (0–8).
+            const hook = runHook(HOOK.SETLIGHTING, [obj, value, dist], { noRecursion: true })
+            if (hook) {
+                value = Math.max(0, Math.min(65536, hookReturn(hook, 0, value)))
+                dist = Math.max(0, Math.min(8, hookReturn(hook, 1, dist)))
+            }
             Lightmap.syncObjectEmitterLight(obj, value, dist)
         }
         override_map_start(x: number, y: number, elevation: number, rotation: number) {

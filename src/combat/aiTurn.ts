@@ -470,7 +470,7 @@ export class AiTurn {
         }
 
         for (const candidate of targets) {
-            if (!candidate || !isWithinPerception(c, candidate, this.rng)) {continue}
+            if (!candidate || !isWithinPerception(c, candidate, this.rng, 3)) {continue}
             if (this.reachable(candidate) || this.combat.checkBadShot(c, candidate, 1, false) === 'ok') {
                 return candidate
             }

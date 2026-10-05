@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { HOOK, hookReturn, runHook } from './hookScripts.js'
 import { Combat } from './combat.js'
-import { loadAreas, lookupMapFromLookup } from './data.js'
+import { loadAreas, lookupMapFromLookup, lookupMapIdFromLookup } from './data.js'
 import { Encounters } from './encounters.js'
 import { Point, pointIntersectsCircle } from './geometry.js'
 import globalState from './globalState.js'
@@ -547,6 +548,19 @@ export namespace Worldmap {
     function execEncounter(encTable: EncounterTable): void {
         const enc = Encounters.evalEncounter(encTable)
         if (!enc) {return}
+        // sfall HOOK_ENCOUNTER: a script may cancel it (-1) or send the party
+        // to another map (ret1 1 loads the map from ret0 instead).
+        const mapId = lookupMapIdFromLookup(enc.mapLookupName)
+        const hook = runHook(HOOK.ENCOUNTER, [0, mapId, 0, typeof encTable.id === 'number' ? encTable.id : -1,
+            typeof enc.encounter?.id === 'number' ? enc.encounter.id : -1])
+        if (hook) {
+            const newMap = hookReturn(hook, 0, mapId)
+            if (newMap === -1) {return}
+            if (hookReturn(hook, 1, 0) === 1 && newMap >= 0) {
+                globalState.gMap.loadMapByID(newMap)
+                return
+            }
+        }
         console.log('final: map %s, groups %o', enc.mapName, enc.groups)
 
         // load map

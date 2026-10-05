@@ -8,6 +8,7 @@
  * "never" 5, exactly like the engine.
  */
 
+import { HOOK, hookReturn, runHook } from '../hookScripts.js'
 import { hexDirectionTo, hexDistance } from '../geometry.js'
 import globalState from '../globalState.js'
 import { Dam } from './criticalTables.js'
@@ -389,14 +390,30 @@ export function playerIsSneaking(rng: Rng, player: any = globalState.player): bo
             else if (sneak > 100) {time = 300}
             else if (sneak > 80) {time = 400}
         }
-        player.sneakWorking = ok
-        player.sneakCheckTick = now + time
+        // sfall HOOK_SNEAK: scripts may change the result and how long it lasts.
+        const hook = runHook(HOOK.SNEAK, [ok ? 1 : 0, time, player])
+        player.sneakWorking = hook ? hookReturn(hook, 0, ok ? 1 : 0) !== 0 : ok
+        player.sneakCheckTick = now + (hook ? hookReturn(hook, 1, time) : time)
     }
     return player.sneakWorking === true
 }
 
-/** combat_ai.cc isWithinPerception. */
-export function isWithinPerception(critter: any, target: any, rng: Rng): boolean {
+/**
+ * combat_ai.cc isWithinPerception, then sfall HOOK_WITHINPERCEPTION (type 1
+ * from obj_can_see_obj, 2 from obj_can_hear_obj, 3 the AI picking targets).
+ */
+export function isWithinPerception(critter: any, target: any, rng: Rng, hookType = 0): boolean {
+    return perceptionLevel(critter, target, rng, hookType) !== 0
+}
+
+/** 0 out of range, 1 in range, 2 forced detection (a hook's answer for obj_can_see_obj). */
+export function perceptionLevel(critter: any, target: any, rng: Rng, hookType = 0): number {
+    const result = engineWithinPerception(critter, target, rng) ? 1 : 0
+    const hook = runHook(HOOK.WITHINPERCEPTION, [critter, target, result, hookType])
+    return hook ? hookReturn(hook, 0, result) : result
+}
+
+function engineWithinPerception(critter: any, target: any, rng: Rng): boolean {
     if (!critter?.position || !target?.position) {return false}
     const distance = hexDistance(target.position, critter.position)
     const perception = statOf(critter, 'PER')
