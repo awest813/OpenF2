@@ -13,6 +13,9 @@ import { Scripting } from './scripting.js'
 import globalState from './globalState.js'
 import { playerInSneakMode, setPlayerSneakMode } from './combat/aiPacket.js'
 import { canUseSkillOn, useSkillOn } from './skillUse.js'
+import { HOOK, runHook } from './hookScripts.js'
+
+const SKILL_STEAL_ID = 10
 
 /** Fallout 2 engine skill IDs (same table as scripting `skillNumToName`). */
 export const FALLOUT_SKILL_ID: Record<Exclude<Skills, Skills.None>, number> = {
@@ -68,9 +71,35 @@ export function canPlayerUseSkillOn(skill: Skills, obj: Obj): boolean {
     return canUseSkillOn(globalState.player, obj, getFalloutSkillId(skill))
 }
 
-/** _obj_use_skill_on for the player: the target's script, then the engine's skillUse. */
-export function applyPlayerSkill(skill: Skills, obj: Obj): void {
-    useSkillOn(globalState.player, obj, getFalloutSkillId(skill), (source, target, id) =>
+/**
+ * The critter that uses a Skilldex skill the player picked on `obj`, after
+ * sfall's HOOK_USESKILLON (-1 cancels, a critter replaces the user except
+ * for Steal, ret1 = 1 lifts the in-combat refusal) and actionUseSkill's
+ * checks; null when the skill is not used.
+ */
+export function playerSkillUser(skill: Skills, obj: Obj): Critter | null {
+    const id = getFalloutSkillId(skill)
+    let user: any = globalState.player
+    let allowInCombat = false
+    const hook = runHook(HOOK.USESKILLON, [user, obj, id], { allowNonIntReturn: true })
+    if (hook && id !== SKILL_STEAL_ID && hook.rets.length > 0) {
+        const r = hook.rets[0]
+        if (r === -1) {return null}
+        if (r && typeof r === 'object') {user = r}
+        if (hook.rets.length > 1 && hook.rets[1] === 1) {allowInCombat = true}
+    }
+    const inCombat = globalState.inCombat
+    if (allowInCombat) {globalState.inCombat = false}
+    try {
+        return canUseSkillOn(user, obj, id) ? user : null
+    } finally {
+        if (allowInCombat) {globalState.inCombat = inCombat}
+    }
+}
+
+/** _obj_use_skill_on: the target's script, then the engine's skillUse. */
+export function applyPlayerSkill(skill: Skills, obj: Obj, user: Critter = globalState.player): void {
+    useSkillOn(user, obj, getFalloutSkillId(skill), (source, target, id) =>
         Scripting.useSkillOn(source as Critter, id, target as Obj)
     )
 }
@@ -89,7 +118,8 @@ export function useSkilldexSkill(skill: Skills, obj?: Obj | null): boolean {
 
     if (skillRequiresTarget(skill)) {
         if (!obj) {return false}
-        if (canPlayerUseSkillOn(skill, obj)) {applyPlayerSkill(skill, obj)}
+        const user = playerSkillUser(skill, obj)
+        if (user) {applyPlayerSkill(skill, obj, user)}
         return true
     }
 

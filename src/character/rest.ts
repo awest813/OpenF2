@@ -13,6 +13,7 @@ import { processRadPoisonUpTo } from './radiationPoison.js'
 import { processChargedItemsUpTo } from '../chargedItems.js'
 import { syncPlayerEntityFromCritter } from '../playerProjection.js'
 import { midnightCheck } from '../mapAging.js'
+import { HOOK, hookReturn, runHook } from '../hookScripts.js'
 
 /** FO2: heal `Healing Rate` HP every 3 game hours while resting. */
 export const TICKS_PER_SECOND = 10
@@ -266,7 +267,7 @@ export function restForHours(hours: number): TimeAdvanceResult {
         ticksAdvanced += chunk.ticksAdvanced
         eventsFired += chunk.eventsFired
         hoursCompleted++
-        if (chunk.interrupted) {
+        if (chunk.interrupted || restTimerHook(h + 1 >= wholeHours && frac <= 0.001 ? 1 : 0, hours)) {
             return { ticksAdvanced, eventsFired, hpHealed: applyRestHealing(ticksAdvanced), hoursCompleted, interrupted: true }
         }
     }
@@ -290,6 +291,16 @@ export function restForHours(hours: number): TimeAdvanceResult {
     }
 
     return { ticksAdvanced, eventsFired, hpHealed, hoursCompleted }
+}
+
+/**
+ * sfall HOOK_RESTTIMER, run as the rest clock advances: event 1 when the rest
+ * ends normally, 0 otherwise. True when a script asked to interrupt it.
+ */
+function restTimerHook(event: number, hours: number): boolean {
+    const total = Math.round(hours * 60)
+    const hook = runHook(HOOK.RESTTIMER, [globalState.gameTickTime ?? 0, event, Math.floor(total / 60), total % 60])
+    return hookReturn(hook, 0, 0) === 1
 }
 
 /** Rest for a number of game minutes. */

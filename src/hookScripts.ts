@@ -24,6 +24,20 @@ export const HOOK = {
 export const HOOK_COUNT = 62
 
 /** The hs_*.int file of each hook (the Init*HookScripts lists). */
+/** sfall's RMOBJ_* reasons for HOOK_REMOVEINVENOBJ (the engine call sites' addresses). */
+export const RMOBJ_ITEM_REMOVED_INVEN = 4831349
+export const RMOBJ_ITEM_REMOVED = 4548572
+export const RMOBJ_ITEM_REMOVED_MULTI = 4563866
+export const RMOBJ_ITEM_DESTROYED = 4543215
+export const RMOBJ_ITEM_DESTROY_MULTI = 4571599
+export const RMOBJ_ITEM_MOVE = 4683293
+export const RMOBJ_CONSUME_DRUG = 4666772
+export const RMOBJ_AI_USE_DRUG_ON = 4359920
+export const RMOBJ_USE_OBJ = 4666865
+export const RMOBJ_INVEN_DROP_ALL_CAPS = 4683864
+export const RMOBJ_INVEN_DROP_ALL_ITEM = 4684069
+export const RMOBJ_THROW = 4266040
+
 export const HOOK_FILES: Record<number, string> = {
     0: 'hs_tohit', 1: 'hs_afterhitroll', 2: 'hs_calcapcost', 3: 'hs_deathanim1', 4: 'hs_deathanim2',
     5: 'hs_combatdamage', 6: 'hs_ondeath', 7: 'hs_findtarget', 8: 'hs_useobjon', 9: 'hs_removeinvenobj',

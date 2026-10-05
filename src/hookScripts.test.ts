@@ -1,3 +1,4 @@
+import globalState from './globalState.js'
 import { describe, it, expect, afterEach } from 'vitest'
 import { clearHookScripts, getHookArg, getHookArgAt, HOOK, hookReturn, registerHook, runHook, setHookArg, setHookReturn, startHookScripts } from './hookScripts.js'
 
@@ -86,5 +87,34 @@ describe('engine events reach the hooks', () => {
         const d: any = { start() { setHookReturn('A strange rock.') } }
         registerHook(d, HOOK.DESCRIPTIONOBJ, null, false)
         expect(examineLines(null, { type: 'scenery', getDescription: () => 'A rock.' })).toEqual(['A strange rock.'])
+    })
+
+    it('RemoveInvenObj sees rm_obj_from_inven and destroy_object with their RMOBJ reasons', async () => {
+        const { Scripting } = await import('./scripting.js')
+        const { RMOBJ_ITEM_DESTROYED, RMOBJ_ITEM_REMOVED } = await import('./hookScripts.js')
+        const script: any = new (Scripting as any).Script()
+        const seen: unknown[][] = []
+        registerHook({ start() { seen.push([getHookArgAt(1), getHookArgAt(2), getHookArgAt(3)]) } }, HOOK.REMOVEINVENOBJ, null, false)
+        const item: any = { type: 'item', pid: 41, amount: 3, approxEq: (o: any) => o === item }
+        const owner: any = { type: 'critter', inventory: [item] }
+        script.rm_obj_from_inven(owner, item)
+        expect(seen).toEqual([[item, 1, RMOBJ_ITEM_REMOVED]])
+        const other: any = { type: 'item', pid: 42, amount: 1, approxEq: () => false }
+        owner.inventory.push(other)
+        globalState.gMap = { getObjects: () => [owner], destroyObject() {}, removeObject() {} } as any
+        script.destroy_object(other)
+        expect(seen[1]).toEqual([other, 1, RMOBJ_ITEM_DESTROYED])
+    })
+
+    it('RestTimer can interrupt a rest after an hour', async () => {
+        const { restForHours } = await import('./character/rest.js')
+        globalState.player = { stats: { get: () => 1, modifyBase() {} }, getStat: () => 1 } as any
+        globalState.inCombat = false
+        globalState.gMap = null as any
+        registerHook({ start() { setHookReturn(1) } }, HOOK.RESTTIMER, null, false)
+        const result = restForHours(5)
+        expect(result.refusedReason).toBeUndefined()
+        expect(result.hoursCompleted).toBe(1)
+        expect(result.interrupted).toBe(true)
     })
 })

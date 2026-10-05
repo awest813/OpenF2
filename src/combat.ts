@@ -70,6 +70,9 @@ import {
     teamOf,
 } from './combat/aiPacket.js'
 import { awardCritterXp } from './character/xp.js'
+import { isProne } from './animSequence.js'
+import { loadPRO } from './pro.js'
+import { attackAnimationForMode, deathAnimationFor, isHitFromFront } from './combat/deathAnim.js'
 
 // Turn-based combat system
 
@@ -699,11 +702,13 @@ export class Combat {
             maxDamage = dmgRange.rets.length > 1 ? hookReturn(dmgRange, 1, maxDamage) : minDamage
         }
 
+        const damageBonus = isPlayer && info.attackType === 'ranged' ? 2 * perkRank(obj, PerkId.BONUS_RANGED_DAMAGE) : 0
+        const difficultyPercent = difficultyDamagePercent(globalState.combatDifficulty ?? 1, this.hostileToPlayer(obj))
         return computeDamage({
             minDamage,
             maxDamage,
             rounds,
-            damageBonus: isPlayer && info.attackType === 'ranged' ? 2 * perkRank(obj, PerkId.BONUS_RANGED_DAMAGE) : 0,
+            damageBonus,
             damageMultiplier: critMultiplier,
             ammoDamageMultiplier: ammo.damageMultiplier,
             ammoDamageDivisor: ammo.damageDivisor,
@@ -714,8 +719,15 @@ export class Combat {
             isEmp: info.damageType === 'EMP',
             penetrate: info.perk === PerkId.WEAPON_PENETRATE,
             finesse: isPlayer && (obj.charTraits?.has?.(TraitId.FINESSE) ?? false),
-            difficultyPercent: difficultyDamagePercent(globalState.combatDifficulty ?? 1, this.hostileToPlayer(obj)),
+            difficultyPercent,
             flatAfter,
+            replaceRounds: (dr, dt) => {
+                const hook = runHook(HOOK.SUBCOMBATDAMAGE, [
+                    obj, target, info.weapon ?? 0, attackTypeId(obj, hitMode), rounds, dr, dt,
+                    damageBonus, critMultiplier, difficultyPercent, 0, 0,
+                ])
+                return hook && hook.rets.length === 1 ? hookReturn(hook, 0, 0) : null
+            },
         }, this.random)
     }
 
@@ -743,6 +755,7 @@ export class Combat {
     private applyResultFlags(victim: Critter, flags: number, damage: number, attacker: Critter, info: AttackWeaponInfo): void {
         if (victim.dead) {return}
         const v = victim as any
+        const wasProne = isProne(victim)
         if (flags & Dam.KNOCKED_OUT) {
             v.knockedOut = true
             v.knockedDown = true
@@ -759,7 +772,7 @@ export class Combat {
         if (flags & Dam.ON_FIRE) {v.onFire = true}
         if ((flags & Dam.DROP) && !victim.isPlayer) {CriticalEffects.dropWeapon(victim)}
         if (flags & Dam.DEAD) {
-            critterKill(victim, attacker, true)
+            critterKill(victim, attacker, true, wasProne ? undefined : this.deathAnimation(attacker, victim, damage, info))
             return
         }
 
@@ -777,6 +790,17 @@ export class Combat {
             const dist = knockbackDistance(damage, info.perk, stonewall, knockbackModifier(info.weapon, attacker, victim))
             if (dist > 0 && attacker.position) {knockBack(liveMap(), victim, attacker.position, dist)}
         }
+    }
+
+    /** _show_damage_to_object's pick of the death animation (with sfall's DeathAnim hooks). */
+    private deathAnimation(attacker: Critter, victim: Critter, damage: number, info: AttackWeaponInfo): number {
+        const kick = (attacker as any).unarmedAttackAnim === 'r' || (!info.weapon && info.mode === 2)
+        const anim = attackAnimationForMode(info.mode, kick)
+        return deathAnimationFor(attacker, victim, info.weapon, damage, info.damageType, anim, isHitFromFront(attacker, victim),
+            (pid) => {
+                const pro = loadPRO(pid, pid & 0xffffff)
+                return pro ? { pid, pro } : null
+            })
     }
 
     /** Deal damage and apply result flags to one defender, emitting combat events. */
@@ -2071,15 +2095,6 @@ function isGrenadeAttack(info: AttackWeaponInfo): boolean {
 
 /** SPECIAL stat names by engine index (STAT_STRENGTH … STAT_LUCK). */
 const SPECIAL_NAMES = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LUK']
-
-/**
- * actions.cc _is_hit_from_front: the attack lands from the front unless the
- * attacker faces the same way as the defender (or one step off).
- */
-function isHitFromFront(attacker: Critter, defender: Critter): boolean {
-    const diff = Math.abs((attacker.orientation ?? 0) - (defender.orientation ?? 0))
-    return diff !== 0 && diff !== 1 && diff !== 5
-}
 
 /**
  * AP to walk `hexes` hexes: each hex costs 4 AP with one crippled leg and 8

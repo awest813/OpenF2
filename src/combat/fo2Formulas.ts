@@ -288,6 +288,11 @@ export interface DamageInput {
     difficultyPercent: number
     /** Flat additions after the per-round loop (Living Anatomy, Pyromaniac). */
     flatAfter: number
+    /**
+     * sfall HOOK_SUBCOMBATDAMAGE: given the final DR and DT, a replacement for
+     * the per-round loop's total, or null to keep the vanilla formula.
+     */
+    replaceRounds?: (dr: number, dt: number) => number | null
 }
 
 export function computeDamage(i: DamageInput, rng: Rng): number {
@@ -304,6 +309,9 @@ export function computeDamage(i: DamageInput, rng: Rng): number {
 
     dr += i.ammoDRModifier
     dr = Math.max(0, Math.min(100, dr))
+
+    const replaced = i.replaceRounds?.(dr, dt)
+    if (typeof replaced === 'number') {return replaced + i.flatAfter}
 
     const multiplier = i.damageMultiplier * i.ammoDamageMultiplier
     const divisor = i.ammoDamageDivisor

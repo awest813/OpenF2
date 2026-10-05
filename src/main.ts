@@ -39,7 +39,7 @@ import { Critter, Obj, useContainerAndLoot } from './object.js'
 import { getObjectUnderCursor, SCREEN_HEIGHT, SCREEN_WIDTH } from './renderer.js'
 import { Scripting } from './scripting.js'
 import { skillRequiresTarget, Skills } from './skills.js'
-import { applyPlayerSkill, canPlayerUseSkillOn, useSkilldexSkill } from './skilldex.js'
+import { applyPlayerSkill, playerSkillUser, useSkilldexSkill } from './skilldex.js'
 import { openCompanionTrade, canTradeWithPartyMember } from './partyTrade.js'
 import { UIMode } from './uiMode.js'
 import {
@@ -84,15 +84,15 @@ function playerUseSkill(skill: Skills, obj: Obj): void {
         useSkilldexSkill(skill)
         return
     }
-    if (!canPlayerUseSkillOn(skill, obj)) {return}
-    const player = globalState.player
-    if (obj === player || !obj.position || Config.engine.doInfiniteUse === true) {
-        applyPlayerSkill(skill, obj)
+    const user = playerSkillUser(skill, obj)
+    if (!user) {return}
+    if (obj === user || !obj.position || !user.position || Config.engine.doInfiniteUse === true) {
+        applyPlayerSkill(skill, obj, user)
         return
     }
-    player.walkInFrontOf(obj.position, () => {
-        player.clearAnim()
-        applyPlayerSkill(skill, obj)
+    user.walkInFrontOf(obj.position, () => {
+        user.clearAnim()
+        applyPlayerSkill(skill, obj, user)
     })
 }
 

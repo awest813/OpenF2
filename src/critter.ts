@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { critterArt } from './animSequence.js'
+import { ANIM_BURNED_TO_NOTHING, ANIM_FALL_BACK, ANIM_FIRE_DANCE } from './combat/deathAnim.js'
 import { HOOK, runHook } from './hookScripts.js'
 import globalState from './globalState.js'
 import { hexDirectionTo } from './geometry.js'
@@ -391,7 +393,7 @@ export function critterKill(
     obj: Critter,
     source?: Critter,
     useScript?: boolean,
-    animName?: string,
+    animName?: string | number,
     callback?: () => void
 ) {
     obj.dead = true
@@ -435,17 +437,36 @@ export function critterKill(
     // sfall HOOK_ONDEATH: just after a critter dies.
     runHook(HOOK.ONDEATH, [obj])
 
-    if (!animName || !obj.hasAnimation(animName)) {animName = 'death'}
+    const finish = function () {
+        obj.frame-- // go to last frame; body remains as static lootable object
+        obj.anim = undefined
+        if (callback) {callback()}
+    }
 
-    obj.staticAnimation(
-        animName,
-        function () {
-            obj.frame-- // go to last frame; body remains as static lootable object
-            obj.anim = undefined
-            if (callback) {callback()}
-        },
-        true
-    )
+    // An engine animation code (from _pick_death): play that art.
+    if (typeof animName === 'number') {
+        let code = animName
+        let art = critterArt(obj, code)
+        if (!art && critterArt(obj, ANIM_FALL_BACK)) {
+            code = ANIM_FALL_BACK
+            art = critterArt(obj, code)
+        }
+        if (art) {
+            const playCode = (anim: number, art: string, done: () => void) => {
+                obj.art = art
+                ;(obj as any).animCode = anim
+                obj.staticAnimation('static', done, true)
+            }
+            // _show_damage_to_object: a fire dance burns down to nothing.
+            const burned = code === ANIM_FIRE_DANCE ? critterArt(obj, ANIM_BURNED_TO_NOTHING) : null
+            playCode(code, art, burned ? () => playCode(ANIM_BURNED_TO_NOTHING, burned, finish) : finish)
+            return
+        }
+    }
+
+    let name = typeof animName === 'string' ? animName : undefined
+    if (!name || !obj.hasAnimation(name)) {name = 'death'}
+    obj.staticAnimation(name, finish, true)
 }
 
 export function critterDamage(

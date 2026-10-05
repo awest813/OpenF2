@@ -49,7 +49,10 @@ import { ScriptVMBridge } from './vm_bridge.js'
 import { Config } from './config.js'
 import { sfallSprintf } from './sfallPrintf.js'
 import { iniInt, iniString, parseIniSetting } from './iniFiles.js'
-import { clearHookScripts, HOOK, hookReturn, runHook, runHookScriptsAtProc, startHookScripts } from './hookScripts.js'
+import {
+    clearHookScripts, HOOK, hookReturn, runHook, runHookScriptsAtProc, startHookScripts,
+    RMOBJ_ITEM_DESTROYED, RMOBJ_ITEM_DESTROY_MULTI, RMOBJ_ITEM_MOVE, RMOBJ_ITEM_REMOVED, RMOBJ_ITEM_REMOVED_MULTI,
+} from './hookScripts.js'
 import { AVAILABLE_GLOBAL_SCRIPT_TYPES, clearGlobalScripts, listedHookNames, runGlobalScriptsAtProc, setGlobalScriptRepeat, setGlobalScriptType, startGlobalScripts } from './globalScripts.js'
 import { getSfallGlobalAny, rawToFloat, setSfallGlobalAny, setSfallGlobalInt } from './sfallGlobals.js'
 import { PERK_MAP } from './character/perks.js'
@@ -290,6 +293,11 @@ export namespace Scripting {
             if (take > 0 && adjustCaps(item, -take)) {amount += take}
         }
         return true
+    }
+
+    /** sfall HOOK_REMOVEINVENOBJ: an item is about to leave `owner`'s inventory. */
+    function removeInvenObjHook(owner: any, item: any, count: number, rmType: number, target: any = 0): void {
+        runHook(HOOK.REMOVEINVENOBJ, [owner, item, count, rmType, target])
     }
 
     /** _correctDeath: a gory death is a plain fall under the violence filter or when there is no such art. */
@@ -1362,6 +1370,7 @@ export namespace Scripting {
             if (!isGameObject(obj) || !isGameObject(other)) {return}
             if (!Array.isArray(other.inventory)) {other.inventory = []}
             const items = [...(Array.isArray(obj.inventory) ? obj.inventory : [])]
+            for (const item of items) {removeInvenObjHook(obj, item, (item as any).amount ?? 1, RMOBJ_ITEM_MOVE, other)}
             obj.inventory = []
             const c = obj as any
             c.leftHand = undefined
@@ -1413,7 +1422,7 @@ export namespace Scripting {
          * opRemoveMultipleObjectsFromInventory: take up to `count` of that item's
          * stack; an emptied stack leaves its hand or armor slot. Returns how many.
          */
-        rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number) {
+        rm_mult_objs_from_inven(obj: Obj, item: Obj, count: number, rmType = RMOBJ_ITEM_REMOVED_MULTI) {
             if (!isGameObject(obj) || !isGameObject(item)) {return 0}
             if (!Array.isArray(obj.inventory)) {obj.inventory = []}
             const carried: Obj[] = obj.inventory
@@ -1422,6 +1431,7 @@ export namespace Scripting {
             const have = typeof stack.amount === 'number' ? stack.amount : 1
             const quantity = Math.max(0, Math.min(have, Number.isFinite(count) ? Math.trunc(count) : 0))
             if (quantity === 0) {return 0}
+            removeInvenObjHook(obj, stack, quantity, rmType)
             stack.amount = have - quantity
             if (stack.amount <= 0) {
                 const index = obj.inventory.indexOf(stack)
@@ -1438,7 +1448,7 @@ export namespace Scripting {
             this.add_mult_objs_to_inven(obj, item, 1)
         }
         rm_obj_from_inven(obj: Obj, item: Obj) {
-            this.rm_mult_objs_from_inven(obj, item, 1)
+            this.rm_mult_objs_from_inven(obj, item, 1, RMOBJ_ITEM_REMOVED)
         }
         /** objectGetCarriedObjectByPid: the first such item, looking inside containers too. */
         obj_carrying_pid_obj(obj: Obj, pid: number) {
@@ -2375,6 +2385,7 @@ export namespace Scripting {
             }
             const owner = findOwner(obj)
             if (owner) {
+                removeInvenObjHook(owner, obj, (obj as any).amount ?? 1, RMOBJ_ITEM_DESTROYED)
                 removeItem(owner, obj, (obj as any).amount ?? 1)
                 if (owner === globalState.player) {syncPlayerEntityFromCritter()}
                 return
@@ -3024,7 +3035,7 @@ export namespace Scripting {
                 if (!owner.inventory.includes(obj)) {continue}
                 const have = typeof (obj as any).amount === 'number' ? (obj as any).amount : 1
                 const n = Math.max(0, Math.min(have, count))
-                return this.rm_mult_objs_from_inven(owner, obj, n) ?? n
+                return this.rm_mult_objs_from_inven(owner, obj, n, RMOBJ_ITEM_DESTROY_MULTI) ?? n
             }
             this.destroy_object(obj)
             return 0

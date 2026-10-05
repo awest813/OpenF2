@@ -8,7 +8,7 @@
  * (_combat_turn_run); here every step that animates is awaited instead.
  */
 
-import { HOOK, hookReturn, runHook } from '../hookScripts.js'
+import { HOOK, hookReturn, RMOBJ_AI_USE_DRUG_ON, runHook } from '../hookScripts.js'
 import { sfallSettings } from '../sfallSettings.js'
 import type { Combat } from '../combat.js'
 import { hexDirectionTo, hexDistance, hexInDirectionDistance, hexLine, Point } from '../geometry.js'
@@ -1093,6 +1093,7 @@ export class AiTurn {
         const inv: AnyCritter[] = this.c.inventory
         const idx = inv.indexOf(drug)
         if (idx < 0) {return false}
+        runHook(HOOK.REMOVEINVENOBJ, [this.c, drug, 1, RMOBJ_AI_USE_DRUG_ON, 0])
         if (typeof drug.amount === 'number' && drug.amount > 1) {drug.amount--}
         else {inv.splice(idx, 1)}
         try {

@@ -945,13 +945,22 @@ export namespace Worldmap {
     function travelPass(nowMs: number): boolean {
         if (!travel) {return false}
         const inCar = isCarFueled()
-        const steps = stepsPerPass(inCar, gvar)
+        let steps = stepsPerPass(inCar, gvar)
+        let fuel = inCar ? fuelPerPass(gvar) : 0
+        if (inCar) {
+            // sfall HOOK_CARTRAVEL: arg0 is the car's extra steps after the first (3–8).
+            const hook = runHook(HOOK.CARTRAVEL, [steps - 1, fuel])
+            if (hook) {
+                if (hook.rets.length > 0 && hookReturn(hook, 0, -1) >= 0) {steps = 1 + hookReturn(hook, 0, 0)}
+                if (hook.rets.length > 1) {fuel = hookReturn(hook, 1, fuel)}
+            }
+        }
         for (let i = 0; i < steps; i++) {
             const square = squareAt({ x: travel.x, y: travel.y })
             walkingStep(travel, square ? worldmap.terrainSpeed[square.terrainType] ?? 1 : 1)
         }
         if (inCar) {
-            setCarFuel(getCarFuel() - fuelPerPass(gvar))
+            setCarFuel(Math.max(0, getCarFuel() - fuel))
             if (getCarFuel() <= 0) {
                 travel.walking = false
                 travel.walkDistance = 0

@@ -55,6 +55,7 @@ import { syncPlayerEntityFromCritter } from './playerProjection.js'
 import { EquipSlot, equipItem, isRealItem, listedItems, reconcileSlots, removeItem, setAsideEquipped, setAsideForBarter, unequipItem, unequipSlot } from './equipment.js'
 import { barterAskValue, checkTrade, inventoryCost, reactionModifier, refusalText } from './barter.js'
 import { setStealHandler } from './skillUse.js'
+import { HOOK, RMOBJ_CONSUME_DRUG, RMOBJ_USE_OBJ, runHook } from './hookScripts.js'
 
 // UI system
 
@@ -491,14 +492,20 @@ export function initUI() {
         }
         if (live && isBook(live)) {
             // _obj_use_item: a book that was read is used up.
-            if (useBook(live) === 1) {removeItem(globalState.player, live, 1)}
+            if (useBook(live) === 1) {
+                runHook(HOOK.REMOVEINVENOBJ, [globalState.player, live, 1, RMOBJ_USE_OBJ, 0])
+                removeItem(globalState.player, live, 1)
+            }
             refreshInventoryPanel()
             return
         }
         if (live && isDrug(live)) {
             // inventory.cc USE on a drug: _item_d_take_drug on the player; a
             // dose that was taken is used up.
-            if (takeDrug(globalState.player, live) === 1) {removeItem(globalState.player, live, 1)}
+            if (takeDrug(globalState.player, live) === 1) {
+                runHook(HOOK.REMOVEINVENOBJ, [globalState.player, live, 1, RMOBJ_CONSUME_DRUG, 0])
+                removeItem(globalState.player, live, 1)
+            }
             refreshInventoryPanel()
             return
         }
